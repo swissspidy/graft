@@ -1,0 +1,15 @@
+{
+  "name": "@graft/cli",
+  "version": "0.0.0",
+  "private": true,
+  "license": "Apache-2.0",
+  "description": "graft command line: validate, compile, verify, canary.",
+  "type": "module",
+  "bin": {
+    "graft": "./bin/graft.js"
+  },
+  "dependencies": {
+    "@graft/core": "workspace:*",
+    "tsx": "^4.20.0"
+  }
+}

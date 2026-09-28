@@ -1,0 +1,25 @@
+{
+  "name": "graft-monorepo",
+  "private": true,
+  "license": "Apache-2.0",
+  "type": "module",
+  "packageManager": "pnpm@10.33.0",
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "graft": "tsx packages/cli/src/main.ts",
+    "typecheck": "tsc -p packages/core && tsc -p packages/cli",
+    "test": "vitest run",
+    "validate:examples": "tsx packages/cli/src/main.ts validate examples/specs"
+  },
+  "pnpm": {
+    "onlyBuiltDependencies": ["esbuild"]
+  },
+  "devDependencies": {
+    "@types/node": "^22.0.0",
+    "tsx": "^4.20.0",
+    "typescript": "^5.9.0",
+    "vitest": "^3.2.0"
+  }
+}
