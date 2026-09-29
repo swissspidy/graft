@@ -199,3 +199,53 @@ function surface_change_notice(): void {
 		);
 	}
 }
+
+/**
+ * Tools → Customizations: review and approve specs.
+ */
+function register_admin_screen(): void {
+	$hook = add_management_page(
+		__( 'Customizations', 'graft' ),
+		__( 'Customizations', 'graft' ),
+		'manage_options',
+		'graft-customizations',
+		static function (): void {
+			printf( '<div class="wrap"><h1>%s</h1><div id="graft-admin"></div></div>', esc_html__( 'Customizations', 'graft' ) );
+		}
+	);
+	add_action(
+		'admin_enqueue_scripts',
+		static function ( string $current ) use ( $hook ): void {
+			if ( $current !== $hook ) {
+				return;
+			}
+			$asset_file = dirname( __DIR__ ) . '/build/admin.asset.php';
+			if ( ! is_readable( $asset_file ) ) {
+				return;
+			}
+			$asset = require $asset_file;
+			wp_enqueue_script( 'graft-admin', plugins_url( 'build/admin.js', __DIR__ ), $asset['dependencies'], $asset['version'], true );
+			wp_enqueue_style( 'wp-components' );
+			$surface = current_surface();
+			wp_add_inline_script(
+				'graft-admin',
+				'window.graftAdmin = ' . wp_json_encode(
+					array(
+						'scopes'  => (object) array_map(
+							static function ( array $scope ): string {
+								return $scope['title'];
+							},
+							surface_scopes()
+						),
+						'surface' => $surface ? array(
+							'hash'        => $surface['hash'],
+							'hostVersion' => $surface['hostVersion'],
+						) : null,
+					),
+					JSON_HEX_TAG | JSON_HEX_AMP
+				) . ';',
+				'before'
+			);
+		}
+	);
+}

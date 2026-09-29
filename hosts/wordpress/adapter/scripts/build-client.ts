@@ -4,7 +4,8 @@ import { fileURLToPath } from 'node:url';
 import { build, type Plugin } from 'esbuild';
 
 /**
- * Bundles the client runtime into the plugin (plugin/build/runtime.js).
+ * Bundles the client into the plugin: build/runtime.js renders
+ * customizations, build/admin.js is the Tools → Customizations screen.
  * React and @wordpress/* come from the globals WordPress already loads;
  * everything else (renderer, core runtime) is bundled.
  */
@@ -23,7 +24,6 @@ const globals: Record<string, [string, string]> = {
 	'@wordpress/api-fetch': ['window.wp.apiFetch', 'wp-api-fetch'],
 };
 
-const used = new Set<string>();
 
 const wordpressGlobals: Plugin = {
 	name: 'wordpress-globals',
@@ -31,15 +31,18 @@ const wordpressGlobals: Plugin = {
 		const filter = new RegExp(`^(${Object.keys(globals).map((k) => k.replace(/[/.]/g, '\\$&')).join('|')})$`);
 		b.onResolve({ filter }, (args) => ({ path: args.path, namespace: 'wp-global' }));
 		b.onLoad({ filter: /.*/, namespace: 'wp-global' }, (args) => {
-			const [expression, handle] = globals[args.path]!;
-			used.add(handle);
+			const [expression] = globals[args.path]!;
 			return { contents: `module.exports = ${expression};`, loader: 'js' };
 		});
 	},
 };
 
 const options = {
-	entryPoints: { runtime: fileURLToPath(new URL('../src/client/mount.tsx', import.meta.url)) },
+	entryPoints: {
+		runtime: fileURLToPath(new URL('../src/client/mount.tsx', import.meta.url)),
+		admin: fileURLToPath(new URL('../src/client/admin.tsx', import.meta.url)),
+	},
+	metafile: true,
 	outdir: outDir,
 	bundle: true,
 	format: 'iife' as const,
@@ -59,13 +62,23 @@ if (watch) {
 	const { context } = await import('esbuild');
 	await (await context(options)).watch();
 } else {
-	await build(options);
-	const js = await readFile(`${outDir}/runtime.js`);
-	const version = createHash('sha256').update(js).digest('hex').slice(0, 20);
-	const dependencies = [...used].sort().map((h) => `'${h}'`).join(', ');
-	await writeFile(
-		`${outDir}/runtime.asset.php`,
-		`<?php return array( 'dependencies' => array( ${dependencies} ), 'version' => '${version}' );\n`,
-	);
-	console.log(`runtime.asset.php: ${[...used].sort().join(', ')}`);
+	const result = await build(options);
+	// One asset file per entry, with the WordPress scripts that entry uses.
+	for (const [output, meta] of Object.entries(result.metafile!.outputs)) {
+		const name = output.replace(/^.*\//, '').replace(/\.js$/, '');
+		const handles = [
+			...new Set(
+				Object.keys(meta.inputs)
+					.filter((input) => input.startsWith('wp-global:'))
+					.map((input) => globals[input.slice('wp-global:'.length)]![1]),
+			),
+		].sort();
+		const js = await readFile(`${outDir}/${name}.js`);
+		const version = createHash('sha256').update(js).digest('hex').slice(0, 20);
+		await writeFile(
+			`${outDir}/${name}.asset.php`,
+			`<?php return array( 'dependencies' => array( ${handles.map((h) => `'${h}'`).join(', ')} ), 'version' => '${version}' );\n`,
+		);
+		console.log(`${name}.asset.php: ${handles.join(', ')}`);
+	}
 }

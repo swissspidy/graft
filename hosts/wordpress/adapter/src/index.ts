@@ -8,3 +8,4 @@ export { startSandbox, type SandboxOptions, type WordPressSandbox } from './sand
 export { verifyInWordPress, type VerifyTarget } from './verify.ts';
 export { hostGuide } from './guide.ts';
 export { loadCorpus, runWordPressCanary, scenarios, scenarioSurface, type Scenario, type WordPressCanaryOptions } from './canary.ts';
+export { describers } from './describe.ts';

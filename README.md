@@ -24,7 +24,7 @@ Status: all six MVP milestones of ADR 0001 are implemented as a prototype (contr
 | `packages/cli`   | The `graft` command: `validate`, `build`, `verify`, `compile` (Claude via the Anthropic SDK), `canary`. |
 | `hosts/wordpress` | WordPress adapter: plugin, abilities, surface generator, surface snapshots. See [its README](hosts/wordpress/README.md). |
 | `examples/specs` | Sample specs, also the future canary corpus.                |
-| `examples/builds` | Hand-written builds of the sample specs for WordPress 7.1 (the compiler can produce these too). |
+| `examples/builds` | Hand-written builds of the sample specs for WordPress 7.1 (the compiler can produce these too). The three examples cover every slot: an admin page, a row action on the Posts screen and a Dashboard widget. |
 | `fixtures/canary` | A multi-tenant corpus of customizations for the canary. |
 
 ## Development
@@ -58,9 +58,11 @@ pnpm graft build examples/builds/review-queue.json \
 ```
 
 To click around yourself: `pnpm build && tsx hosts/wordpress/e2e/server.ts`,
-then log in at http://127.0.0.1:9400/wp-login.php as `editor`,
-`contributor` or `subscriber` (password `password`) and open Posts → Review
-queue.
+then log in at http://127.0.0.1:9400/wp-login.php as `admin`, `editor`,
+`contributor` or `subscriber` (password `password`). Editors find Posts →
+Review queue and the Approve row action; admins find Tools → Customizations,
+where "Waiting for review" waits for approval before it appears on the
+Dashboard.
 
 ## License
 

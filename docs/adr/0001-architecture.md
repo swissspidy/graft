@@ -591,13 +591,16 @@ context):
   included, stays Apache-2.0. Apache-2.0 is GPLv3-compatible; if WordPress.org
   distribution becomes a goal, revisit the plugin's license then.
 
-Still open: 1, 2 and 4.
+Still open: 1 (partly addressed, see below), 2 and 4.
 
 ## Open questions
 
 1. **Check quality.** How do we review generated checks without asking the
    owner to read YAML? Option: render each check back into a plain-language
    sentence and have the owner confirm it matches the criterion.
+   *Partly implemented: `describeCheck()` renders checks as sentences, and
+   the WordPress admin screen shows them next to their criteria at approval
+   time. Asking the owner to confirm each one is still open.*
 2. **Criteria the verifier cannot express** ("looks clean", "is fast"). Flag
    them at authoring time as unverifiable, or allow them with a warning?
 3. **Surface granularity.** Is `posts.list.row-actions` a slot on a host

@@ -61,6 +61,11 @@ a hash and need no rebuild.
   `table` component uses wp-admin list-table markup for now; its props are
   DataViews-shaped, so moving it to DataViews is a change inside the
   wrapper, not the surface.
+- **Admin screen.** Tools → Customizations (administrators) lists every
+  spec with its state, the permissions it requests in plain language
+  (granted or not), and each check rendered as a sentence next to the
+  criterion it proves, with Approve, Decline, Archive and upgrade actions.
+  Built from `adapter/src/client/admin.tsx` into `plugin/build/admin.js`.
 - **REST.** `GET/POST /graft/v1/specs`,
   `POST /graft/v1/specs/<id>/versions/<n>/builds|approve|decline|archive`
   (administrators; users may create `user`-scoped specs).

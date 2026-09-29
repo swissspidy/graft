@@ -101,13 +101,41 @@ test('the served specs are verified, not flagged', async ({ page }) => {
 		spec_id: string;
 		versions: Array<{ state: string; unverified: boolean; builds: Record<string, { verification: { passed: boolean } | null }> }>;
 	}>;
-	expect(specs.map((s) => s.spec_id).sort()).toEqual(['quick-approve', 'review-queue']);
+	expect(specs.map((s) => [s.spec_id, s.versions[0]!.state]).sort()).toEqual([
+		['quick-approve', 'active'],
+		['review-queue', 'active'],
+		['waiting-posts', 'needs_approval'],
+	]);
 	for (const spec of specs) {
 		const version = spec.versions[0]!;
-		expect(version.state).toBe('active');
 		expect(version.unverified).toBe(false);
 		expect(Object.values(version.builds)[0]!.verification?.passed).toBe(true);
 	}
+});
+
+test('admins review a customization in plain language, approve it, and it appears', async ({ page }) => {
+	await login(page, 'admin');
+	await page.goto('/wp-admin/index.php');
+	await expect(page.locator('#graft-waiting-posts')).toHaveCount(0);
+
+	await page.goto('/wp-admin/tools.php?page=graft-customizations');
+	const card = page.locator('[data-graft-spec="waiting-posts"]');
+	await expect(card.locator('[data-graft-state]')).toHaveText('Needs approval');
+	await expect(card.locator('.graft-permissions')).toContainText('See posts you can edit, including drafts and pending posts (not granted yet)');
+	await expect(card.locator('.graft-checks')).toContainText('Shows at most five posts');
+	await expect(card.locator('.graft-checks')).toContainText(
+		'Given an editor "e" and no posts, when "e" opens it, then the list is empty and the page says "Nothing is waiting".',
+	);
+	await page.screenshot({ path: 'test-results/customizations.png', fullPage: true });
+
+	await card.getByRole('button', { name: 'Approve' }).click();
+	await expect(card.locator('[data-graft-state]')).toHaveText('Active');
+	await expect(card.locator('.graft-permissions')).toContainText('(granted)');
+
+	await page.goto('/wp-admin/index.php');
+	const widget = page.locator('#graft-waiting-posts');
+	await expect(widget).toContainText('Waiting for review');
+	await expect(widget.locator('[data-graft-empty]')).toHaveText('Nothing is waiting');
 });
 
 test('subscribers get no review queue', async ({ page }) => {

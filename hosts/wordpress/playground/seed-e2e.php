@@ -53,5 +53,8 @@ foreach ( $examples as $spec_id => $example ) {
 		)
 	);
 	Graft\attach_build( $spec_id, $version['version'], $example['build'], $example['verification'] ?? null );
-	Graft\approve_version( $spec_id, $version['version'] );
+	// waiting-posts is left for the admin to approve in the e2e tests.
+	if ( 'waiting-posts' !== $spec_id ) {
+		Graft\approve_version( $spec_id, $version['version'] );
+	}
 }

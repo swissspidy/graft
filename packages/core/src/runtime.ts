@@ -6,3 +6,4 @@ export { evaluate, isAction, type Action, type EvalContext } from './build/evalu
 export { getPath, isBinding, isCall, isCan, walkTree, walkValue } from './build/expressions.ts';
 export { removeRow } from './build/rows.ts';
 export type { Build, DataSource, TreeNode, Value } from './build/types.ts';
+export { describeCheck, type CheckDescribers } from './verifier/describe.ts';

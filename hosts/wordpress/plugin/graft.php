@@ -40,3 +40,4 @@ add_action( 'admin_footer', __NAMESPACE__ . '\enqueue_runtime' );
 add_action( 'admin_init', __NAMESPACE__ . '\check_surface_change' );
 add_action( 'rest_api_init', __NAMESPACE__ . '\check_surface_change' );
 add_action( 'admin_notices', __NAMESPACE__ . '\surface_change_notice' );
+add_action( 'admin_menu', __NAMESPACE__ . '\register_admin_screen' );
