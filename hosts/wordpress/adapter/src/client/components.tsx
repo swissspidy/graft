@@ -142,7 +142,8 @@ interface TableAction {
 }
 
 function Table({ props, raw, evaluate, invoke }: Props) {
-	const fields = (raw.fields as Field[] | undefined) ?? [];
+	// Unevaluated, for per-row value and tone; as evaluated when the list itself comes from an expression.
+	const fields = (Array.isArray(raw.fields) ? raw.fields : Array.isArray(props.fields) ? props.fields : []) as Field[];
 	const rows = props.rows as Array<Record<string, unknown>> | undefined;
 	const actions = (raw.actions as unknown[] | undefined) ?? [];
 	const columns = fields.length + (actions.length > 0 ? 1 : 0);

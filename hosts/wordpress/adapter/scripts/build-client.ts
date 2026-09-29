@@ -81,9 +81,8 @@ const variantDir = dirname(createRequire(sandboxDir).resolve('@jitl/quickjs-wasm
 
 await mkdir(outDir, { recursive: true });
 await copyFile(`${variantDir}/emscripten-module.wasm`, `${outDir}/quickjs.wasm`);
-if (!watch) {
-	await build(workerOptions);
-}
+// Built once in watch mode too: it changes with @graft/sandbox, not with the client.
+await build(workerOptions);
 // The plugin reads the shared lifecycle table at runtime.
 await copyFile(fileURLToPath(new URL('../../../../schemas/spec-lifecycle.json', import.meta.url)), `${outDir}/spec-lifecycle.json`);
 if (watch) {

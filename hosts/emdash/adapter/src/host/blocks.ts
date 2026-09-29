@@ -163,7 +163,8 @@ export function nodeOutput({ type, props, raw, evaluateRow, actionPrefix }: Node
 			const rows = Array.isArray(props.rows) ? (props.rows as unknown[]) : [];
 			const rawActions = (Array.isArray(raw.actions) ? raw.actions : []) as Value[];
 			// Computed values and tones are expressions per row, so read them unevaluated.
-			const rawColumns = (Array.isArray(raw.columns) ? raw.columns : []) as Array<{ value?: Value; tone?: Value } | undefined>;
+			// When the columns themselves come from an expression, use them as evaluated.
+			const rawColumns = (Array.isArray(raw.columns) ? raw.columns : columns) as Array<{ value?: Value; tone?: Value } | undefined>;
 			const table: NonNullable<NodeOutput['table']> = { columns: columns.map((c) => c.label), rows: [] };
 			const blockColumns: Block[] = columns.map((c) => ({ key: `c${columns.indexOf(c)}`, label: c.label, ...(c.format && c.format !== 'text' ? { format: c.format } : {}) }) as unknown as Block);
 			const actionIds = rawActions.map((_, i) => `${actionPrefix}:${i}`);
@@ -177,9 +178,10 @@ export function nodeOutput({ type, props, raw, evaluateRow, actionPrefix }: Node
 					const computed = rawColumns[i];
 					const text = str(computed?.value !== undefined ? evaluateRow(computed.value, row) : getPath(row, c.key));
 					const tone = computed?.tone !== undefined ? evaluateRow(computed.tone, row) : undefined;
-					if (typeof tone === 'string' && tone in toneMarkers) {
+					// Only a tone the admin shows: never on relative times or empty cells.
+					if (typeof tone === 'string' && Object.hasOwn(toneMarkers, tone) && c.format !== 'relative_time' && text !== '') {
 						snapshotCells[c.label] = { text, tone: tone as Tone };
-						cells[`c${i}`] = c.format === 'relative_time' || text === '' ? text : `${toneMarkers[tone as Tone]} ${text}`;
+						cells[`c${i}`] = `${toneMarkers[tone as Tone]} ${text}`;
 					} else {
 						snapshotCells[c.label] = { text };
 						cells[`c${i}`] = text;
@@ -194,7 +196,8 @@ export function nodeOutput({ type, props, raw, evaluateRow, actionPrefix }: Node
 					}
 					return action;
 				});
-				table.rows.push({ label: primary ? str(getPath(row, primary.key)) : '', record: row, actions, cells: snapshotCells });
+				// The label is what the primary column shows, computed or not.
+				table.rows.push({ label: primary ? (snapshotCells[primary.label]?.text ?? '') : '', record: row, actions, cells: snapshotCells });
 				return cells;
 			});
 			out.table = table;

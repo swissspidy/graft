@@ -103,6 +103,29 @@ describe('semantics', () => {
 		const empty = snapshotTree(table, ctx([], { 'content.status:write': true }), semantics);
 		expect(empty.texts).toContain('Nothing waiting');
 	});
+
+	it('reports only the tones the admin shows, and labels rows by what the primary column shows', () => {
+		const toned: TreeNode = {
+			type: 'table',
+			props: {
+				rows: { $data: 'q.items' },
+				columns: [
+					{ key: 'name', label: 'Name', primary: true, value: { $field: 'title' } },
+					{ key: 'title', label: 'Marked', tone: { $field: 'tone' } },
+					{ key: 'title', label: 'When', format: 'relative_time', tone: 'error' },
+				],
+			},
+		};
+		const rows = [
+			{ ...entry('a', 'Draft A', true), tone: 'warning' },
+			{ ...entry('b', 'Draft B', true), tone: 'constructor' },
+		];
+		const snapshot = snapshotTree(toned, ctx(rows, {}), semantics);
+		expect(snapshot.tables[0]!.rows.map((r) => [r.label, r.cells])).toEqual([
+			['Draft A', { Name: { text: 'Draft A' }, Marked: { text: 'Draft A', tone: 'warning' }, When: { text: 'Draft A' } }],
+			['Draft B', { Name: { text: 'Draft B' }, Marked: { text: 'Draft B' }, When: { text: 'Draft B' } }],
+		]);
+	});
 });
 
 describe('examples', () => {
