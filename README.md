@@ -12,8 +12,12 @@ when the host changes, **migrates, re-anchors or regenerates** the build and
 verifies it again. The spec is the contract, the criteria are the guarantee,
 and the platform can change underneath.
 
-The design is in [ADR 0001](docs/adr/0001-architecture.md), with later decisions (authoring in wp-admin, operating live sites, hardening) in [ADR 0002](docs/adr/0002-authoring-and-operations.md). The first host is
-WordPress 7.1+ (wp-admin); the core is host-agnostic.
+The design is in [ADR 0001](docs/adr/0001-architecture.md), with later
+decisions (authoring in wp-admin, operating live sites, hardening) in
+[ADR 0002](docs/adr/0002-authoring-and-operations.md). There are two hosts:
+WordPress 7.1+ (wp-admin), and [EmDash](hosts/emdash/README.md)
+([ADR 0003](docs/adr/0003-emdash-host.md)). The core needed no changes for
+the second one.
 
 Status: a working prototype. All six MVP milestones of the ADR are built, and
 each is tested against real WordPress in [Playground](https://wordpress.org/playground/).
@@ -49,7 +53,9 @@ date, and can approve with one click.
 ```
 
 More in [`examples/specs`](examples/specs): an admin page, a row action on
-the existing Posts screen, and a Dashboard widget.
+the existing Posts screen, and a Dashboard widget. The same ideas for
+EmDash are in [`examples/emdash`](examples/emdash): a publish queue, a
+panel in the entry editor, and a dashboard widget.
 
 ## How it works
 
@@ -136,6 +142,7 @@ pnpm graft validate --surface hosts/wordpress/plugin/surfaces/7.1.json examples/
 pnpm graft build examples/builds/review-queue.json \
   --surface hosts/wordpress/plugin/surfaces/7.1.json --spec examples/specs/review-queue.md [--fix-refs]
 pnpm graft verify --surface hosts/wordpress/plugin/surfaces/7.1.json --spec examples/specs examples/builds/*.json
+pnpm graft verify --surface hosts/emdash/adapter/surfaces/1.0.json --spec examples/emdash/specs examples/emdash/builds/*.json
 
 # Compile with Claude (ANTHROPIC_API_KEY; default claude-opus-5-5)
 pnpm graft compile examples/specs/review-queue.md \
@@ -161,6 +168,9 @@ pnpm graft site pull --site <url> --user <admin> --password <app password> --out
 | `pnpm test:compile` | The compile pipeline with a scripted model against WordPress |
 | `pnpm test:canary` | Six synthetic host changes, each forcing one rung, against a four-tenant corpus |
 | `pnpm test:e2e` | Playwright in wp-admin: serving, gateway, approval, authoring, `graft site` |
+| `pnpm verify:emdash` | The EmDash example builds' checks in a throwaway EmDash |
+| `pnpm test:emdash` | EmDash plugin smoke test: install, approve, serve per role, forged and refused actions |
+| `pnpm test:e2e:emdash` | Playwright in the EmDash admin: the page, the widget and the editor panel |
 
 CI runs all of them, plus a weekly canary against WordPress nightly. As of
 7.2-alpha the surface is unchanged (same hash as 7.1) and every
@@ -176,7 +186,8 @@ customization re-passes its checks there.
 | `packages/renderer-react` | Renders a build with a host's components and capability gateway |
 | `packages/cli` | The `graft` command |
 | `hosts/wordpress` | The WordPress adapter: plugin, components, surface generator, sandbox, tests ([README](hosts/wordpress/README.md)) |
-| `examples/` | Example specs and hand-written builds |
+| `hosts/emdash` | The EmDash adapter: a native plugin that serves builds as Block Kit, surface, sandbox, test site, tests ([README](hosts/emdash/README.md)) |
+| `examples/` | Example specs and hand-written builds (WordPress; EmDash in `examples/emdash`) |
 | `fixtures/canary` | A multi-tenant corpus for the canary |
 
 ## License

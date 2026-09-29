@@ -546,6 +546,8 @@ covered by unit tests and by tests against real WordPress in Playground
   versions without a prepared build are hidden until one is attached.
 - Upgraded builds that need new scopes can be prepared for active versions;
   they are never served until an admin widens the grant.
+- A second host, EmDash, runs on the same core without changes to it
+  ([ADR 0003](0003-emdash-host.md)).
 
 ## Consequences
 

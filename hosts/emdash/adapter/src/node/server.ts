@@ -1,5 +1,6 @@
 import { spawn, type ChildProcess } from 'node:child_process';
 import { mkdtemp, rm } from 'node:fs/promises';
+import { createConnection } from 'node:net';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -32,6 +33,8 @@ export interface StartOptions {
 	content?: boolean;
 	/** Enables /graft-test/login, which signs in test users with any role. */
 	testLogin?: boolean;
+	/** Extra environment for the site. */
+	env?: Record<string, string>;
 }
 
 async function waitFor(url: string, child: ChildProcess, output: () => string, timeoutMs = 180_000): Promise<void> {
@@ -53,8 +56,23 @@ async function waitFor(url: string, child: ChildProcess, output: () => string, t
 	throw new Error(`EmDash did not start within ${timeoutMs / 1000}s:\n${output()}`);
 }
 
+async function portInUse(port: number): Promise<boolean> {
+	return new Promise((resolve) => {
+		const socket = createConnection({ port, host: '127.0.0.1' });
+		socket.once('connect', () => {
+			socket.destroy();
+			resolve(true);
+		});
+		socket.once('error', () => resolve(false));
+	});
+}
+
 export async function startEmDash(options: StartOptions = {}): Promise<EmDashServer> {
 	const port = options.port ?? 4460 + Math.floor(Math.random() * 400);
+	// Astro would move to another port; a stale server would answer instead.
+	if (await portInUse(port)) {
+		throw new Error(`Port ${port} is in use.`);
+	}
 	const dir = options.database ? undefined : await mkdtemp(join(tmpdir(), 'graft-emdash-'));
 	const database = options.database ?? join(dir!, 'site.db');
 	let output = '';
@@ -66,6 +84,7 @@ export async function startEmDash(options: StartOptions = {}): Promise<EmDashSer
 			GRAFT_SANDBOX: options.sandbox ? '1' : '',
 			GRAFT_TEST_LOGIN: options.testLogin ? '1' : '',
 			ASTRO_TELEMETRY_DISABLED: '1',
+			...options.env,
 		},
 		stdio: ['ignore', 'pipe', 'pipe'],
 		detached: process.platform !== 'win32',

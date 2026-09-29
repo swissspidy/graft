@@ -62,6 +62,37 @@ jobs:
           path: test-results/
           if-no-files-found: ignore
 
+  emdash:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - name: Check the checked-in surface is up to date
+        run: pnpm surface:emdash --check
+      - name: Validate the example specs against the EmDash surface
+        run: pnpm graft validate --surface hosts/emdash/adapter/surfaces/1.0.json examples/emdash/specs
+      - name: Verify the example builds in an EmDash sandbox
+        run: pnpm verify:emdash
+      - name: Smoke test the plugin in EmDash (install, approve, serve, refuse)
+        run: pnpm test:emdash
+      - name: Install Chromium
+        run: pnpm exec playwright install --with-deps chromium
+      - name: End-to-end tests in the EmDash admin
+        run: pnpm test:e2e:emdash
+        env:
+          CI: '1'
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: emdash-e2e-results
+          path: test-results/
+          if-no-files-found: ignore
+
   canary:
     runs-on: ubuntu-latest
     steps:
