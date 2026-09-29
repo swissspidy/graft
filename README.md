@@ -12,7 +12,7 @@ when the host changes, **migrates, re-anchors or regenerates** the build and
 verifies it again. The spec is the contract, the criteria are the guarantee,
 and the platform can change underneath.
 
-The design is in [ADR 0001](docs/adr/0001-architecture.md). The first host is
+The design is in [ADR 0001](docs/adr/0001-architecture.md), with later decisions (authoring in wp-admin, operating live sites, hardening) in [ADR 0002](docs/adr/0002-authoring-and-operations.md). The first host is
 WordPress 7.1+ (wp-admin); the core is host-agnostic.
 
 Status: a working prototype. All six MVP milestones of the ADR are built, and
