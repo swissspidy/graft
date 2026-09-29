@@ -82,6 +82,8 @@ jobs:
         run: pnpm test:emdash
       - name: Compile pipeline with a scripted model against EmDash
         run: pnpm test:compile:emdash
+      - name: Every synthetic EmDash change reaches its expected rung
+        run: pnpm test:canary:emdash
       - name: Install Chromium
         run: pnpm exec playwright install --with-deps chromium
       - name: End-to-end tests in the EmDash admin

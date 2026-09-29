@@ -120,8 +120,12 @@ changes. The snapshot is `hosts/emdash/adapter/surfaces/1.0.json`.
   should use `refresh:<source>`, and the host guide says so.
 - One page, one widget and one panel hold every customization. That is
   cruder than WordPress's menu items, but it is what EmDash allows today.
+- The canary works on EmDash too. The sandbox can apply a synthetic host
+  change (`src/host/patch.ts`: rename, remove or re-scope a capability,
+  change an input, move a slot) to the surface it reports and to the calls
+  it runs. Six scenarios each force one rung of the ladder
+  (`pnpm test:canary:emdash`).
 - Not done yet for EmDash:
-  - the canary and upgrade scenarios;
   - `graft site` against a live EmDash;
   - authoring in its admin;
   - the sandboxed plugin format (needed for installs from EmDash's

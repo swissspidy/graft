@@ -29,13 +29,13 @@ type Item = Awaited<ReturnType<NonNullable<PluginContext['content']>['list']>>['
 const asUser = (viewer: Viewer) => ({ id: viewer.id, role: viewer.role as RoleLevel });
 
 /** Whether the viewer's role has any of the EmDash permissions a scope maps to. */
-export function scopeUsable(viewer: Viewer, scope: string): boolean {
-	const host = scopes[scope]?.host ?? [];
+export function scopeUsable(viewer: Viewer, scope: string, table: Record<string, { host?: string[] }> = scopes): boolean {
+	const host = table[scope]?.host ?? [];
 	return host.length > 0 && host.some((permission) => hasPermission(asUser(viewer), permission as Permission));
 }
 
-export function usableScopes(viewer: Viewer, wanted: string[]): Record<string, boolean> {
-	return Object.fromEntries(wanted.map((scope) => [scope, scopeUsable(viewer, scope)]));
+export function usableScopes(viewer: Viewer, wanted: string[], table?: Record<string, { host?: string[] }>): Record<string, boolean> {
+	return Object.fromEntries(wanted.map((scope) => [scope, scopeUsable(viewer, scope, table)]));
 }
 
 function canPublish(viewer: Viewer, item: Item): boolean {
@@ -113,8 +113,12 @@ async function changeStatus(ctx: PluginContext, viewer: Viewer, input: { collect
 
 type Input = Record<string, unknown>;
 
-/** Runs a capability as a viewer. Input has been validated against the surface. */
-export async function runCapability(ctx: PluginContext, viewer: Viewer, name: string, input: Input): Promise<unknown> {
+/**
+ * Runs a capability as a viewer. Input has been validated against the
+ * surface. `statuses` filters content.list to several statuses (the
+ * canary's "statuses" host change).
+ */
+export async function runCapability(ctx: PluginContext, viewer: Viewer, name: string, input: Input, options: { statuses?: string[] } = {}): Promise<unknown> {
 	const capability = capabilities[name];
 	if (!capability) {
 		throw new HostError('graft_unknown_capability', `Unknown capability "${name}".`);
@@ -137,7 +141,9 @@ export async function runCapability(ctx: PluginContext, viewer: Viewer, name: st
 			const names = new Map<string, string>();
 			const items = [];
 			for (const item of result.items) {
-				items.push(await toEntry(ctx, viewer, collection, item, names));
+				if (!options.statuses || options.statuses.includes(status(item))) {
+					items.push(await toEntry(ctx, viewer, collection, item, names));
+				}
 			}
 			return { items, hasMore: result.hasMore };
 		}

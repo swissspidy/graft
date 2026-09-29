@@ -1,6 +1,7 @@
 import { mkdir, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { compileSpec, type Build, type CanaryReport, type ModelClient, type Spec, type Surface } from '@graft/core';
+import { hostTools } from './hosts.ts';
 import { loadSurface } from './validate.ts';
 
 export interface CanaryCommandOptions {
@@ -17,29 +18,25 @@ export interface CanaryCommandOptions {
 
 /**
  * Runs the upgrade ladder for every customization in a corpus against the
- * next host (a surface file) or a synthetic scenario, in a WordPress
- * sandbox, and reports the outcome per tenant and spec.
+ * next host (a surface file) or a synthetic scenario, in a sandbox of the
+ * host the surface names, and reports the outcome per tenant and spec.
  */
 export async function canaryCommand(options: CanaryCommandOptions): Promise<CanaryReport> {
-	const wordpress = await import('@graft/wordpress-adapter');
 	const from = await loadSurface(options.from);
 	const to = options.to ? await loadSurface(options.to) : undefined;
-	const scenario = options.scenario ? wordpress.scenarios.find((s) => s.name === options.scenario) : undefined;
-	if (options.scenario && !scenario) {
-		throw new Error(`Unknown scenario "${options.scenario}". Available: ${wordpress.scenarios.map((s) => s.name).join(', ')}.`);
-	}
-	const corpus = await wordpress.loadCorpus(options.corpus);
+	const host = await hostTools(from);
+	const corpus = await host.loadCorpus(options.corpus);
 	const model = options.model;
 
-	const { report } = await wordpress.runWordPressCanary({
+	const report = await host.canary({
 		corpus,
 		from,
 		...(to ? { to } : {}),
-		...(scenario ? { scenario } : {}),
+		...(options.scenario ? { scenario: options.scenario } : {}),
 		...(model
 			? {
 					regenerate: async ({ spec, specHash, previous, checks, surface }: { spec: Spec; specHash: string; previous: Build; checks: Build['checks']; surface: Surface }) => {
-						const result = await compileSpec({ spec, specHash, surface, model, host: wordpress.hostGuide, previous, checks });
+						const result = await compileSpec({ spec, specHash, surface, model, host: host.guide, previous, checks });
 						return result.ok ? result.build : undefined;
 					},
 				}

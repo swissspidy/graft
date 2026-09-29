@@ -44,6 +44,8 @@ pnpm surface:emdash [--check]   # regenerate or check surfaces/1.0.json
 pnpm verify:emdash              # verify examples/emdash builds in an EmDash sandbox
 pnpm test:emdash                # plugin smoke test
 pnpm test:compile:emdash        # compile pipeline with a scripted model
+pnpm test:canary:emdash         # synthetic EmDash changes against fixtures/canary/emdash
+pnpm graft canary --corpus fixtures/canary/emdash --from hosts/emdash/adapter/surfaces/1.0.json --scenario move-editor-panel
 pnpm test:e2e:emdash            # Playwright in the EmDash admin
 pnpm graft verify --surface hosts/emdash/adapter/surfaces/1.0.json --spec examples/emdash/specs examples/emdash/builds/*.json
 pnpm graft compile examples/emdash/specs/publish-queue.md --surface hosts/emdash/adapter/surfaces/1.0.json --out publish-queue.build.json

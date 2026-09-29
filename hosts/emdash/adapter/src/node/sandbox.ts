@@ -1,5 +1,6 @@
 import { SandboxCallError, verifyBuild, type Build, type Sandbox, type Spec, type Surface, type Verification } from '@graft/core';
 import { createCan } from '../host/can.ts';
+import type { HostPatch } from '../host/patch.ts';
 import { semantics } from '../host/semantics.ts';
 import { pluginRoute, startEmDash, type EmDashServer, type StartOptions } from './server.ts';
 
@@ -10,7 +11,10 @@ import { pluginRoute, startEmDash, type EmDashServer, type StartOptions } from '
 
 export interface EmDashSandbox extends Sandbox {
 	server: EmDashServer;
+	/** The surface as the (possibly patched) sandbox reports it. */
 	surface(): Promise<Surface>;
+	/** Applies a synthetic host change; {} restores the real host. */
+	patch(patch: HostPatch): Promise<void>;
 	close(): Promise<void>;
 }
 
@@ -40,6 +44,9 @@ export async function startSandbox(options: Omit<StartOptions, 'sandbox'> = {}):
 		},
 		async assert(kind, expected) {
 			return op<{ ok: boolean; actual: unknown }>({ op: 'assert', kind, expected });
+		},
+		async patch(patch) {
+			await op({ op: 'patch', patch });
 		},
 		async surface() {
 			return (await op<{ surface: Surface }>({ op: 'dump' })).surface;

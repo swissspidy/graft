@@ -1,0 +1,172 @@
+{
+	"graft": 1,
+	"spec": {
+		"id": "drafts-glance",
+		"hash": "sha256:ce80943470aa41604d93f9ba4400f83dbcf9016515b6cbd98895e67522329c41"
+	},
+	"surface": {
+		"host": "emdash",
+		"hostVersion": "1.0.1",
+		"hash": "sha256:fa5ee31157f72538390c1e3dddc3edc07ca765a224280c0516d8b655268cd71b"
+	},
+	"mount": {
+		"slot": "dashboard.widget",
+		"title": "Drafts"
+	},
+	"data": {
+		"drafts": {
+			"call": "content.list",
+			"input": {
+				"collection": "posts",
+				"status": "draft",
+				"order": "desc",
+				"limit": 5
+			}
+		}
+	},
+	"tree": {
+		"type": "stack",
+		"children": [
+			{
+				"type": "table",
+				"props": {
+					"rows": {
+						"$data": "drafts.items"
+					},
+					"columns": [
+						{
+							"key": "title",
+							"label": "Title",
+							"primary": true
+						},
+						{
+							"key": "updatedAt",
+							"label": "Updated",
+							"format": "relative_time"
+						}
+					],
+					"empty": "No drafts"
+				}
+			}
+		]
+	},
+	"checks": [
+		{
+			"criterion": "drafts-only",
+			"fixtures": {
+				"users": [
+					{
+						"as": "e",
+						"role": "editor"
+					}
+				],
+				"entries": [
+					{
+						"title": "Draft A",
+						"status": "draft"
+					},
+					{
+						"title": "Post B",
+						"status": "published"
+					}
+				]
+			},
+			"view_as": "e",
+			"expect": [
+				{
+					"rows": [
+						"Draft A"
+					]
+				}
+			]
+		},
+		{
+			"criterion": "at-most-five",
+			"fixtures": {
+				"users": [
+					{
+						"as": "e",
+						"role": "editor"
+					}
+				],
+				"entries": [
+					{
+						"title": "D1",
+						"status": "draft"
+					},
+					{
+						"title": "D2",
+						"status": "draft"
+					},
+					{
+						"title": "D3",
+						"status": "draft"
+					},
+					{
+						"title": "D4",
+						"status": "draft"
+					},
+					{
+						"title": "D5",
+						"status": "draft"
+					},
+					{
+						"title": "D6",
+						"status": "draft"
+					}
+				]
+			},
+			"view_as": "e",
+			"expect": [
+				{
+					"rows": [
+						"D2",
+						"D3",
+						"D4",
+						"D5",
+						"D6"
+					]
+				}
+			]
+		},
+		{
+			"criterion": "empty",
+			"fixtures": {
+				"users": [
+					{
+						"as": "e",
+						"role": "editor"
+					}
+				],
+				"entries": []
+			},
+			"view_as": "e",
+			"expect": [
+				{
+					"text": "No drafts"
+				}
+			]
+		}
+	],
+	"refs": {
+		"slot": "dashboard.widget",
+		"components": {
+			"stack": [],
+			"table": [
+				"columns",
+				"empty",
+				"rows"
+			]
+		},
+		"capabilities": [
+			"content.list"
+		],
+		"scopes": [
+			"content:read"
+		]
+	},
+	"provenance": {
+		"compiler": "handwritten",
+		"strategy": "handwritten"
+	}
+}

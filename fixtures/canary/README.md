@@ -7,3 +7,8 @@ result; `agency` runs its own variant (`editorial-inbox`).
 
 Used by `pnpm test:canary`, which runs every synthetic scenario in
 `hosts/wordpress/adapter/src/canary.ts` against this corpus.
+
+`emdash/` is the same for EmDash: `newsroom` runs all three EmDash
+examples, and `studio` runs the identical publish queue and drafts widget.
+Used by `pnpm test:canary:emdash` (scenarios in
+`hosts/emdash/adapter/src/node/canary.ts`).

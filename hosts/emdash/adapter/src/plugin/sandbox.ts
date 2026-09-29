@@ -1,4 +1,5 @@
-import type { Surface } from '@graft/core';
+import { hashSurface, type Surface } from '@graft/core';
+import { baseSlot, patchSurface, resolveCall, type HostPatch } from '../host/patch.ts';
 import type { PluginContext, RouteContext } from 'emdash';
 import { roles, type RoleName } from '../host/surface.ts';
 import { HostError, runCapability, usableScopes, type Viewer } from './host.ts';
@@ -7,7 +8,8 @@ import { HostError, runCapability, usableScopes, type Viewer } from './host.ts';
  * The verification sandbox protocol, served by the plugin in a throwaway
  * EmDash (the `sandbox` option, set from GRAFT_SANDBOX=1 by the test site).
  * Same operations as the WordPress sandbox: reset, seed, scopes, call,
- * slot, assert, dump.
+ * slot, assert, dump, and patch (a synthetic host change for the canary,
+ * see src/host/patch.ts).
  *
  * Fixture users are role-only viewers: EmDash's permission checks depend on
  * the role level and, for "own" permissions, on the entry's author. Entries
@@ -21,6 +23,7 @@ interface Fixtures {
 
 const USERS = 'sandbox:users';
 const COLLECTIONS = 'sandbox:collections';
+const PATCH = 'sandbox:patch';
 
 function api(ctx: PluginContext) {
 	const content = ctx.content;
@@ -57,7 +60,12 @@ async function allEntries(ctx: PluginContext, collection: string) {
 export async function handleSandbox(ctx: RouteContext, surface: Surface): Promise<unknown> {
 	const request = (ctx.input ?? {}) as Record<string, unknown>;
 	const content = api(ctx);
+	const patch = (await ctx.kv.get<HostPatch>(PATCH)) ?? {};
+	const patched = patchSurface(surface, patch);
 	switch (request.op) {
+		case 'patch':
+			await ctx.kv.set(PATCH, request.patch ?? {});
+			return { ok: true };
 		case 'reset': {
 			for (const collection of new Set([...(await collections(ctx)), 'posts'])) {
 				for (const item of await allEntries(ctx, collection)) {
@@ -103,10 +111,21 @@ export async function handleSandbox(ctx: RouteContext, surface: Surface): Promis
 			return { users: out };
 		}
 		case 'scopes':
-			return { scopes: usableScopes(await viewer(ctx, request.as), (request.scopes as string[]) ?? []) };
+			return { scopes: usableScopes(await viewer(ctx, request.as), (request.scopes as string[]) ?? [], patched.scopes) };
 		case 'call': {
 			try {
-				const result = await runCapability(ctx, await viewer(ctx, request.as), String(request.capability), (request.input ?? {}) as Record<string, unknown>);
+				const who = await viewer(ctx, request.as);
+				const name = String(request.capability);
+				const resolved = resolveCall(patch, name, (request.input ?? {}) as Record<string, unknown>);
+				if (!resolved || !patched.capabilities[name]) {
+					throw new HostError('graft_unknown_capability', `This host has no "${name}".`);
+				}
+				for (const scope of patched.capabilities[name]!.scopes) {
+					if (!usableScopes(who, [scope], patched.scopes)[scope]) {
+						throw new HostError('graft_forbidden', `Your role cannot use "${scope}".`);
+					}
+				}
+				const result = await runCapability(ctx, who, resolved.name, resolved.input, resolved.statuses ? { statuses: resolved.statuses } : {});
 				return { result };
 			} catch (error) {
 				const code = error instanceof HostError ? error.code : 'graft_host_error';
@@ -114,9 +133,12 @@ export async function handleSandbox(ctx: RouteContext, surface: Surface): Promis
 			}
 		}
 		case 'slot': {
-			const slot = String(request.slot);
+			if (!patched.slots[String(request.slot)]) {
+				return { instances: [] };
+			}
+			const slot = baseSlot(patch, String(request.slot));
 			if (slot !== 'content.editor.panel') {
-				return { instances: surface.slots[slot] ? [{}] : [] };
+				return { instances: [{}] };
 			}
 			// One panel per entry the viewer can open in the editor.
 			const who = await viewer(ctx, request.as);
@@ -143,7 +165,7 @@ export async function handleSandbox(ctx: RouteContext, surface: Surface): Promis
 			return { ok: !!item && (expected.status === undefined || item.status === expected.status), actual };
 		}
 		case 'dump':
-			return { surface };
+			return { surface: { ...patched, hash: await hashSurface(patched) } };
 		default:
 			throw new Error(`Unknown sandbox op "${String(request.op)}".`);
 	}

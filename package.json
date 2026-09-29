@@ -23,7 +23,8 @@
     "verify:emdash": "tsx packages/cli/src/main.ts verify --surface hosts/emdash/adapter/surfaces/1.0.json --spec examples/emdash/specs examples/emdash/builds/publish-queue.json examples/emdash/builds/go-live.json examples/emdash/builds/drafts-glance.json",
     "test:emdash": "tsx hosts/emdash/adapter/src/node/smoke.ts",
     "test:e2e:emdash": "playwright test -c hosts/emdash/e2e/playwright.config.ts",
-    "test:compile:emdash": "tsx hosts/emdash/adapter/src/node/compile-smoke.ts"
+    "test:compile:emdash": "tsx hosts/emdash/adapter/src/node/compile-smoke.ts",
+    "test:canary:emdash": "tsx hosts/emdash/adapter/src/node/canary-test.ts"
   },
   "pnpm": {
     "onlyBuiltDependencies": [

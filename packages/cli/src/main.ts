@@ -37,7 +37,8 @@ Commands:
     --corpus <dir>     One directory per tenant with <spec>.md and its <spec>.json build
     --from <file>      Surface the builds were made for (required)
     --to <file>        Surface of the next host version, or:
-    --scenario <name>  A synthetic host change (see hosts/wordpress/adapter/src/canary.ts)
+    --scenario <name>  A synthetic host change (hosts/wordpress/adapter/src/canary.ts,
+                       hosts/emdash/adapter/src/node/canary.ts)
     --regenerate       Let Claude regenerate builds nothing else can save (needs a key)
     --out <dir>        Write upgraded builds and report.json
     --json             Print the report as JSON
