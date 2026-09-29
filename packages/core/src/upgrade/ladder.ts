@@ -154,6 +154,9 @@ function rebase(candidate: Build, to: Surface, rung: LadderStart, replaces: stri
 }
 
 export function describeChange(change: RefChange): string {
+	if (change.kind === 'functions') {
+		return change.change === 'removed' ? 'the host no longer runs build functions' : 'the limits on build functions changed';
+	}
 	const label = change.kind === 'prop' ? `prop ${change.symbol}` : `${change.kind} ${change.symbol}`;
 	const how = change.migration
 		? change.migration.op === 'remove'

@@ -8,11 +8,12 @@ export { deriveCriterionId } from './spec/criteria.ts';
 export type { Criterion, Section, Spec, SpecManifest } from './spec/types.ts';
 export { validateSurface, type SurfaceValidation } from './surface/validate.ts';
 export { canonicalJson, hashSurface, sha256 } from './surface/hash.ts';
-export type { Capability, Component, JsonSchema, Migration, Scope, Slot, Surface } from './surface/types.ts';
+export type { Capability, Component, JsonSchema, Migration, Scope, Slot, Surface, SurfaceFunctions } from './surface/types.ts';
 export { hashSpec, normalizeSpecSource } from './spec/hash.ts';
-export type { AndExpr, Binding, Build, CallExpr, CanExpr, Check, DataRef, DataSource, EqExpr, Expression, FieldRef, Logic, NotExpr, OrExpr, Refs, SlotRef, TreeNode, Value } from './build/types.ts';
-export { getPath, isAnd, isBinding, isCall, isCan, isDataRef, isEq, isExpression, isFieldRef, isNot, isOr, isSlotRef, walkTree, walkValue } from './build/expressions.ts';
-export { evaluate, isAction, type Action, type EvalContext } from './build/evaluate.ts';
+export type { AndExpr, Binding, Build, BuildCode, CallExpr, CanExpr, Check, DataRef, DataSource, EqExpr, Expression, FieldRef, FnExpr, Logic, NotExpr, OrExpr, Refs, SlotRef, TreeNode, Value } from './build/types.ts';
+export { getPath, isAnd, isBinding, isCall, isCan, isDataRef, isEq, isExpression, isFieldRef, isFn, isNot, isOr, isSlotRef, walkTree, walkValue } from './build/expressions.ts';
+export { evaluate, inert, isAction, type Action, type EvalContext } from './build/evaluate.ts';
+export { FunctionError, functionKey, type AsyncFunctionRunner, type FunctionCall, type FunctionErrorKind, type FunctionResult, type FunctionRunner } from './build/functions.ts';
 export { extractRefs } from './build/refs.ts';
 export { validateBuild, type BuildValidation, type ValidateBuildOptions } from './build/validate.ts';
 export { nextSpecState, specEvents, specLifecycle, type SpecEvent, type SpecState } from './lifecycle/spec.ts';
@@ -26,6 +27,7 @@ export {
 	type Snapshot,
 	type SnapshotAction,
 	type SnapshotEmitter,
+	type SnapshotCell,
 	type SnapshotRow,
 	type SnapshotTable,
 } from './verifier/snapshot.ts';

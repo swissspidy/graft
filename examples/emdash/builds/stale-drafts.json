@@ -1,0 +1,271 @@
+{
+	"graft": 1,
+	"spec": {
+		"id": "stale-drafts",
+		"hash": "sha256:b42a4999b74eadcb0fb64b412f4f22e51e4cfb533f314c205aff41431d7d9719"
+	},
+	"surface": {
+		"host": "emdash",
+		"hostVersion": "1.0.1",
+		"hash": "sha256:a5ea900bfba4826a547ad09000415dfee537de74802699f464715ff23aa3fb1f"
+	},
+	"mount": {
+		"slot": "dashboard.widget",
+		"title": "Stale drafts"
+	},
+	"data": {
+		"drafts": {
+			"call": "content.list",
+			"input": {
+				"collection": "posts",
+				"status": "draft",
+				"limit": 10
+			}
+		}
+	},
+	"tree": {
+		"type": "stack",
+		"children": [
+			{
+				"type": "table",
+				"props": {
+					"rows": {
+						"$data": "drafts.items"
+					},
+					"columns": [
+						{
+							"key": "title",
+							"label": "Title",
+							"primary": true
+						},
+						{
+							"key": "age",
+							"label": "Days since update",
+							"format": "number",
+							"value": {
+								"$daysSince": {
+									"$field": "updatedAt"
+								}
+							},
+							"tone": {
+								"$if": [
+									{
+										"$gte": [
+											{
+												"$daysSince": {
+													"$field": "updatedAt"
+												}
+											},
+											30
+										]
+									},
+									"error",
+									{
+										"$if": [
+											{
+												"$gte": [
+													{
+														"$daysSince": {
+															"$field": "updatedAt"
+														}
+													},
+													7
+												]
+											},
+											"warning",
+											"success"
+										]
+									}
+								]
+							}
+						}
+					],
+					"empty": "No drafts"
+				}
+			}
+		]
+	},
+	"checks": [
+		{
+			"criterion": "drafts-only",
+			"fixtures": {
+				"users": [
+					{
+						"as": "e",
+						"role": "editor"
+					}
+				],
+				"entries": [
+					{
+						"title": "Draft A",
+						"status": "draft"
+					},
+					{
+						"title": "Post B",
+						"status": "published"
+					}
+				]
+			},
+			"view_as": "e",
+			"expect": [
+				{
+					"rows": [
+						"Draft A"
+					]
+				},
+				{
+					"columns": [
+						"Title",
+						"Days since update"
+					]
+				}
+			]
+		},
+		{
+			"criterion": "days",
+			"fixtures": {
+				"users": [
+					{
+						"as": "e",
+						"role": "editor"
+					}
+				],
+				"entries": [
+					{
+						"title": "Draft A",
+						"status": "draft"
+					}
+				]
+			},
+			"view_as": "e",
+			"clock": {
+				"advanceDays": 12
+			},
+			"expect": [
+				{
+					"cell": {
+						"row": {
+							"title": "Draft A"
+						},
+						"column": "Days since update",
+						"text": "12"
+					}
+				}
+			]
+		},
+		{
+			"criterion": "age-tone",
+			"fixtures": {
+				"users": [
+					{
+						"as": "e",
+						"role": "editor"
+					}
+				],
+				"entries": [
+					{
+						"title": "Draft A",
+						"status": "draft"
+					}
+				]
+			},
+			"view_as": "e",
+			"expect": [
+				{
+					"cell": {
+						"row": {
+							"title": "Draft A"
+						},
+						"column": "Days since update",
+						"tone": "success"
+					}
+				}
+			]
+		},
+		{
+			"criterion": "age-tone",
+			"fixtures": {
+				"users": [
+					{
+						"as": "e",
+						"role": "editor"
+					}
+				],
+				"entries": [
+					{
+						"title": "Draft A",
+						"status": "draft"
+					}
+				]
+			},
+			"view_as": "e",
+			"expect": [
+				{
+					"cell": {
+						"row": {
+							"title": "Draft A"
+						},
+						"column": "Days since update",
+						"tone": "warning"
+					}
+				}
+			],
+			"clock": {
+				"advanceDays": 8
+			}
+		},
+		{
+			"criterion": "age-tone",
+			"fixtures": {
+				"users": [
+					{
+						"as": "e",
+						"role": "editor"
+					}
+				],
+				"entries": [
+					{
+						"title": "Draft A",
+						"status": "draft"
+					}
+				]
+			},
+			"view_as": "e",
+			"expect": [
+				{
+					"cell": {
+						"row": {
+							"title": "Draft A"
+						},
+						"column": "Days since update",
+						"tone": "error"
+					}
+				}
+			],
+			"clock": {
+				"advanceDays": 31
+			}
+		}
+	],
+	"refs": {
+		"slot": "dashboard.widget",
+		"components": {
+			"stack": [],
+			"table": [
+				"columns",
+				"empty",
+				"rows"
+			]
+		},
+		"capabilities": [
+			"content.list"
+		],
+		"scopes": [
+			"content:read"
+		]
+	},
+	"provenance": {
+		"compiler": "handwritten",
+		"strategy": "handwritten"
+	}
+}

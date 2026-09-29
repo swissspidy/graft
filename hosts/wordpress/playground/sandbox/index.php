@@ -84,8 +84,10 @@ switch ( $request['op'] ?? '' ) {
 					'post_status' => $post['status'] ?? 'publish',
 					'post_type'   => $post['type'] ?? 'post',
 					'post_author' => isset( $post['author'] ) ? alias_user( $post['author'] ) : 1,
-					// Oldest first, one hour apart, so ordering is deterministic.
-					'post_date'   => gmdate( 'Y-m-d H:i:s', time() - ( 100 - $i ) * HOUR_IN_SECONDS ),
+					// Oldest first, one minute apart, so ordering is deterministic
+					// and dates stay on the day the fixtures were seeded (checks
+					// look later with a clock).
+					'post_date'   => gmdate( 'Y-m-d H:i:s', time() - ( 100 - $i ) * MINUTE_IN_SECONDS ),
 				),
 				true
 			);

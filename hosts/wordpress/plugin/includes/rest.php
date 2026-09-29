@@ -68,6 +68,16 @@ function register_routes(): void {
 
 	register_rest_route(
 		REST_NAMESPACE,
+		'/audit',
+		array(
+			'methods'             => WP_REST_Server::READABLE,
+			'callback'            => static fn() => new WP_REST_Response( audit_log() ),
+			'permission_callback' => $manage,
+		)
+	);
+
+	register_rest_route(
+		REST_NAMESPACE,
 		'/surface',
 		array(
 			'methods'             => WP_REST_Server::READABLE,
@@ -189,16 +199,16 @@ function rest_call( WP_REST_Request $request ) {
 	$capability = (string) $request['capability'];
 	$servable   = servable_specs();
 	if ( ! isset( $servable[ $spec_id ] ) ) {
-		return new WP_Error( 'graft_spec_unavailable', __( 'This customization is not available to you.', 'graft' ), array( 'status' => 403 ) );
+		return audit_refusal( $spec_id, $capability, new WP_Error( 'graft_spec_unavailable', __( 'This customization is not available to you.', 'graft' ), array( 'status' => 403 ) ) );
 	}
 	$record = $servable[ $spec_id ]['record'];
 	$build  = $servable[ $spec_id ]['build'];
 	if ( ! in_array( $capability, $build['refs']['capabilities'] ?? array(), true ) ) {
-		return new WP_Error( 'graft_capability_not_in_build', __( 'This customization does not use that capability.', 'graft' ), array( 'status' => 403 ) );
+		return audit_refusal( $spec_id, $capability, new WP_Error( 'graft_capability_not_in_build', __( 'This customization does not use that capability.', 'graft' ), array( 'status' => 403 ) ) );
 	}
 	$map = surface_capability_map();
 	if ( ! isset( $map[ $capability ] ) || ! grant_covers( $record['grant'], $map[ $capability ]['scopes'] ) ) {
-		return new WP_Error( 'graft_not_granted', __( 'This customization has not been granted that permission.', 'graft' ), array( 'status' => 403 ) );
+		return audit_refusal( $spec_id, $capability, new WP_Error( 'graft_not_granted', __( 'This customization has not been granted that permission.', 'graft' ), array( 'status' => 403 ) ) );
 	}
 	$ability = wp_get_ability( $map[ $capability ]['ability'] );
 	if ( ! $ability ) {
@@ -212,4 +222,46 @@ function rest_call( WP_REST_Request $request ) {
 		return $result;
 	}
 	return new WP_REST_Response( $result );
+}
+
+/**
+ * Records a call the gateway refused: a customization asked for something
+ * it did not declare, or was not granted. Keeps the latest 100 refusals for
+ * administrators (GET graft/v1/audit) and fires graft_gateway_refused for
+ * site logging.
+ *
+ * @param string   $spec_id    Spec the call named.
+ * @param string   $capability Capability it asked for.
+ * @param WP_Error $error      The refusal.
+ * @return WP_Error The same refusal.
+ */
+function audit_refusal( string $spec_id, string $capability, WP_Error $error ): WP_Error {
+	$entry   = array(
+		'time'       => gmdate( 'c' ),
+		'user'       => get_current_user_id(),
+		'spec'       => $spec_id,
+		'capability' => $capability,
+		'code'       => $error->get_error_code(),
+	);
+	$log     = audit_log();
+	$log[]   = $entry;
+	$trimmed = array_slice( $log, -100 );
+	update_option( 'graft_audit_log', $trimmed, false );
+	/**
+	 * Fires when the capability gateway refuses a call.
+	 *
+	 * @param array<string, mixed> $entry The refusal: time, user, spec, capability, code.
+	 */
+	do_action( 'graft_gateway_refused', $entry );
+	return $error;
+}
+
+/**
+ * The gateway's latest refusals, oldest first.
+ *
+ * @return array<int, array<string, mixed>>
+ */
+function audit_log(): array {
+	$log = get_option( 'graft_audit_log', array() );
+	return is_array( $log ) ? array_values( $log ) : array();
 }

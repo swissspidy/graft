@@ -1,5 +1,7 @@
 import { createHash } from 'node:crypto';
 import { copyFile, mkdir, readFile, writeFile } from 'node:fs/promises';
+import { createRequire } from 'node:module';
+import { dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { build, type Plugin } from 'esbuild';
 
@@ -57,7 +59,30 @@ const options = {
 	logLevel: 'info' as const,
 };
 
+/**
+ * The functions worker: QuickJS and the code runner, loaded only on screens
+ * with a build that has code. Self-contained (no WordPress globals), with
+ * QuickJS's .wasm copied next to it.
+ */
+const workerOptions = {
+	entryPoints: { 'functions-worker': fileURLToPath(new URL('../../../../packages/sandbox/src/worker.ts', import.meta.url)) },
+	outdir: outDir,
+	bundle: true,
+	format: 'iife' as const,
+	target: 'es2020',
+	minify: !watch,
+	legalComments: 'none' as const,
+	// Node built-ins the Emscripten loader only touches under Node.
+	external: ['fs', 'path', 'url', 'module', 'crypto', 'worker_threads'],
+	logLevel: 'info' as const,
+};
+const sandboxDir = fileURLToPath(new URL('../../../../packages/sandbox/', import.meta.url));
+const variantDir = dirname(createRequire(sandboxDir).resolve('@jitl/quickjs-wasmfile-release-sync'));
+
 await mkdir(outDir, { recursive: true });
+await copyFile(`${variantDir}/emscripten-module.wasm`, `${outDir}/quickjs.wasm`);
+// Built once in watch mode too: it changes with @graft/sandbox, not with the client.
+await build(workerOptions);
 // The plugin reads the shared lifecycle table at runtime.
 await copyFile(fileURLToPath(new URL('../../../../schemas/spec-lifecycle.json', import.meta.url)), `${outDir}/spec-lifecycle.json`);
 if (watch) {

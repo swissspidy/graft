@@ -35,11 +35,12 @@ export function checksOutputSchema(spec: Spec): Record<string, unknown> {
 				items: {
 					type: 'object',
 					additionalProperties: false,
-					required: ['criterion', 'fixtures_json', 'view_as', 'steps_json', 'expect_json'],
+					required: ['criterion', 'fixtures_json', 'view_as', 'advance_days', 'steps_json', 'expect_json'],
 					properties: {
 						criterion: names(spec.criteria.map((c) => c.id)),
 						fixtures_json: { type: 'string', description: 'JSON object: the fixtures to seed.' },
 						view_as: { type: 'string', description: 'Fixture user alias the check renders for.' },
+						advance_days: { type: 'integer', description: 'View the customization this many days after the fixtures were seeded (0 for right away).' },
 						steps_json: { type: 'string', description: 'JSON array of steps, [] for none.' },
 						expect_json: { type: 'string', description: 'JSON array of expectations, at least one.' },
 					},
@@ -59,11 +60,28 @@ export function usableCapabilities(spec: Spec, surface: Surface): string[] {
 
 export function treeOutputSchema(spec: Spec, surface: Surface): Record<string, unknown> {
 	const reads = usableCapabilities(spec, surface).filter((name) => surface.capabilities[name]?.kind === 'read');
+	const code = surface.functions
+		? {
+				code: {
+					...nullable({
+						type: 'object',
+						additionalProperties: false,
+						required: ['source', 'functions'],
+						properties: {
+							source: { type: 'string', description: 'Plain JavaScript declaring each function at top level.' },
+							functions: { type: 'array', items: { type: 'string' }, description: 'The names $fn may call.' },
+						},
+					}),
+					description: 'Pure functions for $fn; null when the expressions suffice.',
+				},
+			}
+		: {};
 	return {
 		type: 'object',
 		additionalProperties: false,
-		required: ['nodes', 'data'],
+		required: ['nodes', 'data', ...Object.keys(code)],
 		properties: {
+			...code,
 			nodes: {
 				type: 'array',
 				description: 'The UI tree, flattened. Exactly one node has parent null (the root). Children keep array order.',

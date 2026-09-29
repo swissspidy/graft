@@ -13,7 +13,8 @@
   },
   "dependencies": {
     "@graft/core": "workspace:*",
-    "@graft/renderer-react": "workspace:*"
+    "@graft/renderer-react": "workspace:*",
+    "@graft/sandbox": "workspace:*"
   },
   "devDependencies": {
     "@types/react": "^18.3.31",

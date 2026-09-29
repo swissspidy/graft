@@ -63,4 +63,20 @@ export interface Surface {
 	scopes: Record<string, Scope>;
 	audiences?: string[];
 	migrations?: Migration[];
+	/** Present when builds may carry pure functions (`code`, `$fn`), and the limits they run under. */
+	functions?: SurfaceFunctions;
+}
+
+export interface SurfaceFunctions {
+	runtime: 'quickjs';
+	limits: {
+		/** CPU time per call, in milliseconds. */
+		timeMs: number;
+		/** Heap of the whole sandbox, in bytes. */
+		memoryBytes: number;
+		/** Largest JSON result of one call, in bytes. */
+		outputBytes: number;
+		/** Largest `code.source`, in bytes. */
+		sourceBytes: number;
+	};
 }

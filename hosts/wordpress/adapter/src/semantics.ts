@@ -1,19 +1,10 @@
 import type { ComponentSemantics, SnapshotAction } from '@graft/core';
+import { cell, readPath, type Field } from './cells.ts';
 
 /**
  * How the WordPress components read in a semantic snapshot. Mirrors what
  * src/client/components.tsx renders: keep the two in step.
  */
-
-interface Field {
-	id: string;
-	label: string;
-	primary?: boolean;
-}
-
-function readPath(row: unknown, path: string): unknown {
-	return path.split('.').reduce<unknown>((value, key) => (value && typeof value === 'object' ? (value as Record<string, unknown>)[key] : undefined), row);
-}
 
 function actionFrom(value: unknown, row?: unknown): SnapshotAction {
 	const action = value as { id?: unknown; label?: unknown; visible?: unknown; disabled?: unknown; onClick?: unknown };
@@ -48,16 +39,18 @@ export const semantics: ComponentSemantics = {
 		emit.action(actionFrom(props));
 	},
 	table: ({ props, raw, evaluate, emit }) => {
-		const fields = (props.fields as Field[] | undefined) ?? [];
+		// Unevaluated, for per-row value and tone; as evaluated when the list itself comes from an expression.
+		const fields = (Array.isArray(raw.fields) ? raw.fields : Array.isArray(props.fields) ? props.fields : []) as Field[];
 		const primary = fields.find((f) => f.primary) ?? fields[0];
 		const rows = Array.isArray(props.rows) ? (props.rows as unknown[]) : [];
 		const actions = Array.isArray(raw.actions) ? raw.actions : [];
 		emit.table({
 			columns: fields.map((f) => f.label),
 			rows: rows.map((row) => ({
-				label: primary ? String(readPath(row, primary.id) ?? '') : '',
+				label: primary ? String((primary.value === undefined ? readPath(row, primary.id) : evaluate(primary.value as never, row)) ?? '') : '',
 				record: row,
 				actions: actions.map((action) => actionFrom(evaluate(action, row), row)),
+				cells: Object.fromEntries(fields.map((f) => [f.label, cell(f, row, (value, r) => evaluate(value as never, r), 'en-US')])),
 			})),
 		});
 		if (rows.length === 0) {

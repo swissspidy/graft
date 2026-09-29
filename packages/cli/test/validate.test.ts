@@ -12,7 +12,7 @@ describe('graft validate', () => {
 	it('exits 0 for the example specs', async () => {
 		const log = vi.spyOn(console, 'log').mockImplementation(() => {});
 		expect(await main(['validate', examples])).toBe(0);
-		expect(log.mock.calls[0]?.[0]).toContain('3 spec(s), 0 invalid');
+		expect(log.mock.calls[0]?.[0]).toContain('5 spec(s), 0 invalid');
 	});
 
 	it('exits 1 and prints JSON diagnostics for an invalid spec', async () => {

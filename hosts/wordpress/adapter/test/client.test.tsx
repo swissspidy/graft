@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { describe, expect, it } from 'vitest';
-import { formatValue } from '../src/client/components.tsx';
+import { formatValue } from '../src/cells.ts';
 import { createCan } from '../src/client/mount.tsx';
 
 describe('createCan', () => {

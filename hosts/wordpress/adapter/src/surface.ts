@@ -1,5 +1,6 @@
 import { hashSurface, validateSurface, type Diagnostic, type Slot, type Surface } from '@graft/core';
 import { components } from './components.ts';
+import { functions } from './functions.ts';
 import { normalizeWordPressSchema } from './normalize-schema.ts';
 import { lastJsonLine, runPhp } from './playground.ts';
 import type { HostDump } from './surface-types.ts';
@@ -35,6 +36,7 @@ export async function assembleSurface(dump: HostDump): Promise<Surface> {
 		capabilities,
 		scopes: mapSorted(dump.scopes, (s) => s),
 		audiences: [...dump.audiences],
+		functions,
 	};
 	const header = { graft: 1, host: dump.host, hostVersion: dump.hostVersion } as const;
 	const hash = await hashSurface({ ...header, ...contract });

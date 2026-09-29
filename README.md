@@ -18,7 +18,10 @@ decisions (authoring in wp-admin, operating live sites, hardening) in
 WordPress 7.1+ (wp-admin), and [EmDash](hosts/emdash/README.md)
 ([ADR 0003](docs/adr/0003-emdash-host.md)), in-process or in EmDash's plugin
 sandbox, with customizations written in either admin
-([ADR 0004](docs/adr/0004-emdash-sandbox-and-authoring.md)).
+([ADR 0004](docs/adr/0004-emdash-sandbox-and-authoring.md)). Where the
+declarative language runs out, a build may carry pure functions that run
+in QuickJS compiled to WebAssembly, with no access to the page
+([ADR 0005](docs/adr/0005-sandboxed-functions.md); WordPress for now).
 
 Status: a working prototype. All six MVP milestones of the ADR are built, and
 each is tested against real WordPress in [Playground](https://wordpress.org/playground/).
@@ -165,12 +168,12 @@ pnpm graft site verify --site <url> --token <token>
 
 | Command | What |
 | --- | --- |
-| `pnpm typecheck`, `pnpm test` | Types and unit tests (core, renderer, CLI, adapter) |
+| `pnpm typecheck`, `pnpm test` | Types and unit tests (core, renderer, sandbox, CLI, adapter) |
 | `pnpm test:wp` | Plugin smoke test in Playground on PHP 7.4 and 8.4: abilities, store, lifecycle, gateway, host changes, security regressions |
 | `pnpm verify:examples` | The example builds' checks in a WordPress sandbox |
-| `pnpm test:compile` | The compile pipeline with a scripted model against WordPress |
-| `pnpm test:canary` | Six synthetic host changes, each forcing one rung, against a four-tenant corpus |
-| `pnpm test:e2e` | Playwright in wp-admin: serving, gateway, approval, authoring, `graft site` |
+| `pnpm test:compile` | The compile pipeline with a scripted model against WordPress, including a build whose code loops |
+| `pnpm test:canary` | Seven synthetic host changes, each forcing one rung, against a five-tenant corpus (one with code) |
+| `pnpm test:e2e` | Playwright in wp-admin: serving, gateway and its audit log, build functions and their lazy loading, approval, authoring, `graft site` |
 | `pnpm verify:emdash` | The EmDash example builds' checks in a throwaway EmDash |
 | `pnpm test:compile:emdash` | The compile pipeline with a scripted model against EmDash |
 | `pnpm test:canary:emdash` | Six synthetic EmDash changes, each forcing one rung, against a two-tenant corpus |
@@ -193,6 +196,7 @@ customization re-passes its checks there.
 | `schemas/` | JSON Schemas for spec, surface and build, and the spec lifecycle table |
 | `packages/core` | Host-agnostic, no I/O: specs, surfaces, builds, expression evaluator, verifier, compiler, upgrade ladder, canary |
 | `packages/renderer-react` | Renders a build with a host's components and capability gateway |
+| `packages/sandbox` | Runs a build's pure functions (`$fn`) in QuickJS/WebAssembly with time, memory and output limits; a Web Worker for pages, in-process for the verifier |
 | `packages/cli` | The `graft` command |
 | `hosts/wordpress` | The WordPress adapter: plugin, components, surface generator, sandbox, tests ([README](hosts/wordpress/README.md)) |
 | `hosts/emdash` | The EmDash adapter: a native plugin that serves builds as Block Kit, surface, sandbox, test site, tests ([README](hosts/emdash/README.md)) |

@@ -151,6 +151,8 @@ export const components: Record<string, Component> = {
 							label,
 							format: { enum: ['text', 'badge', 'relative_time', 'number', 'code'], default: 'text' },
 							primary: { description: "The row's label: what checks call the row by.", type: 'boolean' },
+							value: { description: 'Computed per row instead of reading key, e.g. {"$daysSince": {"$field": "updatedAt"}}.' },
+							tone: { description: 'Computed per row: marks the cell (not relative_time cells).', enum: ['success', 'warning', 'error', 'info'] },
 						},
 						required: ['key', 'label'],
 						additionalProperties: false,

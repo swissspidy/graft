@@ -1,0 +1,18 @@
+{
+  "name": "@graft/sandbox",
+  "version": "0.0.0",
+  "private": true,
+  "license": "Apache-2.0",
+  "description": "Runs a build's pure functions in QuickJS compiled to WebAssembly, with time, memory and output limits. No host APIs reach the code.",
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts",
+    "./worker": "./src/worker.ts",
+    "./client": "./src/client.ts"
+  },
+  "dependencies": {
+    "@graft/core": "workspace:*",
+    "quickjs-emscripten-core": "0.32.0",
+    "@jitl/quickjs-wasmfile-release-sync": "0.32.0"
+  }
+}

@@ -75,6 +75,8 @@ function servable_specs(): array {
 			$build  = $record['builds'][ $surface['hash'] ]['build'] ?? null;
 			// Never serve a build whose scopes the grant does not cover.
 			$covered = is_array( $build ) && grant_covers( $record['grant'], build_scopes( $build ) );
+			// Nor one with code where this surface runs none.
+			$covered = $covered && ( ! isset( $build['code'] ) || isset( $surface['functions'] ) );
 			if ( 'active' === $record['state'] && $covered && applies_to_user( $record, $user ) ) {
 				$servable[ $spec->post_name ] = array(
 					'record' => $record,
@@ -153,19 +155,32 @@ function enqueue_runtime(): void {
 	wp_enqueue_script( 'graft-runtime', plugins_url( 'build/runtime.js', __DIR__ ), $asset['dependencies'], $asset['version'], true );
 	wp_enqueue_style( 'wp-components' );
 
-	$specs    = array();
-	$servable = servable_specs();
+	$specs     = array();
+	$servable  = servable_specs();
+	$with_code = false;
 	foreach ( array_keys( $rendered ) as $spec_id ) {
 		if ( isset( $servable[ $spec_id ] ) ) {
 			$specs[ $spec_id ] = array(
 				'build'  => $servable[ $spec_id ]['build'],
 				'scopes' => (object) usable_scopes( $servable[ $spec_id ]['record'] ),
 			);
+			$with_code = $with_code || isset( $servable[ $spec_id ]['build']['code'] );
 		}
+	}
+	$config = array( 'specs' => (object) $specs );
+	// Only screens with code learn where the functions worker is; the page
+	// starts it (and fetches QuickJS) on the first function call.
+	$surface = current_surface();
+	if ( $with_code && isset( $surface['functions']['limits'] ) ) {
+		$config['functions'] = array(
+			'worker' => plugins_url( 'build/functions-worker.js', __DIR__ ),
+			'wasm'   => plugins_url( 'build/quickjs.wasm', __DIR__ ),
+			'limits' => $surface['functions']['limits'],
+		);
 	}
 	wp_add_inline_script(
 		'graft-runtime',
-		'window.graftRuntime = ' . wp_json_encode( array( 'specs' => (object) $specs ), JSON_UNESCAPED_SLASHES | JSON_HEX_TAG | JSON_HEX_AMP ) . ';',
+		'window.graftRuntime = ' . wp_json_encode( $config, JSON_UNESCAPED_SLASHES | JSON_HEX_TAG | JSON_HEX_AMP ) . ';',
 		'before'
 	);
 }
@@ -249,6 +264,8 @@ function register_admin_screen(): void {
 						),
 						// The whole snapshot: the editor validates and compiles against it.
 						'surface'             => $surface,
+						// QuickJS, for verifying builds with code in the browser.
+						'quickjsWasm'         => plugins_url( 'build/quickjs.wasm', __DIR__ ),
 						/**
 						 * Filters whether wp-admin verifies builds in WordPress Playground
 						 * in the admin's browser (needs access to playground.wordpress.net).

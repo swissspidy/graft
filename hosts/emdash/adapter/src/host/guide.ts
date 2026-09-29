@@ -11,6 +11,8 @@ The site has no other entries. Entries are created oldest first, in list order, 
 - Builds render as EmDash Block Kit: the tree root is "stack"; buttons go inside "actions" (or a table's "actions").
 - content.list returns {items: [{id, collection, title, slug, status, author: {id, name} | null, createdAt, updatedAt, publishedAt, can: {publish}}], hasMore}. Bind table rows to "<source>.items".
 - In a table, columns have a "key" path into the row (e.g. "author.name") and one column is "primary": true; its value is the row label checks refer to.
+- A column can compute its value and tone per row instead of reading "key": {"key": "age", "label": "Days since update", "format": "number", "value": {"$daysSince": {"$field": "updatedAt"}}, "tone": {"$if": [{"$gte": [{"$daysSince": {"$field": "updatedAt"}}, 30]}, "error", "success"]}}. The admin shows a tone as a colored marker. Checks read it with a "cell" expectation.
+- Fixture entries are created and updated when the check starts. To see them older, give the check "advance_days".
 - Per-entry permission: {"$can": "content.status:write"} inside a table row, or with "on": {"$slot": "entry"} in the editor panel, uses the entry's own can flags.
 - The content.editor.panel slot renders once per saved entry with {"entry": {...same fields as content.list items}}; checks match its actions with "row": {"title": ...}.
 - The server re-renders from fresh data after every action: use "then": ["refresh:<source>"] (or "reload:page" in the editor panel), not "remove-row".

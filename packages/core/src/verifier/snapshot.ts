@@ -23,6 +23,14 @@ export interface SnapshotRow {
 	label: string;
 	record: unknown;
 	actions: SnapshotAction[];
+	/** What each column shows for the row, by column label. */
+	cells?: Record<string, SnapshotCell>;
+}
+
+export interface SnapshotCell {
+	text: string;
+	/** A host tone (e.g. success, warning, error) the cell is marked with. */
+	tone?: string;
 }
 
 export interface SnapshotAction {

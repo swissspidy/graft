@@ -7,7 +7,7 @@ import { describeSchemaError, schemaErrorPath } from '../schema-errors.ts';
 import type { Spec } from '../spec/types.ts';
 import { hashSurface } from '../surface/hash.ts';
 import type { JsonSchema, Surface } from '../surface/types.ts';
-import { isBinding, isCall, isCan, isDataRef, isSlotRef, walkTree, walkValue } from './expressions.ts';
+import { isDynamic, isCall, isCan, isDataRef, isFn, isSlotRef, walkTree, walkValue } from './expressions.ts';
 import { extractRefs } from './refs.ts';
 import type { Build, Refs, Value } from './types.ts';
 
@@ -73,9 +73,28 @@ export async function validateBuild(value: unknown, surface: Surface, options: V
 	}
 	const slotProps = slot && typeof slot.provides === 'object' ? Object.keys((slot.provides.properties as object | undefined) ?? {}) : [];
 
+	// Code: pure functions, only where the host can run them.
+	const functions = new Set(build.code?.functions ?? []);
+	if (build.code) {
+		checkCode(build, surface, error);
+	}
+	const noFunctionsIn = (root: Value | undefined, base: string, what: string) =>
+		walkValue(root, base, (item, path) => {
+			if (isFn(item)) {
+				error('build-fn-not-allowed', path, `${what} cannot use $fn: functions only compute values to show, never what is read or written.`);
+			}
+		});
+
 	// Expressions anywhere in the build.
 	const checkExpressions = (root: Value | undefined, base: string) =>
 		walkValue(root, base, (item, path) => {
+			if (isFn(item)) {
+				if (!surface.functions) {
+					error('build-functions-unsupported', path, `${surface.host} does not run build functions, so "$fn" cannot be used.`);
+				} else if (!functions.has(item.$fn)) {
+					error('build-unknown-function', path, `"${item.$fn}" is not one of the build's functions (${[...functions].join(', ') || 'none'}).`);
+				}
+			}
 			if (isDataRef(item) && !Object.hasOwn(build.data, item.$data.split('.')[0] ?? '')) {
 				error('build-unknown-data', path, `"${item.$data}" does not start with a declared data source (${Object.keys(build.data).join(', ') || 'none'}).`);
 			}
@@ -92,6 +111,7 @@ export async function validateBuild(value: unknown, surface: Surface, options: V
 				} else if (item.input !== undefined) {
 					checkAgainstSchema(capability.input, item.input, `${path}/input`, `Input for "${item.$call}"`, diagnostics);
 				}
+				noFunctionsIn(item.input, `${path}/input`, `The input for "${item.$call}"`);
 				item.then?.forEach((op, i) => {
 					const [kind, target] = op.split(':');
 					if ((kind === 'refresh' || kind === 'remove-row') && !Object.hasOwn(build.data, target ?? '')) {
@@ -133,6 +153,7 @@ export async function validateBuild(value: unknown, surface: Surface, options: V
 		}
 		checkAgainstSchema(capability.input, source.input ?? null, `${path}/input`, `Input for "${source.call}"`, diagnostics, source.input === undefined);
 		checkExpressions(source.input, `${path}/input`);
+		noFunctionsIn(source.input, `${path}/input`, `Data source "${name}"`);
 	}
 
 	// Refs are computed, never trusted.
@@ -184,6 +205,24 @@ export async function validateBuild(value: unknown, surface: Surface, options: V
 	return { ok: true, build, refs, diagnostics };
 }
 
+/** The build's code fits the surface's limits and declares the functions it lists. */
+function checkCode(build: Build, surface: Surface, error: (code: string, path: string, message: string) => void): void {
+	const code = build.code!;
+	if (!surface.functions) {
+		error('build-functions-unsupported', '/code', `${surface.host} does not run build functions, so the build cannot carry code.`);
+		return;
+	}
+	const bytes = new TextEncoder().encode(code.source).length;
+	if (bytes > surface.functions.limits.sourceBytes) {
+		error('build-code-too-large', '/code/source', `The code is ${bytes} bytes; ${surface.host} runs at most ${surface.functions.limits.sourceBytes}.`);
+	}
+	code.functions.forEach((name, i) => {
+		if (!new RegExp(`(^|[^.\\w$])function\\s+${name.replace(/\$/g, '\\$')}\\s*\\(`).test(code.source)) {
+			error('build-unknown-function', `/code/functions/${i}`, `The code does not declare "function ${name}(...)".`);
+		}
+	});
+}
+
 /**
  * Validates a value that may contain binding expressions. Bindings are
  * swapped for null, and errors located at a binding (or inside one) are
@@ -226,7 +265,7 @@ function underBindingAlternative(error: ErrorObject, bindingPaths: string[]): bo
 }
 
 function replaceBindings(value: unknown, path: string, found: string[]): unknown {
-	if (isBinding(value)) {
+	if (isDynamic(value)) {
 		found.push(path);
 		return null;
 	}

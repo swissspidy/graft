@@ -133,6 +133,8 @@ export const components: Record<string, Component> = {
 							label,
 							type: { enum: ['text', 'integer', 'date', 'datetime', 'status', 'user', 'link'], default: 'text' },
 							primary: { description: 'The row title field.', type: 'boolean' },
+							value: { description: 'Computed per row instead of reading id, e.g. {"$daysSince": {"$field": "modified"}}.' },
+							tone: { description: 'Computed per row: colors the cell.', enum: ['success', 'warning', 'error', 'info'] },
 						},
 						required: ['id', 'label'],
 						additionalProperties: false,
