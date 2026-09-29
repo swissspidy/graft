@@ -84,7 +84,8 @@ describe('components', () => {
 	});
 
 	it('are about eight, as the ADR planned', () => {
-		expect(Object.keys(components).sort()).toEqual(['button', 'card', 'empty-state', 'heading', 'notice', 'row-action', 'stack', 'table', 'text']);
+		// Plus the widget, which draws with the others (ADR 0006).
+		expect(Object.keys(components).sort()).toEqual(['button', 'card', 'empty-state', 'heading', 'notice', 'row-action', 'stack', 'table', 'text', 'widget']);
 	});
 });
 

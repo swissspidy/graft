@@ -152,6 +152,97 @@ describe('GraftRoot with build functions', () => {
 	});
 });
 
+describe('GraftRoot with widgets', () => {
+	// A counter drawn by code: render and update run in a fake runner.
+	const counter = {
+		...build,
+		code: { language: 'javascript', source: '', functions: ['draw', 'step'] },
+		tree: { type: 'widget', props: { render: 'draw', update: 'step', input: { $slot: 'name' }, state: 0 } },
+	} as unknown as Build;
+	const draw = (name: string, n: number) => ({
+		type: 'stack',
+		children: [
+			{ type: 'text', children: `${name}: ${n}` },
+			{ type: 'button', props: { label: 'Add', onClick: { $event: 'add', payload: { by: 2 } } } },
+			{ type: 'button', props: { label: 'Sneak', onClick: { $call: 'items.close', input: { id: 1 } } } },
+			{ type: 'script', children: 'alert(1)' },
+		],
+	});
+	const run = (calls: FunctionCall[]): FunctionResult[] =>
+		calls.map(({ name, args }) =>
+			name === 'draw'
+				? { ok: true, value: draw(args[0] as string, args[1] as number) }
+				: { ok: true, value: (args[0] as number) + (args[2] as { by: number }).by },
+		);
+	const withButtons: ComponentRegistry = {
+		...components,
+		button: ({ props, invoke }) => <button onClick={() => void invoke(props.onClick)}>{String(props.label)}</button>,
+		script: ({ children }) => <b>{children}</b>,
+	};
+
+	async function mount(gateway: Gateway) {
+		container = document.createElement('div');
+		document.body.append(container);
+		await act(async () => {
+			createRoot(container).render(
+				<GraftRoot
+					build={counter}
+					components={withButtons}
+					gateway={gateway}
+					slot={{ name: 'ada' }}
+					can={() => true}
+					functions={() => ({ call: async (calls) => run(calls) })}
+					widgets={{ components: ['stack', 'text', 'button'], maxNodes: 20 }}
+				/>,
+			);
+		});
+	}
+
+	it('draws what render returns, with the allow-listed components only', async () => {
+		await mount({ call: async () => ({}) });
+		expect(container.textContent).toBe('ada: 0AddSneak');
+	});
+
+	it('applies every click in order, even when they come faster than the runner', async () => {
+		container = document.createElement('div');
+		document.body.append(container);
+		// The runner answers a tick later, so both clicks land before the first update returns.
+		const slow = { call: (calls: FunctionCall[]) => new Promise<FunctionResult[]>((resolve) => setTimeout(() => resolve(run(calls)), 5)) };
+		await act(async () => {
+			createRoot(container).render(
+				<GraftRoot build={counter} components={withButtons} gateway={{ call: async () => ({}) }} slot={{ name: 'ada' }} can={() => true} functions={() => slow} widgets={{ components: ['stack', 'text', 'button'], maxNodes: 20 }} />,
+			);
+		});
+		for (let i = 0; i < 10 && !container.querySelector('button'); i++) {
+			await act(async () => {
+				await new Promise((r) => setTimeout(r, 10));
+			});
+		}
+		const add = container.querySelector('button')!;
+		await act(async () => {
+			add.click();
+			add.click();
+		});
+		for (let i = 0; i < 20 && container.textContent !== 'ada: 4AddSneak'; i++) {
+			await act(async () => {
+				await new Promise((r) => setTimeout(r, 10));
+			});
+		}
+		expect(container.textContent).toBe('ada: 4AddSneak');
+	});
+
+	it('updates its state on its own events, and never reaches the gateway', async () => {
+		const call = vi.fn(async () => ({}));
+		await mount({ call });
+		const [add, sneak] = [...container.querySelectorAll('button')];
+		await act(async () => add!.click());
+		expect(container.textContent).toBe('ada: 2AddSneak');
+		await act(async () => sneak!.click());
+		expect(call).not.toHaveBeenCalledWith('items.close', expect.anything());
+		expect(container.textContent).toBe('ada: 2AddSneak');
+	});
+});
+
 describe('removeRow', () => {
 	it('removes by identity or id without touching rows that stay', () => {
 		const keep = { id: 2, tags: [{ id: 1 }] };

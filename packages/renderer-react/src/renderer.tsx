@@ -1,5 +1,26 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ComponentType, type ReactNode } from 'react';
-import { evaluate, functionKey, isAction, removeRow, type Action, type AsyncFunctionRunner, type Build, type EvalContext, type FunctionCall, type TreeNode, type Value } from '@graft/core/runtime';
+import {
+	evaluate,
+	functionKey,
+	initialState,
+	isAction,
+	isWidgetEvent,
+	removeRow,
+	renderArgs,
+	sanitizeWidgetTree,
+	updateArgs,
+	WIDGET,
+	widgetProps,
+	type Action,
+	type AsyncFunctionRunner,
+	type Build,
+	type EvalContext,
+	type FunctionCall,
+	type TreeNode,
+	type Value,
+	type WidgetEvent,
+	type WidgetLimits,
+} from '@graft/core/runtime';
 
 export { removeRow };
 
@@ -45,12 +66,17 @@ export interface GraftRootProps {
 	 * and only started, when the build has code.
 	 */
 	functions?: () => AsyncFunctionRunner;
+	/** What interactive widgets may draw with; without it, widgets draw nothing. */
+	widgets?: WidgetLimits;
 }
 
 interface RuntimeValue {
 	ctx: EvalContext;
 	invoke(action: unknown): Promise<void>;
 	components: ComponentRegistry;
+	widgets?: WidgetLimits;
+	/** Sends queued function calls to the runner. */
+	flush(): void;
 }
 
 const Runtime = createContext<RuntimeValue | null>(null);
@@ -61,9 +87,9 @@ const Runtime = createContext<RuntimeValue | null>(null);
  * build was validated against the surface, so this only happens if the
  * registry and the surface disagree.
  */
-export function GraftRoot({ build, components, gateway, slot = {}, can, onNotice, onReload, functions }: GraftRootProps) {
+export function GraftRoot({ build, components, gateway, slot = {}, can, onNotice, onReload, functions, widgets }: GraftRootProps) {
 	const [data, setData] = useState<Record<string, unknown>>({});
-	const fn = useFunctions(build.code ? functions : undefined);
+	const { fn, flush } = useFunctions(build.code ? functions : undefined);
 	const mounted = useRef(true);
 	useEffect(() => () => void (mounted.current = false), []);
 
@@ -128,7 +154,10 @@ export function GraftRoot({ build, components, gateway, slot = {}, can, onNotice
 		[gateway, load, onNotice, onReload],
 	);
 
-	const runtime = useMemo<RuntimeValue>(() => ({ ctx: { data, slot, can, fn }, invoke, components }), [data, slot, can, fn, invoke, components]);
+	const runtime = useMemo<RuntimeValue>(
+		() => ({ ctx: { data, slot, can, fn }, invoke, components, flush, ...(widgets ? { widgets } : {}) }),
+		[data, slot, can, fn, invoke, components, flush, widgets],
+	);
 
 	return (
 		<Runtime.Provider value={runtime}>
@@ -141,6 +170,9 @@ function Node({ node }: { node: TreeNode }) {
 	const runtime = useContext(Runtime);
 	if (!runtime) {
 		return null;
+	}
+	if (node.type === WIDGET) {
+		return <Widget node={node} />;
 	}
 	const Component = runtime.components[node.type];
 	if (!Component) {
@@ -172,7 +204,7 @@ function Node({ node }: { node: TreeNode }) {
  * batch, and the tree renders again with their results. A failed call
  * shows as null.
  */
-function useFunctions(factory: (() => AsyncFunctionRunner) | undefined): EvalContext['fn'] {
+function useFunctions(factory: (() => AsyncFunctionRunner) | undefined): { fn: EvalContext['fn']; flush(): void } {
 	const runner = useRef<AsyncFunctionRunner | undefined>(undefined);
 	const results = useRef(new Map<string, unknown>());
 	const queued = useRef(new Map<string, FunctionCall>());
@@ -181,7 +213,7 @@ function useFunctions(factory: (() => AsyncFunctionRunner) | undefined): EvalCon
 
 	useEffect(() => () => runner.current?.dispose?.(), []);
 
-	useEffect(() => {
+	const flush = useCallback(() => {
 		if (!factory || queued.current.size === 0) {
 			return;
 		}
@@ -197,9 +229,11 @@ function useFunctions(factory: (() => AsyncFunctionRunner) | undefined): EvalCon
 			});
 			setVersion((v) => v + 1);
 		});
-	});
+	}, [factory]);
 
-	return useMemo(() => {
+	useEffect(flush);
+
+	const fn = useMemo(() => {
 		if (!factory) {
 			return undefined;
 		}
@@ -215,6 +249,62 @@ function useFunctions(factory: (() => AsyncFunctionRunner) | undefined): EvalCon
 		};
 		// A new function per result batch, so the tree re-evaluates.
 	}, [factory, version]);
+	return { fn, flush };
+}
+
+/**
+ * An interactive widget. Its render function draws a tree of the host's
+ * components from its input and state; the tree is sanitized (allow-listed
+ * components, inert props) and drawn by the host's own components. Its
+ * buttons can only send events: `update` computes the next state, and
+ * nothing reaches the gateway.
+ */
+function Widget({ node }: { node: TreeNode }) {
+	const runtime = useContext(Runtime);
+	const props = runtime ? widgetProps(evaluate((node.props ?? {}) as Record<string, Value>, runtime.ctx) as Record<string, unknown>) : undefined;
+	const [state, setState] = useState<unknown>(() => (props ? initialState(props) : null));
+	// Events wait in order: each one updates the state the previous one left.
+	const [pending, setPending] = useState<WidgetEvent[]>([]);
+	const event = pending[0];
+	const fn = runtime?.ctx.fn;
+
+	// Functions are pure and cached, so these return undefined until their result arrives.
+	const next = props?.update && event && fn ? fn(props.update, updateArgs(props, state, event)) : undefined;
+	const drawn = props && fn ? fn(props.render, renderArgs(props, state)) : undefined;
+
+	useEffect(() => {
+		runtime?.flush();
+		if (event && next !== undefined) {
+			setState(next);
+			setPending((events) => events.slice(1));
+		}
+	});
+
+	const inner = useMemo<RuntimeValue | undefined>(
+		() =>
+			runtime ? {
+				...runtime,
+				// Inside a widget, only its own events do anything.
+				invoke: async (value: unknown) => {
+					if (isWidgetEvent(value)) {
+						setPending((events) => [...events, value]);
+					}
+				},
+			} : undefined,
+		[runtime],
+	);
+	const tree = useMemo(() => (drawn !== undefined && drawn !== null && runtime?.widgets ? sanitizeWidgetTree(drawn, runtime.widgets).tree : undefined), [drawn, runtime?.widgets]);
+
+	if (!tree || !inner) {
+		return null;
+	}
+	return (
+		<Runtime.Provider value={inner}>
+			<div data-graft-widget="" aria-busy={pending.length > 0 ? true : undefined}>
+				<Node node={tree} />
+			</div>
+		</Runtime.Provider>
+	);
 }
 
 function errorMessage(error: unknown): string {

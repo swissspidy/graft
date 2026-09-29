@@ -41,21 +41,21 @@ export const scenarios: Scenario[] = [
 		description: 'Nothing the customizations use changes.',
 		patch: {},
 		migrations: [],
-		expect: { 'review-queue': 'survived', 'quick-approve': 'survived', 'editorial-inbox': 'survived', 'headline-check': 'survived' },
+		expect: { 'review-queue': 'survived', 'quick-approve': 'survived', 'editorial-inbox': 'survived', 'headline-check': 'survived', 'pending-by-author': 'survived' },
 	},
 	{
 		name: 'rename-list-capability',
 		description: 'posts.list is renamed to posts.query, with a declared migration.',
 		patch: { capabilities: { rename: { 'posts.list': 'posts.query' } } },
 		migrations: [{ op: 'rename', kind: 'capability', from: 'posts.list', to: 'posts.query' }],
-		expect: { 'review-queue': 'migrated', 'quick-approve': 'survived', 'editorial-inbox': 'migrated', 'headline-check': 'migrated' },
+		expect: { 'review-queue': 'migrated', 'quick-approve': 'survived', 'editorial-inbox': 'migrated', 'headline-check': 'migrated', 'pending-by-author': 'migrated' },
 	},
 	{
 		name: 'move-row-actions',
 		description: 'The row actions slot is deprecated in favor of posts.list.actions.',
 		patch: { slots: { alias: { 'posts.list.actions': 'posts.list.row-actions' }, deprecate: { 'posts.list.row-actions': 'posts.list.actions' } } },
 		migrations: [],
-		expect: { 'review-queue': 'survived', 'quick-approve': 'reanchored', 'editorial-inbox': 'survived', 'headline-check': 'survived' },
+		expect: { 'review-queue': 'survived', 'quick-approve': 'reanchored', 'editorial-inbox': 'survived', 'headline-check': 'survived', 'pending-by-author': 'survived' },
 	},
 	{
 		name: 'change-list-input',
@@ -63,7 +63,7 @@ export const scenarios: Scenario[] = [
 		patch: { variants: ['posts-list-statuses'], capabilities: { ability: { 'posts.list': 'graft-canary/posts-list' } } },
 		migrations: [],
 		// The headline check is recompiled, and its code comes through.
-		expect: { 'review-queue': 'regenerated', 'quick-approve': 'survived', 'editorial-inbox': 'regenerated', 'headline-check': 'regenerated' },
+		expect: { 'review-queue': 'regenerated', 'quick-approve': 'survived', 'editorial-inbox': 'regenerated', 'headline-check': 'regenerated', 'pending-by-author': 'regenerated' },
 	},
 	{
 		name: 'widen-publish-scope',
@@ -73,14 +73,14 @@ export const scenarios: Scenario[] = [
 			capabilities: { scopes: { 'posts.update_status': ['posts.status:write', 'posts.publish:write'] } },
 		},
 		migrations: [],
-		expect: { 'review-queue': 'needs_approval', 'quick-approve': 'needs_approval', 'editorial-inbox': 'needs_approval', 'headline-check': 'survived' },
+		expect: { 'review-queue': 'needs_approval', 'quick-approve': 'needs_approval', 'editorial-inbox': 'needs_approval', 'headline-check': 'survived', 'pending-by-author': 'survived' },
 	},
 	{
 		name: 'remove-status-update',
 		description: 'posts.update_status is removed without replacement.',
 		patch: { capabilities: { remove: ['posts.update_status'] } },
 		migrations: [],
-		expect: { 'review-queue': 'failed', 'quick-approve': 'failed', 'editorial-inbox': 'failed', 'headline-check': 'survived' },
+		expect: { 'review-queue': 'failed', 'quick-approve': 'failed', 'editorial-inbox': 'failed', 'headline-check': 'survived', 'pending-by-author': 'survived' },
 	},
 	{
 		name: 'no-functions',
@@ -88,7 +88,18 @@ export const scenarios: Scenario[] = [
 		patch: {},
 		migrations: [],
 		surface: ({ functions: _, ...rest }) => rest,
-		expect: { 'review-queue': 'survived', 'quick-approve': 'survived', 'editorial-inbox': 'survived', 'headline-check': 'failed' },
+		expect: { 'review-queue': 'survived', 'quick-approve': 'survived', 'editorial-inbox': 'survived', 'headline-check': 'failed', 'pending-by-author': 'failed' },
+	},
+	{
+		name: 'no-widgets',
+		description: 'The host still runs build functions, but no longer interactive widgets.',
+		patch: {},
+		migrations: [],
+		surface: (surface) => {
+			const { widgets: _, ...functions } = surface.functions!;
+			return { ...surface, functions };
+		},
+		expect: { 'review-queue': 'survived', 'quick-approve': 'survived', 'editorial-inbox': 'survived', 'headline-check': 'survived', 'pending-by-author': 'failed' },
 	},
 ];
 

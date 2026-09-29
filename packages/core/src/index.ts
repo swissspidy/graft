@@ -15,9 +15,10 @@ export { getPath, isAnd, isBinding, isCall, isCan, isDataRef, isEq, isExpression
 export { evaluate, inert, isAction, type Action, type EvalContext } from './build/evaluate.ts';
 export { FunctionError, functionKey, type AsyncFunctionRunner, type FunctionCall, type FunctionErrorKind, type FunctionResult, type FunctionRunner } from './build/functions.ts';
 export { extractRefs } from './build/refs.ts';
-export { validateBuild, type BuildValidation, type ValidateBuildOptions } from './build/validate.ts';
+export { validateBuild, validateWidgetTree, type BuildValidation, type ValidateBuildOptions } from './build/validate.ts';
 export { nextSpecState, specEvents, specLifecycle, type SpecEvent, type SpecState } from './lifecycle/spec.ts';
 export { removeRow } from './build/rows.ts';
+export { initialState, isWidgetEvent, renderArgs, sanitizeWidgetTree, updateArgs, WIDGET, widgetProps, type WidgetEvent, type WidgetLimits, type WidgetProps } from './build/widgets.ts';
 export { SandboxCallError, type Sandbox } from './verifier/sandbox.ts';
 export {
 	allActions,
@@ -30,6 +31,7 @@ export {
 	type SnapshotCell,
 	type SnapshotRow,
 	type SnapshotTable,
+	type SnapshotWidgets,
 } from './verifier/snapshot.ts';
 export { matchesRecord, verifyBuild, type CheckResult, type Verification, type VerifyOptions } from './verifier/run.ts';
 export { buildHash, compileSpec, COMPILER_VERSION } from './compiler/compile.ts';

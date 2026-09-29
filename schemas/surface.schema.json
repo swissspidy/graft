@@ -67,6 +67,16 @@
             "outputBytes": { "description": "Largest JSON result of one call, in bytes.", "type": "integer", "minimum": 1 },
             "sourceBytes": { "description": "Largest code source, in bytes.", "type": "integer", "minimum": 1 }
           }
+        },
+        "widgets": {
+          "description": "Present when builds may use interactive widgets: the components their functions may draw with.",
+          "type": "object",
+          "required": ["components", "maxNodes"],
+          "additionalProperties": false,
+          "properties": {
+            "components": { "type": "array", "items": { "type": "string" }, "uniqueItems": true },
+            "maxNodes": { "type": "integer", "minimum": 1 }
+          }
         }
       }
     },

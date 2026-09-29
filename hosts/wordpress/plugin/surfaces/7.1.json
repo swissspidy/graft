@@ -2,7 +2,7 @@
 	"graft": 1,
 	"host": "wordpress",
 	"hostVersion": "7.1.2",
-	"hash": "sha256:8f417b80e1e4bdc7d3f1daa6c61956b93c3910b4d25ce6692c880d2bb8550d62",
+	"hash": "sha256:c00f62a89f32ae9f1e0c5275974aa8fdecc248c790d51a256139edb95ae21e98",
 	"fingerprint": "sha256:aac93a247c479496ea0abe8ea8b948c5af6bed66a04e8ae3f1ff729ee262cce8",
 	"slots": {
 		"admin.page": {
@@ -638,6 +638,33 @@
 				"additionalProperties": false
 			},
 			"children": "text"
+		},
+		"widget": {
+			"description": "An interactive widget drawn by the build's code: render(input, state) returns a tree of components, and update(state, event, payload, input) the next state when a button sends {\"$event\": name, \"payload\": ...}.",
+			"props": {
+				"type": "object",
+				"properties": {
+					"render": {
+						"description": "The function that draws the widget.",
+						"type": "string"
+					},
+					"update": {
+						"description": "The function that computes the next state from an event.",
+						"type": "string"
+					},
+					"input": {
+						"description": "What the widget draws from, e.g. {\"$data\": \"queue.items\"}."
+					},
+					"state": {
+						"description": "The initial state."
+					}
+				},
+				"required": [
+					"render"
+				],
+				"additionalProperties": false
+			},
+			"children": "none"
 		}
 	},
 	"capabilities": {
@@ -1163,6 +1190,19 @@
 			"memoryBytes": 8388608,
 			"outputBytes": 16384,
 			"sourceBytes": 32768
+		},
+		"widgets": {
+			"components": [
+				"button",
+				"card",
+				"empty-state",
+				"heading",
+				"notice",
+				"stack",
+				"table",
+				"text"
+			],
+			"maxNodes": 200
 		}
 	},
 	"migrations": []

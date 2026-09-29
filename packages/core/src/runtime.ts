@@ -6,6 +6,7 @@ export { evaluate, inert, isAction, type Action, type EvalContext } from './buil
 export { FunctionError, functionKey, type AsyncFunctionRunner, type FunctionCall, type FunctionErrorKind, type FunctionResult, type FunctionRunner } from './build/functions.ts';
 export { getPath, isBinding, isCall, isCan, isFn, walkTree, walkValue } from './build/expressions.ts';
 export { removeRow } from './build/rows.ts';
+export { initialState, isWidgetEvent, renderArgs, sanitizeWidgetTree, updateArgs, WIDGET, widgetProps, type WidgetEvent, type WidgetLimits, type WidgetProps } from './build/widgets.ts';
 export type { Build, BuildCode, DataSource, TreeNode, Value } from './build/types.ts';
 export type { SurfaceFunctions } from './surface/types.ts';
 export { describeCheck, type CheckDescribers } from './verifier/describe.ts';
