@@ -99,14 +99,17 @@ installed.
    writes a spec (validated against the site as they type) and clicks
    **Build it**. The compiler runs in the browser; model requests go through
    the site's WordPress AI client, so provider keys never reach the browser.
-2. The build is saved as a draft until it is verified:
-   `graft site verify --site <url> --user <admin> --password <application password>`
-   runs its checks in a local WordPress sandbox and sends the result back.
+2. The checks run in a private, throwaway WordPress started in the admin's
+   browser ([Playground](https://wordpress.org/playground/) in a hidden
+   iframe, with this site's plugin installed). Failing candidates go back to
+   the compiler; a passing build is saved verified.
 3. The administrator reviews the permissions and every check in plain
    language, next to the criterion it proves, and approves it.
 
-Verifying inside the admin's browser (Playground in an iframe) would remove
-step 2's CLI; it is not built yet.
+Where Playground can't start (offline, blocked), the build is saved as an
+unverified draft, and
+`graft site verify --site <url> --user <admin> --password <application password>`
+verifies it from a terminal instead.
 
 ## Try it
 

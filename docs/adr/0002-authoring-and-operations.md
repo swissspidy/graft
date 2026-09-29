@@ -38,16 +38,22 @@ A build compiled in wp-admin is stored as a draft until it passes its
 checks. Verification must never touch the live site's data, so it runs in
 a throwaway WordPress:
 
-- **Now:** `graft site verify` fetches a site's unverified builds over REST
-  (application password), runs their checks in a local Playground sandbox
-  and posts the verification back. The site then moves them to "needs
-  approval" (or active, when the grant already covers them).
-- **Next:** the same sandbox in the admin's browser (Playground in a hidden
-  iframe, the plugin installed from `GET /graft/v1/sandbox-package`). The
-  sandbox protocol is transport-independent (`protocolSandbox`) so both
-  drivers share it. It is not wired up yet: it has only been exercised on CI
-  runners, because the development environment's browser cannot reach
-  Playground's servers with TLS intact.
+- **In the admin's browser:** "Build it" starts WordPress Playground in a
+  hidden iframe, installs this site's plugin from
+  `GET /graft/v1/sandbox-package` (administrators only, without the browser
+  bundles) and the sandbox endpoint, and runs each candidate's checks
+  there. The sandbox protocol is transport-independent
+  (`protocolSandbox`): the same operations go over HTTP to a Playground
+  server from Node, or through `client.request()` in the browser. It needs
+  access to playground.wordpress.net; the `graft_browser_verification`
+  filter turns it off.
+- **From a terminal:** `graft site verify` fetches a site's unverified
+  builds over REST (application password), runs their checks in a local
+  Playground sandbox and posts the verification back. This covers sites
+  where the browser can't run Playground.
+
+Either way, the site then moves the version to "needs approval" (or
+active, when the grant already covers it).
 
 ### Checks are reviewed in plain language
 
@@ -88,8 +94,7 @@ A security review of the plugin led to these rules:
 ## Consequences
 
 - A non-developer admin can go from an idea to a live, verified, approved
-  customization. Today that needs one CLI step from someone with an
-  application password; browser verification will remove it.
+  customization without leaving wp-admin.
 - Model output never reaches production without passing frozen checks and
   an explicit approval of its permissions.
 - Verification records are still asserted by the admin-level client that
