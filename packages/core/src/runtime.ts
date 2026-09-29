@@ -4,4 +4,5 @@
  */
 export { evaluate, isAction, type Action, type EvalContext } from './build/evaluate.ts';
 export { getPath, isBinding, isCall, isCan, walkTree, walkValue } from './build/expressions.ts';
+export { removeRow } from './build/rows.ts';
 export type { Build, DataSource, TreeNode, Value } from './build/types.ts';

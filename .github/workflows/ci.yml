@@ -36,6 +36,8 @@ jobs:
         run: pnpm test:wp
       - name: Check the checked-in surface is up to date
         run: pnpm surface:generate --check
+      - name: Verify the example builds against their criteria
+        run: pnpm verify:examples
       - name: Install Chromium
         run: pnpm exec playwright install --with-deps chromium
       - name: End-to-end tests in wp-admin

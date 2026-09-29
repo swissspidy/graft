@@ -82,6 +82,7 @@ function GraftButton({ props, invoke }: Props) {
 	}
 	return (
 		<ActionButton
+			id={String(props.id)}
 			label={String(props.label)}
 			action={props.onClick}
 			variant={props.variant as 'primary'}

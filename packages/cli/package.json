@@ -10,6 +10,7 @@
   },
   "dependencies": {
     "@graft/core": "workspace:*",
+    "@graft/wordpress-adapter": "workspace:*",
     "tsx": "^4.20.0"
   }
 }

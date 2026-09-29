@@ -8,7 +8,7 @@ Everything Graft needs to target WordPress 7.1+.
 | `adapter/`    | TypeScript: component registry and their WordPress implementations (`src/client`), ability schema normalization, surface generator, Playground driver. |
 | `e2e/`        | Playwright tests of the runtime in wp-admin, against a seeded Playground.            |
 | `plugin/surfaces/` | Generated surface snapshots, one per WordPress version. Checked in so host upgrades show up as diffs, and shipped with the plugin so it can tell which surface it runs on (by `fingerprint`). |
-| `playground/` | Blueprint and scripts run inside WordPress Playground (surface dump, smoke test, e2e seed). |
+| `playground/` | Blueprint and scripts run inside WordPress Playground (surface dump, smoke test, e2e seed), and `sandbox/`, the verification endpoint. |
 
 ## Surface v0
 
@@ -65,6 +65,29 @@ a hash and need no rebuild.
   `POST /graft/v1/specs/<id>/versions/<n>/builds|approve|decline|archive`
   (administrators; users may create `user`-scoped specs).
 
+## Verification
+
+`graft verify` (or `verifyInWordPress()`) boots a throwaway Playground with
+the plugin and the sandbox endpoint (`playground/sandbox/`, token-protected,
+never shipped). For every check it resets the site, seeds the check's
+fixtures, renders the build headlessly for the `view_as` user, with data
+from real ability calls, performs the steps, and evaluates the
+expectations over a semantic snapshot.
+
+- **Fixtures:** `{ users: [{ as, role }], posts: [{ title, status, author? }] }`,
+  where `author` is a user alias.
+- **Expectations:** `rows` (primary labels of the table, any order),
+  `columns`, `text`, `action` (with optional `row` matcher and
+  `available`), and the host assertion `post` (`{ title, status }`).
+- **Slot instances:** owned slots render once; `posts.list.row-actions`
+  renders once per post in the Posts screen's "All" view for that user.
+- **Semantics** (`adapter/src/semantics.ts`) say how each component reads in
+  a snapshot and must follow `src/client/components.tsx`.
+
+The grant is simulated as the spec's requested permissions, and the
+gateway's checks (capability in the build, scopes granted) are applied as
+in production.
+
 ## Commands
 
 Run from the repository root. Playground CLI is fetched on demand through
@@ -78,5 +101,6 @@ pnpm surface:generate --check       # fail if the plugin changed and the snapsho
 pnpm build                          # bundle the client runtime into plugin/build
 pnpm test:wp                        # smoke test abilities, store, lifecycle and gateway on WordPress 7.1 with PHP 7.4 and 8.4
 pnpm test:e2e                       # Playwright against a seeded Playground (editor, contributor, subscriber)
+pnpm verify:examples                # verify the example builds in a sandbox
 pnpm graft validate --surface hosts/wordpress/plugin/surfaces/7.1.json examples/specs
 ```

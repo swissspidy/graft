@@ -4,7 +4,10 @@ import apiFetch from '@wordpress/api-fetch';
 import { Notice as WPNotice } from '@wordpress/components';
 import { GraftRoot, type Gateway, type Notice } from '@graft/renderer-react';
 import type { Build } from '@graft/core/runtime';
+import { createCan } from '../can.ts';
 import { components } from './components.tsx';
+
+export { createCan };
 
 /** Printed by the plugin (includes/runtime.php) for the specs on this screen. */
 export interface RuntimeConfig {
@@ -22,31 +25,6 @@ declare global {
 	interface Window {
 		graftRuntime?: RuntimeConfig;
 	}
-}
-
-/**
- * Per-object refinement of a scope check: WordPress post objects from the
- * Graft abilities carry `can` flags for the current user.
- */
-const objectChecks: Record<string, string> = {
-	'posts.status:write': 'publish',
-	'posts:write': 'edit',
-};
-
-export function createCan(scopes: Record<string, boolean>) {
-	return (scope: string, on: unknown): boolean => {
-		if (scopes[scope] !== true) {
-			return false;
-		}
-		const key = objectChecks[scope];
-		if (key && typeof on === 'object' && on !== null) {
-			const can = (on as { can?: Record<string, unknown> }).can;
-			if (can && key in can) {
-				return can[key] === true;
-			}
-		}
-		return true;
-	};
 }
 
 export function createGateway(spec: string): Gateway {

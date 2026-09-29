@@ -1,5 +1,6 @@
 import { parseArgs } from 'node:util';
 import { checkBuildFile } from './build.ts';
+import { formatVerification, verifyFiles } from './verify.ts';
 import { formatResults, loadSurface, validateFiles } from './validate.ts';
 
 const USAGE = `Usage: graft <command> [options]
@@ -13,9 +14,15 @@ Commands:
     --surface <file>   Surface the build targets (required)
     --spec <file>      Also check it against the spec it implements
     --fix-refs         Recompute refs and hashes and rewrite the file
+  verify <file...>     Run builds' checks in a sandbox of their host
+    --surface <file>   Surface the builds target (required)
+    --spec <path>      Spec file, or directory of specs matched by id (required)
+    --out <dir>        Write one verification record per spec
+    --json             Print results as JSON
+    --verbose          Show the sandbox's output
 
 Coming next (see docs/adr/0001-architecture.md, section 9):
-  verify, compile, canary`;
+  compile, canary`;
 
 export async function main(argv: string[]): Promise<number> {
 	const [command, ...rest] = argv;
@@ -69,6 +76,31 @@ export async function main(argv: string[]): Promise<number> {
 			console.log(`  ${d.severity.padEnd(7)} ${d.path ?? ''}  ${d.message}  [${d.code}]`);
 		}
 		return result.ok ? 0 : 1;
+	}
+	if (command === 'verify') {
+		const { values, positionals } = parseArgs({
+			args: rest,
+			allowPositionals: true,
+			options: {
+				surface: { type: 'string' },
+				spec: { type: 'string' },
+				out: { type: 'string' },
+				json: { type: 'boolean', default: false },
+				verbose: { type: 'boolean', default: false },
+			},
+		});
+		if (positionals.length === 0 || !values.surface || !values.spec) {
+			console.error('graft verify: pass build files, --surface and --spec.');
+			return 2;
+		}
+		const results = await verifyFiles(positionals, {
+			surface: values.surface,
+			spec: values.spec,
+			verbose: values.verbose,
+			...(values.out ? { out: values.out } : {}),
+		});
+		console.log(values.json ? JSON.stringify(results, null, 2) : formatVerification(results));
+		return results.every((r) => r.verification?.passed) ? 0 : 1;
 	}
 	if (command === undefined || command === 'help' || command === '--help' || command === '-h') {
 		console.log(USAGE);

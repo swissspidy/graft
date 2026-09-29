@@ -1,5 +1,7 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ComponentType, type ReactNode } from 'react';
-import { evaluate, isAction, type Action, type Build, type EvalContext, type TreeNode, type Value } from '@graft/core/runtime';
+import { evaluate, isAction, removeRow, type Action, type Build, type EvalContext, type TreeNode, type Value } from '@graft/core/runtime';
+
+export { removeRow };
 
 /** Runs capability calls for a rendered build; the host enforces the grant. */
 export interface Gateway {
@@ -155,24 +157,6 @@ function Node({ node }: { node: TreeNode }) {
 			{children}
 		</Component>
 	);
-}
-
-/**
- * Removes a row from the arrays in a data source result, matching by
- * identity or by `id`. Rows that stay are not searched, so nested records
- * that happen to share the id are left alone.
- */
-export function removeRow(value: unknown, row: unknown): unknown {
-	const id = typeof row === 'object' && row !== null ? (row as { id?: unknown }).id : undefined;
-	const matches = (item: unknown) =>
-		item === row || (id !== undefined && typeof item === 'object' && item !== null && (item as { id?: unknown }).id === id);
-	if (Array.isArray(value)) {
-		return value.filter((item) => !matches(item));
-	}
-	if (typeof value === 'object' && value !== null) {
-		return Object.fromEntries(Object.entries(value).map(([key, item]) => [key, removeRow(item, row)]));
-	}
-	return value;
 }
 
 function errorMessage(error: unknown): string {

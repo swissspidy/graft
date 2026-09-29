@@ -95,6 +95,21 @@ test('editors see only pending posts with the right columns, and approve them', 
 	await expect(page.locator('#the-list')).toContainText('Draft A');
 });
 
+test('the served specs are verified, not flagged', async ({ page }) => {
+	await login(page, 'admin');
+	const specs = (await page.evaluate(() => window.wp.apiFetch({ path: '/graft/v1/specs' }))) as Array<{
+		spec_id: string;
+		versions: Array<{ state: string; unverified: boolean; builds: Record<string, { verification: { passed: boolean } | null }> }>;
+	}>;
+	expect(specs.map((s) => s.spec_id).sort()).toEqual(['quick-approve', 'review-queue']);
+	for (const spec of specs) {
+		const version = spec.versions[0]!;
+		expect(version.state).toBe('active');
+		expect(version.unverified).toBe(false);
+		expect(Object.values(version.builds)[0]!.verification?.passed).toBe(true);
+	}
+});
+
 test('subscribers get no review queue', async ({ page }) => {
 	await login(page, 'subscriber');
 	const response = await page.goto('/wp-admin/admin.php?page=graft-review-queue');

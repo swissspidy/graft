@@ -1,15 +1,19 @@
 <?php
 /**
  * Seeds a Playground site for the end-to-end tests: users with known
- * passwords, posts, and the example specs installed and approved with their
- * hand-written builds. Hand-written builds are not verified yet (the
- * verifier is milestone 4), so this relies on GRAFT_ALLOW_UNVERIFIED_BUILDS
- * and the versions are flagged as unverified.
+ * passwords, posts, and the example specs installed with their hand-written
+ * builds and the verification records e2e/server.ts produced, then approved.
  */
 
 require_once '/wordpress/wp-load.php';
 
 $users = array();
+wp_update_user(
+	array(
+		'ID'        => 1,
+		'user_pass' => 'password',
+	)
+);
 foreach ( array( 'editor', 'contributor', 'subscriber' ) as $role ) {
 	$users[ $role ] = wp_insert_user(
 		array(
@@ -48,6 +52,6 @@ foreach ( $examples as $spec_id => $example ) {
 			'title'    => $example['title'],
 		)
 	);
-	Graft\attach_build( $spec_id, $version['version'], $example['build'], null );
+	Graft\attach_build( $spec_id, $version['version'], $example['build'], $example['verification'] ?? null );
 	Graft\approve_version( $spec_id, $version['version'] );
 }

@@ -15,3 +15,17 @@ export { evaluate, isAction, type Action, type EvalContext } from './build/evalu
 export { extractRefs } from './build/refs.ts';
 export { validateBuild, type BuildValidation, type ValidateBuildOptions } from './build/validate.ts';
 export { nextSpecState, specEvents, specLifecycle, type SpecEvent, type SpecState } from './lifecycle/spec.ts';
+export { removeRow } from './build/rows.ts';
+export { SandboxCallError, type Sandbox } from './verifier/sandbox.ts';
+export {
+	allActions,
+	snapshotTree,
+	type ComponentSemantics,
+	type SemanticsArgs,
+	type Snapshot,
+	type SnapshotAction,
+	type SnapshotEmitter,
+	type SnapshotRow,
+	type SnapshotTable,
+} from './verifier/snapshot.ts';
+export { matchesRecord, verifyBuild, type CheckResult, type Verification, type VerifyOptions } from './verifier/run.ts';

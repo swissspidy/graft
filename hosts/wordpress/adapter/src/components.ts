@@ -70,6 +70,7 @@ export const components: Record<string, Component> = {
 		props: {
 			type: 'object',
 			properties: {
+				id,
 				label,
 				variant: { enum: ['primary', 'secondary', 'tertiary', 'link'], default: 'secondary' },
 				onClick: action,
@@ -77,7 +78,7 @@ export const components: Record<string, Component> = {
 				visible: condition,
 				confirm: { description: 'Ask for confirmation with this question first.', type: 'string' },
 			},
-			required: ['label', 'onClick'],
+			required: ['id', 'label', 'onClick'],
 			additionalProperties: false,
 		},
 		children: 'none',

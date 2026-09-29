@@ -2,7 +2,7 @@
 	"graft": 1,
 	"host": "wordpress",
 	"hostVersion": "7.1.2",
-	"hash": "sha256:11755c9980d0a6e0653cd3f09a56211edb0d6438205e49a9ed5539cf822e7e43",
+	"hash": "sha256:e3e750ece071f4aee88dd95f36adb2b64be674d7471be5e71e617ee7d4b491b6",
 	"fingerprint": "sha256:aac93a247c479496ea0abe8ea8b948c5af6bed66a04e8ae3f1ff729ee262cce8",
 	"slots": {
 		"admin.page": {
@@ -159,6 +159,10 @@
 			"props": {
 				"type": "object",
 				"properties": {
+					"id": {
+						"type": "string",
+						"pattern": "^[a-z][a-z0-9-]*$"
+					},
 					"label": {
 						"type": "string",
 						"minLength": 1,
@@ -262,6 +266,7 @@
 					}
 				},
 				"required": [
+					"id",
 					"label",
 					"onClick"
 				],

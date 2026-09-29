@@ -93,22 +93,29 @@ function mount_row_actions( array $actions, WP_Post $post ): array {
 		return $actions;
 	}
 	foreach ( array_keys( specs_in_slot( 'posts.list.row-actions' ) ) as $spec_id ) {
-		$actions[ 'graft-' . $spec_id ] = mount_point(
-			$spec_id,
-			array(
-				'post' => array(
-					'id'     => $post->ID,
-					'title'  => get_the_title( $post ),
-					'status' => $post->post_status,
-					'type'   => $post->post_type,
-					'can'    => array(
-						'edit'    => current_user_can( 'edit_post', $post->ID ),
-						'publish' => current_user_can( 'publish_post', $post->ID ),
-					),
-				),
-			),
-			'span'
-		);
+		$actions[ 'graft-' . $spec_id ] = mount_point( $spec_id, post_slot_props( $post ), 'span' );
 	}
 	return $actions;
+}
+
+/**
+ * Slot props for a post row, for the current user. Shared by the live Posts
+ * screen and the verification sandbox so builds see the same data in both.
+ *
+ * @param WP_Post $post Post.
+ * @return array<string, mixed>
+ */
+function post_slot_props( WP_Post $post ): array {
+	return array(
+		'post' => array(
+			'id'     => $post->ID,
+			'title'  => get_the_title( $post ),
+			'status' => $post->post_status,
+			'type'   => $post->post_type,
+			'can'    => array(
+				'edit'    => current_user_can( 'edit_post', $post->ID ),
+				'publish' => current_user_can( 'publish_post', $post->ID ),
+			),
+		),
+	);
 }
