@@ -7,10 +7,14 @@ import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { SandboxCallError, type Sandbox } from '@graft/core';
 import { DEFAULT_PHP, PLAYGROUND_CLI, paths } from './playground.ts';
+import type { HostDump } from './surface.ts';
 
 export interface WordPressSandbox extends Sandbox {
-	/** The WordPress version the sandbox runs. */
 	readonly url: string;
+	/** Applies a synthetic host change (see playground/sandbox/canary.php). */
+	patch(patch: Record<string, unknown>): Promise<void>;
+	/** The host half of the surface as the sandbox currently exposes it. */
+	dump(): Promise<HostDump>;
 	close(): Promise<void>;
 }
 
@@ -40,6 +44,11 @@ export async function startSandbox({ wp = '7.1', php = DEFAULT_PHP, verbose = fa
 			steps: [
 				{ step: 'defineWpConfigConsts', consts: { GRAFT_SANDBOX_TOKEN: token } },
 				{ step: 'activatePlugin', pluginPath: 'graft/graft.php' },
+				{
+					step: 'writeFile',
+					path: '/wordpress/wp-content/mu-plugins/graft-canary.php',
+					data: "<?php require '/wordpress/graft-sandbox/canary.php';",
+				},
 			],
 		}),
 	);
@@ -117,6 +126,12 @@ export async function startSandbox({ wp = '7.1', php = DEFAULT_PHP, verbose = fa
 		},
 		async assert(kind, expected) {
 			return op<{ ok: boolean; actual: unknown }>({ op: 'assert', kind, expected });
+		},
+		async patch(patch) {
+			await op({ op: 'patch', patch });
+		},
+		async dump() {
+			return op<HostDump>({ op: 'dump' });
 		},
 	};
 }

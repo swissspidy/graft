@@ -192,13 +192,25 @@ wp_set_current_user( $subscriber2 );
 $call = call( 'review-queue', 'posts.list' );
 check( 'users outside the audience are not served', 403 === $call['status'] && 'graft_spec_unavailable' === $call['code'], $call );
 
-// Narrow the grant behind the spec's back: the gateway must refuse.
-$version_post = Graft\get_version_post( 'review-queue', 1 );
-Graft\set_json_meta( $version_post->ID, '_graft_grant', array( 'scopes' => array( 'posts:read' ) ) );
+// The host moves a capability behind a new scope while the stored build is
+// unchanged: the gateway must refuse the call.
+$widen = static function ( array $map ): array {
+	$map['posts.update_status']['scopes'][] = 'posts.publish:write';
+	return $map;
+};
+add_filter( 'graft_surface_capability_map', $widen );
 $editor3 = user_named( 'editor', 'editor3' );
 wp_set_current_user( $editor3 );
 $call = call( 'review-queue', 'posts.update_status', array( 'id' => $pending2, 'status' => 'publish' ) );
-check( 'the gateway enforces the grant', 403 === $call['status'] && 'graft_not_granted' === $call['code'] && 'pending' === get_post_status( $pending2 ), $call );
+check( 'the gateway enforces the grant per capability', 403 === $call['status'] && 'graft_not_granted' === $call['code'] && 'pending' === get_post_status( $pending2 ), $call );
+remove_filter( 'graft_surface_capability_map', $widen );
+
+// Narrow the grant behind the spec's back: it is no longer served at all.
+$version_post = Graft\get_version_post( 'review-queue', 1 );
+Graft\set_json_meta( $version_post->ID, '_graft_grant', array( 'scopes' => array( 'posts:read' ) ) );
+wp_set_current_user( user_named( 'editor', 'editor3b' ) );
+$call = call( 'review-queue', 'posts.list' );
+check( 'a build the grant does not cover is not served', 403 === $call['status'] && 'graft_spec_unavailable' === $call['code'], $call );
 Graft\set_json_meta( $version_post->ID, '_graft_grant', $approved['grant'] );
 
 wp_set_current_user( $admin );
@@ -212,6 +224,90 @@ check( 'and supersedes version 1', 'superseded' === Graft\version_record( Graft\
 $archived = Graft\apply_event( 'review-queue', 2, 'archive' );
 check( 'archiving stops serving it', 'archived' === ( $archived['state'] ?? null ) && '' === get_post_meta( Graft\get_spec_post( 'review-queue' )->ID, '_graft_active_version', true ) );
 check( 'invalid events are refused', is_wp_error( Graft\apply_event( 'review-queue', 2, 'approve' ) ) );
+
+// ---------------------------------------------------------------------------
+// Host changes and upgrades prepared ahead of them (milestone 6).
+// ---------------------------------------------------------------------------
+
+$qa = $examples['quick-approve'];
+wp_set_current_user( $admin );
+Graft\create_version( array( 'source' => $qa['source'], 'manifest' => $qa['manifest'], 'title' => $qa['title'] ) );
+Graft\attach_build( 'quick-approve', 1, $qa['build'], array( 'passed' => true ) );
+Graft\approve_version( 'quick-approve', 1 );
+Graft\check_surface_change();
+$state = static function (): string {
+	return Graft\version_record( Graft\get_version_post( 'quick-approve', 1 ) )['state'];
+};
+check( 'quick-approve is active on surface A', 'active' === $state() );
+
+$surface_a = Graft\current_surface();
+$snapshot  = static function ( string $hash, string $fingerprint ) use ( $surface_a ) {
+	return static function ( array $snapshots ) use ( $surface_a, $hash, $fingerprint ): array {
+		$snapshots[ $hash ] = array_merge( $surface_a, array( 'hash' => $hash, 'fingerprint' => $fingerprint ) );
+		return $snapshots;
+	};
+};
+$with_scope = static function ( string $scope ) {
+	return static function ( array $scopes ) use ( $scope ): array {
+		$scopes[ $scope ] = array(
+			'title' => $scope,
+			'host'  => array( 'read' ),
+		);
+		return $scopes;
+	};
+};
+
+// Host B: nothing prepared.
+$hash_b  = 'sha256:' . str_repeat( 'b', 64 );
+$scope_b = $with_scope( 'canary-b:read' );
+add_filter( 'graft_surface_scopes', $scope_b );
+add_filter( 'graft_surface_snapshots', $snapshot( $hash_b, Graft\host_fingerprint() ) );
+check( 'the plugin finds the snapshot for the changed host', $hash_b === ( Graft\current_surface( true )['hash'] ?? null ) );
+Graft\check_surface_change();
+check( 'without a prepared build the version goes to upgrading', 'upgrading' === $state(), $state() );
+wp_set_current_user( user_named( 'editor', 'editor4' ) );
+check( 'an upgrading version is not served', ! isset( Graft\servable_specs()['quick-approve'] ) );
+
+wp_set_current_user( $admin );
+$build_b                    = $qa['build'];
+$build_b['surface']['hash'] = $hash_b;
+$attached                   = Graft\attach_build( 'quick-approve', 1, $build_b, array( 'passed' => true ) );
+check( 'a verified build for the new surface makes it active again', 'active' === ( $attached['state'] ?? null ), $attached['state'] ?? $attached );
+wp_set_current_user( user_named( 'editor', 'editor5' ) );
+check( 'and serves that build', $hash_b === ( Graft\servable_specs()['quick-approve']['build']['surface']['hash'] ?? null ) );
+
+// Host C: prepared in advance, but needing a wider grant.
+wp_set_current_user( $admin );
+$hash_c  = 'sha256:' . str_repeat( 'c', 64 );
+$scope_c = $with_scope( 'canary-c:read' );
+add_filter( 'graft_surface_scopes', $scope_c );
+$fingerprint_c = Graft\host_fingerprint();
+remove_filter( 'graft_surface_scopes', $scope_c );
+add_filter( 'graft_surface_snapshots', $snapshot( $hash_c, $fingerprint_c ) );
+
+$build_c                    = $qa['build'];
+$build_c['surface']['hash'] = $hash_c;
+$build_c['refs']['scopes'][] = 'posts.publish:write';
+$prepared                   = Graft\attach_build( 'quick-approve', 1, $build_c, array( 'passed' => true ) );
+check( 'a build needing a new scope can be prepared for an active version', 'active' === ( $prepared['state'] ?? null ), $prepared );
+
+$moved                           = $qa['build'];
+$moved['surface']['hash']        = $hash_c;
+$moved['mount']['slot']          = 'dashboard.widget';
+check( 'a build mounted elsewhere is refused', is_wp_error( Graft\attach_build( 'quick-approve', 1, $moved, array( 'passed' => true ) ) ) );
+$moved['provenance']['strategy'] = 'reanchored';
+$moved['refs']['scopes'][]       = 'posts.publish:write';
+check( 'unless it was re-anchored to a slot the surface has', ! is_wp_error( Graft\attach_build( 'quick-approve', 1, $moved, array( 'passed' => true ) ) ) );
+
+add_filter( 'graft_surface_scopes', $scope_c );
+Graft\current_surface( true );
+Graft\check_surface_change();
+check( 'on the change the wider build waits for approval', 'needs_approval' === $state(), $state() );
+wp_set_current_user( user_named( 'editor', 'editor6' ) );
+check( 'and is not served meanwhile', ! isset( Graft\servable_specs()['quick-approve'] ) );
+wp_set_current_user( $admin );
+$approved_c = Graft\approve_version( 'quick-approve', 1 );
+check( 'approval widens the grant to what the build needs', 'active' === ( $approved_c['state'] ?? null ) && in_array( 'posts.publish:write', $approved_c['grant']['scopes'] ?? array(), true ), $approved_c );
 
 global $wp_version;
 echo wp_json_encode(

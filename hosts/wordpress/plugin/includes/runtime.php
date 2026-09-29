@@ -73,7 +73,9 @@ function servable_specs(): array {
 			}
 			$record = version_record( $version );
 			$build  = $record['builds'][ $surface['hash'] ]['build'] ?? null;
-			if ( 'active' === $record['state'] && is_array( $build ) && applies_to_user( $record, $user ) ) {
+			// Never serve a build whose scopes the grant does not cover.
+			$covered = is_array( $build ) && grant_covers( $record['grant'], $build['refs']['scopes'] ?? array() );
+			if ( 'active' === $record['state'] && $covered && applies_to_user( $record, $user ) ) {
 				$servable[ $spec->post_name ] = array(
 					'record' => $record,
 					'build'  => $build,
@@ -166,4 +168,34 @@ function enqueue_runtime(): void {
 		'window.graftRuntime = ' . wp_json_encode( array( 'specs' => (object) $specs ), JSON_UNESCAPED_SLASHES | JSON_HEX_TAG | JSON_HEX_AMP ) . ';',
 		'before'
 	);
+}
+
+/**
+ * Tells administrators about customizations that are not shown because the
+ * host changed and no build for the new surface is ready.
+ */
+function surface_change_notice(): void {
+	if ( ! current_user_can( 'manage_options' ) ) {
+		return;
+	}
+	$waiting = array();
+	foreach ( list_specs() as $spec ) {
+		foreach ( $spec['versions'] as $version ) {
+			if ( in_array( $version['state'], array( 'upgrading', 'suspended', 'needs_approval' ), true ) && (int) $spec['active_version'] === $version['version'] ) {
+				$waiting[] = sprintf( '%s (%s)', $spec['title'], str_replace( '_', ' ', $version['state'] ) );
+			}
+		}
+	}
+	if ( $waiting ) {
+		printf(
+			'<div class="notice notice-warning"><p>%s</p></div>',
+			esc_html(
+				sprintf(
+					/* translators: %s: list of customizations. */
+					__( 'These customizations are not shown until they are upgraded for this version of WordPress: %s', 'graft' ),
+					implode( ', ', $waiting )
+				)
+			)
+		);
+	}
 }

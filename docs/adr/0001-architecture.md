@@ -530,6 +530,23 @@ generates input for it.
    releases change the admin surface slowly, so the canary's test corpus
    includes synthetic surface changes that force each rung of the ladder.
 
+### Implementation status
+
+All six milestones exist as a working prototype on WordPress 7.1, each
+covered by unit tests and by tests against real WordPress in Playground
+(`pnpm test:wp`, `test:e2e`, `verify:examples`, `test:compile`,
+`test:canary`). Notes on how the implementation settled some details:
+
+- The model is only called by `graft compile` and `graft canary
+  --regenerate`; everything else is deterministic, and the compile and
+  canary pipelines are tested end to end with scripted models.
+- The plugin detects host changes by fingerprinting its host surface and
+  serves builds prepared for the new surface hash without calling a model.
+  Running the ladder on the server at upgrade time is not implemented;
+  versions without a prepared build are hidden until one is attached.
+- Upgraded builds that need new scopes can be prepared for active versions;
+  they are never served until an admin widens the grant.
+
 ## Consequences
 
 Positive:

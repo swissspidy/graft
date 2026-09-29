@@ -88,6 +88,25 @@ The grant is simulated as the spec's requested permissions, and the
 gateway's checks (capability in the build, scopes granted) are applied as
 in production.
 
+## Upgrades
+
+- Builds are stored per surface hash, so builds for the next WordPress can
+  be attached before it is installed (`graft canary --out` writes them).
+  Re-anchored builds may mount elsewhere than the spec says, and upgraded
+  builds may need scopes beyond the grant: those are stored but not served
+  until approved.
+- On every admin and REST request the plugin compares its surface with the
+  last one it saw (`graft_surface_hash`). On a change, active versions with
+  a verified build for the new surface keep serving, those whose build
+  needs a wider grant move to `needs_approval`, and the rest move to
+  `upgrading` and are hidden until a build arrives (`upgraded`). Admins
+  see a notice listing them. `upgrade_failed` and `retry` are available as
+  REST events.
+- The sandbox's `canary.php` mu-plugin applies synthetic host changes
+  (renamed or removed capabilities, changed scopes, aliased and deprecated
+  slots, an ability with a different input) through the plugin's surface
+  filters, for the canary scenarios.
+
 ## Commands
 
 Run from the repository root. Playground CLI is fetched on demand through
@@ -102,5 +121,6 @@ pnpm build                          # bundle the client runtime into plugin/buil
 pnpm test:wp                        # smoke test abilities, store, lifecycle and gateway on WordPress 7.1 with PHP 7.4 and 8.4
 pnpm test:e2e                       # Playwright against a seeded Playground (editor, contributor, subscriber)
 pnpm verify:examples                # verify the example builds in a sandbox
+pnpm test:canary                    # run every canary scenario against fixtures/canary
 pnpm graft validate --surface hosts/wordpress/plugin/surfaces/7.1.json examples/specs
 ```

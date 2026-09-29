@@ -43,3 +43,8 @@ export type {
 	ModelRequest,
 	ModelResponse,
 } from './compiler/types.ts';
+export { staticCheck, slotPropsUsed, type LadderStart, type RefChange, type RefKind, type StaticCheck } from './upgrade/static-check.ts';
+export { applyMigrations } from './upgrade/migrate.ts';
+export { reanchor, reanchorCandidates } from './upgrade/reanchor.ts';
+export { describeChange, UPGRADE_LADDER, upgradeBuild, type UpgradeOptions, type UpgradeOutcome, type UpgradeResult, type UpgradeStep } from './upgrade/ladder.ts';
+export { formatCanaryReport, OUTCOMES, runCanary, type CanaryEntry, type CanaryOptions, type CanaryReport, type CorpusEntry } from './upgrade/canary.ts';

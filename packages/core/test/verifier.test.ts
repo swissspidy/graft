@@ -1,54 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { extractRefs, hashSpec, hashSurface, validateSpec, verifyBuild, type Build } from '../src/index.ts';
-import { createCan, fakeSandbox, fixtures, semantics, spec, specSource, surface } from './fixtures/acme.ts';
-
-async function pageBuild(input: Build['data'][string]['input'] = { status: 'open' }): Promise<Build> {
-	const build: Build = {
-		graft: 1,
-		spec: { id: 'open-items', hash: await hashSpec(specSource) },
-		surface: { host: 'acme', hash: await hashSurface(surface) },
-		mount: { slot: 'page' },
-		data: { open: { call: 'items.list', input } },
-		tree: {
-			type: 'stack',
-			children: [
-				{ type: 'text', children: 'Open items' },
-				{
-					type: 'list',
-					props: {
-						rows: { $data: 'open.items' },
-						empty: 'All done',
-						actions: [
-							{
-								id: 'close',
-								label: 'Close',
-								visible: { $can: 'items:write' },
-								onClick: { $call: 'items.close', input: { id: { $field: 'id' } }, then: ['remove-row:open'] },
-							},
-						],
-					},
-				},
-			],
-		},
-		checks: [
-			{ criterion: 'open-only', fixtures, view_as: 'm', expect: [{ rows: ['Open A'] }, { columns: ['Title'] }, { text: 'Open items' }] },
-			{
-				criterion: 'close',
-				fixtures,
-				view_as: 'm',
-				steps: [{ action: 'close', row: { title: 'Open A' } }],
-				expect: [{ rows: [] }, { text: 'All done' }, { item: { title: 'Open A', status: 'done' } }],
-			},
-			{ criterion: 'clerks', fixtures, view_as: 'c', expect: [{ rows: ['Open A'] }, { action: 'close', row: { title: 'Open A' }, available: false }] },
-			{ criterion: 'empty', fixtures: { ...fixtures, items: [] }, view_as: 'm', expect: [{ text: 'All done' }] },
-		],
-		refs: { slot: 'page', components: {}, capabilities: [], scopes: [] },
-		provenance: { compiler: 'test' },
-	};
-	build.refs = extractRefs(build, surface);
-	return build;
-}
-
+import { extractRefs, validateSpec, verifyBuild, type Build } from '../src/index.ts';
+import { createCan, fakeSandbox, fixtures, pageBuild, semantics, spec, specSource, surface } from './fixtures/acme.ts';
 
 describe('verifyBuild', () => {
 	it('passes a build that meets its criteria', async () => {

@@ -29,6 +29,12 @@ export interface ValidateBuildOptions {
 	 * id, criteria coverage and requested scopes are checked too.
 	 */
 	spec?: { spec: Spec; hash: string };
+	/**
+	 * Validating an upgrade candidate: the mount may differ from the spec's
+	 * (re-anchored), and scopes the spec does not request are warnings (the
+	 * candidate needs approval) instead of errors.
+	 */
+	upgrade?: boolean;
 }
 
 /**
@@ -142,12 +148,17 @@ export async function validateBuild(value: unknown, surface: Surface, options: V
 		if (build.spec.id !== spec.manifest.id || build.spec.hash !== hash) {
 			error('build-spec-mismatch', '/spec', `The build is for ${build.spec.id} ${build.spec.hash}, not ${spec.manifest.id} ${hash}.`);
 		}
-		if (build.mount.slot !== spec.manifest.mount.slot) {
+		if (build.mount.slot !== spec.manifest.mount.slot && !options.upgrade) {
 			error('build-spec-mismatch', '/mount/slot', `The spec mounts at "${spec.manifest.mount.slot}", the build at "${build.mount.slot}".`);
 		}
 		for (const scope of refs.scopes) {
 			if (!spec.manifest.permissions.includes(scope)) {
-				error('build-scope-not-requested', '/refs/scopes', `The build needs "${scope}", which the spec does not request.`);
+				diagnostics.push({
+					severity: options.upgrade ? 'warning' : 'error',
+					code: 'build-scope-not-requested',
+					path: '/refs/scopes',
+					message: `The build needs "${scope}", which the spec does not request.`,
+				});
 			}
 		}
 		const criteria = new Set(spec.criteria.map((c) => c.id));

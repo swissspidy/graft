@@ -18,6 +18,8 @@ export interface VerifyOptions {
 	 * function the host's renderer uses (with per-object refinement).
 	 */
 	createCan(usable: Record<string, boolean>): EvalContext['can'];
+	/** The grant to simulate. Default: the permissions the spec requests. */
+	grant?: string[];
 }
 
 export interface CheckResult {
@@ -86,7 +88,7 @@ async function runCheck(options: VerifyOptions, check: Check, index: number): Pr
 		return result();
 	}
 
-	const permissions = spec.manifest.permissions;
+	const permissions = options.grant ?? spec.manifest.permissions;
 	const audience = spec.manifest.audience ?? [];
 	const applies = audience.length === 0 || users[viewer].some((role) => audience.includes(role));
 	const can = options.createCan(await sandbox.scopes(viewer, permissions));

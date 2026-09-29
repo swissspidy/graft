@@ -93,7 +93,7 @@ function register_routes(): void {
 		)
 	);
 
-	foreach ( array( 'approve', 'decline', 'archive' ) as $event ) {
+	foreach ( array( 'approve', 'decline', 'archive', 'upgrade_failed', 'retry' ) as $event ) {
 		register_rest_route(
 			REST_NAMESPACE,
 			'/specs/(?P<spec_id>[a-z0-9-]+)/versions/(?P<version>\d+)/' . $event,

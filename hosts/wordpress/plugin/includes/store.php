@@ -394,15 +394,21 @@ function attach_build( string $spec_id, int $version, array $build, ?array $veri
 	if ( ( $build['spec']['id'] ?? null ) !== $spec_id || ( $build['spec']['hash'] ?? null ) !== $record['hash'] ) {
 		return new WP_Error( 'graft_build_mismatch', __( 'The build is for a different spec or version.', 'graft' ), array( 'status' => 400 ) );
 	}
-	if ( ( $build['mount']['slot'] ?? null ) !== ( $record['manifest']['mount']['slot'] ?? null ) ) {
-		return new WP_Error( 'graft_build_mismatch', __( 'The build mounts somewhere else than the spec.', 'graft' ), array( 'status' => 400 ) );
-	}
 	$surface_hash = (string) ( $build['surface']['hash'] ?? '' );
-	if ( ! is_known_surface( $surface_hash ) ) {
+	$snapshot     = surface_snapshot( $surface_hash );
+	if ( ! $snapshot ) {
 		return new WP_Error( 'graft_unknown_surface', __( 'The build targets a surface this plugin does not know.', 'graft' ), array( 'status' => 400 ) );
 	}
+	$slot       = (string) ( $build['mount']['slot'] ?? '' );
+	$reanchored = 'reanchored' === ( $build['provenance']['strategy'] ?? null ) && isset( $snapshot['slots'][ $slot ] );
+	if ( $slot !== ( $record['manifest']['mount']['slot'] ?? null ) && ! $reanchored ) {
+		return new WP_Error( 'graft_build_mismatch', __( 'The build mounts somewhere else than the spec.', 'graft' ), array( 'status' => 400 ) );
+	}
+	// An upgraded build may need scopes the spec never asked for (the host
+	// moved a capability behind a new permission). It is stored, but only
+	// served once an admin widens the grant.
 	$scopes = is_array( $build['refs']['scopes'] ?? null ) ? $build['refs']['scopes'] : array();
-	if ( array_diff( $scopes, $record['manifest']['permissions'] ) ) {
+	if ( array_diff( $scopes, $record['manifest']['permissions'] ) && 'active' !== $record['state'] && 'upgrading' !== $record['state'] ) {
 		return new WP_Error( 'graft_build_scope', __( 'The build needs permissions the spec does not request.', 'graft' ), array( 'status' => 400 ) );
 	}
 
@@ -422,6 +428,13 @@ function attach_build( string $spec_id, int $version, array $build, ?array $veri
 		update_post_meta( $post->ID, '_graft_unverified', 1 );
 	}
 
+	if ( 'upgrading' === $record['state'] ) {
+		$current = current_surface();
+		if ( $current && $current['hash'] === $surface_hash ) {
+			return transition( $post, grant_covers( $record['grant'], $scopes ) ? 'upgraded' : 'upgrade_needs_grant' );
+		}
+		return version_record( get_post( $post->ID ) );
+	}
 	if ( 'draft' === $record['state'] ) {
 		$result = transition( $post, 'submit' );
 		if ( is_wp_error( $result ) ) {
@@ -451,11 +464,15 @@ function approve_version( string $spec_id, int $version ) {
 	if ( 'needs_approval' !== $record['state'] ) {
 		return next_state( $record['state'], 'approve' );
 	}
+	// Grant what the spec requests, plus what the build for the current
+	// surface needs (an upgrade may need a new scope).
+	$current = current_surface();
+	$needed  = $current ? ( $record['builds'][ $current['hash'] ]['build']['refs']['scopes'] ?? array() ) : array();
 	set_json_meta(
 		$post->ID,
 		'_graft_grant',
 		array(
-			'scopes'      => array_values( $record['manifest']['permissions'] ),
+			'scopes'      => array_values( array_unique( array_merge( $record['manifest']['permissions'], $needed ) ) ),
 			'approved_by' => get_current_user_id(),
 			'approved_at' => gmdate( 'c' ),
 		)
@@ -508,4 +525,47 @@ function list_specs(): array {
 		},
 		$specs
 	);
+}
+
+/**
+ * Reacts to the host changing surface (a WordPress update, a plugin that
+ * filters the surface). Active versions with a build prepared for the new
+ * surface keep serving; those whose build needs a wider grant wait for
+ * approval; the rest go to upgrading and are not served until a build for
+ * the new surface is attached. Runs once per change.
+ */
+function check_surface_change(): void {
+	$current = current_surface();
+	$hash    = $current['hash'] ?? 'unknown';
+	$last    = get_option( 'graft_surface_hash' );
+	if ( $last === $hash ) {
+		return;
+	}
+	update_option( 'graft_surface_hash', $hash );
+	if ( false === $last ) {
+		return;
+	}
+	foreach ( list_specs() as $spec ) {
+		if ( ! $spec['active_version'] ) {
+			continue;
+		}
+		$post   = get_version_post( $spec['spec_id'], (int) $spec['active_version'] );
+		$record = $post ? version_record( $post ) : null;
+		if ( ! $record || ! in_array( $record['state'], array( 'active', 'upgrading', 'suspended' ), true ) ) {
+			continue;
+		}
+		$ready = $record['builds'][ $hash ] ?? null;
+		$ready = $ready && ! empty( $ready['verification']['passed'] ) ? $ready['build'] : null;
+		if ( 'active' === $record['state'] ) {
+			if ( $ready && grant_covers( $record['grant'], $ready['refs']['scopes'] ?? array() ) ) {
+				continue;
+			}
+			transition( $post, 'host_changed' );
+		} elseif ( 'suspended' === $record['state'] ) {
+			transition( $post, 'host_changed' );
+		}
+		if ( $ready ) {
+			transition( $post, grant_covers( $record['grant'], $ready['refs']['scopes'] ?? array() ) ? 'upgraded' : 'upgrade_needs_grant' );
+		}
+	}
 }

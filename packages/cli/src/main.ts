@@ -1,7 +1,9 @@
 import { parseArgs } from 'node:util';
 import { anthropicModel, DEFAULT_MODEL } from './anthropic.ts';
 import { checkBuildFile } from './build.ts';
+import { canaryCommand } from './canary.ts';
 import { compileFile } from './compile.ts';
+import { formatCanaryReport } from '@graft/core';
 import { formatVerification, verifyFiles } from './verify.ts';
 import { formatResults, loadSurface, validateFiles } from './validate.ts';
 
@@ -30,9 +32,16 @@ Commands:
     --previous <file>  Earlier build of the same spec version: reuse its checks, regenerate the tree
     --no-verify        Only validate candidates, do not run their checks
                        Needs ANTHROPIC_API_KEY (or an \`ant auth login\` profile).
+  canary               Upgrade every tenant's customizations ahead of a host change
+    --corpus <dir>     One directory per tenant with <spec>.md and its <spec>.json build
+    --from <file>      Surface the builds were made for (required)
+    --to <file>        Surface of the next host version, or:
+    --scenario <name>  A synthetic host change (see hosts/wordpress/adapter/src/canary.ts)
+    --regenerate       Let Claude regenerate builds nothing else can save (needs a key)
+    --out <dir>        Write upgraded builds and report.json
+    --json             Print the report as JSON
 
-Coming next (see docs/adr/0001-architecture.md, section 9):
-  canary`;
+See docs/adr/0001-architecture.md for how the pieces fit together.`;
 
 export async function main(argv: string[]): Promise<number> {
 	const [command, ...rest] = argv;
@@ -148,6 +157,36 @@ export async function main(argv: string[]): Promise<number> {
 			...(values.previous ? { previous: values.previous } : {}),
 		});
 		return result.ok ? 0 : 1;
+	}
+	if (command === 'canary') {
+		const { values } = parseArgs({
+			args: rest,
+			options: {
+				corpus: { type: 'string' },
+				from: { type: 'string' },
+				to: { type: 'string' },
+				scenario: { type: 'string' },
+				regenerate: { type: 'boolean', default: false },
+				model: { type: 'string', default: DEFAULT_MODEL },
+				out: { type: 'string' },
+				json: { type: 'boolean', default: false },
+			},
+		});
+		if (!values.corpus || !values.from || (!values.to && !values.scenario)) {
+			console.error('graft canary: pass --corpus, --from and --to or --scenario.');
+			return 2;
+		}
+		const report = await canaryCommand({
+			corpus: values.corpus,
+			from: values.from,
+			...(values.to ? { to: values.to } : {}),
+			...(values.scenario ? { scenario: values.scenario } : {}),
+			...(values.regenerate ? { model: anthropicModel({ model: values.model }) } : {}),
+			...(values.out ? { out: values.out } : {}),
+			log: (line) => console.error(line),
+		});
+		console.log(values.json ? JSON.stringify({ ...report, entries: report.entries.map(({ build: _b, ...e }) => e) }, null, 2) : formatCanaryReport(report));
+		return report.counts.failed > 0 ? 1 : 0;
 	}
 	if (command === undefined || command === 'help' || command === '--help' || command === '-h') {
 		console.log(USAGE);

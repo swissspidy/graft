@@ -52,3 +52,16 @@ jobs:
           name: e2e-results
           path: test-results/
           if-no-files-found: ignore
+
+  canary:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - name: Every synthetic host change reaches its expected rung
+        run: pnpm test:canary

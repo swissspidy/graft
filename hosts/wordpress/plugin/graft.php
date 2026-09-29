@@ -37,3 +37,6 @@ add_action( 'admin_menu', __NAMESPACE__ . '\mount_admin_pages' );
 add_action( 'wp_dashboard_setup', __NAMESPACE__ . '\mount_dashboard_widgets' );
 add_filter( 'post_row_actions', __NAMESPACE__ . '\mount_row_actions', 10, 2 );
 add_action( 'admin_footer', __NAMESPACE__ . '\enqueue_runtime' );
+add_action( 'admin_init', __NAMESPACE__ . '\check_surface_change' );
+add_action( 'rest_api_init', __NAMESPACE__ . '\check_surface_change' );
+add_action( 'admin_notices', __NAMESPACE__ . '\surface_change_notice' );

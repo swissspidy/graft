@@ -23,7 +23,27 @@ function surface_snapshots(): array {
 			}
 		}
 	}
-	return $snapshots;
+	/**
+	 * Filters the surface snapshots the plugin knows, keyed by name.
+	 *
+	 * @param array<string, array<string, mixed>> $snapshots Snapshots.
+	 */
+	return apply_filters( 'graft_surface_snapshots', $snapshots );
+}
+
+/**
+ * The snapshot with a given surface hash.
+ *
+ * @param string $hash Surface hash.
+ * @return array<string, mixed>|null
+ */
+function surface_snapshot( string $hash ): ?array {
+	foreach ( surface_snapshots() as $surface ) {
+		if ( $surface['hash'] === $hash ) {
+			return $surface;
+		}
+	}
+	return null;
 }
 
 /**
@@ -32,11 +52,12 @@ function surface_snapshots(): array {
  * version or a filter the plugin has not been prepared for). Builds are only
  * served for a known surface.
  *
+ * @param bool $refresh Recompute instead of using this request's answer.
  * @return array<string, mixed>|null
  */
-function current_surface(): ?array {
+function current_surface( bool $refresh = false ): ?array {
 	static $current = false;
-	if ( false === $current ) {
+	if ( false === $current || $refresh ) {
 		$current     = null;
 		$fingerprint = host_fingerprint();
 		foreach ( surface_snapshots() as $surface ) {
@@ -56,10 +77,5 @@ function current_surface(): ?array {
  * @return bool
  */
 function is_known_surface( string $hash ): bool {
-	foreach ( surface_snapshots() as $surface ) {
-		if ( $surface['hash'] === $hash ) {
-			return true;
-		}
-	}
-	return false;
+	return null !== surface_snapshot( $hash );
 }

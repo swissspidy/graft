@@ -7,3 +7,4 @@ export { semantics } from './semantics.ts';
 export { startSandbox, type SandboxOptions, type WordPressSandbox } from './sandbox.ts';
 export { verifyInWordPress, type VerifyTarget } from './verify.ts';
 export { hostGuide } from './guide.ts';
+export { loadCorpus, runWordPressCanary, scenarios, scenarioSurface, type Scenario, type WordPressCanaryOptions } from './canary.ts';

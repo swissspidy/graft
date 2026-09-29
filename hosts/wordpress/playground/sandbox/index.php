@@ -12,6 +12,8 @@
  * - call { as, capability, input }: run the capability's ability as the user.
  * - slot { as, slot }: slot props for every place the slot renders.
  * - assert { kind, expected }: host assertions (kind "post").
+ * - patch { patch }: store a synthetic host change for canary.php.
+ * - dump: the host half of the surface and its fingerprint.
  */
 
 require dirname( __DIR__ ) . '/wp-load.php';
@@ -118,7 +120,13 @@ switch ( $request['op'] ?? '' ) {
 
 	case 'slot':
 		wp_set_current_user( alias_user( (string) $request['as'] ) );
-		if ( 'posts.list.row-actions' === $request['slot'] ) {
+		// Resolve by anchor, so renamed or aliased slots render like the
+		// original.
+		$slot = Graft\surface_slots()[ (string) $request['slot'] ] ?? null;
+		if ( ! $slot ) {
+			respond( array( 'instances' => array() ) );
+		}
+		if ( 'filter:post_row_actions' === ( $slot['anchor'] ?? '' ) ) {
 			// The Posts screen's "All" view: every status it lists, private
 			// posts only where readable.
 			$query     = new WP_Query(
@@ -134,7 +142,16 @@ switch ( $request['op'] ?? '' ) {
 			$instances = array_map( 'Graft\post_slot_props', $query->posts );
 			respond( array( 'instances' => $instances ) );
 		}
-		respond( array( 'instances' => array( (object) array() ) ) );
+		respond( array( 'instances' => 'owned' === $slot['kind'] ? array( (object) array() ) : array() ) );
+
+	case 'patch':
+		update_option( 'graft_canary_patch', $request['patch'] ?? array() );
+		respond( array( 'ok' => true ) );
+
+	case 'dump':
+		$surface                = Graft\host_surface();
+		$surface['fingerprint'] = Graft\host_fingerprint( $surface );
+		respond( $surface );
 
 	case 'assert':
 		if ( 'post' === ( $request['kind'] ?? '' ) ) {

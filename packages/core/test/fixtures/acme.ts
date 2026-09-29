@@ -1,4 +1,14 @@
-import { SandboxCallError, validateSpec, type ComponentSemantics, type Sandbox, type Surface } from '../../src/index.ts';
+import {
+	extractRefs,
+	hashSpec,
+	hashSurface,
+	SandboxCallError,
+	validateSpec,
+	type Build,
+	type ComponentSemantics,
+	type Sandbox,
+	type Surface,
+} from '../../src/index.ts';
 
 /**
  * A tiny fake host ("acme") for verifier and compiler tests: items with
@@ -50,8 +60,17 @@ export const semantics: ComponentSemantics = {
 	},
 };
 
+export interface FakeHostOptions {
+	/** Capability names of the new host mapped to the ones this host implements. */
+	aliases?: Record<string, string>;
+	/** Slots that render like "item.actions". */
+	itemSlots?: string[];
+	/** Name of the status filter in the items.list input. */
+	statusKey?: string;
+}
+
 /** An in-memory host: items with statuses; only managers may close them. */
-export function fakeSandbox(): Sandbox & { calls: string[] } {
+export function fakeSandbox({ aliases = {}, itemSlots = ['item.actions'], statusKey = 'status' }: FakeHostOptions = {}): Sandbox & { calls: string[] } {
 	let users: Record<string, string[]> = {};
 	let items: Array<{ id: number; title: string; status: string }> = [];
 	const calls: string[] = [];
@@ -70,10 +89,11 @@ export function fakeSandbox(): Sandbox & { calls: string[] } {
 		async scopes(user, scopes) {
 			return Object.fromEntries(scopes.map((s) => [s, s === 'items:read' || users[user]?.includes('manager') === true]));
 		},
-		async call(user, capability, input) {
-			calls.push(`${user} ${capability}`);
+		async call(user, name, input) {
+			calls.push(`${user} ${name}`);
+			const capability = aliases[name] ?? name;
 			if (capability === 'items.list') {
-				const status = (input as { status?: string } | null)?.status;
+				const status = (input as Record<string, string> | null)?.[statusKey];
 				return { items: items.filter((item) => !status || item.status === status) };
 			}
 			if (!users[user]?.includes('manager')) {
@@ -84,7 +104,10 @@ export function fakeSandbox(): Sandbox & { calls: string[] } {
 			return item;
 		},
 		async slotInstances(_user, slot) {
-			return slot === 'page' ? [{}] : items.map((item) => ({ item }));
+			if (slot === 'page') {
+				return [{}];
+			}
+			return itemSlots.includes(slot) ? items.map((item) => ({ item })) : [];
 		},
 		async assert(kind, expected) {
 			const e = expected as { title: string; status: string };
@@ -129,3 +152,51 @@ export const fixtures = {
 };
 
 export const createCan = (usable: Record<string, boolean>) => (scope: string) => usable[scope] === true;
+
+/** The page build for the spec: a list of open items with a Close action. */
+export async function pageBuild(input: Build['data'][string]['input'] = { status: 'open' }): Promise<Build> {
+	const build: Build = {
+		graft: 1,
+		spec: { id: 'open-items', hash: await hashSpec(specSource) },
+		surface: { host: 'acme', hostVersion: '1.0', hash: await hashSurface(surface) },
+		mount: { slot: 'page' },
+		data: { open: { call: 'items.list', input } },
+		tree: {
+			type: 'stack',
+			children: [
+				{ type: 'text', children: 'Open items' },
+				{
+					type: 'list',
+					props: {
+						rows: { $data: 'open.items' },
+						empty: 'All done',
+						actions: [
+							{
+								id: 'close',
+								label: 'Close',
+								visible: { $can: 'items:write' },
+								onClick: { $call: 'items.close', input: { id: { $field: 'id' } }, then: ['remove-row:open'] },
+							},
+						],
+					},
+				},
+			],
+		},
+		checks: [
+			{ criterion: 'open-only', fixtures, view_as: 'm', expect: [{ rows: ['Open A'] }, { columns: ['Title'] }, { text: 'Open items' }] },
+			{
+				criterion: 'close',
+				fixtures,
+				view_as: 'm',
+				steps: [{ action: 'close', row: { title: 'Open A' } }],
+				expect: [{ rows: [] }, { text: 'All done' }, { item: { title: 'Open A', status: 'done' } }],
+			},
+			{ criterion: 'clerks', fixtures, view_as: 'c', expect: [{ rows: ['Open A'] }, { action: 'close', row: { title: 'Open A' }, available: false }] },
+			{ criterion: 'empty', fixtures: { ...fixtures, items: [] }, view_as: 'm', expect: [{ text: 'All done' }] },
+		],
+		refs: { slot: 'page', components: {}, capabilities: [], scopes: [] },
+		provenance: { compiler: 'test' },
+	};
+	build.refs = extractRefs(build, surface);
+	return build;
+}
