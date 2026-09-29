@@ -29,3 +29,9 @@ declare module '@wordpress/components' {
 declare module '@wordpress/api-fetch' {
 	export default function apiFetch<T = unknown>(options: { path: string; method?: string; data?: unknown }): Promise<T>;
 }
+
+// PHP files imported as text (esbuild's text loader), e.g. the sandbox endpoint.
+declare module '*.php' {
+	const content: string;
+	export default content;
+}
