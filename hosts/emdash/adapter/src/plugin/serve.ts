@@ -41,19 +41,32 @@ export type Call = (capability: string, input: unknown) => Promise<unknown>;
 export type LoadFunctions = (code: BuildCode, limits: SurfaceFunctions['limits']) => Promise<FunctionRunner>;
 
 /**
- * Sandboxes by code, kept while the process lives: a site has few builds
- * with code, and they change only with a new version. A load that fails is
- * forgotten, so the next render tries again.
+ * Sandboxes by code, at most MAX_RUNNERS: a site has few builds with code,
+ * and the least recently used (an old version's, say) is freed first. A
+ * load that fails is forgotten, so the next render tries again.
  */
 const runners = new Map<string, Promise<FunctionRunner>>();
+const MAX_RUNNERS = 16;
 
 function functionsFor(code: BuildCode, limits: SurfaceFunctions['limits'], load: LoadFunctions): Promise<FunctionRunner> {
 	const key = JSON.stringify([code.source, code.functions, limits]);
 	let runner = runners.get(key);
-	if (!runner) {
+	if (runner) {
+		// Most recently used last.
+		runners.delete(key);
+	} else {
 		runner = load(code, limits);
-		runners.set(key, runner);
-		runner.catch(() => runners.delete(key));
+		runner.catch(() => runners.get(key) === runner && runners.delete(key));
+	}
+	runners.set(key, runner);
+	for (const [oldKey, old] of runners) {
+		if (runners.size <= MAX_RUNNERS) {
+			break;
+		}
+		runners.delete(oldKey);
+		// Renders use a runner synchronously once it is loaded; freeing it in a later task never
+		// pulls it from under one.
+		old.then((evicted) => setTimeout(() => evicted.dispose?.(), 0)).catch(() => undefined);
 	}
 	return runner;
 }

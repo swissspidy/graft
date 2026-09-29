@@ -76,10 +76,9 @@ try {
 	await check('stale drafts shows a draft untouched for 45 days', () => widget('stale-drafts').getByText('45', { exact: true }).waitFor({ timeout: 30_000 }));
 	await check('pending by author filters by author', async () => {
 		await widget('pending-by-author').locator('[data-graft-action="author-grace-hopper"]').click({ timeout: 30_000 });
+		// The widget redraws once its update has run: wait for Ada's post to go.
+		await widget('pending-by-author').locator('tbody tr', { hasText: 'BUDGET SHOWDOWN' }).waitFor({ state: 'detached', timeout: 30_000 });
 		await widget('pending-by-author').locator('tbody tr', { hasText: 'Library hours' }).waitFor();
-		if ((await widget('pending-by-author').locator('tbody tr', { hasText: 'BUDGET SHOWDOWN' }).count()) !== 0) {
-			throw new Error('Ada’s post is still listed');
-		}
 	});
 	await page.goto(`http://127.0.0.1:${site}/wp-admin/tools.php?page=graft-customizations`);
 	await check('waiting-posts waits for approval', () => page.locator('[data-graft-spec="waiting-posts"] [data-graft-state]', { hasText: 'Needs approval' }).waitFor({ timeout: 30_000 }));

@@ -1,6 +1,6 @@
 import { execFile } from 'node:child_process';
 import { copyFile, mkdir, readFile, rm, writeFile } from 'node:fs/promises';
-import { join } from 'node:path';
+import { join, resolve } from 'node:path';
 import { parseArgs, promisify } from 'node:util';
 import { fileURLToPath } from 'node:url';
 import { exampleFixtures } from './fixtures.ts';
@@ -37,7 +37,8 @@ if (values.help) {
 	process.exit(0);
 }
 
-const out = values.out!;
+// Absolute: zip runs inside the staging directory.
+const out = resolve(values.out!);
 const base = values['base-url']!.endsWith('/') ? values['base-url']! : `${values['base-url']}/`;
 const wp = '7.1';
 
