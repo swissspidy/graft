@@ -26,6 +26,20 @@ The same functions can draw interactive widgets that keep state as the
 viewer clicks, still with the host's own components
 ([ADR 0006](docs/adr/0006-interactive-widgets.md)).
 
+## Try it
+
+[![Try in WordPress Playground](https://img.shields.io/badge/Try%20in%20WordPress%20Playground-3F57E1?style=for-the-badge&logo=WordPress&logoColor=ffffff)](https://playground.wordpress.net/?blueprint-url=https://swissspidy.github.io/graft/blueprint.json)
+
+This opens a throwaway WordPress in your browser with Graft and the example
+customizations installed, in a small newsroom with pending posts and drafts.
+The Dashboard shows the headline check, stale drafts and the "Pending by
+author" widget. **Tools → Customizations** lists every customization with
+its checks in plain language, and "Waiting for review" is left for you to
+approve. Every account's password is `password`. Sign in as `edna` (editor)
+for the review queue under **Posts** and the quick-approve row action, or
+as `ada` (contributor) to see the same queue without the Approve button. The demo is rebuilt from `main` on every push
+(`pnpm demo:build`, `pnpm test:demo`).
+
 Status: a working prototype. All six MVP milestones of the ADR are built, and
 each is tested against real WordPress in [Playground](https://wordpress.org/playground/).
 

@@ -15,6 +15,8 @@
     "surface:generate": "tsx hosts/wordpress/adapter/src/cli.ts",
     "test:wp": "pnpm build && tsx hosts/wordpress/adapter/src/smoke.ts",
     "build": "tsx hosts/wordpress/adapter/scripts/build-client.ts",
+    "demo:build": "tsx hosts/wordpress/adapter/src/demo.ts",
+    "test:demo": "tsx hosts/wordpress/adapter/src/demo-test.ts",
     "test:e2e": "playwright test -c hosts/wordpress/e2e/playwright.config.ts",
     "verify:examples": "tsx packages/cli/src/main.ts verify --surface hosts/wordpress/plugin/surfaces/7.1.json --spec examples/specs examples/builds/review-queue.json examples/builds/quick-approve.json examples/builds/waiting-posts.json examples/builds/stale-drafts.json examples/builds/headline-check.json examples/builds/pending-by-author.json",
     "test:compile": "tsx hosts/wordpress/adapter/src/compile-smoke.ts",

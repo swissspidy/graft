@@ -59,6 +59,8 @@ jobs:
         run: pnpm test:compile
       - name: Install Chromium
         run: pnpm exec playwright install --with-deps chromium
+      - name: The Playground demo boots from its blueprint and shows the examples
+        run: pnpm test:demo
       - name: End-to-end tests in wp-admin
         run: pnpm test:e2e
         env:
