@@ -2,18 +2,10 @@ import { hashSurface, validateSurface, type Diagnostic, type Slot, type Surface 
 import { components } from './components.ts';
 import { normalizeWordPressSchema } from './normalize-schema.ts';
 import { lastJsonLine, runPhp } from './playground.ts';
+import type { HostDump } from './surface-types.ts';
 
-/** The host half of the surface as printed by the plugin (see dump-surface.php). */
-export interface HostDump {
-	graft: 1;
-	host: 'wordpress';
-	hostVersion: string;
-	slots: Record<string, Slot> | [];
-	capabilities: Record<string, Surface['capabilities'][string]> | [];
-	scopes: Record<string, Surface['scopes'][string]> | [];
-	audiences: string[];
-	fingerprint: string;
-}
+export type { HostDump };
+
 
 /**
  * Merges the plugin's host dump with the adapter's components into a

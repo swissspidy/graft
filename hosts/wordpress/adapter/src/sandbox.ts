@@ -5,16 +5,11 @@ import { createServer } from 'node:net';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { SandboxCallError, type Sandbox } from '@graft/core';
 import { DEFAULT_PHP, PLAYGROUND_CLI, paths } from './playground.ts';
-import type { HostDump } from './surface.ts';
+import { protocolSandbox, type ProtocolSandbox } from './sandbox-protocol.ts';
 
-export interface WordPressSandbox extends Sandbox {
+export interface WordPressSandbox extends ProtocolSandbox {
 	readonly url: string;
-	/** Applies a synthetic host change (see playground/sandbox/canary.php). */
-	patch(patch: Record<string, unknown>): Promise<void>;
-	/** The host half of the surface as the sandbox currently exposes it. */
-	dump(): Promise<HostDump>;
 	close(): Promise<void>;
 }
 
@@ -101,39 +96,7 @@ export async function startSandbox({ wp = '7.1', php = DEFAULT_PHP, verbose = fa
 		throw error;
 	}
 
-	return {
-		url,
-		close,
-		async reset() {
-			await op({ op: 'reset' });
-		},
-		async seed(fixtures) {
-			const { users } = await op<{ users: Record<string, string[]> }>({ op: 'seed', fixtures });
-			return { users };
-		},
-		async scopes(user, scopes) {
-			return (await op<{ scopes: Record<string, boolean> }>({ op: 'scopes', as: user, scopes })).scopes;
-		},
-		async call(user, capability, input) {
-			const data = await op<{ result?: unknown; error?: { code: string; message: string } }>({ op: 'call', as: user, capability, input });
-			if (data.error) {
-				throw new SandboxCallError(data.error.code, data.error.message);
-			}
-			return data.result;
-		},
-		async slotInstances(user, slot) {
-			return (await op<{ instances: Array<Record<string, unknown>> }>({ op: 'slot', as: user, slot })).instances;
-		},
-		async assert(kind, expected) {
-			return op<{ ok: boolean; actual: unknown }>({ op: 'assert', kind, expected });
-		},
-		async patch(patch) {
-			await op({ op: 'patch', patch });
-		},
-		async dump() {
-			return op<HostDump>({ op: 'dump' });
-		},
-	};
+	return { ...protocolSandbox((body) => op(body)), url, close };
 }
 
 function stop(child: ChildProcess): void {
