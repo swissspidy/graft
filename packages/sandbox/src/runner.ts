@@ -77,6 +77,17 @@ const CALLER = `(() => {
 	};
 })()`;
 
+/** How long preparing the sandbox (our code, not the build's) may take. */
+const SETUP_MS = 1000;
+
+/** Exercises the parser, JSON and common built-ins once, so the build's first call finds a warm engine. */
+const WARM_UP = `(() => {
+	const rows = JSON.parse('[{"id":1,"title":"A b","tags":["x"]},{"id":2,"title":"C","tags":[]}]');
+	const out = rows.filter((row) => row.id > 0).map((row) => ({ ...row, words: row.title.toLowerCase().split(/\\s+/).length }));
+	out.sort((a, b) => a.title.localeCompare(b.title));
+	return JSON.stringify(out).length + new Date(0).getTime();
+})()`;
+
 export class QuickJSFunctions implements FunctionRunner {
 	#deadline = 0;
 	#disposed = false;
@@ -93,8 +104,22 @@ export class QuickJSFunctions implements FunctionRunner {
 		runtime.setMaxStackSize(256 * 1024);
 		runtime.setInterruptHandler(() => performance.now() > this.#deadline);
 
-		this.#caller = this.#run(() => vm.evalCode(CALLER, 'graft:caller'), 'Preparing the sandbox');
+		// Our own code, under a budget of its own: a cold engine (asm.js above all) is much slower
+		// on its first run, and that must not count against the build's code.
+		this.#caller = this.#run(() => vm.evalCode(CALLER, 'graft:caller'), 'Preparing the sandbox', SETUP_MS);
 		try {
+			this.#run(() => vm.evalCode(WARM_UP, 'graft:warm-up'), 'Preparing the sandbox', SETUP_MS).dispose();
+			const warm = this.#run(() => vm.evalCode('(() => [1, "a", { b: true }])', 'graft:warm-up'), 'Preparing the sandbox', SETUP_MS);
+			const json = vm.newString('[]');
+			const time = vm.newNumber(0);
+			try {
+				this.#run(() => vm.callFunction(this.#caller, vm.undefined, warm, json, time), 'Preparing the sandbox', SETUP_MS).dispose();
+			} finally {
+				warm.dispose();
+				json.dispose();
+				time.dispose();
+			}
+
 			this.#run(() => vm.evalCode(code.source, 'build.js'), 'Loading the code').dispose();
 			for (const name of code.functions) {
 				const handle = this.#run(() => ({ value: vm.getProp(vm.global, name) }) as ReturnType<QuickJSContext['evalCode']>, `Reading "${name}"`);
@@ -164,9 +189,9 @@ export class QuickJSFunctions implements FunctionRunner {
 		this.runtime.dispose();
 	}
 
-	/** Runs VM code under the per-call deadline and turns VM errors into FunctionErrors. */
-	#run(step: () => ReturnType<QuickJSContext['evalCode']>, what: string): QuickJSHandle {
-		this.#deadline = performance.now() + this.limits.timeMs;
+	/** Runs VM code under a deadline (the per-call one unless given) and turns VM errors into FunctionErrors. */
+	#run(step: () => ReturnType<QuickJSContext['evalCode']>, what: string, budgetMs = this.limits.timeMs): QuickJSHandle {
+		this.#deadline = performance.now() + budgetMs;
 		let result: ReturnType<QuickJSContext['evalCode']>;
 		try {
 			result = step();
@@ -188,7 +213,7 @@ export class QuickJSFunctions implements FunctionRunner {
 			}
 			const message = typeof error === 'object' && error !== null ? `${error.name ?? 'Error'}: ${error.message ?? ''}` : String(error);
 			if (/interrupted/i.test(message)) {
-				throw new FunctionError('timeout', `${what} ran longer than ${this.limits.timeMs} ms and was stopped`);
+				throw new FunctionError('timeout', `${what} ran longer than ${budgetMs} ms and was stopped`);
 			}
 			if (/out of memory/i.test(message)) {
 				throw new FunctionError('memory', `${what} used more than ${this.limits.memoryBytes} bytes of memory`);
