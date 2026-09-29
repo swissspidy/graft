@@ -18,6 +18,11 @@ export interface EvalContext {
 	 * Returns undefined while a result is pending. Without it, `$fn` is null.
 	 */
 	fn?(name: string, args: unknown[]): unknown;
+	/**
+	 * Inside a widget: resolves a use of one of its declared actions to the
+	 * action for that row, or null when it is not offered.
+	 */
+	use?(use: { $use: string; row?: unknown }): unknown;
 }
 
 /**
@@ -142,6 +147,13 @@ export function evaluate(value: Value | undefined, ctx: EvalContext): unknown {
 	}
 	if (isNot(value)) {
 		return evaluate(value.$not, ctx) !== true;
+	}
+	// A widget's use of a declared action, inside a row (a table's): it applies to that row.
+	if (typeof (value as { $use?: unknown }).$use === 'string') {
+		const marker = value as unknown as { $use: string; row?: unknown };
+		const use = marker.row === undefined && ctx.row !== undefined ? { ...marker, row: ctx.row } : marker;
+		// Resolve once there is a row: a table's props are evaluated first without one.
+		return ctx.use && use.row !== undefined ? ctx.use(use) : use;
 	}
 	if (isCall(value)) {
 		const action: Action = {

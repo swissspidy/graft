@@ -83,7 +83,8 @@ function ActionButton({
 }
 
 function GraftButton({ props, invoke }: Props) {
-	if (props.visible === false) {
+	// A null action is a widget's action that is not offered here.
+	if (props.visible === false || props.onClick === null) {
 		return null;
 	}
 	return (
@@ -182,7 +183,7 @@ function Table({ props, raw, evaluate, invoke }: Props) {
 						<div style={{ display: 'flex', gap: 8 }}>
 							{actions.map((rawAction) => {
 								const action = evaluate(rawAction as never, row) as TableAction;
-								if (action.visible === false) {
+								if (action.visible === false || action.onClick === null) {
 									return null;
 								}
 								return (

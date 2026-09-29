@@ -1,5 +1,5 @@
-import { inert } from './evaluate.ts';
-import type { TreeNode } from './types.ts';
+import { evaluate, inert, isAction, type Action, type EvalContext } from './evaluate.ts';
+import type { TreeNode, Value } from './types.ts';
 
 /**
  * Interactive widgets: a `widget` node names two of the build's functions.
@@ -9,8 +9,11 @@ import type { TreeNode } from './types.ts';
  *
  * Code never touches the page and never calls a capability: what it
  * returns is sanitized here into inert props on allow-listed components,
- * rendered by the host's trusted components, and its only live values are
- * event markers that lead back to `update`.
+ * rendered by the host's trusted components. Its only live values are
+ * markers: events that lead back to `update`, and uses of the widget's
+ * declared actions (`{"$use": name, "row": id}`), which the host resolves
+ * against the rows the widget was given. Code chooses which declared
+ * action to offer on which of those rows, never what the action does.
  */
 
 /** The component type that hosts a widget. */
@@ -23,6 +26,22 @@ export interface WidgetEvent {
 
 export const isWidgetEvent = (value: unknown): value is WidgetEvent =>
 	typeof value === 'object' && value !== null && !Array.isArray(value) && typeof (value as { $event?: unknown }).$event === 'string';
+
+/** Use of one of the widget's declared actions, on one row of its input. */
+export interface WidgetUse {
+	$use: string;
+	/** The row's id, or a row carrying it (a table fills in its own row). */
+	row?: unknown;
+}
+
+export const isWidgetUse = (value: unknown): value is WidgetUse =>
+	typeof value === 'object' && value !== null && !Array.isArray(value) && typeof (value as { $use?: unknown }).$use === 'string';
+
+/** An action a widget node declares: a `$call`, and when it is offered. */
+export interface WidgetAction {
+	call: Value;
+	visible?: Value;
+}
 
 /** What a surface lets widgets draw with. */
 export interface WidgetLimits {
@@ -56,6 +75,13 @@ export function sanitizeWidgetTree(value: unknown, limits: WidgetLimits): Saniti
 	let count = 0;
 
 	const prop = (item: unknown, depth: number): unknown => {
+		if (isWidgetUse(item)) {
+			if (!EVENT_NAME.test(item.$use)) {
+				problems.push(`Action "${item.$use}" is not a valid name.`);
+				return null;
+			}
+			return item.row === undefined ? { $use: item.$use } : { $use: item.$use, row: inert(item.row) };
+		}
 		if (isWidgetEvent(item)) {
 			if (!EVENT_NAME.test(item.$event)) {
 				problems.push(`Event "${item.$event}" is not a valid name.`);
@@ -137,4 +163,44 @@ export function widgetProps(props: Record<string, unknown>): WidgetProps | undef
 		...(props.input !== undefined ? { input: props.input } : {}),
 		...(props.state !== undefined ? { state: props.state } : {}),
 	};
+}
+
+/** The row of a widget's input a use refers to, by id; undefined when it names none. */
+export function widgetRow(input: unknown, ref: unknown): Record<string, unknown> | undefined {
+	const id = typeof ref === 'object' && ref !== null ? (ref as { id?: unknown }).id : ref;
+	if (typeof id !== 'string' && typeof id !== 'number') {
+		return undefined;
+	}
+	const rows = Array.isArray(input) ? input : [];
+	return rows.find((row): row is Record<string, unknown> => typeof row === 'object' && row !== null && (row as { id?: unknown }).id === id);
+}
+
+export interface ResolvedUse {
+	/** The declared action, evaluated for the row. */
+	action?: Action;
+	row?: Record<string, unknown>;
+	available: boolean;
+	/** Why it is not available, when that is the code's doing. */
+	problem?: string;
+}
+
+/**
+ * Resolves a use against the widget's declared actions (unevaluated) and
+ * its input: the row must be one of the input's rows (matched by id, so a
+ * copy the code made cannot change it), and the action is the declared
+ * `$call` evaluated for that row, offered only if its `visible` holds.
+ */
+export function resolveWidgetUse(use: WidgetUse, actions: unknown, input: unknown, ctx: EvalContext): ResolvedUse {
+	const declared = typeof actions === 'object' && actions !== null && Object.hasOwn(actions, use.$use) ? (actions as Record<string, WidgetAction>)[use.$use] : undefined;
+	if (!declared) {
+		return { available: false, problem: `The widget offers "${use.$use}", which it does not declare.` };
+	}
+	const row = widgetRow(input, use.row);
+	if (!row) {
+		return { available: false, problem: `The widget offers "${use.$use}" on a row that is not in its input.` };
+	}
+	const rowCtx = { ...ctx, row };
+	const action = evaluate(declared.call, rowCtx);
+	const visible = declared.visible === undefined || evaluate(declared.visible, rowCtx) === true;
+	return isAction(action) ? { action, row, available: visible } : { row, available: false, problem: `The widget's "${use.$use}" is not a $call.` };
 }

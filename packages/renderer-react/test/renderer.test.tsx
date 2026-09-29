@@ -231,6 +231,49 @@ describe('GraftRoot with widgets', () => {
 		expect(container.textContent).toBe('ada: 4AddSneak');
 	});
 
+	it('runs a declared action on a row of its input, and nothing else', async () => {
+		const withActions = {
+			...build,
+			data: { queue: { call: 'items.list' } },
+			code: { language: 'javascript', source: '', functions: ['draw'] },
+			tree: {
+				type: 'widget',
+				props: {
+					render: 'draw',
+					input: { $data: 'queue.items' },
+					actions: { close: { call: { $call: 'items.close', input: { id: { $field: 'id' } }, then: ['refresh:queue'] } } },
+				},
+			},
+		} as unknown as Build;
+		const drawn = {
+			type: 'stack',
+			children: [
+				{ type: 'button', props: { label: 'Close two', onClick: { $use: 'close', row: 2 } } },
+				{ type: 'button', props: { label: 'Close a row it made up', onClick: { $use: 'close', row: { id: 99 } } } },
+				{ type: 'button', props: { label: 'Use an undeclared action', onClick: { $use: 'delete', row: 1 } } },
+			],
+		};
+		const call = vi.fn(async (capability: string) => (capability === 'items.list' ? { items: [{ id: 1 }, { id: 2 }] } : {}));
+		container = document.createElement('div');
+		document.body.append(container);
+		await act(async () => {
+			createRoot(container).render(
+				<GraftRoot
+					build={withActions}
+					components={withButtons}
+					gateway={{ call }}
+					can={() => true}
+					functions={() => ({ call: async (calls) => calls.map(() => ({ ok: true, value: drawn })) })}
+					widgets={{ components: ['stack', 'button'], maxNodes: 20 }}
+				/>,
+			);
+		});
+		for (const button of [...container.querySelectorAll('button')]) {
+			await act(async () => button.click());
+		}
+		expect(call.mock.calls.filter(([capability]) => capability === 'items.close')).toEqual([['items.close', { id: 2 }]]);
+	});
+
 	it('updates its state on its own events, and never reaches the gateway', async () => {
 		const call = vi.fn(async () => ({}));
 		await mount({ call });

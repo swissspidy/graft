@@ -91,6 +91,14 @@ test('an interactive widget filters pending posts by author, drawn by code in th
 		await expect(everyone).toHaveClass(/is-primary/);
 		await expect(widget.locator('tbody tr')).toHaveCount(3);
 		await widget.screenshot({ path: 'test-results/pending-by-author.png' });
+
+		// The widget's declared action, on one of its rows: publishes through the gateway.
+		await row('Editor pitch').locator('[data-graft-action="approve"]').click();
+		await expect(page.locator('.components-notice__content', { hasText: 'Published.' })).toBeVisible();
+		await expect(row('Editor pitch')).toHaveCount(0);
+		await expect(widget.locator('tbody tr')).toHaveCount(2);
+		const published = (await page.evaluate((id) => window.wp.apiFetch({ path: `/wp/v2/posts/${id}?context=edit` }), created.id)) as { status: string };
+		expect(published.status).toBe('publish');
 	} finally {
 		await page.evaluate((id) => window.wp.apiFetch({ path: `/wp/v2/posts/${id}?force=true`, method: 'DELETE' }), created.id);
 	}

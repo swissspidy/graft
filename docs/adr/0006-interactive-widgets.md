@@ -78,6 +78,37 @@ QuickJS in-process as in ADR 0005.
   instance: it survives `refresh`, and `reload:page` resets it, as in the
   browser.
 
+### Declared actions: code picks the row, the build says what happens
+
+A widget can change things, but only through actions its build declares:
+
+```json
+"actions": { "approve": { "call": { "$call": "posts.update_status", "input": { "id": { "$field": "id" }, "status": "publish" }, "then": ["refresh:pending"] }, "visible": { "$can": "posts.status:write" } } }
+```
+
+A drawn button offers one with `onClick: {"$use": "approve", "row": <id>}`.
+In a table's row actions, `{"$use": "approve"}` applies to that row. The
+host resolves the use while drawing (`resolveWidgetUse`):
+
+- **Declared actions only.** The action must be declared on the widget
+  node. A name it does not declare is refused.
+- **Real rows only.** The row must be one of the widget's `input` rows,
+  matched by `id`. A copy the code made, with forged fields, still
+  resolves to the input's own row, and an id that is not there resolves
+  to nothing.
+- **The build decides what happens.** The declared `$call` is evaluated
+  for that row, as table actions are, and offered only where `visible`
+  holds. What reaches the component is either that action or null. The
+  WordPress components hide a button whose action is null.
+- **The usual gates still apply.** Invoking the action goes through the
+  normal gateway: the build must use the capability, the grant must cover
+  it, and the host's own permission check runs.
+
+Code decides which declared action to offer on which of the rows it was
+given. It never decides the capability, the input or the permission.
+The verifier resolves uses the same way. A use of an undeclared action,
+or on a row that is not in the input, fails the check with a reason.
+
 ### Lifecycle
 
 - **Validation.** Only surfaces with `functions.widgets` accept a
@@ -94,17 +125,19 @@ QuickJS in-process as in ADR 0005.
 
 `examples/specs/pending-by-author.md` lists pending posts with a button
 per author ("Ada (2)"). Choosing an author lists only that author's
-posts, and "Everyone" lists all of them again. Its checks click the
-buttons. It passes in Playground, is served in wp-admin (e2e: the
-buttons switch the list), and is in the canary corpus.
+posts, and "Everyone" lists all of them again. Each row has an Approve
+button, the widget's declared `approve` action, offered where the viewer
+may publish that post. Its checks click the buttons and approve a post.
+It passes in Playground, is served in wp-admin (e2e: the buttons switch
+the list, and Approve publishes through the gateway), and is in the canary
+corpus.
 
 ## Consequences
 
-- **Still read-only.** A widget cannot change anything on the site. A
-  button inside a widget calling a declared action would be the next
-  step. It has to keep code from choosing what is written, for example
-  by letting code pick only among rows the build already reads, with the
-  gateway re-checking. That needs its own design.
+- **Actions need an input list with ids.** A widget without `input` rows
+  (records with an `id`) cannot offer declared actions. That covers lists
+  of records, the common case; actions on other shapes would need another
+  way to name what they apply to.
 - **State is per page view.** Nothing is persisted; a reload starts from
   the initial state.
 - **One worker per build with code.** Two widgets on one screen from two

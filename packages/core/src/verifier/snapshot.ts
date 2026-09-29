@@ -1,6 +1,6 @@
-import { evaluate, type Action, type EvalContext } from '../build/evaluate.ts';
+import { evaluate, isAction, type Action, type EvalContext } from '../build/evaluate.ts';
 import type { TreeNode, Value } from '../build/types.ts';
-import { initialState, isWidgetEvent, renderArgs, sanitizeWidgetTree, WIDGET, widgetProps, type WidgetLimits, type WidgetProps } from '../build/widgets.ts';
+import { initialState, isWidgetEvent, renderArgs, resolveWidgetUse, sanitizeWidgetTree, WIDGET, widgetProps, type WidgetLimits, type WidgetProps, type WidgetUse } from '../build/widgets.ts';
 
 /**
  * A semantic snapshot of a rendered build for one user: what they can read
@@ -108,11 +108,11 @@ export function snapshotTree(tree: TreeNode, ctx: EvalContext, semantics: Compon
 
 	const problem = (text: string) => (snapshot.problems ??= []).push(text);
 
-	const visit = (node: TreeNode, path: string, out: SnapshotEmitter): void => {
+	const visit = (node: TreeNode, path: string, out: SnapshotEmitter, at: EvalContext = ctx): void => {
 		const raw = (node.props ?? {}) as Record<string, Value>;
-		const props = evaluate(raw, ctx) as Record<string, unknown>;
+		const props = evaluate(raw, at) as Record<string, unknown>;
 		if (node.type === WIDGET) {
-			drawWidget(props, path);
+			drawWidget(raw, props, path);
 			return;
 		}
 		const describe = semantics[node.type];
@@ -120,7 +120,7 @@ export function snapshotTree(tree: TreeNode, ctx: EvalContext, semantics: Compon
 			node,
 			props,
 			raw,
-			evaluate: (value, row) => evaluate(value, row === undefined ? ctx : { ...ctx, row }),
+			evaluate: (value, row) => evaluate(value, row === undefined ? at : { ...at, row }),
 			emit: out,
 		});
 		if (result === false) {
@@ -131,12 +131,12 @@ export function snapshotTree(tree: TreeNode, ctx: EvalContext, semantics: Compon
 				out.text(node.children);
 			}
 		} else {
-			node.children?.forEach((child, i) => visit(child, `${path}/children/${i}`, out));
+			node.children?.forEach((child, i) => visit(child, `${path}/children/${i}`, out, at));
 		}
 	};
 
 	/** Draws a widget with its current state; its event buttons become actions that update it. */
-	const drawWidget = (props: Record<string, unknown>, path: string): void => {
+	const drawWidget = (raw: Record<string, Value>, props: Record<string, unknown>, path: string): void => {
 		const wp = widgetProps(props);
 		if (!wp || !widgets || !ctx.fn) {
 			problem(`The widget at ${path} cannot be drawn here.`);
@@ -156,35 +156,33 @@ export function snapshotTree(tree: TreeNode, ctx: EvalContext, semantics: Compon
 			return;
 		}
 		widgets.validate?.(sub).forEach((p) => problem(`The widget at ${path}: ${p}`));
+		// Buttons in a widget: events update it; uses of its declared actions resolve, while
+		// drawing, to the action for one of its rows (or null when it is not offered).
+		const fromWidget = (action: SnapshotAction): SnapshotAction => {
+			const { action: marker, ...rest } = action;
+			if (isWidgetEvent(marker)) {
+				const { $event, payload } = marker;
+				return { ...rest, event: { widget: path, name: $event, ...(payload !== undefined ? { payload } : {}) } };
+			}
+			if (isAction(marker)) {
+				// Only a resolved use can be an action here: the sanitizer turns any $call code draws into null.
+				return { ...action, ...(marker.row !== undefined ? { row: marker.row } : {}) };
+			}
+			return { ...action, available: false };
+		};
 		const inWidget: SnapshotEmitter = {
 			...emit,
-			action: (action) => {
-				if (isWidgetEvent(action.action)) {
-					const { $event, payload } = action.action;
-					const { action: _, ...rest } = action;
-					emit.action({ ...rest, event: { widget: path, name: $event, ...(payload !== undefined ? { payload } : {}) } });
-				} else {
-					// Code cannot make actions: only events reach a widget's buttons.
-					emit.action({ ...action, available: false });
-				}
-			},
-			table: (table) =>
-				emit.table({
-					...table,
-					rows: table.rows.map((row) => ({
-						...row,
-						actions: row.actions.map((a) => {
-							if (!isWidgetEvent(a.action)) {
-								return { ...a, available: false };
-							}
-							const { $event, payload } = a.action;
-							const { action: _, ...rest } = a;
-							return { ...rest, event: { widget: path, name: $event, ...(payload !== undefined ? { payload } : {}) } };
-						}),
-					})),
-				}),
+			action: (action) => emit.action(fromWidget(action)),
+			table: (table) => emit.table({ ...table, rows: table.rows.map((row) => ({ ...row, actions: row.actions.map(fromWidget) })) }),
 		};
-		visit(sub, `${path}/widget`, inWidget);
+		const use = (marker: WidgetUse): unknown => {
+			const resolved = resolveWidgetUse(marker, raw.actions, props.input, ctx);
+			if (resolved.problem) {
+				problem(`The widget at ${path}: ${resolved.problem}`);
+			}
+			return resolved.available && resolved.action ? resolved.action : null;
+		};
+		visit(sub, `${path}/widget`, inWidget, { ...ctx, use });
 	};
 
 	visit(tree, '/tree', emit);
