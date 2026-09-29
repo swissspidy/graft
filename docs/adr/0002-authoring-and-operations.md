@@ -99,5 +99,16 @@ A security review of the plugin led to these rules:
   an explicit approval of its permissions.
 - Verification records are still asserted by the admin-level client that
   uploads them. Anyone with `manage_options` can already change the site,
-  so this does not widen trust; a signed verification (by a CI or a
-  verification service) would make "verified" provable.
+  so this does not widen trust. Signed verification (by a CI or a
+  verification service), which would make "verified" provable, is planned
+  for a future version.
+
+## Future work
+
+- **Signed verification.** A verifier outside the site signs the
+  verification record (build hash, checks hash, surface hash, result), and
+  the plugin accepts only signed records for active versions.
+- **Template inheritance.** Tenant specs that extend a shared template and
+  follow its upgrades, beyond copy-on-install (ADR 0001, question 4).
+- **AI-assisted template migrations.** When a shared template changes,
+  propose the change to each installed copy as a new spec version.

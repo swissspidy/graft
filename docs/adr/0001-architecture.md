@@ -591,7 +591,21 @@ context):
   included, stays Apache-2.0. Apache-2.0 is GPLv3-compatible; if WordPress.org
   distribution becomes a goal, revisit the plugin's license then.
 
-Still open: 1 (partly addressed, see below) and 4; 2 is decided below.
+Decided later (2026-09-29):
+
+- **Check quality (1): no owner confirmation.** Checks are shown as
+  plain-language sentences next to their criteria at approval time, but the
+  owner is not asked to confirm each one. Graft's users should not have to
+  judge checks; the checks-first compiler (frozen before the build exists)
+  and flagging unverifiable criteria carry that weight instead.
+- **Spec variants (4): copy-on-install.** Installing a shared template
+  copies its spec into the tenant; the copy is then the tenant's own spec
+  and is upgraded like any other. When a template changes, an AI-assisted
+  migration can propose the change to copies. Inheritance (a tenant spec
+  that extends a template and follows its upgrades) can be added later
+  without changing the spec format.
+
+All seven questions are decided; 2 is decided below.
 
 ## Open questions
 
@@ -600,7 +614,7 @@ Still open: 1 (partly addressed, see below) and 4; 2 is decided below.
    sentence and have the owner confirm it matches the criterion.
    *Partly implemented: `describeCheck()` renders checks as sentences, and
    the WordPress admin screen shows them next to their criteria at approval
-   time. Asking the owner to confirm each one is still open.*
+   time. Resolved: owners are not asked to confirm each check.*
 2. **Criteria the verifier cannot express** ("looks clean", "is fast"). Flag
    them at authoring time as unverifiable, or allow them with a warning?
    *Implemented as flagging: the checks phase lists criteria it cannot
@@ -612,7 +626,8 @@ Still open: 1 (partly addressed, see below) and 4; 2 is decided below.
    and where upgrades break most. *Resolved: extend existing screens.*
 4. **Spec variants across tenants.** Should a tenant's spec be able to
    extend a shared template (and inherit its upgrades), or is copy-on-install
-   enough for the MVP?
+   enough for the MVP? *Resolved: copy-on-install; inheritance later if
+   needed.*
 5. **Where compilation runs.** Proposal: the compiler (prompt assembly,
    output validation, retry loop) lives once, in TypeScript core. In
    wp-admin it runs in the browser and sends model requests through a thin
