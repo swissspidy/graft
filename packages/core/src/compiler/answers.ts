@@ -21,6 +21,7 @@ export function modelAnswers(build: Build, dataInput?: Record<string, unknown>) 
 				criterion: c.criterion,
 				fixtures_json: JSON.stringify(c.fixtures ?? {}),
 				view_as: c.view_as ?? '',
+				advance_days: c.clock?.advanceDays ?? 0,
 				steps_json: JSON.stringify(c.steps ?? []),
 				expect_json: JSON.stringify(c.expect),
 			})),

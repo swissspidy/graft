@@ -35,11 +35,12 @@ export function checksOutputSchema(spec: Spec): Record<string, unknown> {
 				items: {
 					type: 'object',
 					additionalProperties: false,
-					required: ['criterion', 'fixtures_json', 'view_as', 'steps_json', 'expect_json'],
+					required: ['criterion', 'fixtures_json', 'view_as', 'advance_days', 'steps_json', 'expect_json'],
 					properties: {
 						criterion: names(spec.criteria.map((c) => c.id)),
 						fixtures_json: { type: 'string', description: 'JSON object: the fixtures to seed.' },
 						view_as: { type: 'string', description: 'Fixture user alias the check renders for.' },
+						advance_days: { type: 'integer', description: 'View the customization this many days after the fixtures were seeded (0 for right away).' },
 						steps_json: { type: 'string', description: 'JSON array of steps, [] for none.' },
 						expect_json: { type: 'string', description: 'JSON array of expectations, at least one.' },
 					},

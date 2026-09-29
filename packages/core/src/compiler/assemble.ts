@@ -57,6 +57,9 @@ export function assembleChecks(output: unknown): Assembled<Check[]> {
 		if (typeof item.view_as === 'string' && item.view_as) {
 			check.view_as = item.view_as;
 		}
+		if (typeof item.advance_days === 'number' && item.advance_days > 0) {
+			check.clock = { advanceDays: item.advance_days };
+		}
 		if (Array.isArray(steps) && steps.length > 0) {
 			check.steps = steps as Check['steps'];
 		}

@@ -7,7 +7,7 @@ import { describeSchemaError, schemaErrorPath } from '../schema-errors.ts';
 import type { Spec } from '../spec/types.ts';
 import { hashSurface } from '../surface/hash.ts';
 import type { JsonSchema, Surface } from '../surface/types.ts';
-import { isBinding, isCall, isCan, isDataRef, isSlotRef, walkTree, walkValue } from './expressions.ts';
+import { isDynamic, isCall, isCan, isDataRef, isSlotRef, walkTree, walkValue } from './expressions.ts';
 import { extractRefs } from './refs.ts';
 import type { Build, Refs, Value } from './types.ts';
 
@@ -226,7 +226,7 @@ function underBindingAlternative(error: ErrorObject, bindingPaths: string[]): bo
 }
 
 function replaceBindings(value: unknown, path: string, found: string[]): unknown {
-	if (isBinding(value)) {
+	if (isDynamic(value)) {
 		found.push(path);
 		return null;
 	}

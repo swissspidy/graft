@@ -1,5 +1,5 @@
 import { canonicalJson } from '../surface/hash.ts';
-import { getPath, isAnd, isCall, isCan, isDataRef, isEq, isFieldRef, isNot, isOr, isSlotRef } from './expressions.ts';
+import { compareOp, getPath, isAnd, isCall, isCan, isDataRef, isDaysSince, isEq, isFieldRef, isIf, isNot, isOr, isSlotRef } from './expressions.ts';
 import type { Value } from './types.ts';
 
 export interface EvalContext {
@@ -11,6 +11,28 @@ export interface EvalContext {
 	row?: unknown;
 	/** Host-specific permission check. `on` defaults to the current row. */
 	can(scope: string, on: unknown): boolean;
+	/** The time `$daysSince` counts to, in ms since the epoch. Default: now. */
+	now?: number;
+}
+
+const DAY = 24 * 60 * 60 * 1000;
+
+function compare(op: string, a: unknown, b: unknown): boolean {
+	const comparable = (typeof a === 'number' && typeof b === 'number') || (typeof a === 'string' && typeof b === 'string');
+	if (!comparable) {
+		return false;
+	}
+	const [x, y] = [a as number | string, b as number | string];
+	switch (op) {
+		case '$gt':
+			return x > y;
+		case '$gte':
+			return x >= y;
+		case '$lt':
+			return x < y;
+		default:
+			return x <= y;
+	}
 }
 
 /** A `$call` with its input resolved, ready for the renderer to invoke. */
@@ -57,6 +79,20 @@ export function evaluate(value: Value | undefined, ctx: EvalContext): unknown {
 	if (isEq(value)) {
 		const [a, b] = value.$eq.map((item) => evaluate(item, ctx));
 		return canonicalJson(a ?? null) === canonicalJson(b ?? null);
+	}
+	const op = compareOp(value);
+	if (op) {
+		const [a, b] = (value as unknown as Record<string, Value[]>)[op]!.map((item) => evaluate(item, ctx));
+		return compare(op, a, b);
+	}
+	if (isIf(value)) {
+		const [condition, then, otherwise] = value.$if;
+		return evaluate(evaluate(condition, ctx) === true ? then : otherwise, ctx);
+	}
+	if (isDaysSince(value)) {
+		const date = evaluate(value.$daysSince, ctx);
+		const time = typeof date === 'string' ? Date.parse(date) : Number.NaN;
+		return Number.isNaN(time) ? null : Math.floor(((ctx.now ?? Date.now()) - time) / DAY);
 	}
 	if (isAnd(value)) {
 		return value.$and.every((item) => evaluate(item, ctx) === true);

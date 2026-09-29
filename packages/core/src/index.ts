@@ -26,6 +26,7 @@ export {
 	type Snapshot,
 	type SnapshotAction,
 	type SnapshotEmitter,
+	type SnapshotCell,
 	type SnapshotRow,
 	type SnapshotTable,
 } from './verifier/snapshot.ts';

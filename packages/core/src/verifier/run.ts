@@ -92,6 +92,8 @@ async function runCheck(options: VerifyOptions, check: Check, index: number): Pr
 	const audience = spec.manifest.audience ?? [];
 	const applies = audience.length === 0 || users[viewer].some((role) => audience.includes(role));
 	const can = options.createCan(await sandbox.scopes(viewer, permissions));
+	// The check's clock: now, or later than the fixtures by `clock.advanceDays`.
+	const now = Date.now() + (check.clock?.advanceDays ?? 0) * 24 * 60 * 60 * 1000;
 
 	const call = async (capability: string, input: unknown): Promise<unknown> => {
 		// The gateway's checks, as the host runtime applies them.
@@ -113,7 +115,7 @@ async function runCheck(options: VerifyOptions, check: Check, index: number): Pr
 				continue;
 			}
 			try {
-				next[name] = await call(source.call, evaluate(source.input, { data: {}, slot, can }) ?? null);
+				next[name] = await call(source.call, evaluate(source.input, { data: {}, slot, can, now }) ?? null);
 			} catch (error) {
 				delete next[name];
 				failures.push(`Loading "${name}" failed: ${describeError(error)}.`);
@@ -123,7 +125,7 @@ async function runCheck(options: VerifyOptions, check: Check, index: number): Pr
 	};
 
 	const snap = (instance: Omit<Instance, 'snapshot'>): Instance => {
-		const snapshot = snapshotTree(build.tree, { data: instance.data, slot: instance.slot, can }, semantics);
+		const snapshot = snapshotTree(build.tree, { data: instance.data, slot: instance.slot, can, now }, semantics);
 		// Actions outside tables apply to the slot instance (e.g. the row's post).
 		snapshot.actions = snapshot.actions.map((action) => (action.row === undefined ? { ...action, row: instance.slot } : action));
 		return { ...instance, snapshot };
@@ -221,6 +223,25 @@ async function evaluateExpectation(expectation: Record<string, unknown>, snapsho
 	if ('text' in expectation) {
 		const expected = String(expectation.text);
 		return snapshot.texts.some((text) => text.includes(expected)) ? undefined : `Expected the text "${expected}" to be shown.`;
+	}
+	if ('cell' in expectation) {
+		const cell = (expectation.cell ?? {}) as { row?: Record<string, unknown>; column?: string; text?: string; tone?: string };
+		const row = snapshot.tables.flatMap((t) => t.rows).find((r) => !cell.row || matchesRecord(cell.row, r.record));
+		const where = `the "${cell.column}" cell${cell.row ? ` for ${describeMatcher(cell.row)}` : ''}`;
+		if (!row) {
+			return `Expected ${where}, but no such row is listed.`;
+		}
+		const actual = row.cells?.[String(cell.column)];
+		if (!actual) {
+			return `Expected ${where}, but the row has no such column.`;
+		}
+		if (cell.text !== undefined && !actual.text.includes(String(cell.text))) {
+			return `Expected ${where} to show "${cell.text}", found "${actual.text}".`;
+		}
+		if (cell.tone !== undefined && actual.tone !== cell.tone) {
+			return `Expected ${where} to be marked "${cell.tone}", found ${actual.tone ? `"${actual.tone}"` : 'no mark'}.`;
+		}
+		return undefined;
 	}
 	if ('action' in expectation) {
 		const id = String(expectation.action);

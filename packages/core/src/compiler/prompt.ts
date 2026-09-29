@@ -10,6 +10,9 @@ const EXPRESSIONS = `Prop values are JSON. Besides literals, these expression ob
 - {"$slot": "path"}: a prop the slot provides, e.g. "post.id".
 - {"$can": "scope"} or {"$can": "scope", "on": <value>}: whether the viewer may use a permission scope, optionally on an object; inside a row "on" defaults to the row.
 - {"$eq": [a, b]}, {"$and": [...]}, {"$or": [...]}, {"$not": value}: logic over values and permission checks.
+- {"$gt": [a, b]}, {"$gte": [a, b]}, {"$lt": [a, b]}, {"$lte": [a, b]}: compares two numbers (or two strings).
+- {"$if": [condition, then, else]}: then when the condition is true, else otherwise; nest them for more cases.
+- {"$daysSince": <date>}: whole days from an ISO 8601 date (e.g. {"$field": "modified"}) to now.
 - {"$call": "capability", "input": <value>, "then": [...], "notice": "text"}: an action run on click. "then" may contain "refresh:<source>", "remove-row:<source>" (drop the clicked row from a source) and "reload:page".`;
 
 const CHECK_VOCABULARY = `A check proves one acceptance criterion. It seeds its own fixtures, renders the customization for one fixture user (view_as), optionally performs steps, then evaluates expectations over what that user sees and can do.
@@ -19,7 +22,9 @@ const CHECK_VOCABULARY = `A check proves one acceptance criterion. It seeds its 
   {"columns": ["Label", ...]}: the column labels, in order.
   {"text": "..."}: this text is shown somewhere.
   {"action": "<action id>", "row": {...}, "available": true|false}: whether the action is available (for that row).
+  {"cell": {"row": {...}, "column": "Label", "text": "...", "tone": "..."}}: what a table cell shows for that row (text: contained; tone: the mark, when the column has one).
   plus the host assertions below.
+Fixtures are created when the check starts. To test anything that depends on age ("older than 30 days"), set advance_days: the check then looks that many days later.
 Write checks that would fail for a wrong implementation: include fixtures that must NOT show up, users who must NOT be able to act, and the empty case when a criterion mentions one.
 Some criteria cannot be checked this way: taste ("looks clean"), performance ("is fast"), or anything not observable in what a user sees and can do. Do not write a weak check for those; list them under "unverifiable" with a one-sentence reason the author can act on.`;
 

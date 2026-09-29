@@ -36,7 +36,8 @@ export function describeCheck(check: Check, describers: CheckDescribers = {}): s
 	if (given) {
 		parts.push(`Given ${given}`);
 	}
-	parts.push(`${parts.length ? 'when' : 'When'} ${check.view_as ? `"${check.view_as}"` : 'the viewer'} opens it`);
+	const later = check.clock?.advanceDays ? ` ${check.clock.advanceDays} day${check.clock.advanceDays === 1 ? '' : 's'} later` : '';
+	parts.push(`${parts.length ? 'when' : 'When'} ${check.view_as ? `"${check.view_as}"` : 'the viewer'} opens it${later}`);
 	for (const step of check.steps ?? []) {
 		parts.push(`and uses "${step.action}"${row(step.row)}`);
 	}
@@ -50,6 +51,11 @@ export function describeCheck(check: Check, describers: CheckDescribers = {}): s
 		}
 		if ('text' in e) {
 			return `the page says ${quote(e.text)}`;
+		}
+		if ('cell' in e) {
+			const cell = e.cell as { row?: Record<string, unknown>; column?: string; text?: string; tone?: string };
+			const shows = [cell.text !== undefined ? `shows ${quote(cell.text)}` : '', cell.tone !== undefined ? `is marked ${quote(cell.tone)}` : ''].filter(Boolean);
+			return `the ${quote(cell.column)} cell${row(cell.row)} ${list(shows)}`;
 		}
 		if ('action' in e) {
 			return `"${String(e.action)}"${row(e.row)} is ${e.available === false ? 'not available' : 'available'}`;

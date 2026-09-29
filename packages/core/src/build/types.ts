@@ -37,9 +37,23 @@ export interface NotExpr {
 	$not: Value;
 }
 
+/** `{ $gt: [a, b] }` and $gte, $lt, $lte: numeric (or string) comparison. */
+export type CompareOp = '$gt' | '$gte' | '$lt' | '$lte';
+export type CompareExpr = { [K in CompareOp]: { [P in K]: [Value, Value] } }[CompareOp];
+/** `{ $if: [condition, then, else] }`: then when the condition is true, else otherwise. */
+export interface IfExpr {
+	$if: [Value, Value, Value];
+}
+/** `{ $daysSince: date }`: whole days from a date (ISO 8601) to now; null when it is not a date. */
+export interface DaysSinceExpr {
+	$daysSince: Value;
+}
+
 export type Binding = DataRef | FieldRef | SlotRef;
-export type Logic = EqExpr | AndExpr | OrExpr | NotExpr;
-export type Expression = Binding | CanExpr | CallExpr | Logic;
+export type Logic = EqExpr | AndExpr | OrExpr | NotExpr | CompareExpr;
+/** Expressions whose value is computed at render time from other values. */
+export type Computed = IfExpr | DaysSinceExpr | CompareExpr;
+export type Expression = Binding | CanExpr | CallExpr | Logic | Computed;
 
 export type Value = null | string | number | boolean | Value[] | Expression | { [key: string]: Value };
 
@@ -58,6 +72,8 @@ export interface DataSource {
 export interface Check {
 	criterion: string;
 	fixtures?: Record<string, unknown>;
+	/** When the check looks, relative to when its fixtures were seeded. */
+	clock?: { advanceDays: number };
 	view_as?: string;
 	steps?: Array<{ action: string; row?: Record<string, unknown> }>;
 	expect: Array<Record<string, unknown>>;
