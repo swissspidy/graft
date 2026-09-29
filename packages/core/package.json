@@ -1,0 +1,20 @@
+{
+  "name": "@graft/core",
+  "version": "0.0.0",
+  "private": true,
+  "license": "Apache-2.0",
+  "description": "Host-agnostic Graft core: spec parsing and validation, surfaces, builds, verifier and lifecycle. No I/O.",
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts",
+    "./runtime": "./src/runtime.ts",
+    "./parse": "./src/spec/parse.ts",
+    "./cfworker": "./src/schema-cfworker.ts"
+  },
+  "dependencies": {
+    "@cfworker/json-schema": "^4.1.1",
+    "ajv": "^8.17.0",
+    "ajv-formats": "^3.0.1",
+    "yaml": "^2.8.0"
+  }
+}

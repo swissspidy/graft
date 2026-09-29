@@ -1,0 +1,35 @@
+{
+  "$comment": "Lifecycle of one stored spec version (ADR 0001, section 7). Shared by the TypeScript core and host plugins; edit here only.",
+  "initial": "draft",
+  "states": {
+    "draft": "Written, not yet built.",
+    "building": "A build is being compiled and verified. The previous version keeps serving.",
+    "needs_approval": "Verified, but needs permission scopes outside the current grant.",
+    "active": "Serving.",
+    "rejected": "Compiling or verifying failed.",
+    "upgrading": "The host surface changed; the upgrade ladder is running.",
+    "suspended": "The upgrade failed; not serving until the host changes again or the owner edits.",
+    "superseded": "A newer version became active.",
+    "archived": "Disabled by its owner."
+  },
+  "transitions": [
+    { "from": "draft", "event": "submit", "to": "building" },
+    { "from": "building", "event": "verified_within_grant", "to": "active" },
+    { "from": "building", "event": "verified_needs_grant", "to": "needs_approval" },
+    { "from": "building", "event": "failed", "to": "rejected" },
+    { "from": "rejected", "event": "edit", "to": "draft" },
+    { "from": "needs_approval", "event": "approve", "to": "active" },
+    { "from": "needs_approval", "event": "decline", "to": "draft" },
+    { "from": "needs_approval", "event": "edit", "to": "draft" },
+    { "from": "active", "event": "host_changed", "to": "upgrading" },
+    { "from": "upgrading", "event": "upgraded", "to": "active" },
+    { "from": "upgrading", "event": "upgrade_needs_grant", "to": "needs_approval" },
+    { "from": "upgrading", "event": "upgrade_failed", "to": "suspended" },
+    { "from": "suspended", "event": "host_changed", "to": "upgrading" },
+    { "from": "suspended", "event": "retry", "to": "upgrading" },
+    { "from": "suspended", "event": "edit", "to": "draft" },
+    { "from": "active", "event": "supersede", "to": "superseded" },
+    { "from": "active", "event": "archive", "to": "archived" },
+    { "from": "suspended", "event": "archive", "to": "archived" }
+  ]
+}

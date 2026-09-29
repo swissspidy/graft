@@ -1,0 +1,139 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+  schedule:
+    # Weekly, to catch WordPress nightly changes before they ship.
+    - cron: '17 5 * * 1'
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm typecheck
+      - run: pnpm test
+      - name: Tests again on the schema engine used in sandboxes (no code generation)
+        run: pnpm test:cfworker
+      - run: pnpm validate:examples
+
+  wordpress:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - name: Lint PHP
+        run: find hosts/wordpress/plugin hosts/wordpress/playground -name '*.php' -print0 | xargs -0 -n1 php -l
+      - name: Smoke test the plugin in Playground (WordPress 7.1, PHP 7.4 and 8.4)
+        run: pnpm test:wp
+      - name: Check the checked-in surface is up to date
+        run: pnpm surface:generate --check
+      - name: Verify the example builds against their criteria
+        run: pnpm verify:examples
+      - name: Compile pipeline with a scripted model against WordPress
+        run: pnpm test:compile
+      - name: Install Chromium
+        run: pnpm exec playwright install --with-deps chromium
+      - name: End-to-end tests in wp-admin
+        run: pnpm test:e2e
+        env:
+          CI: '1'
+          # Runners can reach playground.wordpress.net: verify in the browser.
+          GRAFT_E2E_BROWSER_VERIFY: '1'
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: e2e-results
+          path: test-results/
+          if-no-files-found: ignore
+
+  emdash:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - name: Check the checked-in surface and plugin manifest are up to date
+        run: pnpm surface:emdash --check && pnpm manifest:emdash --check
+      - name: Validate the plugin manifest with EmDash's plugin CLI
+        run: pnpm dlx @emdash-cms/plugin-cli@0.13.1 validate hosts/emdash/adapter
+      - name: Validate the example specs against the EmDash surface
+        run: pnpm graft validate --surface hosts/emdash/adapter/surfaces/1.0.json examples/emdash/specs
+      - name: Verify the example builds in an EmDash sandbox
+        run: pnpm verify:emdash
+      - name: Smoke test the plugin in EmDash (install, approve, serve, refuse)
+        run: pnpm test:emdash
+      - name: The same, with the plugin in EmDash's plugin sandbox (workerd)
+        run: pnpm test:emdash:sandboxed
+      - name: Writing a customization in the admin, with a stubbed Claude API (both formats)
+        run: pnpm test:author:emdash
+      - name: Compile pipeline with a scripted model against EmDash
+        run: pnpm test:compile:emdash
+      - name: Every synthetic EmDash change reaches its expected rung
+        run: pnpm test:canary:emdash
+      - name: graft site against a live EmDash (install, verify, pull)
+        run: pnpm test:site:emdash
+      - name: Install Chromium
+        run: pnpm exec playwright install --with-deps chromium
+      - name: End-to-end tests in the EmDash admin
+        run: pnpm test:e2e:emdash
+        env:
+          CI: '1'
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: emdash-e2e-results
+          path: test-results/
+          if-no-files-found: ignore
+
+  canary:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - name: Every synthetic host change reaches its expected rung
+        run: pnpm test:canary
+
+  nightly-canary:
+    # An early warning about the next WordPress: does every customization in
+    # the corpus survive it? Upstream breakage should not block changes here.
+    runs-on: ubuntu-latest
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - name: Generate the WordPress nightly surface
+        run: pnpm surface:generate --wp nightly --out-dir "$RUNNER_TEMP/surfaces"
+      - name: Upgrade the corpus to nightly
+        run: pnpm graft canary --corpus fixtures/canary/tenants --from hosts/wordpress/plugin/surfaces/7.1.json --to "$RUNNER_TEMP/surfaces/nightly.json"

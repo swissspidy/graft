@@ -1,0 +1,18 @@
+{
+  "name": "@graft/cli",
+  "version": "0.0.0",
+  "private": true,
+  "license": "Apache-2.0",
+  "description": "graft command line: validate, compile, verify, canary.",
+  "type": "module",
+  "bin": {
+    "graft": "./bin/graft.js"
+  },
+  "dependencies": {
+    "@anthropic-ai/sdk": "^0.129.0",
+    "@graft/core": "workspace:*",
+    "@graft/emdash": "workspace:*",
+    "@graft/wordpress-adapter": "workspace:*",
+    "tsx": "^4.20.0"
+  }
+}

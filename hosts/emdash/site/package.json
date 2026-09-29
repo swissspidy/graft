@@ -1,0 +1,24 @@
+{
+  "name": "@graft/emdash-site",
+  "version": "0.0.0",
+  "private": true,
+  "license": "Apache-2.0",
+  "description": "A minimal EmDash site with the Graft plugin, for development and tests.",
+  "type": "module",
+  "emdash": {
+    "seed": "seed/seed.json"
+  },
+  "scripts": {
+    "dev": "astro dev"
+  },
+  "dependencies": {
+    "@astrojs/node": "^11.1.5",
+    "@astrojs/react": "^6.0.5",
+    "@emdash-cms/sandbox-workerd": "0.9.1",
+    "@graft/emdash": "workspace:*",
+    "astro": "^7.3.2",
+    "emdash": "1.0.1",
+    "react": "19.2.4",
+    "react-dom": "19.2.4"
+  }
+}

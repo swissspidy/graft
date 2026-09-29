@@ -1,0 +1,25 @@
+{
+  "name": "@graft/wordpress-adapter",
+  "version": "0.0.0",
+  "private": true,
+  "license": "Apache-2.0",
+  "description": "Graft host adapter for WordPress: component registry, surface generator, Playground driver.",
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "surface:generate": "tsx src/cli.ts"
+  },
+  "dependencies": {
+    "@graft/core": "workspace:*",
+    "@graft/renderer-react": "workspace:*"
+  },
+  "devDependencies": {
+    "@types/react": "^18.3.31",
+    "@types/react-dom": "^18.3.7",
+    "esbuild": "^0.25.12",
+    "react": "18.3.1",
+    "react-dom": "18.3.1"
+  }
+}

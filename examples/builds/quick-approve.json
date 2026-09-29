@@ -1,0 +1,204 @@
+{
+	"graft": 1,
+	"spec": {
+		"id": "quick-approve",
+		"hash": "sha256:fab32bddc34329737c0707e45fd134830eae41761ea90fcd6560d27ca49b8a3d"
+	},
+	"surface": {
+		"host": "wordpress",
+		"hostVersion": "7.1.2",
+		"hash": "sha256:e3e750ece071f4aee88dd95f36adb2b64be674d7471be5e71e617ee7d4b491b6"
+	},
+	"mount": {
+		"slot": "posts.list.row-actions"
+	},
+	"data": {},
+	"tree": {
+		"type": "row-action",
+		"props": {
+			"id": "approve",
+			"label": "Approve",
+			"visible": {
+				"$and": [
+					{
+						"$eq": [
+							{
+								"$slot": "post.status"
+							},
+							"pending"
+						]
+					},
+					{
+						"$can": "posts.status:write",
+						"on": {
+							"$slot": "post"
+						}
+					}
+				]
+			},
+			"onClick": {
+				"$call": "posts.update_status",
+				"input": {
+					"id": {
+						"$slot": "post.id"
+					},
+					"status": "publish"
+				},
+				"then": [
+					"reload:page"
+				],
+				"notice": "Post published."
+			}
+		}
+	},
+	"checks": [
+		{
+			"criterion": "shown-on-pending",
+			"fixtures": {
+				"users": [
+					{
+						"as": "e",
+						"role": "editor"
+					}
+				],
+				"posts": [
+					{
+						"title": "Draft A",
+						"status": "pending"
+					}
+				]
+			},
+			"view_as": "e",
+			"expect": [
+				{
+					"action": "approve",
+					"row": {
+						"title": "Draft A"
+					},
+					"available": true
+				}
+			]
+		},
+		{
+			"criterion": "hidden-otherwise",
+			"fixtures": {
+				"users": [
+					{
+						"as": "e",
+						"role": "editor"
+					}
+				],
+				"posts": [
+					{
+						"title": "Draft B",
+						"status": "draft"
+					},
+					{
+						"title": "Post C",
+						"status": "publish"
+					}
+				]
+			},
+			"view_as": "e",
+			"expect": [
+				{
+					"action": "approve",
+					"row": {
+						"title": "Draft B"
+					},
+					"available": false
+				},
+				{
+					"action": "approve",
+					"row": {
+						"title": "Post C"
+					},
+					"available": false
+				}
+			]
+		},
+		{
+			"criterion": "approve",
+			"fixtures": {
+				"users": [
+					{
+						"as": "e",
+						"role": "editor"
+					}
+				],
+				"posts": [
+					{
+						"title": "Draft A",
+						"status": "pending"
+					}
+				]
+			},
+			"view_as": "e",
+			"steps": [
+				{
+					"action": "approve",
+					"row": {
+						"title": "Draft A"
+					}
+				}
+			],
+			"expect": [
+				{
+					"post": {
+						"title": "Draft A",
+						"status": "publish"
+					}
+				}
+			]
+		},
+		{
+			"criterion": "requires-publish",
+			"fixtures": {
+				"users": [
+					{
+						"as": "c",
+						"role": "contributor"
+					}
+				],
+				"posts": [
+					{
+						"title": "Draft A",
+						"status": "pending",
+						"author": "c"
+					}
+				]
+			},
+			"view_as": "c",
+			"expect": [
+				{
+					"action": "approve",
+					"row": {
+						"title": "Draft A"
+					},
+					"available": false
+				}
+			]
+		}
+	],
+	"refs": {
+		"slot": "posts.list.row-actions",
+		"components": {
+			"row-action": [
+				"id",
+				"label",
+				"onClick",
+				"visible"
+			]
+		},
+		"capabilities": [
+			"posts.update_status"
+		],
+		"scopes": [
+			"posts.status:write"
+		]
+	},
+	"provenance": {
+		"compiler": "handwritten",
+		"strategy": "handwritten"
+	}
+}

@@ -1,0 +1,1148 @@
+{
+	"graft": 1,
+	"host": "wordpress",
+	"hostVersion": "7.1.2",
+	"hash": "sha256:e3e750ece071f4aee88dd95f36adb2b64be674d7471be5e71e617ee7d4b491b6",
+	"fingerprint": "sha256:aac93a247c479496ea0abe8ea8b948c5af6bed66a04e8ae3f1ff729ee262cce8",
+	"slots": {
+		"admin.page": {
+			"kind": "owned",
+			"title": "Admin page",
+			"description": "A wp-admin page of its own, linked from the admin menu.",
+			"anchor": "function:add_submenu_page",
+			"options": {
+				"type": "object",
+				"properties": {
+					"menu": {
+						"type": "object",
+						"properties": {
+							"parent": {
+								"description": "Menu the page is listed under. Omit for a top-level item.",
+								"enum": [
+									"dashboard",
+									"posts",
+									"media",
+									"pages",
+									"comments",
+									"appearance",
+									"plugins",
+									"users",
+									"tools",
+									"settings"
+								]
+							},
+							"title": {
+								"type": "string",
+								"minLength": 1,
+								"maxLength": 40
+							}
+						},
+						"required": [
+							"title"
+						],
+						"additionalProperties": false
+					}
+				},
+				"required": [
+					"menu"
+				],
+				"additionalProperties": false
+			},
+			"provides": {
+				"type": "object",
+				"properties": {},
+				"additionalProperties": false
+			}
+		},
+		"dashboard.widget": {
+			"kind": "owned",
+			"title": "Dashboard widget",
+			"description": "A widget on the wp-admin Dashboard.",
+			"screen": "dashboard",
+			"anchor": "function:wp_add_dashboard_widget",
+			"options": {
+				"type": "object",
+				"properties": {
+					"title": {
+						"type": "string",
+						"minLength": 1,
+						"maxLength": 60
+					}
+				},
+				"required": [
+					"title"
+				],
+				"additionalProperties": false
+			},
+			"provides": {
+				"type": "object",
+				"properties": {},
+				"additionalProperties": false
+			}
+		},
+		"posts.list.row-actions": {
+			"kind": "extension",
+			"title": "Posts list row actions",
+			"description": "Actions under each post title on the Posts screen.",
+			"screen": "edit-post",
+			"anchor": "filter:post_row_actions",
+			"options": {
+				"type": "object",
+				"properties": {},
+				"additionalProperties": false
+			},
+			"provides": {
+				"type": "object",
+				"properties": {
+					"post": {
+						"type": "object",
+						"properties": {
+							"id": {
+								"type": "integer"
+							},
+							"title": {
+								"type": "string"
+							},
+							"status": {
+								"type": "string",
+								"enum": [
+									"publish",
+									"future",
+									"draft",
+									"pending",
+									"private"
+								]
+							},
+							"type": {
+								"type": "string"
+							},
+							"can": {
+								"type": "object",
+								"properties": {
+									"edit": {
+										"type": "boolean"
+									},
+									"publish": {
+										"type": "boolean"
+									}
+								},
+								"required": [
+									"edit",
+									"publish"
+								],
+								"additionalProperties": false
+							}
+						},
+						"required": [
+							"id",
+							"title",
+							"status",
+							"type",
+							"can"
+						],
+						"additionalProperties": false
+					}
+				},
+				"required": [
+					"post"
+				],
+				"additionalProperties": false
+			},
+			"accepts": [
+				"row-action"
+			]
+		}
+	},
+	"components": {
+		"button": {
+			"description": "A button that calls a capability.",
+			"props": {
+				"type": "object",
+				"properties": {
+					"id": {
+						"type": "string",
+						"pattern": "^[a-z][a-z0-9-]*$"
+					},
+					"label": {
+						"type": "string",
+						"minLength": 1,
+						"maxLength": 80
+					},
+					"variant": {
+						"enum": [
+							"primary",
+							"secondary",
+							"tertiary",
+							"link"
+						],
+						"default": "secondary"
+					},
+					"onClick": {
+						"description": "A capability call: { $call, input, then }.",
+						"type": "object",
+						"required": [
+							"$call"
+						]
+					},
+					"disabled": {
+						"description": "true, false, a permission check { $can, on }, or logic over them: $eq, $and, $or, $not.",
+						"anyOf": [
+							{
+								"type": "boolean"
+							},
+							{
+								"type": "object",
+								"required": [
+									"$can"
+								]
+							},
+							{
+								"type": "object",
+								"required": [
+									"$eq"
+								]
+							},
+							{
+								"type": "object",
+								"required": [
+									"$and"
+								]
+							},
+							{
+								"type": "object",
+								"required": [
+									"$or"
+								]
+							},
+							{
+								"type": "object",
+								"required": [
+									"$not"
+								]
+							}
+						]
+					},
+					"visible": {
+						"description": "true, false, a permission check { $can, on }, or logic over them: $eq, $and, $or, $not.",
+						"anyOf": [
+							{
+								"type": "boolean"
+							},
+							{
+								"type": "object",
+								"required": [
+									"$can"
+								]
+							},
+							{
+								"type": "object",
+								"required": [
+									"$eq"
+								]
+							},
+							{
+								"type": "object",
+								"required": [
+									"$and"
+								]
+							},
+							{
+								"type": "object",
+								"required": [
+									"$or"
+								]
+							},
+							{
+								"type": "object",
+								"required": [
+									"$not"
+								]
+							}
+						]
+					},
+					"confirm": {
+						"description": "Ask for confirmation with this question first.",
+						"type": "string"
+					}
+				},
+				"required": [
+					"id",
+					"label",
+					"onClick"
+				],
+				"additionalProperties": false
+			},
+			"children": "none"
+		},
+		"card": {
+			"description": "A bordered container with an optional title.",
+			"props": {
+				"type": "object",
+				"properties": {
+					"title": {
+						"type": "string"
+					}
+				},
+				"additionalProperties": false
+			},
+			"children": "any"
+		},
+		"empty-state": {
+			"description": "Shown when there is nothing to display.",
+			"props": {
+				"type": "object",
+				"properties": {
+					"title": {
+						"type": "string",
+						"minLength": 1,
+						"maxLength": 80
+					},
+					"description": {
+						"type": "string"
+					}
+				},
+				"required": [
+					"title"
+				],
+				"additionalProperties": false
+			},
+			"children": "none"
+		},
+		"heading": {
+			"description": "A section heading.",
+			"props": {
+				"type": "object",
+				"properties": {
+					"level": {
+						"type": "integer",
+						"minimum": 1,
+						"maximum": 4,
+						"default": 2
+					}
+				},
+				"additionalProperties": false
+			},
+			"children": "text"
+		},
+		"notice": {
+			"description": "An inline status message.",
+			"props": {
+				"type": "object",
+				"properties": {
+					"status": {
+						"enum": [
+							"info",
+							"success",
+							"warning",
+							"error"
+						],
+						"default": "info"
+					},
+					"dismissible": {
+						"type": "boolean",
+						"default": false
+					}
+				},
+				"additionalProperties": false
+			},
+			"children": "text"
+		},
+		"row-action": {
+			"description": "A link in a list table row's action bar.",
+			"props": {
+				"type": "object",
+				"properties": {
+					"id": {
+						"type": "string",
+						"pattern": "^[a-z][a-z0-9-]*$"
+					},
+					"label": {
+						"type": "string",
+						"minLength": 1,
+						"maxLength": 80
+					},
+					"onClick": {
+						"description": "A capability call: { $call, input, then }.",
+						"type": "object",
+						"required": [
+							"$call"
+						]
+					},
+					"visible": {
+						"description": "true, false, a permission check { $can, on }, or logic over them: $eq, $and, $or, $not.",
+						"anyOf": [
+							{
+								"type": "boolean"
+							},
+							{
+								"type": "object",
+								"required": [
+									"$can"
+								]
+							},
+							{
+								"type": "object",
+								"required": [
+									"$eq"
+								]
+							},
+							{
+								"type": "object",
+								"required": [
+									"$and"
+								]
+							},
+							{
+								"type": "object",
+								"required": [
+									"$or"
+								]
+							},
+							{
+								"type": "object",
+								"required": [
+									"$not"
+								]
+							}
+						]
+					},
+					"confirm": {
+						"type": "string"
+					}
+				},
+				"required": [
+					"id",
+					"label",
+					"onClick"
+				],
+				"additionalProperties": false
+			},
+			"children": "none"
+		},
+		"stack": {
+			"description": "Lays out children in a row or column.",
+			"props": {
+				"type": "object",
+				"properties": {
+					"direction": {
+						"enum": [
+							"row",
+							"column"
+						],
+						"default": "column"
+					},
+					"gap": {
+						"type": "integer",
+						"minimum": 0,
+						"maximum": 8,
+						"default": 2
+					},
+					"align": {
+						"enum": [
+							"start",
+							"center",
+							"end",
+							"stretch"
+						]
+					},
+					"justify": {
+						"enum": [
+							"start",
+							"center",
+							"end",
+							"space-between"
+						]
+					}
+				},
+				"additionalProperties": false
+			},
+			"children": "any"
+		},
+		"table": {
+			"description": "A list of records with fields and per-row actions. DataViews-shaped props: fields and actions.",
+			"props": {
+				"type": "object",
+				"properties": {
+					"rows": {
+						"type": "array",
+						"items": {
+							"type": "object"
+						}
+					},
+					"fields": {
+						"type": "array",
+						"minItems": 1,
+						"items": {
+							"type": "object",
+							"properties": {
+								"id": {
+									"description": "Path into the row, e.g. author.name.",
+									"type": "string",
+									"minLength": 1
+								},
+								"label": {
+									"type": "string",
+									"minLength": 1,
+									"maxLength": 80
+								},
+								"type": {
+									"enum": [
+										"text",
+										"integer",
+										"date",
+										"datetime",
+										"status",
+										"user",
+										"link"
+									],
+									"default": "text"
+								},
+								"primary": {
+									"description": "The row title field.",
+									"type": "boolean"
+								}
+							},
+							"required": [
+								"id",
+								"label"
+							],
+							"additionalProperties": false
+						}
+					},
+					"actions": {
+						"type": "array",
+						"items": {
+							"type": "object",
+							"properties": {
+								"id": {
+									"type": "string",
+									"pattern": "^[a-z][a-z0-9-]*$"
+								},
+								"label": {
+									"type": "string",
+									"minLength": 1,
+									"maxLength": 80
+								},
+								"onClick": {
+									"description": "A capability call: { $call, input, then }.",
+									"type": "object",
+									"required": [
+										"$call"
+									]
+								},
+								"visible": {
+									"description": "true, false, a permission check { $can, on }, or logic over them: $eq, $and, $or, $not.",
+									"anyOf": [
+										{
+											"type": "boolean"
+										},
+										{
+											"type": "object",
+											"required": [
+												"$can"
+											]
+										},
+										{
+											"type": "object",
+											"required": [
+												"$eq"
+											]
+										},
+										{
+											"type": "object",
+											"required": [
+												"$and"
+											]
+										},
+										{
+											"type": "object",
+											"required": [
+												"$or"
+											]
+										},
+										{
+											"type": "object",
+											"required": [
+												"$not"
+											]
+										}
+									]
+								},
+								"primary": {
+									"type": "boolean"
+								},
+								"destructive": {
+									"type": "boolean"
+								},
+								"confirm": {
+									"type": "string"
+								}
+							},
+							"required": [
+								"id",
+								"label",
+								"onClick"
+							],
+							"additionalProperties": false
+						}
+					},
+					"empty": {
+						"description": "Shown when there are no rows.",
+						"type": "string"
+					},
+					"perPage": {
+						"type": "integer",
+						"minimum": 1,
+						"maximum": 100,
+						"default": 20
+					},
+					"search": {
+						"type": "boolean",
+						"default": false
+					}
+				},
+				"required": [
+					"rows",
+					"fields"
+				],
+				"additionalProperties": false
+			},
+			"children": "none"
+		},
+		"text": {
+			"description": "A paragraph of plain text.",
+			"props": {
+				"type": "object",
+				"properties": {
+					"variant": {
+						"enum": [
+							"body",
+							"muted",
+							"strong"
+						],
+						"default": "body"
+					}
+				},
+				"additionalProperties": false
+			},
+			"children": "text"
+		}
+	},
+	"capabilities": {
+		"posts.list": {
+			"kind": "read",
+			"description": "Lists posts the current user can edit, filtered by status, newest first.",
+			"input": {
+				"type": "object",
+				"properties": {
+					"post_type": {
+						"type": "string",
+						"default": "post"
+					},
+					"status": {
+						"type": "array",
+						"items": {
+							"type": "string",
+							"enum": [
+								"publish",
+								"future",
+								"draft",
+								"pending",
+								"private"
+							]
+						},
+						"minItems": 1
+					},
+					"search": {
+						"type": "string"
+					},
+					"per_page": {
+						"type": "integer",
+						"minimum": 1,
+						"maximum": 100,
+						"default": 20
+					},
+					"page": {
+						"type": "integer",
+						"minimum": 1,
+						"default": 1
+					},
+					"orderby": {
+						"type": "string",
+						"enum": [
+							"date",
+							"modified",
+							"title"
+						],
+						"default": "date"
+					},
+					"order": {
+						"type": "string",
+						"enum": [
+							"asc",
+							"desc"
+						],
+						"default": "desc"
+					}
+				},
+				"additionalProperties": false,
+				"default": {}
+			},
+			"output": {
+				"type": "object",
+				"properties": {
+					"items": {
+						"type": "array",
+						"items": {
+							"type": "object",
+							"properties": {
+								"id": {
+									"type": "integer"
+								},
+								"title": {
+									"type": "string"
+								},
+								"status": {
+									"type": "string",
+									"enum": [
+										"publish",
+										"future",
+										"draft",
+										"pending",
+										"private"
+									]
+								},
+								"type": {
+									"type": "string"
+								},
+								"author": {
+									"type": "object",
+									"properties": {
+										"id": {
+											"type": "integer"
+										},
+										"name": {
+											"type": "string"
+										}
+									},
+									"required": [
+										"id",
+										"name"
+									],
+									"additionalProperties": false
+								},
+								"date": {
+									"type": "string",
+									"format": "date-time"
+								},
+								"modified": {
+									"type": "string",
+									"format": "date-time"
+								},
+								"edit_url": {
+									"type": "string",
+									"format": "uri"
+								},
+								"can": {
+									"description": "What the current user may do with this post.",
+									"type": "object",
+									"properties": {
+										"edit": {
+											"type": "boolean"
+										},
+										"publish": {
+											"type": "boolean"
+										}
+									},
+									"required": [
+										"edit",
+										"publish"
+									],
+									"additionalProperties": false
+								}
+							},
+							"required": [
+								"id",
+								"title",
+								"status",
+								"type",
+								"author",
+								"date",
+								"modified",
+								"can"
+							],
+							"additionalProperties": false
+						}
+					},
+					"total": {
+						"type": "integer"
+					},
+					"pages": {
+						"type": "integer"
+					}
+				},
+				"required": [
+					"items",
+					"total",
+					"pages"
+				],
+				"additionalProperties": false
+			},
+			"scopes": [
+				"posts:read"
+			],
+			"binding": {
+				"ability": "graft/posts-list",
+				"annotations": {
+					"readonly": true,
+					"destructive": false,
+					"idempotent": true
+				}
+			}
+		},
+		"posts.update_status": {
+			"kind": "write",
+			"description": "Changes the status of one post, for example to publish a pending post.",
+			"input": {
+				"type": "object",
+				"properties": {
+					"id": {
+						"type": "integer",
+						"minimum": 1
+					},
+					"status": {
+						"type": "string",
+						"enum": [
+							"publish",
+							"draft",
+							"pending",
+							"private"
+						]
+					}
+				},
+				"required": [
+					"id",
+					"status"
+				],
+				"additionalProperties": false
+			},
+			"output": {
+				"type": "object",
+				"properties": {
+					"id": {
+						"type": "integer"
+					},
+					"title": {
+						"type": "string"
+					},
+					"status": {
+						"type": "string",
+						"enum": [
+							"publish",
+							"future",
+							"draft",
+							"pending",
+							"private"
+						]
+					},
+					"type": {
+						"type": "string"
+					},
+					"author": {
+						"type": "object",
+						"properties": {
+							"id": {
+								"type": "integer"
+							},
+							"name": {
+								"type": "string"
+							}
+						},
+						"required": [
+							"id",
+							"name"
+						],
+						"additionalProperties": false
+					},
+					"date": {
+						"type": "string",
+						"format": "date-time"
+					},
+					"modified": {
+						"type": "string",
+						"format": "date-time"
+					},
+					"edit_url": {
+						"type": "string",
+						"format": "uri"
+					},
+					"can": {
+						"description": "What the current user may do with this post.",
+						"type": "object",
+						"properties": {
+							"edit": {
+								"type": "boolean"
+							},
+							"publish": {
+								"type": "boolean"
+							}
+						},
+						"required": [
+							"edit",
+							"publish"
+						],
+						"additionalProperties": false
+					}
+				},
+				"required": [
+					"id",
+					"title",
+					"status",
+					"type",
+					"author",
+					"date",
+					"modified",
+					"can"
+				],
+				"additionalProperties": false
+			},
+			"scopes": [
+				"posts.status:write"
+			],
+			"binding": {
+				"ability": "graft/post-update-status",
+				"annotations": {
+					"readonly": false,
+					"destructive": false,
+					"idempotent": true
+				}
+			}
+		},
+		"site.info": {
+			"kind": "read",
+			"description": "Returns site information configured in WordPress. By default returns all fields, or optionally a filtered subset.",
+			"input": {
+				"type": "object",
+				"properties": {
+					"fields": {
+						"type": "array",
+						"items": {
+							"type": "string",
+							"enum": [
+								"name",
+								"description",
+								"url",
+								"wpurl",
+								"admin_email",
+								"charset",
+								"language",
+								"version"
+							]
+						},
+						"description": "Optional: Limit response to specific fields. If omitted, all fields are returned."
+					}
+				},
+				"additionalProperties": false,
+				"default": {}
+			},
+			"output": {
+				"type": "object",
+				"properties": {
+					"name": {
+						"type": "string",
+						"title": "Site Title",
+						"description": "The site title."
+					},
+					"description": {
+						"type": "string",
+						"title": "Tagline",
+						"description": "The site tagline."
+					},
+					"url": {
+						"type": "string",
+						"title": "Site Address (URL)",
+						"description": "The public URL where visitors access the site. May differ from the WordPress installation URL."
+					},
+					"wpurl": {
+						"type": "string",
+						"title": "WordPress Address (URL)",
+						"description": "The URL where WordPress core files are served. May differ from the public site URL."
+					},
+					"admin_email": {
+						"type": "string",
+						"title": "Administration Email Address",
+						"description": "The site administrator email address."
+					},
+					"charset": {
+						"type": "string",
+						"title": "Site Charset",
+						"description": "The site character encoding."
+					},
+					"language": {
+						"type": "string",
+						"title": "Site Language",
+						"description": "The site locale in dash form (e.g. en-US)."
+					},
+					"version": {
+						"type": "string",
+						"title": "WordPress Version",
+						"description": "The WordPress core version running on this site."
+					}
+				},
+				"additionalProperties": false
+			},
+			"scopes": [
+				"site:read"
+			],
+			"binding": {
+				"ability": "core/get-site-info",
+				"annotations": {
+					"readonly": true,
+					"destructive": false,
+					"idempotent": true
+				}
+			}
+		},
+		"users.current": {
+			"kind": "read",
+			"description": "Returns profile details for the current authenticated user to support personalization, auditing, and access-aware behavior. By default returns all fields, or optionally a filtered subset.",
+			"input": {
+				"type": "object",
+				"properties": {
+					"fields": {
+						"type": "array",
+						"items": {
+							"type": "string",
+							"enum": [
+								"id",
+								"display_name",
+								"user_nicename",
+								"user_login",
+								"roles",
+								"locale",
+								"first_name",
+								"last_name",
+								"nickname",
+								"description",
+								"user_url"
+							]
+						},
+						"description": "Optional: Limit response to specific fields. If omitted, all fields are returned."
+					}
+				},
+				"additionalProperties": false,
+				"default": {}
+			},
+			"output": {
+				"type": "object",
+				"properties": {
+					"id": {
+						"type": "integer",
+						"title": "User ID",
+						"description": "Unique identifier for the user."
+					},
+					"display_name": {
+						"type": "string",
+						"title": "Display Name",
+						"description": "Public-facing name selected by the user."
+					},
+					"user_nicename": {
+						"type": "string",
+						"title": "User Nicename",
+						"description": "URL-friendly slug for the user. Defaults to the username."
+					},
+					"user_login": {
+						"type": "string",
+						"title": "Username",
+						"description": "Login identifier for the user. Cannot be changed once set."
+					},
+					"roles": {
+						"type": "array",
+						"title": "Roles",
+						"description": "Roles assigned to the user, such as administrator, editor, author, contributor, or subscriber.",
+						"items": {
+							"type": "string"
+						}
+					},
+					"locale": {
+						"type": "string",
+						"title": "Language",
+						"description": "Locale code for the user, such as en_US."
+					},
+					"first_name": {
+						"type": "string",
+						"title": "First Name",
+						"description": "Given name."
+					},
+					"last_name": {
+						"type": "string",
+						"title": "Last Name",
+						"description": "Family name."
+					},
+					"nickname": {
+						"type": "string",
+						"title": "Nickname",
+						"description": "Informal name. Defaults to the username."
+					},
+					"description": {
+						"type": "string",
+						"title": "Biographical Info",
+						"description": "User-authored biography. May be empty."
+					},
+					"user_url": {
+						"type": "string",
+						"title": "Website",
+						"description": "Personal website URL."
+					}
+				},
+				"additionalProperties": false
+			},
+			"scopes": [
+				"users.current:read"
+			],
+			"binding": {
+				"ability": "core/get-user-info",
+				"annotations": {
+					"readonly": true,
+					"destructive": false,
+					"idempotent": true
+				}
+			}
+		}
+	},
+	"scopes": {
+		"posts:read": {
+			"title": "See posts you can edit, including drafts and pending posts",
+			"host": [
+				"edit_posts"
+			]
+		},
+		"posts.status:write": {
+			"title": "Publish, unpublish or change the status of posts",
+			"host": [
+				"edit_posts",
+				"publish_posts"
+			]
+		},
+		"site:read": {
+			"title": "See site settings such as the title and address",
+			"host": [
+				"manage_options"
+			]
+		},
+		"users.current:read": {
+			"title": "See your own profile",
+			"host": [
+				"read"
+			]
+		}
+	},
+	"audiences": [
+		"administrator",
+		"editor",
+		"author",
+		"contributor",
+		"subscriber"
+	],
+	"migrations": []
+}

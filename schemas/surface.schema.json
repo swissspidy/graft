@@ -1,0 +1,175 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://graft.dev/schemas/surface/1.json",
+  "title": "Graft surface",
+  "description": "The extension contract a host adapter publishes for one host version: slots, components, capabilities, permission scopes and migrations from the previous surface. Identified by its content hash.",
+  "type": "object",
+  "required": ["graft", "host", "hostVersion", "slots", "components", "capabilities", "scopes"],
+  "additionalProperties": false,
+  "properties": {
+    "graft": { "const": 1 },
+    "host": { "type": "string", "pattern": "^[a-z][a-z0-9-]*$" },
+    "hostVersion": { "type": "string", "minLength": 1 },
+    "hash": {
+      "description": "Content hash of the contract (everything except hash, hostVersion, previous and migrations, canonical JSON, SHA-256). Verified when present.",
+      "type": "string",
+      "pattern": "^sha256:[0-9a-f]{64}$"
+    },
+    "fingerprint": {
+      "description": "Host-computed fingerprint of the host half (structure only, no text, version or roles). The plugin uses it at runtime to find the snapshot it matches.",
+      "type": "string",
+      "pattern": "^sha256:[0-9a-f]{64}$"
+    },
+    "previous": {
+      "description": "Content hash of the surface the migrations start from.",
+      "type": "string"
+    },
+    "slots": {
+      "type": "object",
+      "propertyNames": { "$ref": "#/$defs/symbol" },
+      "additionalProperties": { "$ref": "#/$defs/slot" }
+    },
+    "components": {
+      "type": "object",
+      "propertyNames": { "$ref": "#/$defs/symbol" },
+      "additionalProperties": { "$ref": "#/$defs/component" }
+    },
+    "capabilities": {
+      "type": "object",
+      "propertyNames": { "$ref": "#/$defs/symbol" },
+      "additionalProperties": { "$ref": "#/$defs/capability" }
+    },
+    "scopes": {
+      "type": "object",
+      "propertyNames": { "pattern": "^[a-z][a-z0-9_.]*:(read|write)$" },
+      "additionalProperties": { "$ref": "#/$defs/scope" }
+    },
+    "audiences": {
+      "description": "Audience values a spec may use (for WordPress: role slugs).",
+      "type": "array",
+      "items": { "type": "string" },
+      "uniqueItems": true
+    },
+    "migrations": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/migration" }
+    }
+  },
+  "$defs": {
+    "symbol": {
+      "type": "string",
+      "pattern": "^[a-z][a-z0-9-]*([./][a-z][a-z0-9-_]*)*$"
+    },
+    "jsonSchema": {
+      "description": "An embedded JSON Schema (draft 2020-12). Adapters normalize host schemas (e.g. draft-04 ability schemas) into this.",
+      "type": ["object", "boolean"]
+    },
+    "slot": {
+      "type": "object",
+      "required": ["kind", "title"],
+      "additionalProperties": false,
+      "properties": {
+        "kind": {
+          "description": "owned: the customization gets its own space. extension: it attaches to an existing host screen.",
+          "enum": ["owned", "extension"]
+        },
+        "title": { "type": "string" },
+        "description": { "type": "string" },
+        "screen": { "description": "Host screen an extension slot lives on.", "type": "string" },
+        "anchor": { "description": "Host hook or component the slot attaches to. What re-anchoring replaces.", "type": "string" },
+        "options": { "$ref": "#/$defs/jsonSchema" },
+        "provides": {
+          "description": "Props the slot passes into the tree, e.g. the current post id.",
+          "$ref": "#/$defs/jsonSchema"
+        },
+        "accepts": {
+          "description": "Components allowed at the root of a tree mounted here. Omitted means any.",
+          "type": "array",
+          "items": { "$ref": "#/$defs/symbol" }
+        },
+        "successor": { "description": "Slot that replaces this one if it is deprecated.", "$ref": "#/$defs/symbol" },
+        "deprecated": { "type": "boolean" }
+      }
+    },
+    "component": {
+      "type": "object",
+      "required": ["props"],
+      "additionalProperties": false,
+      "properties": {
+        "description": { "type": "string" },
+        "props": { "$ref": "#/$defs/jsonSchema" },
+        "children": { "enum": ["none", "any", "text"], "default": "none" }
+      }
+    },
+    "capability": {
+      "type": "object",
+      "required": ["kind", "input", "output", "scopes"],
+      "additionalProperties": false,
+      "properties": {
+        "kind": { "enum": ["read", "write"] },
+        "description": { "type": "string" },
+        "input": { "$ref": "#/$defs/jsonSchema" },
+        "output": { "$ref": "#/$defs/jsonSchema" },
+        "scopes": {
+          "description": "Permission scopes a grant must include to call this capability.",
+          "type": "array",
+          "items": { "type": "string", "pattern": "^[a-z][a-z0-9_.]*:(read|write)$" },
+          "minItems": 1
+        },
+        "binding": {
+          "description": "Host-specific binding, e.g. { ability: 'graft/posts-list' }. Opaque to the core.",
+          "type": "object"
+        }
+      }
+    },
+    "scope": {
+      "type": "object",
+      "required": ["title"],
+      "additionalProperties": false,
+      "properties": {
+        "title": { "description": "Plain-language description an admin approves.", "type": "string" },
+        "host": {
+          "description": "Host permissions the scope maps to (for WordPress: capabilities). Opaque to the core.",
+          "type": "array",
+          "items": { "type": "string" }
+        }
+      }
+    },
+    "migration": {
+      "type": "object",
+      "required": ["op"],
+      "oneOf": [
+        {
+          "properties": {
+            "op": { "const": "rename" },
+            "kind": { "enum": ["slot", "component", "capability", "scope"] },
+            "from": { "type": "string" },
+            "to": { "type": "string" }
+          },
+          "required": ["op", "kind", "from", "to"]
+        },
+        {
+          "properties": {
+            "op": { "const": "rename-prop" },
+            "component": { "type": "string" },
+            "from": { "type": "string" },
+            "to": { "type": "string" },
+            "values": {
+              "description": "Optional value map applied while renaming.",
+              "type": "object"
+            }
+          },
+          "required": ["op", "component", "from", "to"]
+        },
+        {
+          "properties": {
+            "op": { "const": "remove" },
+            "kind": { "enum": ["slot", "component", "capability", "scope", "prop"] },
+            "symbol": { "type": "string" }
+          },
+          "required": ["op", "kind", "symbol"]
+        }
+      ]
+    }
+  }
+}

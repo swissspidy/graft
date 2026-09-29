@@ -1,0 +1,19 @@
+{
+  "$schema": "https://emdashcms.com/seed.schema.json",
+  "version": "1",
+  "meta": { "name": "Graft test site" },
+  "settings": { "title": "Graft test site" },
+  "collections": [
+    {
+      "slug": "posts",
+      "label": "Posts",
+      "labelSingular": "Post",
+      "urlPattern": "/posts/{slug}",
+      "supports": ["drafts", "revisions", "scheduling", "search"],
+      "fields": [
+        { "slug": "title", "label": "Title", "type": "string", "required": true, "searchable": true },
+        { "slug": "content", "label": "Content", "type": "portableText", "searchable": true }
+      ]
+    }
+  ]
+}

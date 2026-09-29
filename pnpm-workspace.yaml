@@ -1,0 +1,4 @@
+packages:
+  - packages/*
+  - hosts/*/adapter
+  - hosts/emdash/site
