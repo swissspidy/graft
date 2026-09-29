@@ -202,7 +202,9 @@ add_filter( 'graft_surface_capability_map', $widen );
 $editor3 = user_named( 'editor', 'editor3' );
 wp_set_current_user( $editor3 );
 $call = call( 'review-queue', 'posts.update_status', array( 'id' => $pending2, 'status' => 'publish' ) );
-check( 'the gateway enforces the grant per capability', 403 === $call['status'] && 'graft_not_granted' === $call['code'] && 'pending' === get_post_status( $pending2 ), $call );
+// Scopes are derived from the capability map, so the spec stops being
+// served at all; the gateway's per-capability check stays as a second line.
+check( 'a capability moved behind a new scope is refused', 403 === $call['status'] && in_array( $call['code'], array( 'graft_spec_unavailable', 'graft_not_granted' ), true ) && 'pending' === get_post_status( $pending2 ), $call );
 remove_filter( 'graft_surface_capability_map', $widen );
 
 // Narrow the grant behind the spec's back: it is no longer served at all.
@@ -293,7 +295,10 @@ check( 'a build needing a new scope can be prepared for an active version', 'act
 
 $moved                           = $qa['build'];
 $moved['surface']['hash']        = $hash_c;
-$moved['mount']['slot']          = 'dashboard.widget';
+$moved['mount']                  = array(
+	'slot'  => 'dashboard.widget',
+	'title' => 'Moved',
+);
 check( 'a build mounted elsewhere is refused', is_wp_error( Graft\attach_build( 'quick-approve', 1, $moved, array( 'passed' => true ) ) ) );
 $moved['provenance']['strategy'] = 'reanchored';
 $moved['refs']['scopes'][]       = 'posts.publish:write';
@@ -308,6 +313,99 @@ check( 'and is not served meanwhile', ! isset( Graft\servable_specs()['quick-app
 wp_set_current_user( $admin );
 $approved_c = Graft\approve_version( 'quick-approve', 1 );
 check( 'approval widens the grant to what the build needs', 'active' === ( $approved_c['state'] ?? null ) && in_array( 'posts.publish:write', $approved_c['grant']['scopes'] ?? array(), true ), $approved_c );
+
+// ---------------------------------------------------------------------------
+// Security regressions (review findings).
+// ---------------------------------------------------------------------------
+
+function rest( string $method, string $route, array $body = array() ): array {
+	$request = new WP_REST_Request( $method, $route );
+	$request->set_body_params( $body );
+	$response = rest_do_request( $request );
+	$data     = $response->get_data();
+	return array(
+		'status' => $response->get_status(),
+		'code'   => is_array( $data ) ? ( $data['code'] ?? null ) : null,
+		'data'   => $data,
+	);
+}
+
+$contributor3 = user_named( 'contributor', 'contributor3' );
+wp_set_current_user( $contributor3 );
+$hijack = rest(
+	'POST',
+	'/graft/v1/specs',
+	array(
+		'source'   => $queue['source'] . "\nHijacked.\n",
+		'manifest' => $queue['manifest'],
+		'scope'    => array( 'type' => 'user' ),
+	)
+);
+check( 'contributors cannot add versions to shared specs', 403 === $hijack['status'] && 'graft_forbidden' === $hijack['code'], $hijack );
+
+$personal_manifest       = $queue['manifest'];
+$personal_manifest['id'] = 'my-queue';
+$personal                = rest(
+	'POST',
+	'/graft/v1/specs',
+	array(
+		'source'   => str_replace( 'id: review-queue', 'id: my-queue', $queue['source'] ),
+		'manifest' => $personal_manifest,
+		'scope'    => array( 'type' => 'user' ),
+	)
+);
+check( 'contributors can create personal specs', 201 === $personal['status'], $personal );
+
+wp_set_current_user( $admin );
+$squat = rest(
+	'POST',
+	'/graft/v1/specs',
+	array(
+		'source'   => str_replace( 'id: review-queue', 'id: my-queue', $queue['source'] ) . "\nOrg.\n",
+		'manifest' => $personal_manifest,
+		'scope'    => array( 'type' => 'org' ),
+	)
+);
+check( 'an id taken by a personal spec is not silently reused org-wide', 409 === $squat['status'] && 'graft_id_in_use' === $squat['code'], $squat );
+
+wp_set_current_user( $contributor3 );
+$last = null;
+for ( $i = 0; $i < 12; $i++ ) {
+	$manifest       = $queue['manifest'];
+	$manifest['id'] = 'mine-' . $i;
+	$last           = rest(
+		'POST',
+		'/graft/v1/specs',
+		array(
+			'source'   => "spec $i",
+			'manifest' => $manifest,
+			'scope'    => array( 'type' => 'user' ),
+		)
+	);
+}
+check( 'people who are not admins have a spec limit', 429 === $last['status'] && 'graft_limit' === $last['code'], $last );
+$long = rest(
+	'POST',
+	'/graft/v1/specs',
+	array(
+		'source'   => str_repeat( 'x', 20001 ),
+		'manifest' => $personal_manifest,
+		'scope'    => array( 'type' => 'user' ),
+	)
+);
+check( 'overlong specs are refused', 400 === $long['status'], $long );
+
+wp_set_current_user( $admin );
+$bad_mount                            = $queue['manifest'];
+$bad_mount['mount']['menu']['title']  = str_repeat( 'x', 41 );
+check( 'mount options are validated on the server', is_wp_error( Graft\create_version( array( 'source' => 'x', 'manifest' => $bad_mount ) ) ) );
+
+$unverified_live = Graft\attach_build( 'quick-approve', 1, $build_c, null );
+check( 'an unverified build cannot replace what an active version serves', is_wp_error( $unverified_live ) && 'graft_unverified' === $unverified_live->get_error_code(), $unverified_live );
+
+$understated                   = $qa['build'];
+$understated['refs']['scopes'] = array();
+check( 'scopes are derived on the server, not taken from the build', in_array( 'posts.status:write', Graft\build_scopes( $understated ), true ) );
 
 global $wp_version;
 echo wp_json_encode(

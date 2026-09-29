@@ -153,6 +153,54 @@ function get_version_posts( WP_Post $spec ): array {
 	);
 }
 
+/** Longest spec source accepted, in bytes. */
+const MAX_SOURCE_LENGTH = 20000;
+
+/** Per-user limits for people who are not administrators. */
+const MAX_SPECS_PER_USER    = 10;
+const MAX_VERSIONS_PER_SPEC = 25;
+
+/**
+ * Validates a mount (a spec manifest's or a build's) against its slot's
+ * option schema, server side.
+ *
+ * @param mixed $mount Mount: { slot, ...options }.
+ * @return true|WP_Error
+ */
+function validate_mount( $mount ) {
+	$slots = surface_slots();
+	$slot  = is_array( $mount ) ? (string) ( $mount['slot'] ?? '' ) : '';
+	if ( ! isset( $slots[ $slot ] ) ) {
+		return new WP_Error( 'graft_invalid_mount', __( 'Unknown slot.', 'graft' ), array( 'status' => 400 ) );
+	}
+	$options = $mount;
+	unset( $options['slot'] );
+	if ( isset( $slots[ $slot ]['options'] ) ) {
+		$valid = rest_validate_value_from_schema( $options, $slots[ $slot ]['options'], 'mount' );
+		if ( is_wp_error( $valid ) ) {
+			return new WP_Error( 'graft_invalid_mount', $valid->get_error_message(), array( 'status' => 400 ) );
+		}
+	}
+	return true;
+}
+
+/**
+ * Every scope a build needs: the scopes it declares plus those the host's
+ * capability map requires for each capability it calls. Computed on the
+ * server so a build cannot understate what it needs.
+ *
+ * @param array<string, mixed> $build Build.
+ * @return string[]
+ */
+function build_scopes( array $build ): array {
+	$scopes = is_array( $build['refs']['scopes'] ?? null ) ? $build['refs']['scopes'] : array();
+	$map    = surface_capability_map();
+	foreach ( (array) ( $build['refs']['capabilities'] ?? array() ) as $capability ) {
+		$scopes = array_merge( $scopes, $map[ $capability ]['scopes'] ?? array() );
+	}
+	return array_values( array_unique( $scopes ) );
+}
+
 /**
  * Validates a manifest against the current surface (phase two of spec
  * validation, done again server side because the manifest comes from the
@@ -177,9 +225,9 @@ function validate_manifest( $manifest ) {
 	if ( 'wordpress' !== ( $manifest['host'] ?? null ) ) {
 		return $error( __( 'The spec is not for WordPress.', 'graft' ) );
 	}
-	$slots = surface_slots();
-	if ( ! isset( $manifest['mount']['slot'] ) || ! isset( $slots[ $manifest['mount']['slot'] ] ) ) {
-		return $error( __( 'Unknown slot.', 'graft' ) );
+	$mount = validate_mount( $manifest['mount'] ?? null );
+	if ( is_wp_error( $mount ) ) {
+		return $mount;
 	}
 	$scopes = surface_scopes();
 	if ( ! isset( $manifest['permissions'] ) || ! is_array( $manifest['permissions'] ) ) {
@@ -223,11 +271,45 @@ function create_version( array $args ) {
 	if ( ! in_array( $scope['type'] ?? '', array( 'org', 'team', 'user' ), true ) || ( 'team' === $scope['type'] && ! isset( wp_roles()->roles[ $scope['role'] ?? '' ] ) ) ) {
 		return new WP_Error( 'graft_invalid_scope', __( 'Invalid scope.', 'graft' ), array( 'status' => 400 ) );
 	}
+	if ( strlen( $source ) > MAX_SOURCE_LENGTH ) {
+		return new WP_Error( 'graft_too_long', __( 'The spec is too long.', 'graft' ), array( 'status' => 400 ) );
+	}
 	$owner   = (int) ( $args['owner'] ?? get_current_user_id() );
 	$spec_id = $manifest['id'];
 	$hash    = hash_spec( $source );
+	$admin   = current_user_can( 'manage_options' );
 
 	$spec = get_spec_post( $spec_id );
+	if ( $spec ) {
+		// Only administrators may add versions to shared specs; people may
+		// only add versions to their own personal ones. The stored scope
+		// decides, never the scope in the request.
+		$stored = get_json_meta( $spec->ID, '_graft_scope' );
+		$mine   = 'user' === ( $stored['type'] ?? '' ) && (int) $spec->post_author === get_current_user_id();
+		if ( ! $admin && ! $mine ) {
+			return new WP_Error( 'graft_forbidden', __( 'You cannot change this customization.', 'graft' ), array( 'status' => 403 ) );
+		}
+		if ( ( $stored['type'] ?? 'org' ) !== $scope['type'] ) {
+			return new WP_Error( 'graft_id_in_use', __( 'This id is already used by a customization with another scope.', 'graft' ), array( 'status' => 409 ) );
+		}
+		if ( ! $admin && count( get_version_posts( $spec ) ) >= MAX_VERSIONS_PER_SPEC ) {
+			return new WP_Error( 'graft_limit', __( 'This customization has too many versions.', 'graft' ), array( 'status' => 429 ) );
+		}
+	} elseif ( ! $admin ) {
+		$owned = get_posts(
+			array(
+				'post_type'        => SPEC_POST_TYPE,
+				'post_status'      => 'private',
+				'author'           => get_current_user_id(),
+				'numberposts'      => MAX_SPECS_PER_USER,
+				'fields'           => 'ids',
+				'suppress_filters' => true,
+			)
+		);
+		if ( count( $owned ) >= MAX_SPECS_PER_USER ) {
+			return new WP_Error( 'graft_limit', __( 'You have too many customizations.', 'graft' ), array( 'status' => 429 ) );
+		}
+	}
 	if ( ! $spec ) {
 		$spec_post_id = wp_insert_post(
 			array(
@@ -401,15 +483,31 @@ function attach_build( string $spec_id, int $version, array $build, ?array $veri
 	}
 	$slot       = (string) ( $build['mount']['slot'] ?? '' );
 	$reanchored = 'reanchored' === ( $build['provenance']['strategy'] ?? null ) && isset( $snapshot['slots'][ $slot ] );
+	// Validate the mount against the slot on this host. A build re-anchored
+	// to a slot of a future surface is validated when that surface is live.
+	if ( isset( surface_slots()[ $slot ] ) ) {
+		$mount = validate_mount( $build['mount'] ?? null );
+		if ( is_wp_error( $mount ) ) {
+			return $mount;
+		}
+	}
 	if ( $slot !== ( $record['manifest']['mount']['slot'] ?? null ) && ! $reanchored ) {
 		return new WP_Error( 'graft_build_mismatch', __( 'The build mounts somewhere else than the spec.', 'graft' ), array( 'status' => 400 ) );
 	}
 	// An upgraded build may need scopes the spec never asked for (the host
 	// moved a capability behind a new permission). It is stored, but only
 	// served once an admin widens the grant.
-	$scopes = is_array( $build['refs']['scopes'] ?? null ) ? $build['refs']['scopes'] : array();
+	$scopes = build_scopes( $build );
 	if ( array_diff( $scopes, $record['manifest']['permissions'] ) && 'active' !== $record['state'] && 'upgrading' !== $record['state'] ) {
 		return new WP_Error( 'graft_build_scope', __( 'The build needs permissions the spec does not request.', 'graft' ), array( 'status' => 400 ) );
+	}
+
+	$verified = ! empty( $verification['passed'] );
+	$allowed  = defined( 'GRAFT_ALLOW_UNVERIFIED_BUILDS' ) && GRAFT_ALLOW_UNVERIFIED_BUILDS;
+	if ( 'active' === $record['state'] && ! $verified && ! $allowed ) {
+		// Never replace what an active version serves (or will serve after an
+		// upgrade) with something unverified.
+		return new WP_Error( 'graft_unverified', __( 'Only verified builds can be attached to an active customization.', 'graft' ), array( 'status' => 400 ) );
 	}
 
 	$builds                  = $record['builds'];
@@ -420,9 +518,8 @@ function attach_build( string $spec_id, int $version, array $build, ?array $veri
 	);
 	set_json_meta( $post->ID, '_graft_builds', $builds );
 
-	$verified = ! empty( $verification['passed'] );
 	if ( ! $verified ) {
-		if ( ! ( defined( 'GRAFT_ALLOW_UNVERIFIED_BUILDS' ) && GRAFT_ALLOW_UNVERIFIED_BUILDS ) ) {
+		if ( ! $allowed ) {
 			return version_record( get_post( $post->ID ) );
 		}
 		update_post_meta( $post->ID, '_graft_unverified', 1 );
@@ -467,7 +564,8 @@ function approve_version( string $spec_id, int $version ) {
 	// Grant what the spec requests, plus what the build for the current
 	// surface needs (an upgrade may need a new scope).
 	$current = current_surface();
-	$needed  = $current ? ( $record['builds'][ $current['hash'] ]['build']['refs']['scopes'] ?? array() ) : array();
+	$build   = $current ? ( $record['builds'][ $current['hash'] ]['build'] ?? null ) : null;
+	$needed  = is_array( $build ) ? build_scopes( $build ) : array();
 	set_json_meta(
 		$post->ID,
 		'_graft_grant',
@@ -557,7 +655,7 @@ function check_surface_change(): void {
 		$ready = $record['builds'][ $hash ] ?? null;
 		$ready = $ready && ! empty( $ready['verification']['passed'] ) ? $ready['build'] : null;
 		if ( 'active' === $record['state'] ) {
-			if ( $ready && grant_covers( $record['grant'], $ready['refs']['scopes'] ?? array() ) ) {
+			if ( $ready && grant_covers( $record['grant'], build_scopes( $ready ) ) ) {
 				continue;
 			}
 			transition( $post, 'host_changed' );
@@ -565,7 +663,7 @@ function check_surface_change(): void {
 			transition( $post, 'host_changed' );
 		}
 		if ( $ready ) {
-			transition( $post, grant_covers( $record['grant'], $ready['refs']['scopes'] ?? array() ) ? 'upgraded' : 'upgrade_needs_grant' );
+			transition( $post, grant_covers( $record['grant'], build_scopes( $ready ) ) ? 'upgraded' : 'upgrade_needs_grant' );
 		}
 	}
 }

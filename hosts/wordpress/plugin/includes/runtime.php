@@ -74,7 +74,7 @@ function servable_specs(): array {
 			$record = version_record( $version );
 			$build  = $record['builds'][ $surface['hash'] ]['build'] ?? null;
 			// Never serve a build whose scopes the grant does not cover.
-			$covered = is_array( $build ) && grant_covers( $record['grant'], $build['refs']['scopes'] ?? array() );
+			$covered = is_array( $build ) && grant_covers( $record['grant'], build_scopes( $build ) );
 			if ( 'active' === $record['state'] && $covered && applies_to_user( $record, $user ) ) {
 				$servable[ $spec->post_name ] = array(
 					'record' => $record,
@@ -178,12 +178,22 @@ function surface_change_notice(): void {
 	if ( ! current_user_can( 'manage_options' ) ) {
 		return;
 	}
+	// Runs on every admin page: read only titles and states, not versions.
 	$waiting = array();
-	foreach ( list_specs() as $spec ) {
-		foreach ( $spec['versions'] as $version ) {
-			if ( in_array( $version['state'], array( 'upgrading', 'suspended', 'needs_approval' ), true ) && (int) $spec['active_version'] === $version['version'] ) {
-				$waiting[] = sprintf( '%s (%s)', $spec['title'], str_replace( '_', ' ', $version['state'] ) );
-			}
+	$specs   = get_posts(
+		array(
+			'post_type'        => SPEC_POST_TYPE,
+			'post_status'      => 'private',
+			'numberposts'      => -1,
+			'meta_key'         => '_graft_active_version', // phpcs:ignore WordPress.DB.SlowDBQuery.slow_db_query_meta_key
+			'suppress_filters' => true,
+		)
+	);
+	foreach ( $specs as $spec ) {
+		$version = get_version_post( $spec->post_name, (int) get_post_meta( $spec->ID, '_graft_active_version', true ) );
+		$state   = $version ? (string) get_post_meta( $version->ID, '_graft_state', true ) : '';
+		if ( in_array( $state, array( 'upgrading', 'suspended', 'needs_approval' ), true ) ) {
+			$waiting[] = sprintf( '%s (%s)', $spec->post_title, str_replace( '_', ' ', $state ) );
 		}
 	}
 	if ( $waiting ) {

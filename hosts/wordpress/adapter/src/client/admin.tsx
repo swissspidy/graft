@@ -210,8 +210,16 @@ function App({ config }: { config: AdminConfig }) {
 			{specs === null ? <Spinner /> : null}
 			{specs?.length === 0 ? <p>No customizations yet.</p> : null}
 			{specs?.map((spec) => {
-				// The version that matters: the newest one that is not superseded.
-				const version = spec.versions.find((v) => v.state !== 'superseded') ?? spec.versions[0];
+				// What is live, and separately the newest version waiting to
+				// replace it, so a new draft never hides the live one.
+				const active = spec.versions.find((v) => v.version === spec.active_version);
+				const pending = spec.versions.find(
+					(v) => v.version > (active?.version ?? 0) && !['superseded', 'archived', 'rejected'].includes(v.state),
+				);
+				const shown = [active, pending].filter((v): v is VersionRecord => Boolean(v));
+				if (shown.length === 0 && spec.versions[0]) {
+					shown.push(spec.versions[0]);
+				}
 				return (
 					<div key={spec.spec_id} data-graft-spec={spec.spec_id}>
 						<Card>
@@ -219,7 +227,12 @@ function App({ config }: { config: AdminConfig }) {
 								<strong>{spec.title}</strong> <code>{spec.spec_id}</code>
 							</CardHeader>
 							<CardBody>
-								{version ? <Version version={version} config={config} busy={busy === spec.spec_id} onEvent={(event) => void onEvent(spec, version, event)} /> : null}
+								{shown.map((version, i) => (
+									<div key={version.version} data-graft-role={i === 0 && version === active ? 'active' : 'pending'}>
+										{i > 0 ? <h3>Newer version</h3> : null}
+										<Version version={version} config={config} busy={busy === spec.spec_id} onEvent={(event) => void onEvent(spec, version, event)} />
+									</div>
+								))}
 							</CardBody>
 						</Card>
 					</div>

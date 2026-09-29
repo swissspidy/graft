@@ -51,7 +51,8 @@ function mount_admin_pages(): void {
 	$parents = menu_parents();
 	foreach ( specs_in_slot( 'admin.page' ) as $spec_id => $entry ) {
 		$menu     = $entry['build']['mount']['menu'] ?? array();
-		$title    = (string) ( $menu['title'] ?? $entry['record']['title'] );
+		// WordPress prints menu titles as HTML.
+		$title    = esc_html( (string) ( $menu['title'] ?? $entry['record']['title'] ) );
 		$slug     = 'graft-' . $spec_id;
 		$callback = static function () use ( $spec_id ): void {
 			echo '<div class="wrap graft-page">' . mount_point( $spec_id ) . '</div>'; // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- mount_point() escapes.
