@@ -189,6 +189,20 @@ describe('widgets in builds', () => {
 		expect(bad.results[0]!.failures[0]).toMatch(/^The widget at \/tree: \/children\/2\/props/);
 	});
 
+	it('keep a state of null that update returned, instead of starting over', async () => {
+		const clearing = async () => ({
+			call(name: string, args: unknown[]) {
+				if (name === 'step') {
+					return null;
+				}
+				return { type: 'stack', children: [{ type: 'text', children: `State: ${JSON.stringify(args[1])}` }, { type: 'button', props: { id: 'add', label: 'Clear', onClick: { $event: 'clear' } } }] };
+			},
+		});
+		const b = build([{ criterion: 'count', view_as: 'v', steps: [{ action: 'add' }], expect: [{ text: 'State: null' }] }], { render: 'draw', update: 'step', state: 5 });
+		const result = await verifyBuild({ build: b, spec, surface, sandbox, semantics, createCan: () => () => true, loadFunctions: clearing });
+		expect(result.results.flatMap((r) => r.failures)).toEqual([]);
+	});
+
 	it('need regenerating when the host stops running widgets', () => {
 		const { widgets: _, ...noWidgets } = surface.functions!;
 		const check = staticCheck(build([]), surface, { ...surface, functions: noWidgets });

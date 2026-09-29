@@ -60,23 +60,40 @@ test('the headline check runs its code in the sandbox, loaded only where it is n
 
 test('an interactive widget filters pending posts by author, drawn by code in the sandbox', async ({ page }) => {
 	await login(page, 'editor');
-	await page.goto('/wp-admin/index.php');
-	const widget = page.locator('#graft-pending-by-author');
-	const everyone = widget.locator('[data-graft-action="everyone"]');
-	const author = widget.locator('[data-graft-action="author-contributor-user"]');
-	await expect(everyone).toHaveText('Everyone (2)');
-	await expect(author).toHaveText('Contributor User (2)');
-	await expect(everyone).toHaveClass(/is-primary/);
-	await expect(widget.locator('tbody tr')).toHaveCount(2);
+	// A pending post by a second author, removed again at the end so the other tests see the seeded site.
+	const created = (await page.evaluate(() =>
+		window.wp.apiFetch({ path: '/wp/v2/posts', method: 'POST', data: { title: 'Editor pitch', status: 'pending' } }),
+	)) as { id: number };
+	try {
+		await page.goto('/wp-admin/index.php');
+		const widget = page.locator('#graft-pending-by-author');
+		const everyone = widget.locator('[data-graft-action="everyone"]');
+		const contributor = widget.locator('[data-graft-action="author-contributor-user"]');
+		const editor = widget.locator('[data-graft-action="author-editor-user"]');
+		const row = (title: string) => widget.locator('tbody tr', { hasText: title });
+		await expect(everyone).toHaveText('Everyone (3)');
+		await expect(contributor).toHaveText('Contributor User (2)');
+		await expect(editor).toHaveText('Editor User (1)');
+		await expect(everyone).toHaveClass(/is-primary/);
+		await expect(widget.locator('tbody tr')).toHaveCount(3);
 
-	await author.click();
-	await expect(author).toHaveClass(/is-primary/);
-	await expect(everyone).not.toHaveClass(/is-primary/);
-	await expect(widget.locator('tbody tr', { hasText: 'Draft A' })).toBeVisible();
+		await contributor.click();
+		await expect(contributor).toHaveClass(/is-primary/);
+		await expect(widget.locator('tbody tr')).toHaveCount(2);
+		await expect(row('Draft A')).toBeVisible();
+		await expect(row('Editor pitch')).toHaveCount(0);
 
-	await everyone.click();
-	await expect(everyone).toHaveClass(/is-primary/);
-	await widget.screenshot({ path: 'test-results/pending-by-author.png' });
+		await editor.click();
+		await expect(widget.locator('tbody tr')).toHaveCount(1);
+		await expect(row('Editor pitch')).toBeVisible();
+
+		await everyone.click();
+		await expect(everyone).toHaveClass(/is-primary/);
+		await expect(widget.locator('tbody tr')).toHaveCount(3);
+		await widget.screenshot({ path: 'test-results/pending-by-author.png' });
+	} finally {
+		await page.evaluate((id) => window.wp.apiFetch({ path: `/wp/v2/posts/${id}?force=true`, method: 'DELETE' }), created.id);
+	}
 });
 
 test('contributors see their pending posts in the review queue, without Approve', async ({ page }) => {

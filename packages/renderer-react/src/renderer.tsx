@@ -263,18 +263,20 @@ function Widget({ node }: { node: TreeNode }) {
 	const runtime = useContext(Runtime);
 	const props = runtime ? widgetProps(evaluate((node.props ?? {}) as Record<string, Value>, runtime.ctx) as Record<string, unknown>) : undefined;
 	const [state, setState] = useState<unknown>(() => (props ? initialState(props) : null));
-	const [pending, setPending] = useState<WidgetEvent | undefined>(undefined);
+	// Events wait in order: each one updates the state the previous one left.
+	const [pending, setPending] = useState<WidgetEvent[]>([]);
+	const event = pending[0];
 	const fn = runtime?.ctx.fn;
 
 	// Functions are pure and cached, so these return undefined until their result arrives.
-	const next = props?.update && pending && fn ? fn(props.update, updateArgs(props, state, pending)) : undefined;
+	const next = props?.update && event && fn ? fn(props.update, updateArgs(props, state, event)) : undefined;
 	const drawn = props && fn ? fn(props.render, renderArgs(props, state)) : undefined;
 
 	useEffect(() => {
 		runtime?.flush();
-		if (pending && next !== undefined) {
+		if (event && next !== undefined) {
 			setState(next);
-			setPending(undefined);
+			setPending((events) => events.slice(1));
 		}
 	});
 
@@ -285,7 +287,7 @@ function Widget({ node }: { node: TreeNode }) {
 				// Inside a widget, only its own events do anything.
 				invoke: async (value: unknown) => {
 					if (isWidgetEvent(value)) {
-						setPending(value);
+						setPending((events) => [...events, value]);
 					}
 				},
 			} : undefined,
@@ -298,7 +300,7 @@ function Widget({ node }: { node: TreeNode }) {
 	}
 	return (
 		<Runtime.Provider value={inner}>
-			<div data-graft-widget="" aria-busy={pending ? true : undefined}>
+			<div data-graft-widget="" aria-busy={pending.length > 0 ? true : undefined}>
 				<Node node={tree} />
 			</div>
 		</Runtime.Provider>

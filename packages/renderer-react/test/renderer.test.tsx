@@ -203,6 +203,34 @@ describe('GraftRoot with widgets', () => {
 		expect(container.textContent).toBe('ada: 0AddSneak');
 	});
 
+	it('applies every click in order, even when they come faster than the runner', async () => {
+		container = document.createElement('div');
+		document.body.append(container);
+		// The runner answers a tick later, so both clicks land before the first update returns.
+		const slow = { call: (calls: FunctionCall[]) => new Promise<FunctionResult[]>((resolve) => setTimeout(() => resolve(run(calls)), 5)) };
+		await act(async () => {
+			createRoot(container).render(
+				<GraftRoot build={counter} components={withButtons} gateway={{ call: async () => ({}) }} slot={{ name: 'ada' }} can={() => true} functions={() => slow} widgets={{ components: ['stack', 'text', 'button'], maxNodes: 20 }} />,
+			);
+		});
+		for (let i = 0; i < 10 && !container.querySelector('button'); i++) {
+			await act(async () => {
+				await new Promise((r) => setTimeout(r, 10));
+			});
+		}
+		const add = container.querySelector('button')!;
+		await act(async () => {
+			add.click();
+			add.click();
+		});
+		for (let i = 0; i < 20 && container.textContent !== 'ada: 4AddSneak'; i++) {
+			await act(async () => {
+				await new Promise((r) => setTimeout(r, 10));
+			});
+		}
+		expect(container.textContent).toBe('ada: 4AddSneak');
+	});
+
 	it('updates its state on its own events, and never reaches the gateway', async () => {
 		const call = vi.fn(async () => ({}));
 		await mount({ call });

@@ -170,7 +170,7 @@ async function runCheck(options: VerifyOptions, check: Check, index: number, fun
 			build.tree,
 			{ data: instance.data, slot: instance.slot, can, now, fn },
 			semantics,
-			widgetLimits ? { limits: widgetLimits, state: (path) => instance.widgets[path], validate: (tree) => validateWidgetTree(tree, options.surface) } : undefined,
+			widgetLimits ? { limits: widgetLimits, state: (path) => (Object.hasOwn(instance.widgets, path) ? { has: true, value: instance.widgets[path] } : { has: false }), validate: (tree) => validateWidgetTree(tree, options.surface) } : undefined,
 		);
 		for (const problem of snapshot.problems ?? []) {
 			if (!failures.includes(problem)) {

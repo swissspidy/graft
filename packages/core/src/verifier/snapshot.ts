@@ -21,8 +21,8 @@ export interface Snapshot {
 /** How widgets are drawn in a snapshot. */
 export interface SnapshotWidgets {
 	limits: WidgetLimits;
-	/** The state a widget is in, or undefined for its initial state. */
-	state(path: string): unknown;
+	/** The state a widget is in; `has` is false while it is in its initial state (a stored null is a state). */
+	state(path: string): { has: boolean; value?: unknown };
 	/** Problems with a sanitized tree, e.g. props that do not match the surface. */
 	validate?(tree: TreeNode): string[];
 }
@@ -142,7 +142,8 @@ export function snapshotTree(tree: TreeNode, ctx: EvalContext, semantics: Compon
 			problem(`The widget at ${path} cannot be drawn here.`);
 			return;
 		}
-		const state = widgets.state(path) ?? initialState(wp);
+		const stored = widgets.state(path);
+		const state = stored.has ? stored.value : initialState(wp);
 		(snapshot.widgets ??= {})[path] = { props: wp, state };
 		const drawn = ctx.fn(wp.render, renderArgs(wp, state));
 		if (drawn === null || drawn === undefined) {
