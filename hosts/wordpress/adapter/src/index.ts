@@ -6,3 +6,4 @@ export { createCan } from './can.ts';
 export { semantics } from './semantics.ts';
 export { startSandbox, type SandboxOptions, type WordPressSandbox } from './sandbox.ts';
 export { verifyInWordPress, type VerifyTarget } from './verify.ts';
+export { hostGuide } from './guide.ts';

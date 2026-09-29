@@ -292,6 +292,9 @@ and slot live in the adapter's own test suite; they verify the adapter, not
 individual specs.
 
 Checks are generated from criteria once per spec version and then *frozen*.
+(Implemented in milestone 5 as two compiler phases: checks are written
+from the criteria alone, before any tree exists, and the tree is then
+compiled and retried against them.)
 Regenerating a tree on host upgrade reuses the existing checks (migrated
 like any other build content if their references change). Regenerating the
 UI and its tests together would let the system grade its own homework.

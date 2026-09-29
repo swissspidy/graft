@@ -38,6 +38,8 @@ jobs:
         run: pnpm surface:generate --check
       - name: Verify the example builds against their criteria
         run: pnpm verify:examples
+      - name: Compile pipeline with a scripted model against WordPress
+        run: pnpm test:compile
       - name: Install Chromium
         run: pnpm exec playwright install --with-deps chromium
       - name: End-to-end tests in wp-admin

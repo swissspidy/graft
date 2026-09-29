@@ -1,5 +1,7 @@
 import { parseArgs } from 'node:util';
+import { anthropicModel, DEFAULT_MODEL } from './anthropic.ts';
 import { checkBuildFile } from './build.ts';
+import { compileFile } from './compile.ts';
 import { formatVerification, verifyFiles } from './verify.ts';
 import { formatResults, loadSurface, validateFiles } from './validate.ts';
 
@@ -20,9 +22,17 @@ Commands:
     --out <dir>        Write one verification record per spec
     --json             Print results as JSON
     --verbose          Show the sandbox's output
+  compile <spec>       Compile a spec into a verified build with Claude
+    --surface <file>   Surface to build for (required)
+    --out <file>       Where to write the build (default: <spec id>.build.json)
+    --model <id>       Model (default: ${DEFAULT_MODEL})
+    --attempts <n>     Attempts per phase (default: 3)
+    --previous <file>  Earlier build of the same spec version: reuse its checks, regenerate the tree
+    --no-verify        Only validate candidates, do not run their checks
+                       Needs ANTHROPIC_API_KEY (or an \`ant auth login\` profile).
 
 Coming next (see docs/adr/0001-architecture.md, section 9):
-  compile, canary`;
+  canary`;
 
 export async function main(argv: string[]): Promise<number> {
 	const [command, ...rest] = argv;
@@ -101,6 +111,43 @@ export async function main(argv: string[]): Promise<number> {
 		});
 		console.log(values.json ? JSON.stringify(results, null, 2) : formatVerification(results));
 		return results.every((r) => r.verification?.passed) ? 0 : 1;
+	}
+	if (command === 'compile') {
+		const { values, positionals } = parseArgs({
+			args: rest,
+			allowPositionals: true,
+			allowNegative: true,
+			options: {
+				surface: { type: 'string' },
+				out: { type: 'string' },
+				model: { type: 'string', default: DEFAULT_MODEL },
+				attempts: { type: 'string', default: '3' },
+				previous: { type: 'string' },
+				verify: { type: 'boolean', default: true },
+			},
+		});
+		const [file] = positionals;
+		if (!file || !values.surface) {
+			console.error('graft compile: pass a spec file and --surface.');
+			return 2;
+		}
+		let model;
+		try {
+			model = anthropicModel({ model: values.model });
+		} catch (error) {
+			console.error(`graft compile: ${error instanceof Error ? error.message : String(error)}`);
+			return 2;
+		}
+		const id = file.replace(/^.*\//, '').replace(/\.md$/, '');
+		const result = await compileFile(file, {
+			surface: values.surface,
+			out: values.out ?? `${id}.build.json`,
+			model,
+			verify: values.verify,
+			attempts: Number(values.attempts),
+			...(values.previous ? { previous: values.previous } : {}),
+		});
+		return result.ok ? 0 : 1;
 	}
 	if (command === undefined || command === 'help' || command === '--help' || command === '-h') {
 		console.log(USAGE);

@@ -9,6 +9,7 @@
     "graft": "./bin/graft.js"
   },
   "dependencies": {
+    "@anthropic-ai/sdk": "^0.129.0",
     "@graft/core": "workspace:*",
     "@graft/wordpress-adapter": "workspace:*",
     "tsx": "^4.20.0"
