@@ -2,135 +2,180 @@
 
 Durable, spec-driven customizations for multi-tenant apps.
 
-A customization is a short spec (intent, acceptance criteria, permissions)
-stored per tenant. Graft compiles it into a declarative UI build for one
-version of the host app, verifies the build against the acceptance criteria,
-and when the host changes it migrates, re-anchors or regenerates the build
-and verifies it again.
+AI lets people who don't write code customize software, but what they get
+is generated code, which breaks when the host app updates and which nobody
+around can maintain. In Graft, a customization's source of truth is a short
+**spec**: what it should do, how we know it does it, and what it may touch.
+Graft compiles the spec into a declarative UI **build** for one version of
+the host, **verifies** the build against the spec's acceptance criteria, and
+when the host changes, **migrates, re-anchors or regenerates** the build and
+verifies it again. The spec is the contract, the criteria are the guarantee,
+and the platform can change underneath.
 
-Status: all six MVP milestones of ADR 0001 are implemented as a prototype (contracts, WordPress surface, runtime, verifier, compiler, upgrade ladder and canary). Start with
-[ADR 0001](docs/adr/0001-architecture.md) and the example specs:
-[an admin page](examples/specs/review-queue.md) and
-[an extension of the Posts screen](examples/specs/quick-approve.md).
+The design is in [ADR 0001](docs/adr/0001-architecture.md). The first host is
+WordPress 7.1+ (wp-admin); the core is host-agnostic.
 
-## Layout
+Status: a working prototype. All six MVP milestones of the ADR are built, and
+each is tested against real WordPress in [Playground](https://wordpress.org/playground/).
 
-| Path             | What                                                        |
-| ---------------- | ----------------------------------------------------------- |
-| `schemas/`       | JSON Schemas for the three contracts: spec, surface, build. |
-| `schemas/spec-lifecycle.json` | The spec version state machine, shared by the core and the plugin. |
-| `packages/core`  | Host-agnostic core, no I/O: spec parser and validator, surface validation and hashing, build validation, refs, expression evaluator, lifecycle, the verifier (semantic snapshots and check runner over a host `Sandbox`) and the compiler (checks first, then a tree verified against them, with an injected model), and the upgrade ladder and canary. |
-| `packages/renderer-react` | Renders a build tree with React, given a host's components and capability gateway. |
-| `packages/cli`   | The `graft` command: `validate`, `build`, `verify`, `compile` (Claude via the Anthropic SDK), `canary`, and `site verify` / `site pull` against a live site. |
-| `hosts/wordpress` | WordPress adapter: plugin, abilities, surface generator, surface snapshots. See [its README](hosts/wordpress/README.md). |
-| `examples/specs` | Sample specs, also the future canary corpus.                |
-| `examples/builds` | Hand-written builds of the sample specs for WordPress 7.1 (the compiler can produce these too). The three examples cover every slot: an admin page, a row action on the Posts screen and a Dashboard widget. |
-| `fixtures/canary` | A multi-tenant corpus of customizations for the canary. |
+## A customization
 
-## Development
+```markdown
+---
+graft: 1
+id: review-queue
+host: wordpress
+mount:
+  slot: admin.page
+  menu: { parent: posts, title: Review queue }
+audience: [editor, contributor]
+permissions:
+  - posts:read
+  - posts.status:write
+---
 
-Requires Node 22+ and pnpm.
+# Review queue for editors
 
-```sh
-pnpm install
-pnpm test                          # unit tests
-pnpm typecheck
-pnpm graft validate examples/specs # validate spec files or directories
-pnpm validate:examples             # ...and check them against the WordPress 7.1 surface
-pnpm verify:examples               # run the example builds' checks in a WordPress sandbox
-pnpm test:compile                  # compile pipeline with a scripted model against WordPress
-pnpm test:canary                   # every synthetic host change against the corpus
+Editors see only posts that need review, with title, author and submission
+date, and can approve with one click.
 
-# Upgrade the corpus ahead of a host change:
-pnpm graft canary --corpus fixtures/canary/tenants \
-  --from hosts/wordpress/plugin/surfaces/7.1.json --scenario move-row-actions
+## Acceptance criteria
 
-# Compile a spec with Claude (needs ANTHROPIC_API_KEY):
-pnpm graft compile examples/specs/review-queue.md \
-  --surface hosts/wordpress/plugin/surfaces/7.1.json --out review-queue.build.json
-pnpm build                         # bundle the client runtime into the plugin
-pnpm test:wp                       # smoke test the plugin in WordPress Playground
-pnpm test:e2e                      # drive wp-admin in Chromium against a seeded Playground
-pnpm surface:generate              # regenerate hosts/wordpress/plugin/surfaces/7.1.json
-pnpm graft build examples/builds/review-queue.json \
-  --surface hosts/wordpress/plugin/surfaces/7.1.json \
-  --spec examples/specs/review-queue.md [--fix-refs]
+- Only posts with status "pending" are listed {#pending-only}
+- Columns: title, author, submitted date {#columns}
+- "Approve" sets status to "publish" and removes the row {#approve}
+- Contributors cannot see the approve button {#contributors-no-approve}
+- When nothing is pending, the page says "Nothing to review" {#empty-state}
 ```
 
-To click around yourself: `pnpm build && tsx hosts/wordpress/e2e/server.ts`,
-then log in at http://127.0.0.1:9400/wp-login.php as `admin`, `editor`,
-`contributor` or `subscriber` (password `password`). Editors find Posts →
-Review queue and the Approve row action; admins find Tools → Customizations,
-where "Waiting for review" waits for approval before it appears on the
-Dashboard.
+More in [`examples/specs`](examples/specs): an admin page, a row action on
+the existing Posts screen, and a Dashboard widget.
 
-## License
+## How it works
 
-Apache-2.0
+**Build.** A build is data, not code: a tree of components the host
+declares (table, button, notice, ...), bindings into data sources, and
+actions that call the host's capabilities (WordPress abilities). A trusted
+renderer draws it with native wp-admin components. It also carries
+executable **checks**, one or more per acceptance criterion.
 
-## Compiling
+**Serve.** The WordPress plugin mounts active builds in their slots. Every
+data read and action goes through a gateway that checks the viewer, that the
+build uses the capability, and that an admin granted its permission scope,
+before the ability's own WordPress permission check runs.
 
-`graft compile` turns a spec into a verified build in two phases:
+**Verify.** The verifier renders a build headlessly for a fixture user
+inside a throwaway WordPress, through real ability calls, and asserts over a
+semantic snapshot (rows, columns, text, available actions, resulting post
+state). No tenant data is ever touched.
 
-1. **Checks.** Claude turns the acceptance criteria into executable checks
-   without seeing any implementation. They are frozen from then on.
-2. **Tree.** Claude builds the tree and data sources against the frozen
-   checks. Each candidate is validated against the surface and spec and
-   verified in a WordPress sandbox; problems go back to the model until it
-   passes or the attempts run out (3 per phase by default).
+**Compile.** Claude writes the checks from the criteria first, without
+seeing any implementation, and those checks are frozen. It then builds the
+tree against them; each candidate is validated against the host's surface
+and verified, and failures go back to the model. The model never grades its
+own homework. Criteria that can't be checked objectively ("looks clean") are
+sent back to the author instead of getting a weak check.
 
-Output is constrained with structured outputs (the tree comes back as a flat
-node list with component and capability names limited to the surface), the
-system prompt is cached across attempts, and refusals fall back server-side
-(`fallbacks: "default"`). The default model is `claude-opus-5-5` at `high`
-effort. `--previous <build>` regenerates a build for a changed host while
-reusing its frozen checks.
-
-## Upgrading
-
-When the host changes, each active build goes up a ladder until one
-candidate passes its frozen checks on the new host:
+**Upgrade.** Each host version publishes a **surface** (slots, components,
+capabilities, scopes) with a content hash. When it changes, every build goes
+up a ladder until a candidate passes its frozen checks on the new host:
 
 | Rung | When | Outcome |
 | --- | --- | --- |
 | reverify | nothing the build uses changed | survived |
 | migrate | every change has a declared migration (renames) | migrated |
-| re-anchor | only the mount point moved (a deprecated slot's successor, or the one compatible slot) | re-anchored |
-| regenerate | anything else: recompile with the frozen checks and the old build as reference | regenerated |
+| re-anchor | only the mount point moved | re-anchored |
+| regenerate | anything else: recompile with the frozen checks | regenerated |
 
-A candidate that needs a scope outside the grant exits as *needs approval*
-(verified with the wider grant, so it works once approved). If nothing
-passes, the outcome is *failed*.
-
-`graft canary` runs the ladder for every tenant's customizations ahead of
-the upgrade, sharing results between identical customizations, and writes
-the upgraded builds. The plugin stores builds per surface hash: when the
-host's surface actually changes, versions with a prepared build keep
-serving, those that need a wider grant wait for approval, and the rest are
-hidden (and flagged to admins) until a build for the new surface arrives.
-
-A weekly CI job runs the canary against WordPress nightly. As of
-7.2-alpha the surface is unchanged (same hash as 7.1) and every
-customization in the corpus re-passes its checks there.
-
-`pnpm test:canary` proves each rung against a real WordPress: synthetic
-host changes are applied inside the sandbox through the plugin's surface
-filters (`hosts/wordpress/playground/sandbox/canary.php`), and the new
-surface is generated from that patched host like any other snapshot.
+A candidate that needs a permission outside the grant stops at *needs
+approval*; if nothing passes, the outcome is *failed*. `graft canary` runs
+this for every tenant ahead of an upgrade, sharing work between identical
+customizations, so builds for the next WordPress are ready before it is
+installed.
 
 ## Authoring in wp-admin
 
-1. An administrator opens Tools → Customizations → New customization,
+1. An administrator opens **Tools → Customizations → New customization**,
    writes a spec (validated against the site as they type) and clicks
-   "Build it". The compiler runs in the browser; model requests go through
-   the site's AI client, so provider keys never reach the browser.
-2. The build is saved as a draft: it has not been verified.
-3. `graft site verify --site <url> --user <admin> --password <application password>`
-   runs the draft's checks in a local WordPress sandbox and sends the
-   result back; the version moves to "Needs approval".
-4. The administrator reviews the permissions and the checks in plain
-   language, and approves it.
+   **Build it**. The compiler runs in the browser; model requests go through
+   the site's WordPress AI client, so provider keys never reach the browser.
+2. The build is saved as a draft until it is verified:
+   `graft site verify --site <url> --user <admin> --password <application password>`
+   runs its checks in a local WordPress sandbox and sends the result back.
+3. The administrator reviews the permissions and every check in plain
+   language, next to the criterion it proves, and approves it.
 
-Verifying inside the admin's browser (WordPress Playground in an iframe)
-would remove step 3; it is not built yet. `graft site pull --out <dir>`
-exports a site's active customizations as a canary corpus tenant.
+Verifying inside the admin's browser (Playground in an iframe) would remove
+step 2's CLI; it is not built yet.
+
+## Try it
+
+Requires Node 22+ and pnpm. Playground is fetched on demand (network access
+needed the first time).
+
+```sh
+pnpm install
+pnpm build                             # bundle the plugin's client
+pnpm exec tsx hosts/wordpress/e2e/server.ts   # a seeded WordPress on :9400
+```
+
+Log in at http://127.0.0.1:9400/wp-login.php as `admin`, `editor`,
+`contributor` or `subscriber` (password `password`). Editors find **Posts →
+Review queue** and an **Approve** row action on pending posts. Admins find
+**Tools → Customizations**, where "Waiting for review" waits for approval
+before it appears on the Dashboard.
+
+## Commands
+
+```sh
+# Specs and builds
+pnpm graft validate --surface hosts/wordpress/plugin/surfaces/7.1.json examples/specs
+pnpm graft build examples/builds/review-queue.json \
+  --surface hosts/wordpress/plugin/surfaces/7.1.json --spec examples/specs/review-queue.md [--fix-refs]
+pnpm graft verify --surface hosts/wordpress/plugin/surfaces/7.1.json --spec examples/specs examples/builds/*.json
+
+# Compile with Claude (ANTHROPIC_API_KEY; default claude-opus-5-5)
+pnpm graft compile examples/specs/review-queue.md \
+  --surface hosts/wordpress/plugin/surfaces/7.1.json --out review-queue.build.json
+
+# Upgrades
+pnpm graft canary --corpus fixtures/canary/tenants \
+  --from hosts/wordpress/plugin/surfaces/7.1.json --scenario move-row-actions   # or --to <surface.json>
+pnpm surface:generate [--wp nightly] [--check]
+
+# A live site (application password)
+pnpm graft site verify --site <url> --user <admin> --password <app password>
+pnpm graft site pull --site <url> --user <admin> --password <app password> --out corpus/<tenant>
+```
+
+## Tests
+
+| Command | What |
+| --- | --- |
+| `pnpm typecheck`, `pnpm test` | Types and unit tests (core, renderer, CLI, adapter) |
+| `pnpm test:wp` | Plugin smoke test in Playground on PHP 7.4 and 8.4: abilities, store, lifecycle, gateway, host changes, security regressions |
+| `pnpm verify:examples` | The example builds' checks in a WordPress sandbox |
+| `pnpm test:compile` | The compile pipeline with a scripted model against WordPress |
+| `pnpm test:canary` | Six synthetic host changes, each forcing one rung, against a four-tenant corpus |
+| `pnpm test:e2e` | Playwright in wp-admin: serving, gateway, approval, authoring, `graft site` |
+
+CI runs all of them, plus a weekly canary against WordPress nightly. As of
+7.2-alpha the surface is unchanged (same hash as 7.1) and every
+customization re-passes its checks there.
+
+## Layout
+
+| Path | What |
+| --- | --- |
+| `docs/adr` | Architecture decision records |
+| `schemas/` | JSON Schemas for spec, surface and build, and the spec lifecycle table |
+| `packages/core` | Host-agnostic, no I/O: specs, surfaces, builds, expression evaluator, verifier, compiler, upgrade ladder, canary |
+| `packages/renderer-react` | Renders a build with a host's components and capability gateway |
+| `packages/cli` | The `graft` command |
+| `hosts/wordpress` | The WordPress adapter: plugin, components, surface generator, sandbox, tests ([README](hosts/wordpress/README.md)) |
+| `examples/` | Example specs and hand-written builds |
+| `fixtures/canary` | A multi-tenant corpus for the canary |
+
+## License
+
+Apache-2.0
