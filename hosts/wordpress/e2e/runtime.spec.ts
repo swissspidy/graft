@@ -26,6 +26,35 @@ const queue = (page: Page) => page.locator('.graft-page table');
 const queueRow = (page: Page, title: string) => queue(page).locator('tbody tr', { hasText: title });
 const listRow = (page: Page, title: string) => page.locator('#the-list tr', { hasText: title });
 
+/** What this document fetched of the functions sandbox (the worker's own fetches show up as the worker's). */
+const sandboxLoads = (page: Page) =>
+	page.evaluate(() => performance.getEntriesByType('resource').map((e) => e.name).filter((url) => /functions-worker\.js|quickjs\.wasm/.test(url)));
+
+test('the headline check runs its code in the sandbox, loaded only where it is needed', async ({ page }) => {
+	await login(page, 'editor');
+	const isOurs = (w: { url(): string }) => w.url().includes('functions-worker.js');
+	const worker = page.waitForEvent('worker', { predicate: isOurs });
+
+	await page.goto('/wp-admin/index.php');
+	const widget = page.locator('#graft-headline-check');
+	const verdict = (title: string) => widget.locator('tbody tr', { hasText: title }).locator('[data-graft-field="verdict"] [data-graft-tone]');
+	await expect(verdict('Draft A')).toHaveText('Too short');
+	await expect(verdict('Draft A')).toHaveAttribute('data-graft-tone', 'warning');
+	await expect(verdict('Draft E')).toHaveText('Too short');
+	await worker;
+	expect(await sandboxLoads(page)).toEqual([expect.stringContaining('functions-worker.js')]);
+
+	// The review queue has no code: no worker, no QuickJS.
+	await page.goto('/wp-admin/admin.php?page=graft-review-queue');
+	await expect(queueRow(page, 'Draft A')).toBeVisible();
+	expect(await sandboxLoads(page)).toEqual([]);
+	expect(page.workers().filter(isOurs)).toEqual([]);
+
+	await page.goto('/wp-admin/index.php');
+	await expect(verdict('Draft A')).toHaveText('Too short');
+	await widget.screenshot({ path: 'test-results/headline-check.png' });
+});
+
 test('contributors see their pending posts in the review queue, without Approve', async ({ page }) => {
 	await login(page, 'contributor');
 	await page.goto('/wp-admin/admin.php?page=graft-review-queue');
@@ -112,6 +141,25 @@ test('stale drafts show how many days ago each draft was updated, colored by age
 	await widget.screenshot({ path: 'test-results/stale-drafts.png' });
 });
 
+test('the gateway logs what it refused, for administrators only', async ({ page }) => {
+	await login(page, 'admin');
+	const log = (await page.evaluate(() => window.wp.apiFetch({ path: '/graft/v1/audit' }))) as Array<{ spec: string; capability: string; code: string; user: number }>;
+	// From the contributor's direct calls earlier.
+	expect(log).toContainEqual(expect.objectContaining({ spec: 'review-queue', capability: 'site.info', code: 'graft_capability_not_in_build' }));
+	expect(log).toContainEqual(expect.objectContaining({ spec: 'quick-approve', capability: 'posts.update_status', code: 'graft_spec_unavailable' }));
+
+	await login(page, 'editor');
+	const status = await page.evaluate(async () => {
+		try {
+			await window.wp.apiFetch({ path: '/graft/v1/audit' });
+			return 'allowed';
+		} catch (error) {
+			return (error as { code: string }).code;
+		}
+	});
+	expect(status).toBe('rest_forbidden');
+});
+
 test('the served specs are verified, not flagged', async ({ page }) => {
 	await login(page, 'admin');
 	const specs = (await page.evaluate(() => window.wp.apiFetch({ path: '/graft/v1/specs' }))) as Array<{
@@ -119,6 +167,7 @@ test('the served specs are verified, not flagged', async ({ page }) => {
 		versions: Array<{ state: string; unverified: boolean; builds: Record<string, { verification: { passed: boolean } | null }> }>;
 	}>;
 	expect(specs.filter((s) => s.spec_id !== 'waiting-copy').map((s) => [s.spec_id, s.versions[0]!.state]).sort()).toEqual([
+		['headline-check', 'active'],
 		['quick-approve', 'active'],
 		['review-queue', 'active'],
 		['stale-drafts', 'active'],
@@ -222,8 +271,8 @@ test('graft site verify verifies the draft built in wp-admin, and the admin appr
 test('graft site pull exports the active customizations as a canary corpus', async () => {
 	const out = new URL('../../../test-results/pulled/e2e-site', import.meta.url).pathname;
 	const output = await graft('site', 'pull', '--out', out);
-	expect(output).toContain('Wrote 5 customization(s)');
-	for (const spec of ['review-queue', 'quick-approve', 'stale-drafts', 'waiting-posts', 'waiting-copy']) {
+	expect(output).toContain('Wrote 6 customization(s)');
+	for (const spec of ['review-queue', 'quick-approve', 'stale-drafts', 'headline-check', 'waiting-posts', 'waiting-copy']) {
 		expect(existsSync(`${out}/${spec}.md`) && existsSync(`${out}/${spec}.json`) && existsSync(`${out}/${spec}.grant.json`)).toBe(true);
 	}
 	expect(JSON.parse(readFileSync(`${out}/review-queue.grant.json`, 'utf8'))).toEqual({ scopes: ['posts:read', 'posts.status:write'] });

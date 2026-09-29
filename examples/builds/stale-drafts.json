@@ -7,7 +7,7 @@
 	"surface": {
 		"host": "wordpress",
 		"hostVersion": "7.1.2",
-		"hash": "sha256:4b21eabb9fe647fd0c718ac8d18c4c00cd3a27b80166ed98b1bd783ae68b4a1c"
+		"hash": "sha256:8f417b80e1e4bdc7d3f1daa6c61956b93c3910b4d25ce6692c880d2bb8550d62"
 	},
 	"mount": {
 		"slot": "dashboard.widget",

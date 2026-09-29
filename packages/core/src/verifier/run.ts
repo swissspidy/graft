@@ -1,6 +1,7 @@
 import { evaluate, isAction, type EvalContext } from '../build/evaluate.ts';
 import { removeRow } from '../build/rows.ts';
-import type { Build, Check } from '../build/types.ts';
+import type { FunctionRunner } from '../build/functions.ts';
+import type { Build, BuildCode, Check } from '../build/types.ts';
 import type { Spec } from '../spec/types.ts';
 import { canonicalJson } from '../surface/hash.ts';
 import type { Surface } from '../surface/types.ts';
@@ -20,6 +21,8 @@ export interface VerifyOptions {
 	createCan(usable: Record<string, boolean>): EvalContext['can'];
 	/** The grant to simulate. Default: the permissions the spec requests. */
 	grant?: string[];
+	/** Starts the host's sandbox for a build with code. Required to verify such builds. */
+	loadFunctions?(code: BuildCode, limits: NonNullable<Surface['functions']>['limits']): Promise<FunctionRunner>;
 }
 
 export interface CheckResult {
@@ -60,8 +63,27 @@ interface Instance {
 export async function verifyBuild(options: VerifyOptions): Promise<Verification> {
 	const { build, spec } = options;
 	const results: CheckResult[] = [];
-	for (const [index, check] of build.checks.entries()) {
-		results.push(await runCheck(options, check, index));
+	let functions: FunctionRunner | undefined;
+	let unavailable: string | undefined;
+	if (build.code) {
+		if (!options.surface.functions) {
+			unavailable = `${options.surface.host} does not run build functions.`;
+		} else if (!options.loadFunctions) {
+			unavailable = 'The build has code, and this verifier has no sandbox to run it.';
+		} else {
+			try {
+				functions = await options.loadFunctions(build.code, options.surface.functions.limits);
+			} catch (error) {
+				unavailable = `The build's code does not load: ${describeError(error)}.`;
+			}
+		}
+	}
+	try {
+		for (const [index, check] of build.checks.entries()) {
+			results.push(unavailable ? { criterion: check.criterion, check: index, passed: false, failures: [unavailable] } : await runCheck(options, check, index, functions));
+		}
+	} finally {
+		functions?.dispose?.();
 	}
 	const checked = new Set(build.checks.map((c) => c.criterion));
 	const unchecked = spec.criteria.map((c) => c.id).filter((id) => !checked.has(id));
@@ -75,7 +97,7 @@ export async function verifyBuild(options: VerifyOptions): Promise<Verification>
 	};
 }
 
-async function runCheck(options: VerifyOptions, check: Check, index: number): Promise<CheckResult> {
+async function runCheck(options: VerifyOptions, check: Check, index: number, functions?: FunctionRunner): Promise<CheckResult> {
 	const { build, spec, sandbox, semantics } = options;
 	const failures: string[] = [];
 	const result = (): CheckResult => ({ criterion: check.criterion, check: index, passed: failures.length === 0, failures });
@@ -94,6 +116,20 @@ async function runCheck(options: VerifyOptions, check: Check, index: number): Pr
 	const can = options.createCan(await sandbox.scopes(viewer, permissions));
 	// The check's clock: now, or later than the fixtures by `clock.advanceDays`.
 	const now = Date.now() + (check.clock?.advanceDays ?? 0) * 24 * 60 * 60 * 1000;
+	// Functions run synchronously here; a failed call shows as null, as in the host, and fails the check.
+	const fn = functions
+		? (name: string, args: unknown[]): unknown => {
+				try {
+					return functions.call(name, args);
+				} catch (error) {
+					const failure = `Function "${name}" failed: ${describeError(error)}.`;
+					if (!failures.includes(failure)) {
+						failures.push(failure);
+					}
+					return null;
+				}
+			}
+		: undefined;
 
 	const call = async (capability: string, input: unknown): Promise<unknown> => {
 		// The gateway's checks, as the host runtime applies them.
@@ -115,7 +151,7 @@ async function runCheck(options: VerifyOptions, check: Check, index: number): Pr
 				continue;
 			}
 			try {
-				next[name] = await call(source.call, evaluate(source.input, { data: {}, slot, can, now }) ?? null);
+				next[name] = await call(source.call, evaluate(source.input, { data: {}, slot, can, now, fn }) ?? null);
 			} catch (error) {
 				delete next[name];
 				failures.push(`Loading "${name}" failed: ${describeError(error)}.`);
@@ -125,7 +161,7 @@ async function runCheck(options: VerifyOptions, check: Check, index: number): Pr
 	};
 
 	const snap = (instance: Omit<Instance, 'snapshot'>): Instance => {
-		const snapshot = snapshotTree(build.tree, { data: instance.data, slot: instance.slot, can, now }, semantics);
+		const snapshot = snapshotTree(build.tree, { data: instance.data, slot: instance.slot, can, now, fn }, semantics);
 		// Actions outside tables apply to the slot instance (e.g. the row's post).
 		snapshot.actions = snapshot.actions.map((action) => (action.row === undefined ? { ...action, row: instance.slot } : action));
 		return { ...instance, snapshot };

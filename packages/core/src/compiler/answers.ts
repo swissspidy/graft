@@ -33,6 +33,7 @@ export function modelAnswers(build: Build, dataInput?: Record<string, unknown>) 
 				call: source.call,
 				input_json: JSON.stringify(dataInput?.[name] ?? source.input ?? null),
 			})),
+			code: build.code ? { source: build.code.source, functions: build.code.functions } : null,
 		},
 	};
 }

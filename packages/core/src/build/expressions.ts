@@ -1,4 +1,4 @@
-import type { AndExpr, Binding, CallExpr, CanExpr, CompareExpr, CompareOp, DataRef, DaysSinceExpr, EqExpr, Expression, FieldRef, IfExpr, NotExpr, OrExpr, SlotRef, TreeNode, Value } from './types.ts';
+import type { AndExpr, Binding, CallExpr, CanExpr, CompareExpr, CompareOp, DataRef, DaysSinceExpr, EqExpr, Expression, FieldRef, FnExpr, IfExpr, NotExpr, OrExpr, SlotRef, TreeNode, Value } from './types.ts';
 
 function isRecord(value: unknown): value is Record<string, unknown> {
 	return typeof value === 'object' && value !== null && !Array.isArray(value);
@@ -19,11 +19,12 @@ export const compareOp = (v: unknown): CompareOp | undefined =>
 export const isCompare = (v: unknown): v is CompareExpr => compareOp(v) !== undefined;
 export const isIf = (v: unknown): v is IfExpr => isRecord(v) && Array.isArray(v.$if) && v.$if.length === 3;
 export const isDaysSince = (v: unknown): v is DaysSinceExpr => isRecord(v) && Object.hasOwn(v, '$daysSince');
+export const isFn = (v: unknown): v is FnExpr => isRecord(v) && typeof v.$fn === 'string';
 export const isBinding = (v: unknown): v is Binding => isDataRef(v) || isFieldRef(v) || isSlotRef(v);
 /** Values only known at render time: bindings and the expressions computed from them. */
-export const isDynamic = (v: unknown): boolean => isBinding(v) || isIf(v) || isDaysSince(v) || isCompare(v);
+export const isDynamic = (v: unknown): boolean => isBinding(v) || isIf(v) || isDaysSince(v) || isCompare(v) || isFn(v);
 export const isExpression = (v: unknown): v is Expression =>
-	isBinding(v) || isCan(v) || isCall(v) || isEq(v) || isAnd(v) || isOr(v) || isNot(v) || isCompare(v) || isIf(v) || isDaysSince(v);
+	isBinding(v) || isCan(v) || isCall(v) || isEq(v) || isAnd(v) || isOr(v) || isNot(v) || isCompare(v) || isIf(v) || isDaysSince(v) || isFn(v);
 
 /** Visits every value (depth first, parents before children) with its JSON pointer. */
 export function walkValue(value: Value | undefined, path: string, visit: (value: Value, path: string) => void): void {

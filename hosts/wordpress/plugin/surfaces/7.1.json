@@ -2,7 +2,7 @@
 	"graft": 1,
 	"host": "wordpress",
 	"hostVersion": "7.1.2",
-	"hash": "sha256:4b21eabb9fe647fd0c718ac8d18c4c00cd3a27b80166ed98b1bd783ae68b4a1c",
+	"hash": "sha256:8f417b80e1e4bdc7d3f1daa6c61956b93c3910b4d25ce6692c880d2bb8550d62",
 	"fingerprint": "sha256:aac93a247c479496ea0abe8ea8b948c5af6bed66a04e8ae3f1ff729ee262cce8",
 	"slots": {
 		"admin.page": {
@@ -1156,5 +1156,14 @@
 		"contributor",
 		"subscriber"
 	],
+	"functions": {
+		"runtime": "quickjs",
+		"limits": {
+			"timeMs": 50,
+			"memoryBytes": 8388608,
+			"outputBytes": 16384,
+			"sourceBytes": 32768
+		}
+	},
 	"migrations": []
 }

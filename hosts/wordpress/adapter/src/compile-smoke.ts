@@ -48,6 +48,35 @@ try {
 	if (!prompts[2]?.includes('Check for "pending-only"')) failures.push('the verification failure was not fed back');
 	if (JSON.stringify(result.build?.data) !== JSON.stringify(handwritten.data)) failures.push('the accepted build is not the corrected one');
 	console.log(failures.length ? `✖ ${failures.join('; ')}` : '✔ compile pipeline: rejected the wrong tree in WordPress, accepted the fix');
+
+	// With code: the first answer's function never returns. The sandbox stops
+	// it, verification fails, and the compiler asks again.
+	const headlineSource = await readFile(`${examplesDir}/specs/headline-check.md`, 'utf8');
+	const headline = JSON.parse(await readFile(`${examplesDir}/builds/headline-check.json`, 'utf8')) as Build;
+	const headlineSpec = validateSpec(headlineSource, { surface }).spec!;
+	const looping = { ...modelAnswers(headline).tree, code: { source: 'function headlineVerdict(title) { for (;;) {} }', functions: ['headlineVerdict'] } };
+	const codeAnswers = { checks: [modelAnswers(headline).checks], tree: [looping, modelAnswers(headline).tree] };
+	const codePrompts: string[] = [];
+	const withCode = await compileSpec({
+		spec: headlineSpec,
+		specHash: await hashSpec(headlineSource),
+		surface,
+		model: {
+			async generate(request) {
+				codePrompts.push(request.prompt);
+				return { output: codeAnswers[request.purpose].shift(), model: 'scripted' };
+			},
+		},
+		host: hostGuide,
+		verify: async (build) => (await verifyInWordPress([{ build, spec: headlineSpec, surface }], { sandbox }))[0]!,
+		onEvent: (event) => console.log(JSON.stringify(event)),
+	});
+	const codeFailures: string[] = [];
+	if (!withCode.ok) codeFailures.push('the compile with code did not succeed');
+	if (!codePrompts[2]?.includes('ran longer than')) codeFailures.push('the stopped function was not fed back');
+	if (JSON.stringify(withCode.build?.code) !== JSON.stringify(headline.code)) codeFailures.push('the accepted build does not carry the working code');
+	console.log(codeFailures.length ? `✖ ${codeFailures.join('; ')}` : '✔ compile pipeline with code: stopped the looping function, accepted the fix');
+	failures.push(...codeFailures);
 	process.exitCode = failures.length ? 1 : 0;
 } finally {
 	await sandbox.close();

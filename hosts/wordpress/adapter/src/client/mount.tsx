@@ -3,7 +3,8 @@ import { createRoot } from 'react-dom/client';
 import apiFetch from '@wordpress/api-fetch';
 import { Notice as WPNotice } from '@wordpress/components';
 import { GraftRoot, type Gateway, type Notice } from '@graft/renderer-react';
-import type { Build } from '@graft/core/runtime';
+import type { AsyncFunctionRunner, Build, SurfaceFunctions } from '@graft/core/runtime';
+import { startFunctions } from '@graft/sandbox/client';
 import { createCan } from '../can.ts';
 import { components } from './components.tsx';
 
@@ -19,6 +20,8 @@ export interface RuntimeConfig {
 			scopes: Record<string, boolean>;
 		}
 	>;
+	/** Present when a build on this screen has code: where the functions worker is, and its limits. */
+	functions?: { worker: string; wasm: string; limits: SurfaceFunctions['limits'] };
 }
 
 declare global {
@@ -40,6 +43,22 @@ function Mounted({ spec, config, slot }: { spec: string; config: RuntimeConfig['
 	const [gateway] = useState(() => createGateway(spec));
 	const [can] = useState(() => createCan(config.scopes));
 	const inline = config.build.mount.slot === 'posts.list.row-actions';
+	// Started on the first $fn only: screens without code never load the worker or QuickJS.
+	const [functions] = useState(() => {
+		const code = config.build.code;
+		const host = window.graftRuntime?.functions;
+		if (!code || !host) {
+			return undefined;
+		}
+		return (): AsyncFunctionRunner =>
+			startFunctions({
+				workerUrl: host.worker,
+				wasmLocation: host.wasm,
+				code,
+				limits: host.limits,
+				onProblem: (message) => console.warn(`Graft: ${spec}: ${message}`),
+			});
+	});
 	return (
 		<>
 			{notices.map((notice) =>
@@ -62,6 +81,7 @@ function Mounted({ spec, config, slot }: { spec: string; config: RuntimeConfig['
 				can={can}
 				onNotice={onNotice}
 				onReload={() => window.location.reload()}
+				functions={functions}
 			/>
 		</>
 	);

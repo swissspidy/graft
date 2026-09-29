@@ -1,4 +1,4 @@
-import type { Check, DataSource, TreeNode, Value } from '../build/types.ts';
+import type { BuildCode, Check, DataSource, TreeNode, Value } from '../build/types.ts';
 
 export interface Assembled<T> {
 	value?: T;
@@ -77,7 +77,7 @@ interface FlatNode {
 }
 
 /** Turns the model's flat node list and data sources into a tree. */
-export function assembleTree(output: unknown): Assembled<{ tree: TreeNode; data: Record<string, DataSource> }> {
+export function assembleTree(output: unknown): Assembled<{ tree: TreeNode; data: Record<string, DataSource>; code?: BuildCode }> {
 	const problems: string[] = [];
 	if (!isObject(output) || !Array.isArray(output.nodes) || !Array.isArray(output.data)) {
 		return { problems: ['The output must be an object with "nodes" and "data" arrays.'] };
@@ -158,8 +158,18 @@ export function assembleTree(output: unknown): Assembled<{ tree: TreeNode; data:
 		data[item.name] = input === null || input === undefined ? { call: item.call } : { call: item.call, input: input as Value };
 	}
 
+	let code: BuildCode | undefined;
+	const rawCode = output.code;
+	if (isObject(rawCode)) {
+		if (typeof rawCode.source !== 'string' || !Array.isArray(rawCode.functions) || !rawCode.functions.every((f) => typeof f === 'string')) {
+			problems.push('"code" must have a "source" string and a "functions" list of names.');
+		} else {
+			code = { language: 'javascript', source: rawCode.source, functions: rawCode.functions as string[] };
+		}
+	}
+
 	if (problems.length > 0 || !root) {
 		return { problems };
 	}
-	return { value: { tree: root, data }, problems };
+	return { value: { tree: root, data, ...(code ? { code } : {}) }, problems };
 }

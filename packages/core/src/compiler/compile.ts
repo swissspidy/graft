@@ -104,6 +104,7 @@ export async function compileSpec(options: CompileOptions): Promise<CompileResul
 			data: assembled.value.data,
 			checks,
 			refs: { slot: spec.manifest.mount.slot, components: {}, capabilities: [], scopes: [] },
+			...(assembled.value.code ? { code: assembled.value.code } : {}),
 			provenance,
 		};
 		candidate.refs = extractRefs(candidate, surface);

@@ -1,6 +1,7 @@
 import { readdir, readFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import {
+	hashSurface,
 	runCanary,
 	validateSpec,
 	verifyBuild,
@@ -16,6 +17,7 @@ import { createCan } from './can.ts';
 import { playgroundVersion } from './playground.ts';
 import { startSandbox, type WordPressSandbox } from './sandbox.ts';
 import { semantics } from './semantics.ts';
+import { loadFunctions } from '@graft/sandbox';
 import { assembleSurface } from './surface.ts';
 
 /**
@@ -29,6 +31,8 @@ export interface Scenario {
 	patch: Record<string, unknown>;
 	migrations: Migration[];
 	expect: Record<string, UpgradeOutcome>;
+	/** A change to the generated surface that no plugin filter can make. */
+	surface?(surface: Surface): Surface;
 }
 
 export const scenarios: Scenario[] = [
@@ -37,28 +41,29 @@ export const scenarios: Scenario[] = [
 		description: 'Nothing the customizations use changes.',
 		patch: {},
 		migrations: [],
-		expect: { 'review-queue': 'survived', 'quick-approve': 'survived', 'editorial-inbox': 'survived' },
+		expect: { 'review-queue': 'survived', 'quick-approve': 'survived', 'editorial-inbox': 'survived', 'headline-check': 'survived' },
 	},
 	{
 		name: 'rename-list-capability',
 		description: 'posts.list is renamed to posts.query, with a declared migration.',
 		patch: { capabilities: { rename: { 'posts.list': 'posts.query' } } },
 		migrations: [{ op: 'rename', kind: 'capability', from: 'posts.list', to: 'posts.query' }],
-		expect: { 'review-queue': 'migrated', 'quick-approve': 'survived', 'editorial-inbox': 'migrated' },
+		expect: { 'review-queue': 'migrated', 'quick-approve': 'survived', 'editorial-inbox': 'migrated', 'headline-check': 'migrated' },
 	},
 	{
 		name: 'move-row-actions',
 		description: 'The row actions slot is deprecated in favor of posts.list.actions.',
 		patch: { slots: { alias: { 'posts.list.actions': 'posts.list.row-actions' }, deprecate: { 'posts.list.row-actions': 'posts.list.actions' } } },
 		migrations: [],
-		expect: { 'review-queue': 'survived', 'quick-approve': 'reanchored', 'editorial-inbox': 'survived' },
+		expect: { 'review-queue': 'survived', 'quick-approve': 'reanchored', 'editorial-inbox': 'survived', 'headline-check': 'survived' },
 	},
 	{
 		name: 'change-list-input',
 		description: 'posts.list takes "statuses" instead of "status"; no migration describes it.',
 		patch: { variants: ['posts-list-statuses'], capabilities: { ability: { 'posts.list': 'graft-canary/posts-list' } } },
 		migrations: [],
-		expect: { 'review-queue': 'regenerated', 'quick-approve': 'survived', 'editorial-inbox': 'regenerated' },
+		// The headline check is recompiled, and its code comes through.
+		expect: { 'review-queue': 'regenerated', 'quick-approve': 'survived', 'editorial-inbox': 'regenerated', 'headline-check': 'regenerated' },
 	},
 	{
 		name: 'widen-publish-scope',
@@ -68,14 +73,22 @@ export const scenarios: Scenario[] = [
 			capabilities: { scopes: { 'posts.update_status': ['posts.status:write', 'posts.publish:write'] } },
 		},
 		migrations: [],
-		expect: { 'review-queue': 'needs_approval', 'quick-approve': 'needs_approval', 'editorial-inbox': 'needs_approval' },
+		expect: { 'review-queue': 'needs_approval', 'quick-approve': 'needs_approval', 'editorial-inbox': 'needs_approval', 'headline-check': 'survived' },
 	},
 	{
 		name: 'remove-status-update',
 		description: 'posts.update_status is removed without replacement.',
 		patch: { capabilities: { remove: ['posts.update_status'] } },
 		migrations: [],
-		expect: { 'review-queue': 'failed', 'quick-approve': 'failed', 'editorial-inbox': 'failed' },
+		expect: { 'review-queue': 'failed', 'quick-approve': 'failed', 'editorial-inbox': 'failed', 'headline-check': 'survived' },
+	},
+	{
+		name: 'no-functions',
+		description: 'The host stops running build functions.',
+		patch: {},
+		migrations: [],
+		surface: ({ functions: _, ...rest }) => rest,
+		expect: { 'review-queue': 'survived', 'quick-approve': 'survived', 'editorial-inbox': 'survived', 'headline-check': 'failed' },
 	},
 ];
 
@@ -107,7 +120,11 @@ export async function loadCorpus(dir: string): Promise<CorpusEntry[]> {
 /** Surface B for a scenario: patch the sandbox, then generate the surface from it. */
 export async function scenarioSurface(sandbox: WordPressSandbox, from: Surface, scenario: Scenario): Promise<Surface> {
 	await sandbox.patch(scenario.patch);
-	const surface = await assembleSurface(await sandbox.dump());
+	let surface = await assembleSurface(await sandbox.dump());
+	if (scenario.surface) {
+		surface = scenario.surface(surface);
+		surface.hash = await hashSurface(surface);
+	}
 	return { ...surface, hostVersion: `${surface.hostVersion}+${scenario.name}`, previous: from.hash!, migrations: scenario.migrations };
 }
 
@@ -141,7 +158,7 @@ export async function runWordPressCanary(options: WordPressCanaryOptions): Promi
 			corpus: options.corpus,
 			from,
 			to,
-			verify: (build, spec, grant) => verifyBuild({ build, spec, surface: to, sandbox, semantics, createCan, grant }),
+			verify: (build, spec, grant) => verifyBuild({ build, spec, surface: to, sandbox, semantics, createCan, grant, loadFunctions }),
 			...(options.regenerate ? { regenerate: options.regenerate } : {}),
 			...(options.chooseSlot ? { chooseSlot: options.chooseSlot } : {}),
 			...(options.onEntry ? { onEntry: options.onEntry } : {}),

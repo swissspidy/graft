@@ -1,5 +1,5 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ComponentType, type ReactNode } from 'react';
-import { evaluate, isAction, removeRow, type Action, type Build, type EvalContext, type TreeNode, type Value } from '@graft/core/runtime';
+import { evaluate, functionKey, isAction, removeRow, type Action, type AsyncFunctionRunner, type Build, type EvalContext, type FunctionCall, type TreeNode, type Value } from '@graft/core/runtime';
 
 export { removeRow };
 
@@ -40,6 +40,11 @@ export interface GraftRootProps {
 	onNotice?(notice: Notice): void;
 	/** Called for `reload:page`. */
 	onReload?(): void;
+	/**
+	 * Runs the build's functions (`$fn`), off the main thread. Only needed,
+	 * and only started, when the build has code.
+	 */
+	functions?: () => AsyncFunctionRunner;
 }
 
 interface RuntimeValue {
@@ -56,8 +61,9 @@ const Runtime = createContext<RuntimeValue | null>(null);
  * build was validated against the surface, so this only happens if the
  * registry and the surface disagree.
  */
-export function GraftRoot({ build, components, gateway, slot = {}, can, onNotice, onReload }: GraftRootProps) {
+export function GraftRoot({ build, components, gateway, slot = {}, can, onNotice, onReload, functions }: GraftRootProps) {
 	const [data, setData] = useState<Record<string, unknown>>({});
+	const fn = useFunctions(build.code ? functions : undefined);
 	const mounted = useRef(true);
 	useEffect(() => () => void (mounted.current = false), []);
 
@@ -122,7 +128,7 @@ export function GraftRoot({ build, components, gateway, slot = {}, can, onNotice
 		[gateway, load, onNotice, onReload],
 	);
 
-	const runtime = useMemo<RuntimeValue>(() => ({ ctx: { data, slot, can }, invoke, components }), [data, slot, can, invoke, components]);
+	const runtime = useMemo<RuntimeValue>(() => ({ ctx: { data, slot, can, fn }, invoke, components }), [data, slot, can, fn, invoke, components]);
 
 	return (
 		<Runtime.Provider value={runtime}>
@@ -157,6 +163,58 @@ function Node({ node }: { node: TreeNode }) {
 			{children}
 		</Component>
 	);
+}
+
+/**
+ * `$fn` for a render. Results are cached by function and arguments (the
+ * functions are pure). A call without a result yet evaluates to undefined
+ * and is queued; after the render, queued calls go to the runner in one
+ * batch, and the tree renders again with their results. A failed call
+ * shows as null.
+ */
+function useFunctions(factory: (() => AsyncFunctionRunner) | undefined): EvalContext['fn'] {
+	const runner = useRef<AsyncFunctionRunner | undefined>(undefined);
+	const results = useRef(new Map<string, unknown>());
+	const queued = useRef(new Map<string, FunctionCall>());
+	const inFlight = useRef(new Set<string>());
+	const [version, setVersion] = useState(0);
+
+	useEffect(() => () => runner.current?.dispose?.(), []);
+
+	useEffect(() => {
+		if (!factory || queued.current.size === 0) {
+			return;
+		}
+		const batch = [...queued.current];
+		queued.current.clear();
+		batch.forEach(([key]) => inFlight.current.add(key));
+		runner.current ??= factory();
+		void runner.current.call(batch.map(([, call]) => call)).then((out) => {
+			batch.forEach(([key], i) => {
+				const result = out[i];
+				results.current.set(key, result?.ok ? result.value : null);
+				inFlight.current.delete(key);
+			});
+			setVersion((v) => v + 1);
+		});
+	});
+
+	return useMemo(() => {
+		if (!factory) {
+			return undefined;
+		}
+		return (name: string, args: unknown[]) => {
+			const key = functionKey(name, args);
+			if (results.current.has(key)) {
+				return results.current.get(key);
+			}
+			if (!inFlight.current.has(key)) {
+				queued.current.set(key, { name, args });
+			}
+			return undefined;
+		};
+		// A new function per result batch, so the tree re-evaluates.
+	}, [factory, version]);
 }
 
 function errorMessage(error: unknown): string {

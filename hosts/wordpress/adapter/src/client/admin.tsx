@@ -6,6 +6,7 @@ import { describeCheck, verifyBuild, type Build, type Surface } from '@graft/cor
 import { createCan } from '../can.ts';
 import { playgroundVersion } from '../playground-version.ts';
 import { semantics } from '../semantics.ts';
+import { loadFunctions } from '@graft/sandbox';
 import { browserSandbox } from './browser-sandbox.ts';
 import { parseSpec } from '@graft/core/parse';
 import { describers } from '../describe.ts';
@@ -21,6 +22,7 @@ interface AdminConfig {
 	scopes: Record<string, string>;
 	browserVerification: boolean;
 	surface: (Surface & { hash: string }) | null;
+	quickjsWasm: string;
 }
 
 interface VersionRecord {
@@ -207,7 +209,15 @@ function App({ config }: { config: AdminConfig }) {
 										startVerifier: async () => {
 											const sandbox = await browserSandbox(playgroundVersion(config.surface!.hostVersion));
 											return (build: Build, spec: Parameters<typeof verifyBuild>[0]['spec']) =>
-												verifyBuild({ build, spec, surface: config.surface!, sandbox, semantics, createCan });
+												verifyBuild({
+													build,
+													spec,
+													surface: config.surface!,
+													sandbox,
+													semantics,
+													createCan,
+													loadFunctions: (code, limits) => loadFunctions(code, limits, { wasmLocation: config.quickjsWasm }),
+												});
 										},
 									}
 								: {})}

@@ -2,7 +2,7 @@
 import { act } from 'react';
 import { createRoot } from 'react-dom/client';
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import type { Build } from '@graft/core';
+import type { AsyncFunctionRunner, Build, FunctionCall, FunctionResult } from '@graft/core';
 import { GraftRoot, removeRow, type ComponentRegistry, type Gateway } from '../src/index.ts';
 
 (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
@@ -112,6 +112,43 @@ describe('GraftRoot', () => {
 		await act(async () => container.querySelector('button')!.click());
 		expect(onNotice).toHaveBeenCalledWith({ status: 'error', message: 'Not allowed.' });
 		expect(container.textContent).toBe('QueueOneClose');
+	});
+});
+
+describe('GraftRoot with build functions', () => {
+	const withCode = {
+		...build,
+		code: { language: 'javascript', source: 'function shout(s) { return s.toUpperCase(); }', functions: ['shout'] },
+		tree: { type: 'stack', children: [{ type: 'label', props: { text: { $fn: 'shout', args: [{ $slot: 'name' }] } } }] },
+	} as unknown as Build;
+	const withLabel: ComponentRegistry = { ...components, label: ({ props }) => <p>{props.text === undefined ? '…' : String(props.text)}</p> };
+
+	async function mount(b: Build, functions?: () => AsyncFunctionRunner) {
+		container = document.createElement('div');
+		document.body.append(container);
+		await act(async () => {
+			createRoot(container).render(<GraftRoot build={b} components={withLabel} gateway={{ call: async () => ({ items: [] }) }} slot={{ name: 'ada' }} can={() => true} functions={functions} />);
+		});
+	}
+
+	it('runs $fn through the runner in one batch, then renders the result', async () => {
+		const call = vi.fn(async (calls: FunctionCall[]): Promise<FunctionResult[]> => calls.map((c) => ({ ok: true, value: String(c.args[0]).toUpperCase() })));
+		const factory = vi.fn(() => ({ call }));
+		await mount(withCode, factory);
+		expect(factory).toHaveBeenCalledTimes(1);
+		expect(call).toHaveBeenCalledWith([{ name: 'shout', args: ['ada'] }]);
+		expect(container.textContent).toBe('ADA');
+	});
+
+	it('shows a failed call as nothing', async () => {
+		await mount(withCode, () => ({ call: async (calls) => calls.map(() => ({ ok: false, kind: 'timeout', message: 'too slow' })) }));
+		expect(container.textContent).toBe('null');
+	});
+
+	it('never starts the runner for a build without code', async () => {
+		const factory = vi.fn(() => ({ call: async () => [] }));
+		await mount(build, factory);
+		expect(factory).not.toHaveBeenCalled();
 	});
 });
 

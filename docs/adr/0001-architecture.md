@@ -252,7 +252,9 @@ version)` and contains:
   `reload:page`. Later extended with the comparisons `$gt`, `$gte`, `$lt`,
   `$lte`, the choice `$if: [condition, then, else]` and `$daysSince`, so
   a table cell can show an age and color it; checks can look later with
-  `clock: { advanceDays }` and expect a cell's text and tone.)
+  `clock: { advanceDays }` and expect a cell's text and tone. Where that
+  runs out, `$fn` calls a build's own pure functions, run in a sandbox:
+  [ADR 0005](0005-sandboxed-functions.md).)
 - `data`: named data sources, each a capability call with fixed or bound
   input.
 - `checks`: one or more executable checks per acceptance criterion (see

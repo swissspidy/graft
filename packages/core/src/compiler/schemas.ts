@@ -60,11 +60,28 @@ export function usableCapabilities(spec: Spec, surface: Surface): string[] {
 
 export function treeOutputSchema(spec: Spec, surface: Surface): Record<string, unknown> {
 	const reads = usableCapabilities(spec, surface).filter((name) => surface.capabilities[name]?.kind === 'read');
+	const code = surface.functions
+		? {
+				code: {
+					...nullable({
+						type: 'object',
+						additionalProperties: false,
+						required: ['source', 'functions'],
+						properties: {
+							source: { type: 'string', description: 'Plain JavaScript declaring each function at top level.' },
+							functions: { type: 'array', items: { type: 'string' }, description: 'The names $fn may call.' },
+						},
+					}),
+					description: 'Pure functions for $fn; null when the expressions suffice.',
+				},
+			}
+		: {};
 	return {
 		type: 'object',
 		additionalProperties: false,
-		required: ['nodes', 'data'],
+		required: ['nodes', 'data', ...Object.keys(code)],
 		properties: {
+			...code,
 			nodes: {
 				type: 'array',
 				description: 'The UI tree, flattened. Exactly one node has parent null (the root). Children keep array order.',

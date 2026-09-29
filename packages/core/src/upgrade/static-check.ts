@@ -3,7 +3,7 @@ import type { Build } from '../build/types.ts';
 import { canonicalJson } from '../surface/hash.ts';
 import type { Migration, Surface } from '../surface/types.ts';
 
-export type RefKind = 'slot' | 'component' | 'prop' | 'capability' | 'scope';
+export type RefKind = 'slot' | 'component' | 'prop' | 'capability' | 'scope' | 'functions';
 
 export interface RefChange {
 	kind: RefKind;
@@ -114,6 +114,15 @@ export function staticCheck(build: Build, from: Surface, to: Surface): StaticChe
 	for (const scope of build.refs.scopes) {
 		if (!to.scopes[scope]) {
 			add({ kind: 'scope', symbol: scope, change: 'removed' });
+		}
+	}
+
+	// Build functions: the host must still run them. New limits only need a re-verification.
+	if (build.code) {
+		if (!to.functions) {
+			add({ kind: 'functions', symbol: from.functions?.runtime ?? 'quickjs', change: 'removed' });
+		} else if (canonicalJson(from.functions ?? null) !== canonicalJson(to.functions)) {
+			add({ kind: 'functions', symbol: to.functions.runtime, change: 'changed', refsOnly: true });
 		}
 	}
 

@@ -1,5 +1,5 @@
 import { canonicalJson } from '../surface/hash.ts';
-import { compareOp, getPath, isAnd, isCall, isCan, isDataRef, isDaysSince, isEq, isFieldRef, isIf, isNot, isOr, isSlotRef } from './expressions.ts';
+import { compareOp, getPath, isAnd, isCall, isCan, isDataRef, isDaysSince, isEq, isFieldRef, isFn, isIf, isNot, isOr, isSlotRef } from './expressions.ts';
 import type { Value } from './types.ts';
 
 export interface EvalContext {
@@ -13,6 +13,39 @@ export interface EvalContext {
 	can(scope: string, on: unknown): boolean;
 	/** The time `$daysSince` counts to, in ms since the epoch. Default: now. */
 	now?: number;
+	/**
+	 * Runs one of the build's pure functions (`$fn`) in the host's sandbox.
+	 * Returns undefined while a result is pending. Without it, `$fn` is null.
+	 */
+	fn?(name: string, args: unknown[]): unknown;
+}
+
+/**
+ * What a function returned, as inert data: JSON values only, and no object
+ * keys starting with "$", so a result can never become an expression or an
+ * action. Anything else is null.
+ */
+export function inert(value: unknown, depth = 0): unknown {
+	if (value === null || typeof value === 'string' || typeof value === 'boolean') {
+		return value;
+	}
+	if (typeof value === 'number') {
+		return Number.isFinite(value) ? value : null;
+	}
+	if (depth >= 8 || typeof value !== 'object') {
+		return null;
+	}
+	if (Array.isArray(value)) {
+		return value.map((item) => inert(item, depth + 1));
+	}
+	if (Object.getPrototypeOf(value) !== Object.prototype && Object.getPrototypeOf(value) !== null) {
+		return null;
+	}
+	const entries = Object.entries(value);
+	if (entries.some(([key]) => key.startsWith('$'))) {
+		return null;
+	}
+	return Object.fromEntries(entries.map(([key, item]) => [key, inert(item, depth + 1)]));
 }
 
 const DAY = 24 * 60 * 60 * 1000;
@@ -93,6 +126,13 @@ export function evaluate(value: Value | undefined, ctx: EvalContext): unknown {
 		const date = evaluate(value.$daysSince, ctx);
 		const time = typeof date === 'string' ? Date.parse(date) : Number.NaN;
 		return Number.isNaN(time) ? null : Math.floor(((ctx.now ?? Date.now()) - time) / DAY);
+	}
+	if (isFn(value)) {
+		if (!ctx.fn) {
+			return null;
+		}
+		const result = ctx.fn(value.$fn, (value.args ?? []).map((arg) => inert(evaluate(arg, ctx) ?? null)));
+		return result === undefined ? undefined : inert(result);
 	}
 	if (isAnd(value)) {
 		return value.$and.every((item) => evaluate(item, ctx) === true);

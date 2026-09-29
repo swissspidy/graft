@@ -50,6 +50,26 @@
       "items": { "type": "string" },
       "uniqueItems": true
     },
+    "functions": {
+      "description": "Present when builds may carry pure functions (code, $fn), with the limits they run under.",
+      "type": "object",
+      "required": ["runtime", "limits"],
+      "additionalProperties": false,
+      "properties": {
+        "runtime": { "const": "quickjs" },
+        "limits": {
+          "type": "object",
+          "required": ["timeMs", "memoryBytes", "outputBytes", "sourceBytes"],
+          "additionalProperties": false,
+          "properties": {
+            "timeMs": { "description": "CPU time per call, in milliseconds.", "type": "integer", "minimum": 1 },
+            "memoryBytes": { "description": "Heap of the whole sandbox, in bytes.", "type": "integer", "minimum": 1 },
+            "outputBytes": { "description": "Largest JSON result of one call, in bytes.", "type": "integer", "minimum": 1 },
+            "sourceBytes": { "description": "Largest code source, in bytes.", "type": "integer", "minimum": 1 }
+          }
+        }
+      }
+    },
     "migrations": {
       "type": "array",
       "items": { "$ref": "#/$defs/migration" }

@@ -52,7 +52,17 @@ export interface DaysSinceExpr {
 export type Binding = DataRef | FieldRef | SlotRef;
 export type Logic = EqExpr | AndExpr | OrExpr | NotExpr | CompareExpr;
 /** Expressions whose value is computed at render time from other values. */
-export type Computed = IfExpr | DaysSinceExpr | CompareExpr;
+/**
+ * A call to one of the build's own pure functions (see Build.code). It only
+ * computes a value to show: code reads nothing and invokes nothing, and
+ * what it returns is inert data.
+ */
+export interface FnExpr {
+	$fn: string;
+	args?: Value[];
+}
+
+export type Computed = IfExpr | DaysSinceExpr | CompareExpr | FnExpr;
 export type Expression = Binding | CanExpr | CallExpr | Logic | Computed;
 
 export type Value = null | string | number | boolean | Value[] | Expression | { [key: string]: Value };
@@ -87,6 +97,14 @@ export interface Refs {
 	scopes: string[];
 }
 
+export interface BuildCode {
+	language: 'javascript';
+	/** A script declaring each function at top level: `function name(a, b) { ... }`. */
+	source: string;
+	/** The functions `$fn` may call, declared in `source`. */
+	functions: string[];
+}
+
 export interface Build {
 	graft: 1;
 	spec: { id: string; hash: string };
@@ -96,6 +114,8 @@ export interface Build {
 	data: Record<string, DataSource>;
 	checks: Check[];
 	refs: Refs;
+	/** Pure functions for `$fn`, run in the host's sandbox. Only on surfaces with `functions`. */
+	code?: BuildCode;
 	provenance: {
 		compiler: string;
 		model?: string;

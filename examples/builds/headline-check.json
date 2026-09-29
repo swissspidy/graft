@@ -1,0 +1,291 @@
+{
+	"graft": 1,
+	"spec": {
+		"id": "headline-check",
+		"hash": "sha256:397b2fd73445a45a0425415fe53173a98c9fd458b8dcbc7bf30b33186f498673"
+	},
+	"surface": {
+		"host": "wordpress",
+		"hostVersion": "7.1.2",
+		"hash": "sha256:8f417b80e1e4bdc7d3f1daa6c61956b93c3910b4d25ce6692c880d2bb8550d62"
+	},
+	"mount": {
+		"slot": "dashboard.widget",
+		"title": "Headline check"
+	},
+	"data": {
+		"pending": {
+			"call": "posts.list",
+			"input": {
+				"status": [
+					"pending"
+				],
+				"per_page": 10,
+				"orderby": "date",
+				"order": "desc"
+			}
+		}
+	},
+	"tree": {
+		"type": "table",
+		"props": {
+			"rows": {
+				"$data": "pending.items"
+			},
+			"fields": [
+				{
+					"id": "title",
+					"label": "Title",
+					"primary": true
+				},
+				{
+					"id": "verdict",
+					"label": "Headline",
+					"value": {
+						"$fn": "headlineVerdict",
+						"args": [
+							{
+								"$field": "title"
+							}
+						]
+					},
+					"tone": {
+						"$if": [
+							{
+								"$eq": [
+									{
+										"$fn": "headlineVerdict",
+										"args": [
+											{
+												"$field": "title"
+											}
+										]
+									},
+									"Looks good"
+								]
+							},
+							"success",
+							"warning"
+						]
+					}
+				}
+			],
+			"empty": "Nothing is waiting"
+		}
+	},
+	"checks": [
+		{
+			"criterion": "pending-only",
+			"fixtures": {
+				"users": [
+					{
+						"as": "e",
+						"role": "editor"
+					}
+				],
+				"posts": [
+					{
+						"title": "Waiting for review",
+						"status": "pending"
+					},
+					{
+						"title": "Still a draft",
+						"status": "draft"
+					},
+					{
+						"title": "Already out there",
+						"status": "publish"
+					}
+				]
+			},
+			"view_as": "e",
+			"expect": [
+				{
+					"rows": [
+						"Waiting for review"
+					]
+				},
+				{
+					"columns": [
+						"Title",
+						"Headline"
+					]
+				}
+			]
+		},
+		{
+			"criterion": "too-long",
+			"fixtures": {
+				"users": [
+					{
+						"as": "e",
+						"role": "editor"
+					}
+				],
+				"posts": [
+					{
+						"title": "A headline that goes on and on well past the point where search results cut it",
+						"status": "pending"
+					}
+				]
+			},
+			"view_as": "e",
+			"expect": [
+				{
+					"cell": {
+						"row": {
+							"title": "A headline that goes on and on well past the point where search results cut it"
+						},
+						"column": "Headline",
+						"text": "Too long"
+					}
+				}
+			]
+		},
+		{
+			"criterion": "all-caps",
+			"fixtures": {
+				"users": [
+					{
+						"as": "e",
+						"role": "editor"
+					}
+				],
+				"posts": [
+					{
+						"title": "CITY HALL VOTES TONIGHT",
+						"status": "pending"
+					}
+				]
+			},
+			"view_as": "e",
+			"expect": [
+				{
+					"cell": {
+						"row": {
+							"title": "CITY HALL VOTES TONIGHT"
+						},
+						"column": "Headline",
+						"text": "All caps"
+					}
+				}
+			]
+		},
+		{
+			"criterion": "too-short",
+			"fixtures": {
+				"users": [
+					{
+						"as": "e",
+						"role": "editor"
+					}
+				],
+				"posts": [
+					{
+						"title": "Budget vote",
+						"status": "pending"
+					}
+				]
+			},
+			"view_as": "e",
+			"expect": [
+				{
+					"cell": {
+						"row": {
+							"title": "Budget vote"
+						},
+						"column": "Headline",
+						"text": "Too short"
+					}
+				}
+			]
+		},
+		{
+			"criterion": "warning",
+			"fixtures": {
+				"users": [
+					{
+						"as": "e",
+						"role": "editor"
+					}
+				],
+				"posts": [
+					{
+						"title": "BUDGET VOTE",
+						"status": "pending"
+					}
+				]
+			},
+			"view_as": "e",
+			"expect": [
+				{
+					"cell": {
+						"row": {
+							"title": "BUDGET VOTE"
+						},
+						"column": "Headline",
+						"text": "All caps, Too short",
+						"tone": "warning"
+					}
+				}
+			]
+		},
+		{
+			"criterion": "good",
+			"fixtures": {
+				"users": [
+					{
+						"as": "e",
+						"role": "editor"
+					}
+				],
+				"posts": [
+					{
+						"title": "City hall votes on the budget tonight",
+						"status": "pending"
+					}
+				]
+			},
+			"view_as": "e",
+			"expect": [
+				{
+					"cell": {
+						"row": {
+							"title": "City hall votes on the budget tonight"
+						},
+						"column": "Headline",
+						"text": "Looks good",
+						"tone": "success"
+					}
+				}
+			]
+		}
+	],
+	"refs": {
+		"slot": "dashboard.widget",
+		"components": {
+			"table": [
+				"empty",
+				"fields",
+				"rows"
+			]
+		},
+		"capabilities": [
+			"posts.list"
+		],
+		"scopes": [
+			"posts:read"
+		]
+	},
+	"code": {
+		"language": "javascript",
+		"source": "// What is wrong with a headline, as a list of problems.\nfunction headlineProblems(title) {\n\tconst problems = [];\n\tconst text = String(title).trim();\n\tif (text.length > 70) {\n\t\tproblems.push('Too long');\n\t}\n\tconst letters = text.replace(/[^A-Za-zÀ-ɏ]/g, '');\n\tif (letters.length >= 4 && letters === letters.toUpperCase()) {\n\t\tproblems.push('All caps');\n\t}\n\tif (text.split(/\\s+/).filter(Boolean).length < 3) {\n\t\tproblems.push('Too short');\n\t}\n\treturn problems;\n}\n\n// The verdict to show: the problems, or that it looks good.\nfunction headlineVerdict(title) {\n\tconst problems = headlineProblems(title);\n\treturn problems.length === 0 ? 'Looks good' : problems.join(', ');\n}\n",
+		"functions": [
+			"headlineVerdict"
+		]
+	},
+	"provenance": {
+		"compiler": "handwritten",
+		"strategy": "handwritten"
+	}
+}
