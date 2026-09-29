@@ -56,7 +56,7 @@ permissions: [items:read, items:write]
 
 const code = { language: 'javascript' as const, source: 'function shout(s) { return s.toUpperCase(); }', functions: ['shout'] };
 
-function build(tree: Build['tree'], options: { code?: Build['code']; data?: Build['data']; target?: Surface } = {}): Build {
+function build(tree: Build['tree'], options: { code?: Build['code'] | null; data?: Build['data']; target?: Surface } = {}): Build {
 	const target = options.target ?? surface;
 	const b: Build = {
 		graft: 1,
