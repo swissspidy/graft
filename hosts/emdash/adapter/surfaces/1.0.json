@@ -1,0 +1,1268 @@
+{
+	"graft": 1,
+	"host": "emdash",
+	"hostVersion": "1.0.1",
+	"slots": {
+		"admin.page": {
+			"kind": "owned",
+			"title": "Admin page",
+			"description": "A tab of its own on the Customizations page of the EmDash admin.",
+			"anchor": "plugin-admin-page",
+			"options": {
+				"type": "object",
+				"properties": {
+					"title": {
+						"type": "string",
+						"minLength": 1,
+						"maxLength": 40
+					}
+				},
+				"required": [
+					"title"
+				],
+				"additionalProperties": false
+			},
+			"provides": {
+				"type": "object",
+				"properties": {},
+				"additionalProperties": false
+			},
+			"accepts": [
+				"stack"
+			]
+		},
+		"dashboard.widget": {
+			"kind": "owned",
+			"title": "Dashboard widget",
+			"description": "A section of the Customizations widget on the EmDash dashboard.",
+			"screen": "dashboard",
+			"anchor": "plugin-dashboard-widget",
+			"options": {
+				"type": "object",
+				"properties": {
+					"title": {
+						"type": "string",
+						"minLength": 1,
+						"maxLength": 60
+					}
+				},
+				"required": [
+					"title"
+				],
+				"additionalProperties": false
+			},
+			"provides": {
+				"type": "object",
+				"properties": {},
+				"additionalProperties": false
+			},
+			"accepts": [
+				"stack"
+			]
+		},
+		"content.editor.panel": {
+			"kind": "extension",
+			"title": "Entry editor panel",
+			"description": "A section of the Customizations panel in the sidebar of the entry editor, for saved entries.",
+			"screen": "content-editor",
+			"anchor": "plugin-editor-panel",
+			"options": {
+				"type": "object",
+				"properties": {
+					"collections": {
+						"description": "Collections whose editor shows it. Omit for all.",
+						"type": "array",
+						"items": {
+							"description": "Collection slug, e.g. \"posts\".",
+							"type": "string",
+							"pattern": "^[a-z][a-z0-9_]*$",
+							"default": "posts"
+						},
+						"uniqueItems": true
+					}
+				},
+				"additionalProperties": false
+			},
+			"provides": {
+				"type": "object",
+				"properties": {
+					"entry": {
+						"type": "object",
+						"properties": {
+							"id": {
+								"type": "string"
+							},
+							"collection": {
+								"type": "string"
+							},
+							"title": {
+								"type": "string"
+							},
+							"slug": {
+								"type": [
+									"string",
+									"null"
+								]
+							},
+							"status": {
+								"enum": [
+									"draft",
+									"published",
+									"scheduled"
+								]
+							},
+							"author": {
+								"type": [
+									"object",
+									"null"
+								],
+								"properties": {
+									"id": {
+										"type": "string"
+									},
+									"name": {
+										"type": "string"
+									}
+								},
+								"required": [
+									"id",
+									"name"
+								],
+								"additionalProperties": false
+							},
+							"createdAt": {
+								"type": "string",
+								"format": "date-time"
+							},
+							"updatedAt": {
+								"type": "string",
+								"format": "date-time"
+							},
+							"publishedAt": {
+								"type": [
+									"string",
+									"null"
+								],
+								"format": "date-time"
+							},
+							"can": {
+								"description": "What the current user may do with this entry.",
+								"type": "object",
+								"properties": {
+									"publish": {
+										"type": "boolean"
+									}
+								},
+								"required": [
+									"publish"
+								],
+								"additionalProperties": false
+							}
+						},
+						"required": [
+							"id",
+							"collection",
+							"title",
+							"status",
+							"can"
+						],
+						"additionalProperties": false
+					}
+				},
+				"required": [
+					"entry"
+				],
+				"additionalProperties": false
+			},
+			"accepts": [
+				"stack"
+			]
+		}
+	},
+	"components": {
+		"stack": {
+			"description": "The root of a tree: its children render one below the other.",
+			"props": {
+				"type": "object",
+				"properties": {},
+				"additionalProperties": false
+			},
+			"children": "any"
+		},
+		"header": {
+			"description": "A heading.",
+			"props": {
+				"type": "object",
+				"properties": {
+					"text": {
+						"type": "string",
+						"maxLength": 2000
+					}
+				},
+				"required": [
+					"text"
+				],
+				"additionalProperties": false
+			},
+			"children": "none"
+		},
+		"section": {
+			"description": "A paragraph of text (Markdown links and emphasis allowed).",
+			"props": {
+				"type": "object",
+				"properties": {
+					"text": {
+						"type": "string",
+						"maxLength": 2000
+					}
+				},
+				"required": [
+					"text"
+				],
+				"additionalProperties": false
+			},
+			"children": "none"
+		},
+		"context": {
+			"description": "Small, muted help text.",
+			"props": {
+				"type": "object",
+				"properties": {
+					"text": {
+						"type": "string",
+						"maxLength": 2000
+					}
+				},
+				"required": [
+					"text"
+				],
+				"additionalProperties": false
+			},
+			"children": "none"
+		},
+		"divider": {
+			"description": "A horizontal rule.",
+			"props": {
+				"type": "object",
+				"properties": {},
+				"additionalProperties": false
+			},
+			"children": "none"
+		},
+		"banner": {
+			"description": "An inline message.",
+			"props": {
+				"type": "object",
+				"properties": {
+					"title": {
+						"type": "string",
+						"maxLength": 120
+					},
+					"text": {
+						"type": "string",
+						"maxLength": 2000
+					},
+					"variant": {
+						"enum": [
+							"default",
+							"alert",
+							"error"
+						],
+						"default": "default"
+					},
+					"visible": {
+						"description": "true, false, a permission check { $can, on }, or logic over them: $eq, $and, $or, $not.",
+						"anyOf": [
+							{
+								"type": "boolean"
+							},
+							{
+								"type": "object",
+								"required": [
+									"$can"
+								]
+							},
+							{
+								"type": "object",
+								"required": [
+									"$eq"
+								]
+							},
+							{
+								"type": "object",
+								"required": [
+									"$and"
+								]
+							},
+							{
+								"type": "object",
+								"required": [
+									"$or"
+								]
+							},
+							{
+								"type": "object",
+								"required": [
+									"$not"
+								]
+							}
+						]
+					}
+				},
+				"additionalProperties": false
+			},
+			"children": "none"
+		},
+		"fields": {
+			"description": "A two-column grid of labels and values.",
+			"props": {
+				"type": "object",
+				"properties": {
+					"items": {
+						"type": "array",
+						"maxItems": 20,
+						"items": {
+							"type": "object",
+							"properties": {
+								"label": {
+									"type": "string",
+									"minLength": 1,
+									"maxLength": 80
+								},
+								"value": {
+									"type": [
+										"string",
+										"number",
+										"null"
+									]
+								}
+							},
+							"required": [
+								"label"
+							],
+							"additionalProperties": false
+						}
+					}
+				},
+				"required": [
+					"items"
+				],
+				"additionalProperties": false
+			},
+			"children": "none"
+		},
+		"stats": {
+			"description": "Metric cards: a label and a number each.",
+			"props": {
+				"type": "object",
+				"properties": {
+					"items": {
+						"type": "array",
+						"maxItems": 6,
+						"items": {
+							"type": "object",
+							"properties": {
+								"label": {
+									"type": "string",
+									"minLength": 1,
+									"maxLength": 80
+								},
+								"value": {
+									"type": [
+										"string",
+										"number",
+										"null"
+									]
+								},
+								"description": {
+									"type": "string",
+									"maxLength": 120
+								}
+							},
+							"required": [
+								"label"
+							],
+							"additionalProperties": false
+						}
+					}
+				},
+				"required": [
+					"items"
+				],
+				"additionalProperties": false
+			},
+			"children": "none"
+		},
+		"empty": {
+			"description": "An empty state: shown in place of content when there is nothing to show.",
+			"props": {
+				"type": "object",
+				"properties": {
+					"title": {
+						"type": "string",
+						"minLength": 1,
+						"maxLength": 80
+					},
+					"text": {
+						"type": "string",
+						"maxLength": 300
+					},
+					"visible": {
+						"description": "true, false, a permission check { $can, on }, or logic over them: $eq, $and, $or, $not.",
+						"anyOf": [
+							{
+								"type": "boolean"
+							},
+							{
+								"type": "object",
+								"required": [
+									"$can"
+								]
+							},
+							{
+								"type": "object",
+								"required": [
+									"$eq"
+								]
+							},
+							{
+								"type": "object",
+								"required": [
+									"$and"
+								]
+							},
+							{
+								"type": "object",
+								"required": [
+									"$or"
+								]
+							},
+							{
+								"type": "object",
+								"required": [
+									"$not"
+								]
+							}
+						]
+					}
+				},
+				"required": [
+					"title"
+				],
+				"additionalProperties": false
+			},
+			"children": "none"
+		},
+		"table": {
+			"description": "A table of records with optional per-row buttons.",
+			"props": {
+				"type": "object",
+				"properties": {
+					"rows": {
+						"description": "Records, usually bound to a data source.",
+						"type": "array"
+					},
+					"columns": {
+						"type": "array",
+						"minItems": 1,
+						"maxItems": 8,
+						"items": {
+							"type": "object",
+							"properties": {
+								"key": {
+									"description": "Path into the row, e.g. \"author.name\".",
+									"type": "string",
+									"minLength": 1
+								},
+								"label": {
+									"type": "string",
+									"minLength": 1,
+									"maxLength": 80
+								},
+								"format": {
+									"enum": [
+										"text",
+										"badge",
+										"relative_time",
+										"number",
+										"code"
+									],
+									"default": "text"
+								},
+								"primary": {
+									"description": "The row's label: what checks call the row by.",
+									"type": "boolean"
+								}
+							},
+							"required": [
+								"key",
+								"label"
+							],
+							"additionalProperties": false
+						}
+					},
+					"actions": {
+						"description": "Buttons shown on every row; bindings and $can resolve per row.",
+						"type": "array",
+						"maxItems": 3,
+						"items": {
+							"type": "object",
+							"properties": {
+								"id": {
+									"type": "string",
+									"pattern": "^[a-z][a-z0-9-]*$"
+								},
+								"label": {
+									"type": "string",
+									"minLength": 1,
+									"maxLength": 80
+								},
+								"style": {
+									"enum": [
+										"primary",
+										"secondary",
+										"danger"
+									],
+									"default": "secondary"
+								},
+								"onClick": {
+									"description": "A capability call: { $call, input, then, notice }.",
+									"type": "object",
+									"required": [
+										"$call"
+									]
+								},
+								"visible": {
+									"description": "true, false, a permission check { $can, on }, or logic over them: $eq, $and, $or, $not.",
+									"anyOf": [
+										{
+											"type": "boolean"
+										},
+										{
+											"type": "object",
+											"required": [
+												"$can"
+											]
+										},
+										{
+											"type": "object",
+											"required": [
+												"$eq"
+											]
+										},
+										{
+											"type": "object",
+											"required": [
+												"$and"
+											]
+										},
+										{
+											"type": "object",
+											"required": [
+												"$or"
+											]
+										},
+										{
+											"type": "object",
+											"required": [
+												"$not"
+											]
+										}
+									]
+								},
+								"disabled": {
+									"description": "true, false, a permission check { $can, on }, or logic over them: $eq, $and, $or, $not.",
+									"anyOf": [
+										{
+											"type": "boolean"
+										},
+										{
+											"type": "object",
+											"required": [
+												"$can"
+											]
+										},
+										{
+											"type": "object",
+											"required": [
+												"$eq"
+											]
+										},
+										{
+											"type": "object",
+											"required": [
+												"$and"
+											]
+										},
+										{
+											"type": "object",
+											"required": [
+												"$or"
+											]
+										},
+										{
+											"type": "object",
+											"required": [
+												"$not"
+											]
+										}
+									]
+								},
+								"confirm": {
+									"description": "Ask for confirmation with this question first.",
+									"type": "string",
+									"maxLength": 200
+								}
+							},
+							"required": [
+								"id",
+								"label",
+								"onClick"
+							],
+							"additionalProperties": false
+						}
+					},
+					"empty": {
+						"description": "Shown instead of the table when there are no rows.",
+						"type": "string",
+						"maxLength": 200
+					}
+				},
+				"required": [
+					"rows",
+					"columns"
+				],
+				"additionalProperties": false
+			},
+			"children": "none"
+		},
+		"actions": {
+			"description": "A row of buttons.",
+			"props": {
+				"type": "object",
+				"properties": {},
+				"additionalProperties": false
+			},
+			"children": "any"
+		},
+		"button": {
+			"description": "A button that calls a capability. Place it inside \"actions\".",
+			"props": {
+				"type": "object",
+				"properties": {
+					"id": {
+						"type": "string",
+						"pattern": "^[a-z][a-z0-9-]*$"
+					},
+					"label": {
+						"type": "string",
+						"minLength": 1,
+						"maxLength": 80
+					},
+					"style": {
+						"enum": [
+							"primary",
+							"secondary",
+							"danger"
+						],
+						"default": "secondary"
+					},
+					"onClick": {
+						"description": "A capability call: { $call, input, then, notice }.",
+						"type": "object",
+						"required": [
+							"$call"
+						]
+					},
+					"visible": {
+						"description": "true, false, a permission check { $can, on }, or logic over them: $eq, $and, $or, $not.",
+						"anyOf": [
+							{
+								"type": "boolean"
+							},
+							{
+								"type": "object",
+								"required": [
+									"$can"
+								]
+							},
+							{
+								"type": "object",
+								"required": [
+									"$eq"
+								]
+							},
+							{
+								"type": "object",
+								"required": [
+									"$and"
+								]
+							},
+							{
+								"type": "object",
+								"required": [
+									"$or"
+								]
+							},
+							{
+								"type": "object",
+								"required": [
+									"$not"
+								]
+							}
+						]
+					},
+					"disabled": {
+						"description": "true, false, a permission check { $can, on }, or logic over them: $eq, $and, $or, $not.",
+						"anyOf": [
+							{
+								"type": "boolean"
+							},
+							{
+								"type": "object",
+								"required": [
+									"$can"
+								]
+							},
+							{
+								"type": "object",
+								"required": [
+									"$eq"
+								]
+							},
+							{
+								"type": "object",
+								"required": [
+									"$and"
+								]
+							},
+							{
+								"type": "object",
+								"required": [
+									"$or"
+								]
+							},
+							{
+								"type": "object",
+								"required": [
+									"$not"
+								]
+							}
+						]
+					},
+					"confirm": {
+						"description": "Ask for confirmation with this question first.",
+						"type": "string",
+						"maxLength": 200
+					}
+				},
+				"required": [
+					"id",
+					"label",
+					"onClick"
+				],
+				"additionalProperties": false
+			},
+			"children": "none"
+		}
+	},
+	"capabilities": {
+		"content.list": {
+			"kind": "read",
+			"description": "Lists entries of a collection, newest first unless \"order\" says otherwise.",
+			"input": {
+				"type": "object",
+				"properties": {
+					"collection": {
+						"description": "Collection slug, e.g. \"posts\".",
+						"type": "string",
+						"pattern": "^[a-z][a-z0-9_]*$",
+						"default": "posts"
+					},
+					"status": {
+						"enum": [
+							"draft",
+							"published",
+							"scheduled"
+						]
+					},
+					"order": {
+						"description": "By last update.",
+						"enum": [
+							"asc",
+							"desc"
+						],
+						"default": "desc"
+					},
+					"limit": {
+						"type": "integer",
+						"minimum": 1,
+						"maximum": 100,
+						"default": 20
+					}
+				},
+				"additionalProperties": false
+			},
+			"output": {
+				"type": "object",
+				"properties": {
+					"items": {
+						"type": "array",
+						"items": {
+							"type": "object",
+							"properties": {
+								"id": {
+									"type": "string"
+								},
+								"collection": {
+									"type": "string"
+								},
+								"title": {
+									"type": "string"
+								},
+								"slug": {
+									"type": [
+										"string",
+										"null"
+									]
+								},
+								"status": {
+									"enum": [
+										"draft",
+										"published",
+										"scheduled"
+									]
+								},
+								"author": {
+									"type": [
+										"object",
+										"null"
+									],
+									"properties": {
+										"id": {
+											"type": "string"
+										},
+										"name": {
+											"type": "string"
+										}
+									},
+									"required": [
+										"id",
+										"name"
+									],
+									"additionalProperties": false
+								},
+								"createdAt": {
+									"type": "string",
+									"format": "date-time"
+								},
+								"updatedAt": {
+									"type": "string",
+									"format": "date-time"
+								},
+								"publishedAt": {
+									"type": [
+										"string",
+										"null"
+									],
+									"format": "date-time"
+								},
+								"can": {
+									"description": "What the current user may do with this entry.",
+									"type": "object",
+									"properties": {
+										"publish": {
+											"type": "boolean"
+										}
+									},
+									"required": [
+										"publish"
+									],
+									"additionalProperties": false
+								}
+							},
+							"required": [
+								"id",
+								"collection",
+								"title",
+								"status",
+								"can"
+							],
+							"additionalProperties": false
+						}
+					},
+					"hasMore": {
+						"type": "boolean"
+					}
+				},
+				"required": [
+					"items",
+					"hasMore"
+				],
+				"additionalProperties": false
+			},
+			"scopes": [
+				"content:read"
+			],
+			"binding": {
+				"content": "list"
+			}
+		},
+		"content.get": {
+			"kind": "read",
+			"description": "One entry.",
+			"input": {
+				"type": "object",
+				"properties": {
+					"collection": {
+						"description": "Collection slug, e.g. \"posts\".",
+						"type": "string",
+						"pattern": "^[a-z][a-z0-9_]*$",
+						"default": "posts"
+					},
+					"id": {
+						"type": "string",
+						"minLength": 1
+					}
+				},
+				"required": [
+					"id"
+				],
+				"additionalProperties": false
+			},
+			"output": {
+				"type": "object",
+				"properties": {
+					"id": {
+						"type": "string"
+					},
+					"collection": {
+						"type": "string"
+					},
+					"title": {
+						"type": "string"
+					},
+					"slug": {
+						"type": [
+							"string",
+							"null"
+						]
+					},
+					"status": {
+						"enum": [
+							"draft",
+							"published",
+							"scheduled"
+						]
+					},
+					"author": {
+						"type": [
+							"object",
+							"null"
+						],
+						"properties": {
+							"id": {
+								"type": "string"
+							},
+							"name": {
+								"type": "string"
+							}
+						},
+						"required": [
+							"id",
+							"name"
+						],
+						"additionalProperties": false
+					},
+					"createdAt": {
+						"type": "string",
+						"format": "date-time"
+					},
+					"updatedAt": {
+						"type": "string",
+						"format": "date-time"
+					},
+					"publishedAt": {
+						"type": [
+							"string",
+							"null"
+						],
+						"format": "date-time"
+					},
+					"can": {
+						"description": "What the current user may do with this entry.",
+						"type": "object",
+						"properties": {
+							"publish": {
+								"type": "boolean"
+							}
+						},
+						"required": [
+							"publish"
+						],
+						"additionalProperties": false
+					}
+				},
+				"required": [
+					"id",
+					"collection",
+					"title",
+					"status",
+					"can"
+				],
+				"additionalProperties": false
+			},
+			"scopes": [
+				"content:read"
+			],
+			"binding": {
+				"content": "get"
+			}
+		},
+		"content.publish": {
+			"kind": "write",
+			"description": "Publishes an entry: its current draft goes live.",
+			"input": {
+				"type": "object",
+				"properties": {
+					"collection": {
+						"description": "Collection slug, e.g. \"posts\".",
+						"type": "string",
+						"pattern": "^[a-z][a-z0-9_]*$",
+						"default": "posts"
+					},
+					"id": {
+						"type": "string",
+						"minLength": 1
+					}
+				},
+				"required": [
+					"id"
+				],
+				"additionalProperties": false
+			},
+			"output": {
+				"type": "object",
+				"properties": {
+					"id": {
+						"type": "string"
+					},
+					"collection": {
+						"type": "string"
+					},
+					"title": {
+						"type": "string"
+					},
+					"slug": {
+						"type": [
+							"string",
+							"null"
+						]
+					},
+					"status": {
+						"enum": [
+							"draft",
+							"published",
+							"scheduled"
+						]
+					},
+					"author": {
+						"type": [
+							"object",
+							"null"
+						],
+						"properties": {
+							"id": {
+								"type": "string"
+							},
+							"name": {
+								"type": "string"
+							}
+						},
+						"required": [
+							"id",
+							"name"
+						],
+						"additionalProperties": false
+					},
+					"createdAt": {
+						"type": "string",
+						"format": "date-time"
+					},
+					"updatedAt": {
+						"type": "string",
+						"format": "date-time"
+					},
+					"publishedAt": {
+						"type": [
+							"string",
+							"null"
+						],
+						"format": "date-time"
+					},
+					"can": {
+						"description": "What the current user may do with this entry.",
+						"type": "object",
+						"properties": {
+							"publish": {
+								"type": "boolean"
+							}
+						},
+						"required": [
+							"publish"
+						],
+						"additionalProperties": false
+					}
+				},
+				"required": [
+					"id",
+					"collection",
+					"title",
+					"status",
+					"can"
+				],
+				"additionalProperties": false
+			},
+			"scopes": [
+				"content.status:write"
+			],
+			"binding": {
+				"content": "publish"
+			}
+		},
+		"content.unpublish": {
+			"kind": "write",
+			"description": "Takes a published entry offline; it becomes a draft.",
+			"input": {
+				"type": "object",
+				"properties": {
+					"collection": {
+						"description": "Collection slug, e.g. \"posts\".",
+						"type": "string",
+						"pattern": "^[a-z][a-z0-9_]*$",
+						"default": "posts"
+					},
+					"id": {
+						"type": "string",
+						"minLength": 1
+					}
+				},
+				"required": [
+					"id"
+				],
+				"additionalProperties": false
+			},
+			"output": {
+				"type": "object",
+				"properties": {
+					"id": {
+						"type": "string"
+					},
+					"collection": {
+						"type": "string"
+					},
+					"title": {
+						"type": "string"
+					},
+					"slug": {
+						"type": [
+							"string",
+							"null"
+						]
+					},
+					"status": {
+						"enum": [
+							"draft",
+							"published",
+							"scheduled"
+						]
+					},
+					"author": {
+						"type": [
+							"object",
+							"null"
+						],
+						"properties": {
+							"id": {
+								"type": "string"
+							},
+							"name": {
+								"type": "string"
+							}
+						},
+						"required": [
+							"id",
+							"name"
+						],
+						"additionalProperties": false
+					},
+					"createdAt": {
+						"type": "string",
+						"format": "date-time"
+					},
+					"updatedAt": {
+						"type": "string",
+						"format": "date-time"
+					},
+					"publishedAt": {
+						"type": [
+							"string",
+							"null"
+						],
+						"format": "date-time"
+					},
+					"can": {
+						"description": "What the current user may do with this entry.",
+						"type": "object",
+						"properties": {
+							"publish": {
+								"type": "boolean"
+							}
+						},
+						"required": [
+							"publish"
+						],
+						"additionalProperties": false
+					}
+				},
+				"required": [
+					"id",
+					"collection",
+					"title",
+					"status",
+					"can"
+				],
+				"additionalProperties": false
+			},
+			"scopes": [
+				"content.status:write"
+			],
+			"binding": {
+				"content": "unpublish"
+			}
+		}
+	},
+	"scopes": {
+		"content:read": {
+			"title": "See content, including drafts",
+			"host": [
+				"content:read_drafts"
+			]
+		},
+		"content.status:write": {
+			"title": "Publish and unpublish content",
+			"host": [
+				"content:publish_own",
+				"content:publish_any"
+			]
+		}
+	},
+	"audiences": [
+		"subscriber",
+		"contributor",
+		"author",
+		"editor",
+		"admin"
+	],
+	"hash": "sha256:fa5ee31157f72538390c1e3dddc3edc07ca765a224280c0516d8b655268cd71b"
+}

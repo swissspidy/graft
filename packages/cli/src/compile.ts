@@ -1,5 +1,6 @@
 import { readFile, writeFile } from 'node:fs/promises';
 import { compileSpec, hashSpec, validateSpec, type Build, type CompileEvent, type CompileResult, type ModelClient } from '@graft/core';
+import { hostTools } from './hosts.ts';
 import { loadSurface } from './validate.ts';
 
 export interface CompileCommandOptions {
@@ -39,24 +40,21 @@ export async function compileFile(specFile: string, options: CompileCommandOptio
 		throw new Error(`Invalid spec ${specFile}:\n${parsed.diagnostics.map((d) => `  ${d.line ?? ''} ${d.message}`).join('\n')}`);
 	}
 	const spec = parsed.spec;
-	if (surface.host !== 'wordpress') {
-		throw new Error(`No compiler support for host "${surface.host}".`);
-	}
-	const wordpress = await import('@graft/wordpress-adapter');
+	const host = await hostTools(surface);
 
 	const previous = options.previous ? (JSON.parse(await readFile(options.previous, 'utf8')) as Build) : undefined;
-	const sandbox = options.verify === false ? undefined : await wordpress.startSandbox({ wp: wordpress.playgroundVersion(surface.hostVersion) });
+	const sandbox = options.verify === false ? undefined : await host.startSandbox();
 	try {
 		const result = await compileSpec({
 			spec,
 			specHash: await hashSpec(source),
 			surface,
 			model: options.model,
-			host: wordpress.hostGuide,
+			host: host.guide,
 			maxAttempts: options.attempts ?? 3,
 			...(previous ? { previous, checks: previous.checks } : {}),
 			...(sandbox
-				? { verify: async (build: Build) => (await wordpress.verifyInWordPress([{ build, spec, surface }], { sandbox }))[0]! }
+				? { verify: async (build: Build) => (await host.verify([{ build, spec, surface }], sandbox))[0]! }
 				: {}),
 			onEvent: (event) => log(describe(event)),
 		});

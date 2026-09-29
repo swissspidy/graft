@@ -1,6 +1,7 @@
 import { mkdir, readdir, readFile, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { hashSpec, validateBuild, validateSpec, type Build, type Spec, type Surface, type Verification } from '@graft/core';
+import { hostTools } from './hosts.ts';
 import { loadSurface } from './validate.ts';
 
 export interface VerifyCommandOptions {
@@ -61,14 +62,8 @@ export async function verifyFiles(files: string[], options: VerifyCommandOptions
 	}
 
 	if (targets.length > 0) {
-		if (surface.host !== 'wordpress') {
-			throw new Error(`No sandbox for host "${surface.host}".`);
-		}
-		const { playgroundVersion, verifyInWordPress } = await import('@graft/wordpress-adapter');
-		const verifications = await verifyInWordPress(
-			targets.map(({ build, spec }) => ({ build, spec, surface })),
-			{ wp: options.wp ?? playgroundVersion(surface.hostVersion), verbose: options.verbose ?? false },
-		);
+		const host = await hostTools(surface, { ...(options.wp ? { wp: options.wp } : {}), verbose: options.verbose ?? false });
+		const verifications = await host.verify(targets.map(({ build, spec }) => ({ build, spec, surface })));
 		targets.forEach(({ file }, i) => results.push({ file, verification: verifications[i]!, errors: [] }));
 	}
 

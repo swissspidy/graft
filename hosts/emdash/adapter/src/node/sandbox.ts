@@ -1,0 +1,71 @@
+import { SandboxCallError, verifyBuild, type Build, type Sandbox, type Spec, type Surface, type Verification } from '@graft/core';
+import { createCan } from '../host/can.ts';
+import { semantics } from '../host/semantics.ts';
+import { pluginRoute, startEmDash, type EmDashServer, type StartOptions } from './server.ts';
+
+/**
+ * The verification sandbox: a throwaway EmDash with the Graft sandbox
+ * route, driven over HTTP.
+ */
+
+export interface EmDashSandbox extends Sandbox {
+	server: EmDashServer;
+	surface(): Promise<Surface>;
+	close(): Promise<void>;
+}
+
+export async function startSandbox(options: Omit<StartOptions, 'sandbox'> = {}): Promise<EmDashSandbox> {
+	const server = await startEmDash({ ...options, sandbox: true });
+	const op = <T>(body: Record<string, unknown>) => pluginRoute<T>(server, 'sandbox', body);
+	return {
+		server,
+		async reset() {
+			await op({ op: 'reset' });
+		},
+		async seed(fixtures) {
+			return op<{ users: Record<string, string[]> }>({ op: 'seed', fixtures });
+		},
+		async scopes(user, scopes) {
+			return (await op<{ scopes: Record<string, boolean> }>({ op: 'scopes', as: user, scopes })).scopes;
+		},
+		async call(user, capability, input) {
+			const data = await op<{ result?: unknown; error?: { code: string; message: string } }>({ op: 'call', as: user, capability, input });
+			if (data.error) {
+				throw new SandboxCallError(data.error.code, data.error.message);
+			}
+			return data.result;
+		},
+		async slotInstances(user, slot) {
+			return (await op<{ instances: Array<Record<string, unknown>> }>({ op: 'slot', as: user, slot })).instances;
+		},
+		async assert(kind, expected) {
+			return op<{ ok: boolean; actual: unknown }>({ op: 'assert', kind, expected });
+		},
+		async surface() {
+			return (await op<{ surface: Surface }>({ op: 'dump' })).surface;
+		},
+		close: () => server.close(),
+	};
+}
+
+export interface VerifyTarget {
+	build: Build;
+	spec: Spec;
+	surface: Surface;
+}
+
+/** Verifies builds in one EmDash sandbox; starts one unless given. */
+export async function verifyInEmDash(targets: VerifyTarget[], options: { sandbox?: EmDashSandbox; log?: (line: string) => void } = {}): Promise<Verification[]> {
+	const sandbox = options.sandbox ?? (await startSandbox({ log: options.log }));
+	try {
+		const results: Verification[] = [];
+		for (const target of targets) {
+			results.push(await verifyBuild({ ...target, sandbox, semantics, createCan }));
+		}
+		return results;
+	} finally {
+		if (!options.sandbox) {
+			await sandbox.close();
+		}
+	}
+}

@@ -1,0 +1,24 @@
+{
+  "name": "@graft/emdash",
+  "version": "0.0.0",
+  "private": true,
+  "license": "Apache-2.0",
+  "description": "Graft host adapter for EmDash: the plugin that serves builds as Block Kit, the surface, and the verification sandbox.",
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts",
+    "./plugin": "./src/plugin/index.ts",
+    "./host": "./src/host/index.ts",
+    "./node": "./src/node/index.ts"
+  },
+  "dependencies": {
+    "@emdash-cms/auth": "1.0.1",
+    "@graft/core": "workspace:*"
+  },
+  "peerDependencies": {
+    "emdash": "^1.0.1"
+  },
+  "devDependencies": {
+    "emdash": "1.0.1"
+  }
+}
