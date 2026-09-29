@@ -1,4 +1,5 @@
 import { SandboxCallError, verifyBuild, type Build, type Sandbox, type Spec, type Surface, type Verification } from '@graft/core';
+import { loadFunctions } from '@graft/sandbox';
 import { createCan } from '../host/can.ts';
 import type { HostPatch } from '../host/patch.ts';
 import { semantics } from '../host/semantics.ts';
@@ -67,7 +68,7 @@ export async function verifyInEmDash(targets: VerifyTarget[], options: { sandbox
 	try {
 		const results: Verification[] = [];
 		for (const target of targets) {
-			results.push(await verifyBuild({ ...target, sandbox, semantics, createCan }));
+			results.push(await verifyBuild({ ...target, sandbox, semantics, createCan, loadFunctions }));
 		}
 		return results;
 	} finally {

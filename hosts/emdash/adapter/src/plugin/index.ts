@@ -1,6 +1,7 @@
 import { definePlugin, PluginRouteError, type RouteContext } from 'emdash';
 import { adminPages, adminWidgets, capabilities, editorPanels, allowedHosts, PLUGIN_ID, PLUGIN_VERSION, sandboxCapabilities, settingsSchema } from './manifest.ts';
 import { GraftRouteError, graftRoutes, type RouteOptions } from './routes.ts';
+import type { LoadFunctions } from './serve.ts';
 
 export { currentSurface } from './routes.ts';
 
@@ -26,9 +27,12 @@ function toPluginError(error: unknown): never {
 	throw error;
 }
 
+/** Build functions in QuickJS compiled to WebAssembly, loaded on first use. */
+const loadFunctions: LoadFunctions = async (code, limits) => (await import('@graft/sandbox')).loadFunctions(code, limits);
+
 export function createPlugin(options: GraftOptions = {}) {
 	const routes = Object.fromEntries(
-		Object.entries(graftRoutes({ authoring: true, ...options })).map(([name, route]) => [
+		Object.entries(graftRoutes({ authoring: true, loadFunctions, ...options })).map(([name, route]) => [
 			name,
 			{
 				permission: route.permission,

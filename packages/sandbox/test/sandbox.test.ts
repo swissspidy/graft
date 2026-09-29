@@ -126,3 +126,21 @@ describe('build functions in QuickJS', () => {
 		expect(value).toBe(3);
 	});
 });
+
+describe('the asm.js build, for runtimes without WebAssembly', () => {
+	it('runs the same code under the same limits', async () => {
+		const { loadFunctions: loadAsmjs } = await import('../src/asmjs.ts');
+		const f = await loadAsmjs(
+			{ language: 'javascript', source: 'function shout(s) { return s.toUpperCase(); } function spin() { for (;;) {} } function seen() { return typeof fetch + typeof document; }', functions: ['shout', 'spin', 'seen'] },
+			DEFAULT_LIMITS,
+		);
+		try {
+			expect(f.call('shout', ['ada'])).toBe('ADA');
+			expect(f.call('seen', [])).toBe('undefinedundefined');
+			expect((await failure(() => f.call('spin', []))).kind).toBe('timeout');
+			expect(f.call('shout', ['still works'])).toBe('STILL WORKS');
+		} finally {
+			f.dispose();
+		}
+	});
+});

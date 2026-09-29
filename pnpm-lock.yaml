@@ -32,6 +32,9 @@ importers:
       '@graft/core':
         specifier: workspace:*
         version: link:../../../packages/core
+      '@graft/sandbox':
+        specifier: workspace:*
+        version: link:../../../packages/sandbox
     devDependencies:
       '@emdash-cms/auth':
         specifier: 1.0.1
@@ -161,6 +164,9 @@ importers:
       '@graft/core':
         specifier: workspace:*
         version: link:../core
+      '@jitl/quickjs-asmjs-mjs-release-sync':
+        specifier: 0.32.0
+        version: 0.32.0
       '@jitl/quickjs-wasmfile-release-sync':
         specifier: 0.32.0
         version: 0.32.0
@@ -1352,6 +1358,9 @@ packages:
     engines: {node: '>=20.9.0'}
     cpu: [x64]
     os: [win32]
+
+  '@jitl/quickjs-asmjs-mjs-release-sync@0.32.0':
+    resolution: {integrity: sha512-fI2PLbEgrNbdK8cr3JkINTiVFQ0DmargzTrSnBG/k8hzN17RleDGfZd0SH2fiNdByvGS1WGM9rawr8WZ7gV4DA==}
 
   '@jitl/quickjs-ffi-types@0.32.0':
     resolution: {integrity: sha512-v9T+GQpmk43VDJ7d72sf0Nexhk+ArvtUihW27dy7lqAl0zBObFKtSBBIm5RBjwIhE8VwsPPm9PNuvPvNqLWUEg==}
@@ -5382,6 +5391,10 @@ snapshots:
 
   '@img/sharp-win32-x64@0.35.5':
     optional: true
+
+  '@jitl/quickjs-asmjs-mjs-release-sync@0.32.0':
+    dependencies:
+      '@jitl/quickjs-ffi-types': 0.32.0
 
   '@jitl/quickjs-ffi-types@0.32.0': {}
 

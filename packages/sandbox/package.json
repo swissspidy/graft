@@ -8,11 +8,13 @@
   "exports": {
     ".": "./src/index.ts",
     "./worker": "./src/worker.ts",
-    "./client": "./src/client.ts"
+    "./client": "./src/client.ts",
+    "./asmjs": "./src/asmjs.ts"
   },
   "dependencies": {
     "@graft/core": "workspace:*",
     "quickjs-emscripten-core": "0.32.0",
-    "@jitl/quickjs-wasmfile-release-sync": "0.32.0"
+    "@jitl/quickjs-wasmfile-release-sync": "0.32.0",
+    "@jitl/quickjs-asmjs-mjs-release-sync": "0.32.0"
   }
 }

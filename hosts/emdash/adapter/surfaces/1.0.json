@@ -776,6 +776,91 @@
 				"additionalProperties": false
 			},
 			"children": "none"
+		},
+		"widget": {
+			"description": "An interactive widget drawn by the build's code, on the server: render(input, state) returns a tree of components, and update(state, event, payload, input) the next state when a button sends {\"$event\": name, \"payload\": ...}.",
+			"props": {
+				"type": "object",
+				"properties": {
+					"render": {
+						"description": "The function that draws the widget.",
+						"type": "string"
+					},
+					"update": {
+						"description": "The function that computes the next state from an event.",
+						"type": "string"
+					},
+					"input": {
+						"description": "What the widget draws from, e.g. {\"$data\": \"entries\"}."
+					},
+					"state": {
+						"description": "The initial state."
+					},
+					"actions": {
+						"description": "Actions the widget may offer on rows of its input (an array of records with an id): {\"publish\": {\"call\": {\"$call\": ..., \"input\": {\"id\": {\"$field\": \"id\"}}}, \"visible\": {\"$can\": ...}}}. A drawn button uses one with {\"$use\": \"publish\", \"row\": <row id>}; inside a table row, {\"$use\": \"publish\"} applies to that row.",
+						"type": "object",
+						"additionalProperties": {
+							"type": "object",
+							"properties": {
+								"call": {
+									"description": "A capability call: { $call, input, then, notice }.",
+									"type": "object",
+									"required": [
+										"$call"
+									]
+								},
+								"visible": {
+									"description": "true, false, a permission check { $can, on }, or logic over them: $eq, $and, $or, $not.",
+									"anyOf": [
+										{
+											"type": "boolean"
+										},
+										{
+											"type": "object",
+											"required": [
+												"$can"
+											]
+										},
+										{
+											"type": "object",
+											"required": [
+												"$eq"
+											]
+										},
+										{
+											"type": "object",
+											"required": [
+												"$and"
+											]
+										},
+										{
+											"type": "object",
+											"required": [
+												"$or"
+											]
+										},
+										{
+											"type": "object",
+											"required": [
+												"$not"
+											]
+										}
+									]
+								}
+							},
+							"required": [
+								"call"
+							],
+							"additionalProperties": false
+						}
+					}
+				},
+				"required": [
+					"render"
+				],
+				"additionalProperties": false
+			},
+			"children": "none"
 		}
 	},
 	"capabilities": {
@@ -1276,5 +1361,31 @@
 		"editor",
 		"admin"
 	],
-	"hash": "sha256:a5ea900bfba4826a547ad09000415dfee537de74802699f464715ff23aa3fb1f"
+	"functions": {
+		"runtime": "quickjs",
+		"limits": {
+			"timeMs": 100,
+			"memoryBytes": 8388608,
+			"outputBytes": 16384,
+			"sourceBytes": 32768
+		},
+		"widgets": {
+			"components": [
+				"stack",
+				"header",
+				"section",
+				"context",
+				"divider",
+				"banner",
+				"fields",
+				"stats",
+				"empty",
+				"table",
+				"actions",
+				"button"
+			],
+			"maxNodes": 200
+		}
+	},
+	"hash": "sha256:b9329970caab68a82f9e7fe44db516aa9d4dfddfe028473af619f480e85a35a0"
 }

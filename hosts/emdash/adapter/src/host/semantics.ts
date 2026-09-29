@@ -13,6 +13,11 @@ const toSnapshot = (action: RenderedAction): SnapshotAction => {
 	if (action.action) {
 		snapshot.action = action.action;
 	}
+	if (action.event) {
+		// The event marker: the verifier knows which widget it is in, and turns it into the snapshot's event.
+		const { name, payload } = action.event;
+		snapshot.action = (payload === undefined ? { $event: name } : { $event: name, payload }) as unknown as SnapshotAction['action'];
+	}
 	if (action.row !== undefined) {
 		snapshot.row = action.row;
 	}
@@ -23,7 +28,8 @@ function describe({ node, props, raw, evaluate, emit }: SemanticsArgs): void | f
 	if (props.visible === false && node.type !== 'button') {
 		return false;
 	}
-	const output = nodeOutput({ type: node.type, props, raw, evaluateRow: (value, row) => evaluate(value, row), actionPrefix: 'snapshot' });
+	// Event buttons read as available: the verifier draws widgets and knows which one a button is in.
+	const output = nodeOutput({ type: node.type, props, raw, evaluateRow: (value, row) => evaluate(value, row), actionPrefix: 'snapshot', widget: '' });
 	output.texts.forEach(emit.text);
 	output.actions.forEach((action) => emit.action(toSnapshot(action)));
 	if (output.table) {

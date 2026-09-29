@@ -155,6 +155,33 @@ async function main(): Promise<number> {
 		const author = await login(server, 'author', 30);
 		const authorPanel = await asUser<{ blocks: Block[] }>(server, author.cookie, panelPath, { type: 'panel_load' });
 		check('the panel is not shown outside its audience', authorPanel.status === 200 ? texts(authorPanel.data?.blocks).includes('No customizations for this entry.') : authorPanel.status === 403, authorPanel);
+
+		// A widget: its code draws on the server, and its state travels in the buttons.
+		const board = example('status-board');
+		await pluginRoute(server, 'install', { source: board.source, build: board.build, verification: verification('status-board') });
+		await admin({ type: 'block_action', page: '/customizations', action_id: 'graft:approve', value: 'status-board' });
+		await content.seed([{ title: 'Draft D', status: 'draft' }]);
+		const tab = (blocks: Block[] | undefined, label: string) => (flatten(blocks).find((b) => b.type === 'tab')?.panels as Array<{ label: string; blocks: Block[] }> | undefined)?.find((p) => p.label === label)?.blocks;
+		const buttons = (blocks?: Block[]) => flatten(blocks).flatMap((b) => (b.type === 'actions' ? (b.elements as Block[]) : []));
+		const drafts = tab((await page(editor.cookie, { type: 'page_load', page: '/customizations' })).data?.blocks, 'Status board');
+		check('the widget draws the drafts and counts', rows(drafts)?.map((r) => r.title).join() === 'Draft D' && texts(drafts).includes('Drafts: 1 · Published: 3'), drafts);
+		const showPublished = buttons(drafts).find((b) => b.label === 'Published (3)');
+		check('the widget draws a button per status', buttons(drafts).some((b) => b.label === 'Drafts (1)') && showPublished !== undefined, buttons(drafts));
+		const switched = await page(editor.cookie, { type: 'block_action', page: '/customizations', action_id: showPublished?.action_id, value: showPublished?.value });
+		const publishedView = tab(switched.data?.blocks, 'Status board');
+		check('an event updates the widget: it lists the published posts', !switched.data?.toast && rows(publishedView)?.map((r) => r.title).sort().join() === 'Draft A,Draft C,Post B', switched);
+		const unpublish = rows(publishedView)?.find((r) => r.title === 'Post B')?.buttons[0];
+		check('rows the widget offers an action on get its button', unpublish?.label === 'Unpublish', rows(publishedView));
+		const forgedRow = await page(editor.cookie, { type: 'block_action', page: '/customizations', action_id: unpublish?.action_id, value: String(unpublish?.value).replace(/"v":"[^"]*"/, '"v":"not-an-entry"') });
+		check('an action on a row the widget was not given is refused', forgedRow.data?.toast?.type === 'error', forgedRow);
+		const byContributor = await page(contributor.cookie, { type: 'block_action', page: '/customizations', action_id: unpublish?.action_id, value: unpublish?.value });
+		check("a contributor replaying the widget's action is refused", byContributor.data?.toast?.type === 'error' && (await content.find('Post B'))?.status === 'published', byContributor);
+		const offline = await page(editor.cookie, { type: 'block_action', page: '/customizations', action_id: unpublish?.action_id, value: unpublish?.value });
+		const afterOffline = tab(offline.data?.blocks, 'Status board');
+		check("the widget's action runs, and the widget keeps its state", offline.data?.toast?.message === 'Taken offline.' && rows(afterOffline)?.map((r) => r.title).sort().join() === 'Draft A,Draft C', offline);
+		check('the post is a draft again in EmDash', (await content.find('Post B'))?.status === 'draft');
+		const contributorBoard = tab((await page(contributor.cookie, { type: 'page_load', page: '/customizations' })).data?.blocks, 'Status board');
+		check('contributors see the widget without Publish buttons', (rows(contributorBoard)?.length ?? 0) > 0 && rows(contributorBoard)!.every((r) => r.buttons.length === 0), contributorBoard);
 	} finally {
 		await Promise.all([sandbox.close(), server.close()]);
 	}

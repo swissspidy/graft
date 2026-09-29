@@ -1,0 +1,428 @@
+{
+	"graft": 1,
+	"spec": {
+		"id": "status-board",
+		"hash": "sha256:be0c7a3ea99ebdb2922afe82fd56276c46a031d4031222f5f4fb5b90feac6830"
+	},
+	"surface": {
+		"host": "emdash",
+		"hostVersion": "1.0.1",
+		"hash": "sha256:b9329970caab68a82f9e7fe44db516aa9d4dfddfe028473af619f480e85a35a0"
+	},
+	"mount": {
+		"slot": "admin.page",
+		"title": "Status board"
+	},
+	"data": {
+		"posts": {
+			"call": "content.list",
+			"input": {
+				"collection": "posts",
+				"order": "desc",
+				"limit": 100
+			}
+		}
+	},
+	"tree": {
+		"type": "stack",
+		"children": [
+			{
+				"type": "widget",
+				"props": {
+					"render": "draw",
+					"update": "show",
+					"input": {
+						"$data": "posts.items"
+					},
+					"state": {
+						"status": "draft"
+					},
+					"actions": {
+						"publish": {
+							"call": {
+								"$call": "content.publish",
+								"input": {
+									"collection": "posts",
+									"id": {
+										"$field": "id"
+									}
+								},
+								"then": [
+									"refresh:posts"
+								],
+								"notice": "Published."
+							},
+							"visible": {
+								"$can": "content.status:write"
+							}
+						},
+						"unpublish": {
+							"call": {
+								"$call": "content.unpublish",
+								"input": {
+									"collection": "posts",
+									"id": {
+										"$field": "id"
+									}
+								},
+								"then": [
+									"refresh:posts"
+								],
+								"notice": "Taken offline."
+							},
+							"visible": {
+								"$can": "content.status:write"
+							}
+						}
+					}
+				}
+			}
+		]
+	},
+	"code": {
+		"language": "javascript",
+		"source": "// A button per status with how many posts have it, and the posts with the\n// chosen status, each with the declared action that moves it to the other.\nfunction draw(posts, state) {\n\tconst all = Array.isArray(posts) ? posts : [];\n\tconst status = state && state.status === 'published' ? 'published' : 'draft';\n\tconst count = (s) => all.filter((post) => post.status === s).length;\n\tconst tab = (id, label, s) => ({\n\t\ttype: 'button',\n\t\tprops: { id, label: `${label} (${count(s)})`, style: s === status ? 'primary' : 'secondary', onClick: { $event: 'show', payload: { status: s } } },\n\t});\n\tconst drafts = status === 'draft';\n\treturn {\n\t\ttype: 'stack',\n\t\tchildren: [\n\t\t\t{ type: 'context', props: { text: `Drafts: ${count('draft')} · Published: ${count('published')}` } },\n\t\t\t{ type: 'actions', children: [tab('drafts', 'Drafts', 'draft'), tab('published', 'Published', 'published')] },\n\t\t\t{\n\t\t\t\ttype: 'table',\n\t\t\t\tprops: {\n\t\t\t\t\trows: all.filter((post) => post.status === status),\n\t\t\t\t\tcolumns: [\n\t\t\t\t\t\t{ key: 'title', label: 'Title', primary: true },\n\t\t\t\t\t\t{ key: 'updatedAt', label: 'Last updated', format: 'relative_time' },\n\t\t\t\t\t],\n\t\t\t\t\tactions: [drafts ? { id: 'publish', label: 'Publish', style: 'primary', onClick: { $use: 'publish' } } : { id: 'unpublish', label: 'Unpublish', onClick: { $use: 'unpublish' } }],\n\t\t\t\t\tempty: drafts ? 'No drafts' : 'Nothing published',\n\t\t\t\t},\n\t\t\t},\n\t\t],\n\t};\n}\n\n// Showing drafts or published posts.\nfunction show(state, event, payload) {\n\treturn event === 'show' ? { status: payload && payload.status === 'published' ? 'published' : 'draft' } : state;\n}\n",
+		"functions": [
+			"draw",
+			"show"
+		]
+	},
+	"checks": [
+		{
+			"criterion": "drafts-first",
+			"fixtures": {
+				"users": [
+					{
+						"as": "e",
+						"role": "editor"
+					}
+				],
+				"entries": [
+					{
+						"title": "Draft A",
+						"status": "draft"
+					},
+					{
+						"title": "Draft B",
+						"status": "draft"
+					},
+					{
+						"title": "Post C",
+						"status": "published"
+					}
+				]
+			},
+			"view_as": "e",
+			"expect": [
+				{
+					"rows": [
+						"Draft A",
+						"Draft B"
+					]
+				},
+				{
+					"text": "Drafts: 2 · Published: 1"
+				},
+				{
+					"action": "drafts"
+				},
+				{
+					"action": "published"
+				}
+			]
+		},
+		{
+			"criterion": "switch",
+			"fixtures": {
+				"users": [
+					{
+						"as": "e",
+						"role": "editor"
+					}
+				],
+				"entries": [
+					{
+						"title": "Draft A",
+						"status": "draft"
+					},
+					{
+						"title": "Draft B",
+						"status": "draft"
+					},
+					{
+						"title": "Post C",
+						"status": "published"
+					}
+				]
+			},
+			"view_as": "e",
+			"steps": [
+				{
+					"action": "published"
+				}
+			],
+			"expect": [
+				{
+					"rows": [
+						"Post C"
+					]
+				}
+			]
+		},
+		{
+			"criterion": "switch",
+			"fixtures": {
+				"users": [
+					{
+						"as": "e",
+						"role": "editor"
+					}
+				],
+				"entries": [
+					{
+						"title": "Draft A",
+						"status": "draft"
+					},
+					{
+						"title": "Draft B",
+						"status": "draft"
+					},
+					{
+						"title": "Post C",
+						"status": "published"
+					}
+				]
+			},
+			"view_as": "e",
+			"steps": [
+				{
+					"action": "published"
+				},
+				{
+					"action": "drafts"
+				}
+			],
+			"expect": [
+				{
+					"rows": [
+						"Draft A",
+						"Draft B"
+					]
+				}
+			]
+		},
+		{
+			"criterion": "publish",
+			"fixtures": {
+				"users": [
+					{
+						"as": "e",
+						"role": "editor"
+					}
+				],
+				"entries": [
+					{
+						"title": "Draft A",
+						"status": "draft"
+					},
+					{
+						"title": "Draft B",
+						"status": "draft"
+					},
+					{
+						"title": "Post C",
+						"status": "published"
+					}
+				]
+			},
+			"view_as": "e",
+			"steps": [
+				{
+					"action": "publish",
+					"row": {
+						"title": "Draft B"
+					}
+				}
+			],
+			"expect": [
+				{
+					"rows": [
+						"Draft A"
+					]
+				},
+				{
+					"text": "Drafts: 1 · Published: 2"
+				},
+				{
+					"entry": {
+						"title": "Draft B",
+						"status": "published"
+					}
+				}
+			]
+		},
+		{
+			"criterion": "unpublish",
+			"fixtures": {
+				"users": [
+					{
+						"as": "e",
+						"role": "editor"
+					}
+				],
+				"entries": [
+					{
+						"title": "Draft A",
+						"status": "draft"
+					},
+					{
+						"title": "Draft B",
+						"status": "draft"
+					},
+					{
+						"title": "Post C",
+						"status": "published"
+					}
+				]
+			},
+			"view_as": "e",
+			"steps": [
+				{
+					"action": "published"
+				},
+				{
+					"action": "unpublish",
+					"row": {
+						"title": "Post C"
+					}
+				}
+			],
+			"expect": [
+				{
+					"rows": []
+				},
+				{
+					"text": "Nothing published"
+				},
+				{
+					"entry": {
+						"title": "Post C",
+						"status": "draft"
+					}
+				}
+			]
+		},
+		{
+			"criterion": "contributors",
+			"fixtures": {
+				"users": [
+					{
+						"as": "c",
+						"role": "contributor"
+					}
+				],
+				"entries": [
+					{
+						"title": "Draft A",
+						"status": "draft"
+					},
+					{
+						"title": "Draft B",
+						"status": "draft"
+					},
+					{
+						"title": "Post C",
+						"status": "published"
+					}
+				]
+			},
+			"view_as": "c",
+			"expect": [
+				{
+					"rows": [
+						"Draft A",
+						"Draft B"
+					]
+				},
+				{
+					"action": "publish",
+					"row": {
+						"title": "Draft A"
+					},
+					"available": false
+				}
+			]
+		},
+		{
+			"criterion": "contributors",
+			"fixtures": {
+				"users": [
+					{
+						"as": "c",
+						"role": "contributor"
+					}
+				],
+				"entries": [
+					{
+						"title": "Draft A",
+						"status": "draft"
+					},
+					{
+						"title": "Draft B",
+						"status": "draft"
+					},
+					{
+						"title": "Post C",
+						"status": "published"
+					}
+				]
+			},
+			"view_as": "c",
+			"steps": [
+				{
+					"action": "published"
+				}
+			],
+			"expect": [
+				{
+					"rows": [
+						"Post C"
+					]
+				},
+				{
+					"action": "unpublish",
+					"row": {
+						"title": "Post C"
+					},
+					"available": false
+				}
+			]
+		}
+	],
+	"provenance": {
+		"compiler": "handwritten",
+		"strategy": "handwritten"
+	},
+	"refs": {
+		"slot": "admin.page",
+		"components": {
+			"stack": [],
+			"widget": [
+				"actions",
+				"input",
+				"render",
+				"state",
+				"update"
+			]
+		},
+		"capabilities": [
+			"content.list",
+			"content.publish",
+			"content.unpublish"
+		],
+		"scopes": [
+			"content.status:write",
+			"content:read"
+		]
+	}
+}

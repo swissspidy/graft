@@ -2,7 +2,7 @@ import { expect, test, type Page } from '@playwright/test';
 
 /**
  * Graft customizations in the real EmDash admin, as people with different
- * roles see them. The server (server.ts) installs and approves the three
+ * roles see them. The server (server.ts) installs and approves the
  * examples and seeds "Hello world" (published) and two drafts, "Draft
  * ideas" and "Release notes". Tests run in order and share that state.
  */
@@ -10,13 +10,11 @@ import { expect, test, type Page } from '@playwright/test';
 const roles = { contributor: 20, author: 30, editor: 40, admin: 50 } as const;
 
 async function signIn(page: Page, user: keyof typeof roles, path: string): Promise<void> {
+	// First sign-in greets the new account, whenever the admin gets to it; the dialog hides the page.
+	const welcome = page.getByRole('button', { name: 'Get Started' });
+	await page.addLocatorHandler(welcome, () => welcome.click());
 	await page.goto(`/graft-test/login?user=${user}&role=${roles[user]}&redirect=${encodeURIComponent(path)}`);
 	await expect(page.getByText('Loading EmDash')).toHaveCount(0, { timeout: 60_000 });
-	// First sign-in greets the new account.
-	const welcome = page.getByRole('button', { name: 'Get Started' });
-	if (await welcome.isVisible({ timeout: 3_000 }).catch(() => false)) {
-		await welcome.click();
-	}
 }
 
 const customizations = '/_emdash/admin/plugins/graft/customizations';
@@ -66,6 +64,23 @@ test('editors publish a draft from the publish queue', async ({ page }) => {
 	// EmDash agrees: the post is live.
 	await page.goto('/_emdash/admin/content/posts');
 	await expect(page.getByRole('row', { name: /Release notes/ })).toContainText(/published/i);
+});
+
+test('editors switch the status board and take a post offline from it', async ({ page }) => {
+	await signIn(page, 'editor', customizations);
+	await page.getByRole('tab', { name: 'Status board' }).click();
+	// Drawn by the build's code on the server: counts, a button per status, the drafts.
+	await expect(page.getByText('Drafts: 1 · Published: 2')).toBeVisible();
+	await expect(page.getByRole('row', { name: /Draft ideas/ })).toBeVisible();
+	await page.getByRole('button', { name: 'Published (2)' }).click();
+	await expect(page.getByRole('row', { name: /Hello world/ })).toBeVisible();
+	await expect(page.getByRole('row', { name: /Draft ideas/ })).toHaveCount(0);
+	await page.getByRole('row', { name: /Hello world/ }).getByRole('button', { name: 'Unpublish' }).click();
+	await expect(page.getByText('Taken offline.')).toBeVisible();
+	// The widget keeps showing published posts; the post has left them.
+	await expect(page.getByRole('row', { name: /Hello world/ })).toHaveCount(0);
+	await expect(page.getByRole('row', { name: /Release notes/ })).toBeVisible();
+	await expect(page.getByText('Drafts: 2 · Published: 1')).toBeVisible();
 });
 
 test('editors take a post live from the editor panel', async ({ page }) => {

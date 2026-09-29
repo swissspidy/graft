@@ -143,10 +143,18 @@ corpus.
 - **One worker per build with code.** Two widgets on one screen from two
   customizations start two workers; one build's code never shares a
   realm with another's.
-- **EmDash.** EmDash does not run functions yet (ADR 0005), so it has no
-  widgets either. Its Block Kit could draw the sanitized trees on the
-  server, the same way it draws builds, once QuickJS runs in its plugin
-  sandbox.
+- **EmDash.** EmDash draws widgets on the server: the plugin runs
+  `render`, sanitizes the tree and translates it to Block Kit like the
+  build's own tree, with the same Block Kit components as the allow-list.
+  The admin keeps no state for a plugin, so every button of a
+  customization with widgets carries the widgets' states in its value. A
+  click re-renders with those states, finds the button again in that
+  render and, for an event, runs `update` for the next state; the event's
+  payload comes from that render, never from the browser. The viewer can
+  forge a state, which only changes what the code draws: a declared
+  action still resolves against the rows the server loaded, is offered
+  only where `visible` holds, and passes the gateway. State lasts as long
+  as the view: a reload, or opening another tab, starts over.
 - **Components stay trusted.** Arrow's sandbox, mentioned in ADR 0005,
   renders templates to the DOM through a bridge. This design never
   renders code's markup: code describes, the host's components draw. It

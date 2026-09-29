@@ -1,4 +1,22 @@
-import { evaluate, getPath, isAction, type Action, type EvalContext, type TreeNode, type Value } from '@graft/core/runtime';
+import {
+	evaluate,
+	getPath,
+	initialState,
+	isAction,
+	isWidgetEvent,
+	renderArgs,
+	resolveWidgetUse,
+	sanitizeWidgetTree,
+	WIDGET,
+	widgetProps,
+	type Action,
+	type EvalContext,
+	type TreeNode,
+	type Value,
+	type WidgetLimits,
+	type WidgetProps,
+	type WidgetUse,
+} from '@graft/core/runtime';
 
 /**
  * Translates a build's tree into EmDash Block Kit. The admin draws the
@@ -6,6 +24,15 @@ import { evaluate, getPath, isAction, type Action, type EvalContext, type TreeNo
  * action id and value set here, and the plugin resolves them against a
  * fresh render (see `renderTree().actions`), so the browser never supplies
  * a capability or its input.
+ *
+ * Widgets are drawn here too, on the server: their code's tree is rendered
+ * like the build's own. The admin keeps no state for them, so each button
+ * of a customization with widgets carries the widgets' states in its value
+ * (see `withWidgetStates`); a click re-renders with those states and finds
+ * the button again, and an event button's payload comes from that render,
+ * never from the browser. A forged state only changes what the code draws:
+ * actions it offers still resolve against the rows the server loaded, and
+ * pass the declared `visible` condition and the gateway.
  */
 
 /** A Block Kit block or element, as JSON. */
@@ -20,6 +47,8 @@ export interface RenderedAction {
 	action?: Action;
 	/** The table row the action belongs to. */
 	row?: unknown;
+	/** A widget's event button: using it updates that widget's state. */
+	event?: { widget: string; name: string; payload?: unknown };
 	/** Block Kit `action_id` and `value` of the button. */
 	actionId: string;
 	value?: string;
@@ -45,6 +74,8 @@ export interface NodeArgs {
 	evaluateRow(value: Value | undefined, row: unknown): unknown;
 	/** Prefix for action ids: unique per customization and node. */
 	actionPrefix: string;
+	/** The widget the node is drawn in, if any: only its buttons send events. */
+	widget?: string;
 }
 
 export type Tone = 'success' | 'warning' | 'error' | 'info';
@@ -63,12 +94,16 @@ export function rowKey(row: unknown, index: number): string {
 	return typeof id === 'string' || typeof id === 'number' ? String(id) : `#${index}`;
 }
 
-function button(props: Record<string, unknown>, actionId: string, value?: string, row?: unknown): { element?: Block; action: RenderedAction } {
+function button(props: Record<string, unknown>, actionId: string, widget: string | undefined, value?: string, row?: unknown): { element?: Block; action: RenderedAction } {
 	const onClick = props.onClick;
-	const available = props.visible !== false && props.disabled !== true && isAction(onClick);
+	const event = widget !== undefined && isWidgetEvent(onClick) ? onClick : undefined;
+	const available = props.visible !== false && props.disabled !== true && (isAction(onClick) || event !== undefined);
 	const action: RenderedAction = { id: str(props.id), label: str(props.label), available, actionId };
 	if (isAction(onClick)) {
 		action.action = onClick;
+	}
+	if (event) {
+		action.event = { widget: widget!, name: event.$event, ...(event.payload !== undefined ? { payload: event.payload } : {}) };
 	}
 	if (value !== undefined) {
 		action.value = value;
@@ -93,7 +128,7 @@ function button(props: Record<string, unknown>, actionId: string, value?: string
 }
 
 /** One node's blocks, buttons and snapshot contributions. Children are the caller's. */
-export function nodeOutput({ type, props, raw, evaluateRow, actionPrefix }: NodeArgs): NodeOutput {
+export function nodeOutput({ type, props, raw, evaluateRow, actionPrefix, widget }: NodeArgs): NodeOutput {
 	const out: NodeOutput = { blocks: [], elements: [], actions: [], texts: [] };
 	const text = (value: unknown) => {
 		const s = str(value).trim();
@@ -150,7 +185,7 @@ export function nodeOutput({ type, props, raw, evaluateRow, actionPrefix }: Node
 			break;
 		}
 		case 'button': {
-			const { element, action } = button(props, actionPrefix);
+			const { element, action } = button(props, actionPrefix, widget);
 			if (element) {
 				out.elements.push(element);
 			}
@@ -190,7 +225,7 @@ export function nodeOutput({ type, props, raw, evaluateRow, actionPrefix }: Node
 				const value = rowKey(row, index);
 				const actions = rawActions.map((rawAction, i) => {
 					const resolved = (evaluateRow(rawAction, row) ?? {}) as Record<string, unknown>;
-					const { element, action } = button(resolved, actionIds[i]!, value, row);
+					const { element, action } = button(resolved, actionIds[i]!, widget, value, row);
 					if (element) {
 						cells[actionIds[i]!] = element;
 					}
@@ -221,17 +256,39 @@ export interface Rendered {
 	blocks: Block[];
 	/** Every button, available or not, in tree order. */
 	actions: RenderedAction[];
+	/** Widgets drawn, by node path: what they were given and the state they drew. */
+	widgets: Record<string, { props: WidgetProps; state: unknown }>;
+	/** What went wrong while drawing: a widget that cannot be drawn, or drew something invalid. */
+	problems: string[];
+}
+
+/** How widgets are drawn in a render. */
+export interface RenderWidgets {
+	limits: WidgetLimits;
+	/** Widget states by node path; a widget without one is in its initial state. */
+	states: Record<string, unknown>;
+	/** Problems with a sanitized tree, e.g. props that do not match the surface. */
+	validate?(tree: TreeNode): string[];
 }
 
 /**
  * Renders a tree for a context. `prefix` namespaces action ids, so several
- * customizations can share a widget or panel.
+ * customizations can share a widget or panel. Widgets need `widgets` and a
+ * `ctx.fn` to run their code.
  */
-export function renderTree(tree: TreeNode, ctx: EvalContext, prefix: string): Rendered {
-	const rendered: Rendered = { blocks: [], actions: [] };
-	const visit = (node: TreeNode, path: string): Block[] => {
+export function renderTree(tree: TreeNode, ctx: EvalContext, prefix: string, widgets?: RenderWidgets): Rendered {
+	const rendered: Rendered = { blocks: [], actions: [], widgets: {}, problems: [] };
+	const problem = (text: string) => {
+		if (!rendered.problems.includes(text)) {
+			rendered.problems.push(text);
+		}
+	};
+	const visit = (node: TreeNode, path: string, at: EvalContext, widget?: string): Block[] => {
 		const raw = (node.props ?? {}) as Record<string, Value>;
-		const props = evaluate(raw as Value, ctx) as Record<string, unknown>;
+		const props = evaluate(raw as Value, at) as Record<string, unknown>;
+		if (node.type === WIDGET) {
+			return drawWidget(raw, props, path, at);
+		}
 		if (props.visible === false && node.type !== 'button') {
 			return [];
 		}
@@ -239,14 +296,15 @@ export function renderTree(tree: TreeNode, ctx: EvalContext, prefix: string): Re
 			type: node.type,
 			props,
 			raw,
-			evaluateRow: (value, row) => evaluate(value, { ...ctx, row }),
+			evaluateRow: (value, row) => evaluate(value, { ...at, row }),
 			actionPrefix: `${prefix}:${path}`,
+			...(widget !== undefined ? { widget } : {}),
 		});
 		rendered.actions.push(...output.actions, ...(output.table?.rows.flatMap((row) => row.actions) ?? []));
 		const children = Array.isArray(node.children) ? node.children : [];
 		const inner: Block[] = [];
 		children.forEach((child, i) => {
-			inner.push(...visit(child, `${path}.${i}`));
+			inner.push(...visit(child, `${path}.${i}`, at, widget));
 		});
 		if (node.type === 'actions') {
 			const elements = inner.filter(isElement);
@@ -254,8 +312,88 @@ export function renderTree(tree: TreeNode, ctx: EvalContext, prefix: string): Re
 		}
 		return [...output.blocks, ...output.elements, ...inner];
 	};
-	rendered.blocks = wrapElements(visit(tree, '0'));
+
+	/** Draws a widget in its current state: its code's tree, sanitized, rendered like the build's own. */
+	const drawWidget = (raw: Record<string, Value>, props: Record<string, unknown>, path: string, at: EvalContext): Block[] => {
+		const wp = widgetProps(props);
+		if (!wp || !widgets || !at.fn) {
+			problem('A widget cannot be drawn here.');
+			return [];
+		}
+		const state = Object.hasOwn(widgets.states, path) ? widgets.states[path] : initialState(wp);
+		rendered.widgets[path] = { props: wp, state };
+		const drawn = at.fn(wp.render, renderArgs(wp, state));
+		if (drawn === null || drawn === undefined) {
+			problem('A widget drew nothing.');
+			return [];
+		}
+		const { tree: sub, problems } = sanitizeWidgetTree(drawn, widgets.limits);
+		problems.forEach((p) => problem(`A widget: ${p}`));
+		if (!sub) {
+			return [];
+		}
+		widgets.validate?.(sub).forEach((p) => problem(`A widget: ${p}`));
+		// Uses of the widget's declared actions resolve to the action for one of its rows, or null (hidden).
+		const use = (marker: WidgetUse): unknown => {
+			const resolved = resolveWidgetUse(marker, raw.actions, props.input, at);
+			if (resolved.problem) {
+				problem(`A widget: ${resolved.problem}`);
+			}
+			return resolved.available && resolved.action ? resolved.action : null;
+		};
+		return visit(sub, `${path}.w`, { ...at, use }, path);
+	};
+
+	rendered.blocks = wrapElements(visit(tree, '0', ctx));
 	return rendered;
+}
+
+/** Marks a button value that carries widget states. */
+const STATES = 'w|';
+
+/**
+ * Puts the states of a render's widgets into the value of each of its
+ * buttons (those with the render's prefix), so a click brings them back.
+ * Renders without widgets are left as they are.
+ */
+export function withWidgetStates(rendered: Rendered, prefix: string): Rendered {
+	const paths = Object.keys(rendered.widgets);
+	if (paths.length === 0) {
+		return rendered;
+	}
+	const states = Object.fromEntries(paths.map((path) => [path, rendered.widgets[path]!.state]));
+	const rewrite = (item: unknown): void => {
+		if (Array.isArray(item)) {
+			item.forEach(rewrite);
+			return;
+		}
+		if (typeof item !== 'object' || item === null) {
+			return;
+		}
+		const block = item as Block;
+		if (block.type === 'button' && typeof block.action_id === 'string' && block.action_id.startsWith(`${prefix}:`)) {
+			const value = typeof block.value === 'string' ? block.value : undefined;
+			block.value = STATES + JSON.stringify(value === undefined ? { w: states } : { v: value, w: states });
+			return;
+		}
+		Object.values(block).forEach(rewrite);
+	};
+	rewrite(rendered.blocks);
+	return rendered;
+}
+
+/** A button value as the admin sent it back: the button's own value and the widget states it carried. */
+export function readValue(value: unknown): { value: unknown; states: Record<string, unknown> } {
+	if (typeof value === 'string' && value.startsWith(STATES)) {
+		try {
+			const parsed = JSON.parse(value.slice(STATES.length)) as { v?: unknown; w?: unknown };
+			const states = typeof parsed.w === 'object' && parsed.w !== null && !Array.isArray(parsed.w) ? (parsed.w as Record<string, unknown>) : {};
+			return { value: typeof parsed.v === 'string' ? parsed.v : undefined, states };
+		} catch {
+			// Not ours: a row id that happens to look like it.
+		}
+	}
+	return { value, states: {} };
 }
 
 const isElement = (block: Block) => block.type === 'button';

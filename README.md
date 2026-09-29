@@ -21,7 +21,8 @@ sandbox, with customizations written in either admin
 ([ADR 0004](docs/adr/0004-emdash-sandbox-and-authoring.md)). Where the
 declarative language runs out, a build may carry pure functions that run
 in QuickJS compiled to WebAssembly, with no access to the page
-([ADR 0005](docs/adr/0005-sandboxed-functions.md); WordPress for now).
+([ADR 0005](docs/adr/0005-sandboxed-functions.md); on EmDash, on the
+server, and as asm.js in its plugin sandbox).
 The same functions can draw interactive widgets that keep state as the
 viewer clicks, still with the host's own components
 ([ADR 0006](docs/adr/0006-interactive-widgets.md)).
@@ -76,7 +77,8 @@ date, and can approve with one click.
 More in [`examples/specs`](examples/specs): an admin page, a row action on
 the existing Posts screen, and a Dashboard widget. The same ideas for
 EmDash are in [`examples/emdash`](examples/emdash): a publish queue, a
-panel in the entry editor, and a dashboard widget.
+panel in the entry editor, dashboard widgets, and a status board drawn by
+code that switches between drafts and published posts.
 
 ## How it works
 
@@ -193,12 +195,12 @@ pnpm graft site verify --site <url> --token <token>
 | `pnpm test:e2e` | Playwright in wp-admin: serving, gateway and its audit log, build functions and their lazy loading, an interactive widget, approval, authoring, `graft site` |
 | `pnpm verify:emdash` | The EmDash example builds' checks in a throwaway EmDash |
 | `pnpm test:compile:emdash` | The compile pipeline with a scripted model against EmDash |
-| `pnpm test:canary:emdash` | Six synthetic EmDash changes, each forcing one rung, against a two-tenant corpus |
+| `pnpm test:canary:emdash` | Six synthetic EmDash changes, each forcing one rung, against a two-tenant corpus (one with code and a widget) |
 | `pnpm test:site:emdash` | `graft site` against a live EmDash: install with local verification, verify drafts, pull into the canary |
 | `pnpm test:emdash:sandboxed` | The same, with Graft in EmDash's plugin sandbox (workerd) |
 | `pnpm test:author:emdash` | Writing a customization in the EmDash admin, with a stubbed Claude API, in both formats |
 | `pnpm test:cfworker` | The unit tests again on the schema engine used where code generation is forbidden |
-| `pnpm test:emdash` | EmDash plugin smoke test: install, approve, serve per role, forged and refused actions |
+| `pnpm test:emdash` | EmDash plugin smoke test: install, approve, serve per role, forged and refused actions, a widget's events and actions |
 | `pnpm test:e2e:emdash` | Playwright in the EmDash admin: the page, the widget and the editor panel |
 
 CI runs all of them, plus a weekly canary against WordPress nightly. As of
@@ -213,7 +215,7 @@ customization re-passes its checks there.
 | `schemas/` | JSON Schemas for spec, surface and build, and the spec lifecycle table |
 | `packages/core` | Host-agnostic, no I/O: specs, surfaces, builds, expression evaluator, verifier, compiler, upgrade ladder, canary |
 | `packages/renderer-react` | Renders a build with a host's components and capability gateway |
-| `packages/sandbox` | Runs a build's pure functions (`$fn`, widgets) in QuickJS/WebAssembly with time, memory and output limits; a Web Worker for pages, in-process for the verifier |
+| `packages/sandbox` | Runs a build's pure functions (`$fn`, widgets) in QuickJS/WebAssembly (or asm.js, `@graft/sandbox/asmjs`, where WebAssembly cannot be compiled) with time, memory and output limits; a Web Worker for pages, in-process for the verifier and EmDash |
 | `packages/cli` | The `graft` command |
 | `hosts/wordpress` | The WordPress adapter: plugin, components, surface generator, sandbox, tests ([README](hosts/wordpress/README.md)) |
 | `hosts/emdash` | The EmDash adapter: a native plugin that serves builds as Block Kit, surface, sandbox, test site, tests ([README](hosts/emdash/README.md)) |
