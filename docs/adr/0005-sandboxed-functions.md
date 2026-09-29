@@ -176,10 +176,14 @@ time; a model writing JavaScript per build isn't that.
 
 - **The example.** `examples/specs/headline-check.md` is verified in
   Playground and served in wp-admin.
-- **Determinism.** Code can still call `Date.now()` and `Math.random()`,
-  and nothing forbids it. The prompt says functions are pure. A build that
-  depends on either will verify inconsistently, which the canary would
-  show. Freezing both is possible if it becomes a problem.
+- **Determinism.** Inside the sandbox, `Date` and `Date.now()` report the
+  time the host passes with each call. The page passes its current time;
+  the verifier passes the check's clock, so `clock.advanceDays` applies to
+  code as it does to `$daysSince`. `Math.random()` is a PRNG reseeded on
+  every call, so a function gives the same result for the same arguments
+  at the same time. The replacement `Date` is also what
+  `Date.prototype.constructor` returns, so reaching for the original
+  through the prototype finds the frozen one.
 - **EmDash.** EmDash renders on the server, in the plugin or in EmDash's
   own workerd sandbox. Running QuickJS there is possible (it is plain
   Wasm), but loading a wasm file in the sandboxed plugin format needs

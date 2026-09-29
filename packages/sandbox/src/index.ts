@@ -48,7 +48,30 @@ const intrinsics = { ...DefaultIntrinsics, Promise: false };
  */
 const CALLER = `(() => {
 	const parse = JSON.parse, stringify = JSON.stringify, apply = Reflect.apply;
-	return (fn, json) => {
+	// Time and randomness are the host's, per call, so a function returns the
+	// same for the same arguments at the same time (the verifier's clock).
+	const RealDate = Date;
+	let now = 0;
+	let seed = 1;
+	function FrozenDate(...args) {
+		if (!new.target) {
+			return new RealDate(now).toString();
+		}
+		return args.length ? new RealDate(...args) : new RealDate(now);
+	}
+	FrozenDate.prototype = RealDate.prototype;
+	FrozenDate.now = () => now;
+	FrozenDate.parse = RealDate.parse;
+	FrozenDate.UTC = RealDate.UTC;
+	Object.defineProperty(RealDate.prototype, 'constructor', { value: FrozenDate });
+	globalThis.Date = FrozenDate;
+	Math.random = () => {
+		seed = (Math.imul(seed, 1664525) + 1013904223) >>> 0;
+		return seed / 4294967296;
+	};
+	return (fn, json, time) => {
+		now = time;
+		seed = 1;
 		const result = stringify(apply(fn, undefined, parse(json)));
 		return result === undefined ? 'null' : result;
 	};
@@ -103,7 +126,8 @@ export class QuickJSFunctions implements FunctionRunner {
 		}
 	}
 
-	call(name: string, args: unknown[]): unknown {
+	/** Runs a function; `now` is what Date and Date.now() report inside it (default: the host's time). */
+	call(name: string, args: unknown[], now: number = Date.now()): unknown {
 		if (this.#disposed) {
 			throw new FunctionError('error', 'The sandbox is closed');
 		}
@@ -112,8 +136,9 @@ export class QuickJSFunctions implements FunctionRunner {
 			throw new FunctionError('unknown-function', `No function "${name}"`);
 		}
 		const json = this.vm.newString(JSON.stringify(args));
+		const time = this.vm.newNumber(now);
 		try {
-			const result = this.#run(() => this.vm.callFunction(this.#caller, this.vm.undefined, fn, json), `"${name}"`);
+			const result = this.#run(() => this.vm.callFunction(this.#caller, this.vm.undefined, fn, json, time), `"${name}"`);
 			const text = this.vm.getString(result);
 			result.dispose();
 			if (new TextEncoder().encode(text).length > this.limits.outputBytes) {
@@ -122,6 +147,7 @@ export class QuickJSFunctions implements FunctionRunner {
 			return JSON.parse(text) as unknown;
 		} finally {
 			json.dispose();
+			time.dispose();
 		}
 	}
 

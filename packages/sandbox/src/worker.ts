@@ -41,12 +41,12 @@ self.onmessage = async (event: MessageEvent<ToWorker>) => {
 		}
 		return;
 	}
-	const results = message.calls.map(({ name, args }): FunctionResult => {
+	const results = message.calls.map(({ name, args, now }): FunctionResult => {
 		if (!functions) {
 			return { ok: false, kind: 'error', message: 'The code is not loaded' };
 		}
 		try {
-			return { ok: true, value: functions.call(name, args) };
+			return { ok: true, value: functions.call(name, args, now) };
 		} catch (error) {
 			return error instanceof FunctionError ? { ok: false, kind: error.kind, message: error.message } : { ok: false, kind: 'error', message: String(error) };
 		}

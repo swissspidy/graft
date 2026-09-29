@@ -104,6 +104,22 @@ describe('build functions in QuickJS', () => {
 		expect(evaluate({ $fn: 'nested' }, { data: {}, slot: {}, can: () => true, fn: (name, args) => nested.call(name, args) })).toEqual({ label: 'Go', onClick: null });
 	});
 
+	it('see the host\'s time and a seeded Math.random, so a call repeats', async () => {
+		const f = await load(
+			`function clock() { return [Date.now(), new Date().toISOString(), typeof Date(), new Date(0).getTime(), new Date() instanceof Date, Date.parse('2026-01-01T00:00:00Z')]; }
+			function dice() { return [Math.random(), Math.random()]; }
+			function peek() { return new (Object.getPrototypeOf(new Date()).constructor)().getTime(); }`,
+			['clock', 'dice', 'peek'],
+		);
+		const now = Date.parse('2026-09-29T12:00:00Z');
+		expect(f.call('clock', [], now)).toEqual([now, '2026-09-29T12:00:00.000Z', 'string', 0, true, Date.parse('2026-01-01T00:00:00Z')]);
+		const first = f.call('dice', []);
+		expect(f.call('dice', [])).toEqual(first);
+		expect((first as number[])[0]).not.toBe((first as number[])[1]);
+		// Reaching for the real Date through the prototype finds the frozen one.
+		expect(f.call('peek', [], now)).toBe(now);
+	});
+
 	it('receive evaluated arguments', async () => {
 		const f = await load(`function words(text) { return text.trim().split(/\\s+/).length; }`, ['words']);
 		const value = evaluate({ $fn: 'words', args: [{ $field: 'title' }] }, { data: {}, slot: {}, row: { title: ' one two  three ' }, can: () => true, fn: (name, args) => f.call(name, args) });
