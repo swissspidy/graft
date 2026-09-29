@@ -13,6 +13,7 @@ import {
 	type UpgradeOutcome,
 } from '@graft/core';
 import { createCan } from './can.ts';
+import { playgroundVersion } from './playground.ts';
 import { startSandbox, type WordPressSandbox } from './sandbox.ts';
 import { semantics } from './semantics.ts';
 import { assembleSurface } from './surface.ts';
@@ -132,7 +133,7 @@ export async function runWordPressCanary(options: WordPressCanaryOptions): Promi
 	if (!options.to && !options.scenario) {
 		throw new Error('Pass a target surface or a scenario.');
 	}
-	const version = (options.to ?? from).hostVersion.split(/[.+]/).slice(0, 2).join('.');
+	const version = playgroundVersion((options.to ?? from).hostVersion);
 	const sandbox = options.sandbox ?? (await startSandbox({ wp: version }));
 	try {
 		const to = options.scenario ? await scenarioSurface(sandbox, from, options.scenario) : options.to!;

@@ -109,6 +109,10 @@ host's surface actually changes, versions with a prepared build keep
 serving, those that need a wider grant wait for approval, and the rest are
 hidden (and flagged to admins) until a build for the new surface arrives.
 
+A weekly CI job runs the canary against WordPress nightly. As of
+7.2-alpha the surface is unchanged (same hash as 7.1) and every
+customization in the corpus re-passes its checks there.
+
 `pnpm test:canary` proves each rung against a real WordPress: synthetic
 host changes are applied inside the sandbox through the plugin's surface
 filters (`hosts/wordpress/playground/sandbox/canary.php`), and the new

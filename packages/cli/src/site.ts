@@ -102,11 +102,11 @@ export async function siteVerify(site: Site, surfacesDir: string, log: (line: st
 	}
 
 	if (targets.length > 0) {
-		const { verifyInWordPress } = await import('@graft/wordpress-adapter');
+		const { playgroundVersion, verifyInWordPress } = await import('@graft/wordpress-adapter');
 		// One sandbox per WordPress version the targets were built for.
 		const byVersion = new Map<string, typeof targets>();
 		for (const target of targets) {
-			const wp = target.surface.hostVersion.split('.').slice(0, 2).join('.');
+			const wp = playgroundVersion(target.surface.hostVersion);
 			byVersion.set(wp, [...(byVersion.get(wp) ?? []), target]);
 		}
 		for (const [wp, group] of byVersion) {

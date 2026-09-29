@@ -4,6 +4,9 @@ on:
   push:
   pull_request:
   workflow_dispatch:
+  schedule:
+    # Weekly, to catch WordPress nightly changes before they ship.
+    - cron: '17 5 * * 1'
 
 concurrency:
   group: ci-${{ github.ref }}
@@ -69,3 +72,21 @@ jobs:
       - run: pnpm install --frozen-lockfile
       - name: Every synthetic host change reaches its expected rung
         run: pnpm test:canary
+
+  nightly-canary:
+    # An early warning about the next WordPress: does every customization in
+    # the corpus survive it? Upstream breakage should not block changes here.
+    runs-on: ubuntu-latest
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - name: Generate the WordPress nightly surface
+        run: pnpm surface:generate --wp nightly --out-dir "$RUNNER_TEMP/surfaces"
+      - name: Upgrade the corpus to nightly
+        run: pnpm graft canary --corpus fixtures/canary/tenants --from hosts/wordpress/plugin/surfaces/7.1.json --to "$RUNNER_TEMP/surfaces/nightly.json"

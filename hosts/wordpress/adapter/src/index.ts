@@ -1,7 +1,7 @@
 export { components } from './components.ts';
 export { normalizeWordPressSchema } from './normalize-schema.ts';
 export { assembleSurface, generateSurface, type GeneratedSurface, type HostDump } from './surface.ts';
-export { DEFAULT_PHP, PLAYGROUND_CLI, lastJsonLine, paths, runPhp, type RunPhpOptions } from './playground.ts';
+export { DEFAULT_PHP, PLAYGROUND_CLI, lastJsonLine, playgroundVersion, paths, runPhp, type RunPhpOptions } from './playground.ts';
 export { createCan } from './can.ts';
 export { semantics } from './semantics.ts';
 export { startSandbox, type SandboxOptions, type WordPressSandbox } from './sandbox.ts';

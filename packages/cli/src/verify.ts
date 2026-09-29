@@ -64,10 +64,10 @@ export async function verifyFiles(files: string[], options: VerifyCommandOptions
 		if (surface.host !== 'wordpress') {
 			throw new Error(`No sandbox for host "${surface.host}".`);
 		}
-		const { verifyInWordPress } = await import('@graft/wordpress-adapter');
+		const { playgroundVersion, verifyInWordPress } = await import('@graft/wordpress-adapter');
 		const verifications = await verifyInWordPress(
 			targets.map(({ build, spec }) => ({ build, spec, surface })),
-			{ wp: options.wp ?? surface.hostVersion.split('.').slice(0, 2).join('.'), verbose: options.verbose ?? false },
+			{ wp: options.wp ?? playgroundVersion(surface.hostVersion), verbose: options.verbose ?? false },
 		);
 		targets.forEach(({ file }, i) => results.push({ file, verification: verifications[i]!, errors: [] }));
 	}

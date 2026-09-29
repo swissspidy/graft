@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { normalizeWordPressSchema } from '../src/index.ts';
+import { normalizeWordPressSchema, playgroundVersion } from '../src/index.ts';
 
 describe('normalizeWordPressSchema', () => {
 	it('turns empty PHP arrays that stand for objects into objects', () => {
@@ -57,5 +57,15 @@ describe('normalizeWordPressSchema', () => {
 			},
 			additionalProperties: { anyOf: [{ type: 'string' }] },
 		});
+	});
+});
+
+describe('playgroundVersion', () => {
+	it('maps WordPress versions to Playground channels', () => {
+		expect(playgroundVersion('7.1.2')).toBe('7.1');
+		expect(playgroundVersion('7.1.2+move-row-actions')).toBe('7.1');
+		expect(playgroundVersion('7.2-alpha-63987')).toBe('nightly');
+		expect(playgroundVersion('7.2-beta1')).toBe('beta');
+		expect(playgroundVersion('7.2-RC2')).toBe('beta');
 	});
 });

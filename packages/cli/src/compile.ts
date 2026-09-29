@@ -45,7 +45,7 @@ export async function compileFile(specFile: string, options: CompileCommandOptio
 	const wordpress = await import('@graft/wordpress-adapter');
 
 	const previous = options.previous ? (JSON.parse(await readFile(options.previous, 'utf8')) as Build) : undefined;
-	const sandbox = options.verify === false ? undefined : await wordpress.startSandbox({ wp: surface.hostVersion.split('.').slice(0, 2).join('.') });
+	const sandbox = options.verify === false ? undefined : await wordpress.startSandbox({ wp: wordpress.playgroundVersion(surface.hostVersion) });
 	try {
 		const result = await compileSpec({
 			spec,
