@@ -1,13 +1,22 @@
 // Probe: can headless Chromium start WordPress Playground in an iframe and run
 // PHP in it? Prerequisite for verifying builds inside the admin's browser.
+import { createServer } from 'node:http';
 import { chromium } from '@playwright/test';
+
+// Serve the page from 127.0.0.1: Playground needs a secure context
+// (crypto.subtle), which about:blank is not; wp-admin on HTTPS or localhost is.
+const server = createServer((_, res) => {
+	res.setHeader('Content-Type', 'text/html');
+	res.end('<!doctype html><html><body><iframe id="pg"></iframe></body></html>');
+});
+await new Promise((resolve) => server.listen(0, '127.0.0.1', resolve));
 
 const browser = await chromium.launch();
 const page = await browser.newPage();
 page.on('console', (m) => console.log(`console ${m.type()}:`, m.text().slice(0, 300)));
 page.on('pageerror', (e) => console.log('page error:', e.message));
 page.on('requestfailed', (r) => console.log('request failed:', r.url().slice(0, 120), r.failure()?.errorText));
-await page.setContent('<!doctype html><html><body><iframe id="pg"></iframe></body></html>');
+await page.goto(`http://127.0.0.1:${server.address().port}/`);
 const started = Date.now();
 const timeout = new Promise((resolve) => setTimeout(() => resolve('ERROR timed out after 180s'), 180_000));
 const result = await Promise.race([timeout, page
@@ -28,4 +37,5 @@ const result = await Promise.race([timeout, page
 	.catch((e) => `ERROR ${e.message}`)]);
 console.log(`PROBE RESULT: ${result} (${Math.round((Date.now() - started) / 1000)}s)`);
 await browser.close().catch(() => {});
+server.close();
 process.exitCode = result.startsWith('ERROR') ? 1 : 0;
