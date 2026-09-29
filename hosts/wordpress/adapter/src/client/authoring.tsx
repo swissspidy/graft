@@ -90,6 +90,14 @@ export function Authoring({ surface, onSaved, onCancel, verify }: AuthoringProps
 				...(verify ? { verify } : {}),
 				onEvent: (event) => setLog((lines) => [...lines, describe(event)]),
 			});
+			if (result.unverifiable?.length) {
+				setError(
+					`Some criteria cannot be checked, so nothing could guarantee them: ${result.unverifiable
+						.map((u) => `"${u.criterion}": ${u.reason}`)
+						.join(' ')} Make them observable (what someone sees or can do), or move them out of the acceptance criteria.`,
+				);
+				return;
+			}
 			if (!result.ok || !result.build) {
 				setError('The build did not succeed. Make the criteria more specific or simplify the spec, then try again.');
 				return;

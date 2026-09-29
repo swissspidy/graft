@@ -4,7 +4,7 @@ import { extractRefs } from '../build/refs.ts';
 import type { Build, Check } from '../build/types.ts';
 import { validateBuild } from '../build/validate.ts';
 import { canonicalJson, sha256 } from '../surface/hash.ts';
-import { assembleChecks, assembleTree } from './assemble.ts';
+import { assembleChecks, assembleTree, assembleUnverifiable } from './assemble.ts';
 import { checksPrompt, checksSystem, treePrompt, treeSystem } from './prompt.ts';
 import { checksOutputSchema, treeOutputSchema } from './schemas.ts';
 import type { CompileAttempt, CompileOptions, CompileResult } from './types.ts';
@@ -42,6 +42,13 @@ export async function compileSpec(options: CompileOptions): Promise<CompileResul
 		for (let attempt = 1; attempt <= maxAttempts && !checks; attempt++) {
 			options.onEvent?.({ type: 'request', purpose: 'checks', attempt });
 			const response = await model.generate({ purpose: 'checks', system, prompt: checksPrompt(spec, feedback), schema });
+			const unverifiable = assembleUnverifiable(response.output);
+			if (unverifiable.length > 0) {
+				const problems = unverifiable.map((u) => `Criterion "${u.criterion}" cannot be checked: ${u.reason}`);
+				attempts.push({ phase: 'checks', problems, diagnostics: [] });
+				options.onEvent?.({ type: 'rejected', purpose: 'checks', attempt, problems });
+				return { ok: false, unverifiable, attempts };
+			}
 			const assembled = assembleChecks(response.output);
 			const problems = [...assembled.problems];
 			if (assembled.value) {

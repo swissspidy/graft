@@ -39,6 +39,7 @@ const check = (criterion: string, expect: unknown[], steps: unknown[] = [], view
 });
 
 const goodChecks = {
+	unverifiable: [],
 	checks: [
 		check('open-only', [{ rows: ['Open A'] }]),
 		check('close', [{ rows: [] }, { item: { title: 'Open A', status: 'done' } }], [{ action: 'close', row: { title: 'Open A' } }]),
@@ -78,7 +79,7 @@ const verify = (build: Build) => verifyBuild({ build, spec, surface, sandbox: fa
 describe('compileSpec', () => {
 	it('retries each phase with the problems until the build passes verification', async () => {
 		const model = scripted({
-			checks: [{ checks: goodChecks.checks.slice(0, 3) }, goodChecks],
+			checks: [{ unverifiable: [], checks: goodChecks.checks.slice(0, 3) }, goodChecks],
 			tree: [
 				tree({ ...listProps, rows: { $data: 'missing.items' } }, { status: 'open' }),
 				tree(listProps, {}),
@@ -143,6 +144,20 @@ describe('compileSpec', () => {
 		expect(result.ok).toBe(false);
 		expect(result.build).toBeDefined();
 		expect(result.verification?.passed).toBe(false);
+	});
+
+	it('stops when a criterion cannot be checked objectively', async () => {
+		const model = scripted({
+			checks: [{ unverifiable: [{ criterion: 'empty', reason: '"say so" does not name the text to show.' }], checks: goodChecks.checks }],
+			tree: [],
+		});
+		const result = await compileSpec({ spec, specHash, surface, model, host });
+		expect(result.ok).toBe(false);
+		expect(result.unverifiable).toEqual([{ criterion: 'empty', reason: '"say so" does not name the text to show.' }]);
+		expect(result.attempts[0]!.problems).toEqual(['Criterion "empty" cannot be checked: "say so" does not name the text to show.']);
+		expect(model.requests.map((r) => r.purpose)).toEqual(['checks']);
+		const schema = model.requests[0]!.schema as { required: string[] };
+		expect(schema.required).toContain('unverifiable');
 	});
 
 	it('rejects malformed tree output with specific problems', async () => {

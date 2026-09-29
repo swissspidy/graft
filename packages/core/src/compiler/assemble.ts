@@ -20,6 +20,14 @@ function parseJson(text: unknown, what: string, problems: string[]): unknown {
 
 const isObject = (value: unknown): value is Record<string, unknown> => typeof value === 'object' && value !== null && !Array.isArray(value);
 
+/** Criteria the model flagged as not objectively checkable. */
+export function assembleUnverifiable(output: unknown): Array<{ criterion: string; reason: string }> {
+	const items = isObject(output) && Array.isArray(output.unverifiable) ? output.unverifiable : [];
+	return items
+		.filter((item): item is { criterion: string; reason: string } => isObject(item) && typeof item.criterion === 'string')
+		.map((item) => ({ criterion: item.criterion, reason: String(item.reason ?? '') }));
+}
+
 /** Turns the model's checks output into checks. */
 export function assembleChecks(output: unknown): Assembled<Check[]> {
 	const problems: string[] = [];

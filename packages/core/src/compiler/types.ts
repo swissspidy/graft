@@ -74,6 +74,12 @@ export interface CompileAttempt {
 
 export interface CompileResult {
 	ok: boolean;
+	/**
+	 * Criteria the model judged impossible to check objectively, with the
+	 * reason. Compilation stops: the author has to make them checkable (or
+	 * move them out of the acceptance criteria).
+	 */
+	unverifiable?: Array<{ criterion: string; reason: string }>;
 	/** The accepted build, or the last candidate when none was accepted. */
 	build?: Build;
 	checks?: Check[];

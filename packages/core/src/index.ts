@@ -30,7 +30,7 @@ export {
 } from './verifier/snapshot.ts';
 export { matchesRecord, verifyBuild, type CheckResult, type Verification, type VerifyOptions } from './verifier/run.ts';
 export { buildHash, compileSpec, COMPILER_VERSION } from './compiler/compile.ts';
-export { assembleChecks, assembleTree } from './compiler/assemble.ts';
+export { assembleChecks, assembleTree, assembleUnverifiable } from './compiler/assemble.ts';
 export { checksOutputSchema, treeOutputSchema, usableCapabilities } from './compiler/schemas.ts';
 export { describeSpec, describeSurface } from './compiler/prompt.ts';
 export type {

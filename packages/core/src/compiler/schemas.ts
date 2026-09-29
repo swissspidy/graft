@@ -15,8 +15,21 @@ export function checksOutputSchema(spec: Spec): Record<string, unknown> {
 	return {
 		type: 'object',
 		additionalProperties: false,
-		required: ['checks'],
+		required: ['checks', 'unverifiable'],
 		properties: {
+			unverifiable: {
+				type: 'array',
+				description: 'Criteria that cannot be checked objectively from what users see and can do, with the reason. Leave empty when every criterion is checkable.',
+				items: {
+					type: 'object',
+					additionalProperties: false,
+					required: ['criterion', 'reason'],
+					properties: {
+						criterion: names(spec.criteria.map((c) => c.id)),
+						reason: { type: 'string' },
+					},
+				},
+			},
 			checks: {
 				type: 'array',
 				items: {

@@ -20,7 +20,8 @@ const CHECK_VOCABULARY = `A check proves one acceptance criterion. It seeds its 
   {"text": "..."}: this text is shown somewhere.
   {"action": "<action id>", "row": {...}, "available": true|false}: whether the action is available (for that row).
   plus the host assertions below.
-Write checks that would fail for a wrong implementation: include fixtures that must NOT show up, users who must NOT be able to act, and the empty case when a criterion mentions one.`;
+Write checks that would fail for a wrong implementation: include fixtures that must NOT show up, users who must NOT be able to act, and the empty case when a criterion mentions one.
+Some criteria cannot be checked this way: taste ("looks clean"), performance ("is fast"), or anything not observable in what a user sees and can do. Do not write a weak check for those; list them under "unverifiable" with a one-sentence reason the author can act on.`;
 
 function json(value: unknown): string {
 	return JSON.stringify(value);

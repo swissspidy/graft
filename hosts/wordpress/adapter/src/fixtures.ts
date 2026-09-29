@@ -75,6 +75,7 @@ export function modelAnswers(build: Build, dataInput?: Record<string, unknown>) 
 	visit(build.tree, null);
 	return {
 		checks: {
+			unverifiable: [],
 			checks: build.checks.map((c: Check) => ({
 				criterion: c.criterion,
 				fixtures_json: JSON.stringify(c.fixtures ?? {}),

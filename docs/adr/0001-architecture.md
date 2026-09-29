@@ -591,7 +591,7 @@ context):
   included, stays Apache-2.0. Apache-2.0 is GPLv3-compatible; if WordPress.org
   distribution becomes a goal, revisit the plugin's license then.
 
-Still open: 1 (partly addressed, see below), 2 and 4.
+Still open: 1 (partly addressed, see below) and 4; 2 is decided below.
 
 ## Open questions
 
@@ -603,6 +603,9 @@ Still open: 1 (partly addressed, see below), 2 and 4.
    time. Asking the owner to confirm each one is still open.*
 2. **Criteria the verifier cannot express** ("looks clean", "is fast"). Flag
    them at authoring time as unverifiable, or allow them with a warning?
+   *Implemented as flagging: the checks phase lists criteria it cannot
+   check objectively, with a reason, and compilation stops so the author
+   can rephrase them or move them out of the criteria.*
 3. **Surface granularity.** Is `posts.list.row-actions` a slot on a host
    screen we extend in place, or do MVP customizations only get their own
    pages and widgets? Extending existing screens is where users want to be
