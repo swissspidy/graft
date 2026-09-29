@@ -1,10 +1,12 @@
 import { parseArgs } from 'node:util';
-import { formatResults, validateFiles } from './validate.ts';
+import { formatResults, loadSurface, validateFiles } from './validate.ts';
 
 const USAGE = `Usage: graft <command> [options]
 
 Commands:
   validate <path...>   Validate spec files or directories of specs
+    --surface <file>   Also check mount, audience and permissions against a
+                       host surface, e.g. hosts/wordpress/surfaces/7.1.json
     --json             Print results as JSON
 
 Coming next (see docs/adr/0001-architecture.md, section 9):
@@ -16,16 +18,23 @@ export async function main(argv: string[]): Promise<number> {
 		const { values, positionals } = parseArgs({
 			args: rest,
 			allowPositionals: true,
-			options: { json: { type: 'boolean', default: false } },
+			options: {
+				json: { type: 'boolean', default: false },
+				surface: { type: 'string' },
+			},
 		});
 		if (positionals.length === 0) {
 			console.error('graft validate: pass at least one spec file or directory.');
 			return 2;
 		}
-		const results = await validateFiles(positionals);
+		const surface = values.surface ? await loadSurface(values.surface) : undefined;
+		const results = await validateFiles(positionals, surface);
 		if (values.json) {
 			console.log(JSON.stringify(results, null, 2));
 		} else {
+			if (surface) {
+				console.log(`Checking against ${surface.host} ${surface.hostVersion} (${surface.hash ?? 'unhashed'})\n`);
+			}
 			console.log(formatResults(results, process.cwd()));
 		}
 		return results.every((r) => r.ok) ? 0 : 1;

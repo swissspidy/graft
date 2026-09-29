@@ -10,6 +10,11 @@
     "graft": { "const": 1 },
     "host": { "type": "string", "pattern": "^[a-z][a-z0-9-]*$" },
     "hostVersion": { "type": "string", "minLength": 1 },
+    "hash": {
+      "description": "Content hash of the contract (everything except hash, hostVersion, previous and migrations, canonical JSON, SHA-256). Verified when present.",
+      "type": "string",
+      "pattern": "^sha256:[0-9a-f]{64}$"
+    },
     "previous": {
       "description": "Content hash of the surface the migrations start from.",
       "type": "string"

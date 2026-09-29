@@ -19,3 +19,20 @@ jobs:
       - run: pnpm typecheck
       - run: pnpm test
       - run: pnpm validate:examples
+
+  wordpress:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - name: Lint PHP
+        run: find hosts/wordpress/plugin hosts/wordpress/playground -name '*.php' -print0 | xargs -0 -n1 php -l
+      - name: Smoke test the plugin in Playground (WordPress 7.1, PHP 7.4 and 8.4)
+        run: pnpm test:wp
+      - name: Check the checked-in surface is up to date
+        run: pnpm surface:generate --check

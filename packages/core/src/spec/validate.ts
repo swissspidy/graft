@@ -1,11 +1,13 @@
-import { Ajv2020, type ErrorObject } from 'ajv/dist/2020.js';
 import specSchema from '../../../../schemas/spec.schema.json' with { type: 'json' };
+import { createAjv } from '../ajv.ts';
 import { hasErrors, type Diagnostic } from '../diagnostics.ts';
+import { describeSchemaError, schemaErrorPath } from '../schema-errors.ts';
+import type { Surface } from '../surface/types.ts';
 import { parseSpec } from './parse.ts';
+import { checkManifestAgainstSurface } from './surface.ts';
 import type { Spec, SpecManifest } from './types.ts';
 
-const ajv = new Ajv2020({ allErrors: true, strict: true, allowUnionTypes: true });
-const validateManifest = ajv.compile<SpecManifest>(specSchema);
+const validateManifest = createAjv().compile<SpecManifest>(specSchema);
 
 export interface SpecValidation {
 	ok: boolean;
@@ -14,27 +16,37 @@ export interface SpecValidation {
 	diagnostics: Diagnostic[];
 }
 
+export interface ValidateSpecOptions {
+	/**
+	 * Surface of the target host version. When given, mount, audience and
+	 * permissions are checked against it (phase two).
+	 */
+	surface?: Surface;
+}
+
 /**
- * Host-agnostic validation (phase one): parses the file and checks the
- * frontmatter against the spec schema. Checking mount, audience and
- * permissions against a surface is the host adapter's job (phase two).
+ * Validates a spec file. Phase one is host-agnostic: the file is parsed and
+ * the frontmatter checked against the spec schema. Phase two runs when a
+ * surface is given and the manifest passed phase one.
  */
-export function validateSpec(source: string): SpecValidation {
+export function validateSpec(source: string, options: ValidateSpecOptions = {}): SpecValidation {
 	const parsed = parseSpec(source);
 	const diagnostics = [...parsed.diagnostics];
 
 	const frontmatter = parsed.frontmatter;
 	const isObject = typeof frontmatter === 'object' && frontmatter !== null && !Array.isArray(frontmatter);
-	if (isObject && !validateManifest(frontmatter)) {
-		for (const error of validateManifest.errors ?? []) {
+	let manifestOk = false;
+	if (isObject) {
+		manifestOk = validateManifest(frontmatter);
+		for (const error of manifestOk ? [] : (validateManifest.errors ?? [])) {
 			const path = schemaErrorPath(error);
-			const line = parsed.lineOf(path);
 			const diagnostic: Diagnostic = {
 				severity: 'error',
 				code: 'frontmatter-schema',
 				message: describeSchemaError(error),
 				path: path || '/',
 			};
+			const line = parsed.lineOf(path);
 			if (line !== undefined) {
 				diagnostic.line = line;
 			}
@@ -42,9 +54,13 @@ export function validateSpec(source: string): SpecValidation {
 		}
 	}
 
+	if (manifestOk && options.surface) {
+		diagnostics.push(...checkManifestAgainstSurface(frontmatter as SpecManifest, options.surface, parsed.lineOf));
+	}
+
 	diagnostics.sort((a, b) => (a.line ?? 0) - (b.line ?? 0));
 
-	if (hasErrors(diagnostics) || !isObject) {
+	if (hasErrors(diagnostics) || !manifestOk) {
 		return { ok: false, diagnostics };
 	}
 
@@ -60,30 +76,4 @@ export function validateSpec(source: string): SpecValidation {
 		spec.notes = parsed.notes;
 	}
 	return { ok: true, spec, diagnostics };
-}
-
-function schemaErrorPath(error: ErrorObject): string {
-	if (error.keyword === 'additionalProperties') {
-		const extra = (error.params as { additionalProperty: string }).additionalProperty;
-		return `${error.instancePath}/${extra}`;
-	}
-	return error.instancePath;
-}
-
-function describeSchemaError(error: ErrorObject): string {
-	const where = error.instancePath ? `"${error.instancePath.slice(1).replace(/\//g, '.')}"` : 'The frontmatter';
-	switch (error.keyword) {
-		case 'required':
-			return `${where} is missing required field "${(error.params as { missingProperty: string }).missingProperty}".`;
-		case 'additionalProperties':
-			return `${where} has unknown field "${(error.params as { additionalProperty: string }).additionalProperty}".`;
-		case 'const':
-			return `${where} must be ${JSON.stringify((error.params as { allowedValue: unknown }).allowedValue)}.`;
-		case 'pattern':
-			return `${where} has an invalid value (must match ${(error.params as { pattern: string }).pattern}).`;
-		case 'uniqueItems':
-			return `${where} contains duplicates.`;
-		default:
-			return `${where} ${error.message ?? 'is invalid'}.`;
-	}
 }

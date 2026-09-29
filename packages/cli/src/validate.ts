@@ -1,6 +1,6 @@
 import { readdir, readFile, stat } from 'node:fs/promises';
 import { isAbsolute, join, relative } from 'node:path';
-import { validateSpec, type Diagnostic, type Spec } from '@graft/core';
+import { validateSpec, validateSurface, type Diagnostic, type Spec, type Surface } from '@graft/core';
 
 export interface FileResult {
 	file: string;
@@ -28,11 +28,21 @@ export async function collectSpecFiles(paths: string[]): Promise<string[]> {
 	return [...new Set(files)].sort();
 }
 
-export async function validateFiles(paths: string[]): Promise<FileResult[]> {
+/** Loads and validates a surface file; throws with the diagnostics if it is invalid. */
+export async function loadSurface(file: string): Promise<Surface> {
+	const result = await validateSurface(JSON.parse(await readFile(file, 'utf8')));
+	if (!result.surface) {
+		const details = result.diagnostics.map((d) => `  ${d.path ?? ''} ${d.message}`).join('\n');
+		throw new Error(`Invalid surface ${file}:\n${details}`);
+	}
+	return result.surface;
+}
+
+export async function validateFiles(paths: string[], surface?: Surface): Promise<FileResult[]> {
 	const files = await collectSpecFiles(paths);
 	return Promise.all(
 		files.map(async (file) => {
-			const result = validateSpec(await readFile(file, 'utf8'));
+			const result = validateSpec(await readFile(file, 'utf8'), surface ? { surface } : {});
 			return { file, ...result };
 		}),
 	);

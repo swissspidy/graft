@@ -1,5 +1,10 @@
 export { hasErrors, type Diagnostic, type Severity } from './diagnostics.ts';
+export { createAjv } from './ajv.ts';
 export { parseSpec, type ParsedSpec } from './spec/parse.ts';
-export { validateSpec, type SpecValidation } from './spec/validate.ts';
+export { validateSpec, type SpecValidation, type ValidateSpecOptions } from './spec/validate.ts';
+export { checkManifestAgainstSurface } from './spec/surface.ts';
 export { deriveCriterionId } from './spec/criteria.ts';
 export type { Criterion, Section, Spec, SpecManifest } from './spec/types.ts';
+export { validateSurface, type SurfaceValidation } from './surface/validate.ts';
+export { canonicalJson, hashSurface, sha256 } from './surface/hash.ts';
+export type { Capability, Component, JsonSchema, Migration, Scope, Slot, Surface } from './surface/types.ts';

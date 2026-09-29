@@ -9,12 +9,16 @@
   },
   "scripts": {
     "graft": "tsx packages/cli/src/main.ts",
-    "typecheck": "tsc -p packages/core && tsc -p packages/cli",
+    "typecheck": "tsc -p packages/core && tsc -p packages/cli && tsc -p hosts/wordpress/adapter",
     "test": "vitest run",
-    "validate:examples": "tsx packages/cli/src/main.ts validate examples/specs"
+    "validate:examples": "tsx packages/cli/src/main.ts validate --surface hosts/wordpress/surfaces/7.1.json examples/specs",
+    "surface:generate": "tsx hosts/wordpress/adapter/src/cli.ts",
+    "test:wp": "tsx hosts/wordpress/adapter/src/smoke.ts"
   },
   "pnpm": {
-    "onlyBuiltDependencies": ["esbuild"]
+    "onlyBuiltDependencies": [
+      "esbuild"
+    ]
   },
   "devDependencies": {
     "@types/node": "^22.0.0",

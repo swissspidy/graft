@@ -8,7 +8,7 @@ version of the host app, verifies the build against the acceptance criteria,
 and when the host changes it migrates, re-anchors or regenerates the build
 and verifies it again.
 
-Status: milestone 1 of 6 (contracts). Start with
+Status: milestones 1 (contracts) and 2 (WordPress surface v0) of 6. Start with
 [ADR 0001](docs/adr/0001-architecture.md) and the example specs:
 [an admin page](examples/specs/review-queue.md) and
 [an extension of the Posts screen](examples/specs/quick-approve.md).
@@ -18,8 +18,9 @@ Status: milestone 1 of 6 (contracts). Start with
 | Path             | What                                                        |
 | ---------------- | ----------------------------------------------------------- |
 | `schemas/`       | JSON Schemas for the three contracts: spec, surface, build. |
-| `packages/core`  | Host-agnostic core, no I/O. Today: spec parser and validator. |
+| `packages/core`  | Host-agnostic core, no I/O. Today: spec parser and validator, surface validation and hashing. |
 | `packages/cli`   | The `graft` command. Today: `graft validate`.               |
+| `hosts/wordpress` | WordPress adapter: plugin, abilities, surface generator, surface snapshots. See [its README](hosts/wordpress/README.md). |
 | `examples/specs` | Sample specs, also the future canary corpus.                |
 
 ## Development
@@ -31,6 +32,9 @@ pnpm install
 pnpm test                          # unit tests
 pnpm typecheck
 pnpm graft validate examples/specs # validate spec files or directories
+pnpm validate:examples             # ...and check them against the WordPress 7.1 surface
+pnpm test:wp                       # smoke test the plugin in WordPress Playground
+pnpm surface:generate              # regenerate hosts/wordpress/surfaces/7.1.json
 ```
 
 ## License
