@@ -249,7 +249,10 @@ version)` and contains:
   HTML strings. (Implemented in milestone 3 with `$data`, `$field`, `$slot`,
   `$can`, `$call` and the logic operators `$eq`, `$and`, `$or`, `$not`;
   `then` supports `refresh:<source>`, `remove-row:<source>` and
-  `reload:page`.)
+  `reload:page`. Later extended with the comparisons `$gt`, `$gte`, `$lt`,
+  `$lte`, the choice `$if: [condition, then, else]` and `$daysSince`, so
+  a table cell can show an age and color it; checks can look later with
+  `clock: { advanceDays }` and expect a cell's text and tone.)
 - `data`: named data sources, each a capability call with fixed or bound
   input.
 - `checks`: one or more executable checks per acceptance criterion (see

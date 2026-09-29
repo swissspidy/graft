@@ -492,6 +492,18 @@
 								"primary": {
 									"description": "The row's label: what checks call the row by.",
 									"type": "boolean"
+								},
+								"value": {
+									"description": "Computed per row instead of reading key, e.g. {\"$daysSince\": {\"$field\": \"updatedAt\"}}."
+								},
+								"tone": {
+									"description": "Computed per row: marks the cell (not relative_time cells).",
+									"enum": [
+										"success",
+										"warning",
+										"error",
+										"info"
+									]
 								}
 							},
 							"required": [
@@ -1264,5 +1276,5 @@
 		"editor",
 		"admin"
 	],
-	"hash": "sha256:fa5ee31157f72538390c1e3dddc3edc07ca765a224280c0516d8b655268cd71b"
+	"hash": "sha256:a5ea900bfba4826a547ad09000415dfee537de74802699f464715ff23aa3fb1f"
 }

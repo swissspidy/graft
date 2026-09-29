@@ -10,6 +10,8 @@ The site has no other posts and no users besides the admin. Posts are created ol
 	notes: `WordPress specifics:
 - posts.list returns {items: [{id, title, status, type, author: {id, name}, date, modified, edit_url, can: {edit, publish}}], total, pages}. Bind table rows to "<source>.items".
 - In a table, give fields an "id" path into the row (e.g. "author.name") and mark the title field "primary": true; its value is the row label checks refer to.
+- A table field can compute its value and tone per row instead of reading "id": {"id": "age", "label": "Days since update", "type": "integer", "value": {"$daysSince": {"$field": "modified"}}, "tone": {"$if": [{"$gte": [{"$daysSince": {"$field": "modified"}}, 30]}, "error", "success"]}}. Checks read it with a "cell" expectation; its text is the formatted value.
+- Fixture posts are created within the last two hours, and modified when created. To see them older, give the check "advance_days".
 - Per-post permission: {"$can": "posts.status:write"} inside a table row, or with "on": {"$slot": "post"} in a row action, uses the post's own can flags.
 - The posts.list.row-actions slot renders once per post on the Posts screen with {"post": {id, title, status, type, can}}. WordPress renders that list, so row actions should end with "then": ["reload:page"].
 - Every action (button, table action, row-action) needs an "id" matching the action ids the checks use.`,

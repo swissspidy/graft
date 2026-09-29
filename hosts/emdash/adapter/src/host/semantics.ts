@@ -29,7 +29,7 @@ function describe({ node, props, raw, evaluate, emit }: SemanticsArgs): void | f
 	if (output.table) {
 		emit.table({
 			columns: output.table.columns,
-			rows: output.table.rows.map((row) => ({ label: row.label, record: row.record, actions: row.actions.map(toSnapshot) })),
+			rows: output.table.rows.map((row) => ({ label: row.label, record: row.record, actions: row.actions.map(toSnapshot), cells: row.cells })),
 		});
 	}
 }

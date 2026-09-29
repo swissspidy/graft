@@ -1,8 +1,8 @@
 {
 	"graft": 1,
 	"spec": {
-		"id": "publish-queue",
-		"hash": "sha256:8bd2c50b0a07388e5276f99b5e1c367cd84067b58b8e46f6a8f8d896a2c947ef"
+		"id": "stale-drafts",
+		"hash": "sha256:b42a4999b74eadcb0fb64b412f4f22e51e4cfb533f314c205aff41431d7d9719"
 	},
 	"surface": {
 		"host": "emdash",
@@ -10,16 +10,16 @@
 		"hash": "sha256:a5ea900bfba4826a547ad09000415dfee537de74802699f464715ff23aa3fb1f"
 	},
 	"mount": {
-		"slot": "admin.page",
-		"title": "Publish queue"
+		"slot": "dashboard.widget",
+		"title": "Stale drafts"
 	},
 	"data": {
-		"queue": {
+		"drafts": {
 			"call": "content.list",
 			"input": {
 				"collection": "posts",
 				"status": "draft",
-				"order": "asc"
+				"limit": 10
 			}
 		}
 	},
@@ -27,22 +27,10 @@
 		"type": "stack",
 		"children": [
 			{
-				"type": "header",
-				"props": {
-					"text": "Publish queue"
-				}
-			},
-			{
-				"type": "context",
-				"props": {
-					"text": "Drafts, oldest first."
-				}
-			},
-			{
 				"type": "table",
 				"props": {
 					"rows": {
-						"$data": "queue.items"
+						"$data": "drafts.items"
 					},
 					"columns": [
 						{
@@ -51,39 +39,48 @@
 							"primary": true
 						},
 						{
-							"key": "author.name",
-							"label": "Author"
-						},
-						{
-							"key": "updatedAt",
-							"label": "Last updated",
-							"format": "relative_time"
-						}
-					],
-					"actions": [
-						{
-							"id": "publish",
-							"label": "Publish",
-							"style": "primary",
-							"visible": {
-								"$can": "content.status:write"
+							"key": "age",
+							"label": "Days since update",
+							"format": "number",
+							"value": {
+								"$daysSince": {
+									"$field": "updatedAt"
+								}
 							},
-							"onClick": {
-								"$call": "content.publish",
-								"input": {
-									"collection": "posts",
-									"id": {
-										"$field": "id"
+							"tone": {
+								"$if": [
+									{
+										"$gte": [
+											{
+												"$daysSince": {
+													"$field": "updatedAt"
+												}
+											},
+											30
+										]
+									},
+									"error",
+									{
+										"$if": [
+											{
+												"$gte": [
+													{
+														"$daysSince": {
+															"$field": "updatedAt"
+														}
+													},
+													7
+												]
+											},
+											"warning",
+											"success"
+										]
 									}
-								},
-								"then": [
-									"refresh:queue"
-								],
-								"notice": "Published."
+								]
 							}
 						}
 					],
-					"empty": "Nothing waiting"
+					"empty": "No drafts"
 				}
 			}
 		]
@@ -106,10 +103,6 @@
 					{
 						"title": "Post B",
 						"status": "published"
-					},
-					{
-						"title": "Later C",
-						"status": "scheduled"
 					}
 				]
 			},
@@ -119,38 +112,17 @@
 					"rows": [
 						"Draft A"
 					]
-				}
-			]
-		},
-		{
-			"criterion": "columns",
-			"fixtures": {
-				"users": [
-					{
-						"as": "e",
-						"role": "editor"
-					}
-				],
-				"entries": [
-					{
-						"title": "Draft A",
-						"status": "draft"
-					}
-				]
-			},
-			"view_as": "e",
-			"expect": [
+				},
 				{
 					"columns": [
 						"Title",
-						"Author",
-						"Last updated"
+						"Days since update"
 					]
 				}
 			]
 		},
 		{
-			"criterion": "publish",
+			"criterion": "days",
 			"fixtures": {
 				"users": [
 					{
@@ -166,33 +138,89 @@
 				]
 			},
 			"view_as": "e",
-			"steps": [
+			"clock": {
+				"advanceDays": 12
+			},
+			"expect": [
 				{
-					"action": "publish",
-					"row": {
-						"title": "Draft A"
+					"cell": {
+						"row": {
+							"title": "Draft A"
+						},
+						"column": "Days since update",
+						"text": "12"
+					}
+				}
+			]
+		},
+		{
+			"criterion": "age-tone",
+			"fixtures": {
+				"users": [
+					{
+						"as": "e",
+						"role": "editor"
+					}
+				],
+				"entries": [
+					{
+						"title": "Draft A",
+						"status": "draft"
+					}
+				]
+			},
+			"view_as": "e",
+			"expect": [
+				{
+					"cell": {
+						"row": {
+							"title": "Draft A"
+						},
+						"column": "Days since update",
+						"tone": "success"
+					}
+				}
+			]
+		},
+		{
+			"criterion": "age-tone",
+			"fixtures": {
+				"users": [
+					{
+						"as": "e",
+						"role": "editor"
+					}
+				],
+				"entries": [
+					{
+						"title": "Draft A",
+						"status": "draft"
+					}
+				]
+			},
+			"view_as": "e",
+			"expect": [
+				{
+					"cell": {
+						"row": {
+							"title": "Draft A"
+						},
+						"column": "Days since update",
+						"tone": "warning"
 					}
 				}
 			],
-			"expect": [
-				{
-					"rows": []
-				},
-				{
-					"entry": {
-						"title": "Draft A",
-						"status": "published"
-					}
-				}
-			]
+			"clock": {
+				"advanceDays": 8
+			}
 		},
 		{
-			"criterion": "contributors-no-publish",
+			"criterion": "age-tone",
 			"fixtures": {
 				"users": [
 					{
-						"as": "c",
-						"role": "contributor"
+						"as": "e",
+						"role": "editor"
 					}
 				],
 				"entries": [
@@ -202,67 +230,37 @@
 					}
 				]
 			},
-			"view_as": "c",
-			"expect": [
-				{
-					"rows": [
-						"Draft A"
-					]
-				},
-				{
-					"action": "publish",
-					"row": {
-						"title": "Draft A"
-					},
-					"available": false
-				}
-			]
-		},
-		{
-			"criterion": "empty-state",
-			"fixtures": {
-				"users": [
-					{
-						"as": "e",
-						"role": "editor"
-					}
-				],
-				"entries": []
-			},
 			"view_as": "e",
 			"expect": [
 				{
-					"rows": []
-				},
-				{
-					"text": "Nothing waiting"
+					"cell": {
+						"row": {
+							"title": "Draft A"
+						},
+						"column": "Days since update",
+						"tone": "error"
+					}
 				}
-			]
+			],
+			"clock": {
+				"advanceDays": 31
+			}
 		}
 	],
 	"refs": {
-		"slot": "admin.page",
+		"slot": "dashboard.widget",
 		"components": {
-			"context": [
-				"text"
-			],
-			"header": [
-				"text"
-			],
 			"stack": [],
 			"table": [
-				"actions",
 				"columns",
 				"empty",
 				"rows"
 			]
 		},
 		"capabilities": [
-			"content.list",
-			"content.publish"
+			"content.list"
 		],
 		"scopes": [
-			"content.status:write",
 			"content:read"
 		]
 	},

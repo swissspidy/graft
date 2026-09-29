@@ -24,7 +24,7 @@ const customizations = '/_emdash/admin/plugins/graft/customizations';
 test('contributors see the publish queue without Publish buttons', async ({ page }) => {
 	await signIn(page, 'contributor', customizations);
 	await expect(page.getByRole('row', { name: /Draft ideas/ })).toBeVisible();
-	await expect(page.getByRole('row', { name: /Release notes/ })).toBeVisible();
+	await expect(page.getByRole('row', { name: /Release notes/ }).first()).toBeVisible();
 	await expect(page.getByRole('row', { name: /Hello world/ })).toHaveCount(0);
 	await expect(page.getByRole('button', { name: 'Publish' })).toHaveCount(0);
 	// Customizations for editors only are not in the sidebar's widget either.
@@ -48,8 +48,11 @@ test('the dashboard widget lists drafts for editors', async ({ page }) => {
 	await signIn(page, 'editor', '/_emdash/admin');
 	// EmDash's own "Drafts" count card comes first; the widget's heading is ours.
 	await expect(page.getByRole('heading', { name: 'Drafts', exact: true }).last()).toBeVisible();
-	await expect(page.getByRole('row', { name: /Release notes/ })).toBeVisible();
-	await expect(page.getByRole('row', { name: /Draft ideas/ })).toBeVisible();
+	await expect(page.getByRole('row', { name: /Release notes/ }).first()).toBeVisible();
+	await expect(page.getByRole('row', { name: /Draft ideas/ }).first()).toBeVisible();
+	// Stale drafts: seeded today, so every draft is fresh and marked green.
+	await expect(page.getByRole('heading', { name: 'Stale drafts' })).toBeVisible();
+	await expect(page.getByRole('cell', { name: '🟢 0' }).first()).toBeVisible();
 });
 
 test('editors publish a draft from the publish queue', async ({ page }) => {

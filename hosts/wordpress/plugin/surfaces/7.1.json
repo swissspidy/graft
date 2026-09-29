@@ -2,7 +2,7 @@
 	"graft": 1,
 	"host": "wordpress",
 	"hostVersion": "7.1.2",
-	"hash": "sha256:e3e750ece071f4aee88dd95f36adb2b64be674d7471be5e71e617ee7d4b491b6",
+	"hash": "sha256:4b21eabb9fe647fd0c718ac8d18c4c00cd3a27b80166ed98b1bd783ae68b4a1c",
 	"fingerprint": "sha256:aac93a247c479496ea0abe8ea8b948c5af6bed66a04e8ae3f1ff729ee262cce8",
 	"slots": {
 		"admin.page": {
@@ -500,6 +500,18 @@
 								"primary": {
 									"description": "The row title field.",
 									"type": "boolean"
+								},
+								"value": {
+									"description": "Computed per row instead of reading id, e.g. {\"$daysSince\": {\"$field\": \"modified\"}}."
+								},
+								"tone": {
+									"description": "Computed per row: colors the cell.",
+									"enum": [
+										"success",
+										"warning",
+										"error",
+										"info"
+									]
 								}
 							},
 							"required": [

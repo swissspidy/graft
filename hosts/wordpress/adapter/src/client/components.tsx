@@ -1,6 +1,7 @@
 import { useState, type CSSProperties } from 'react';
 import { Button, Card, CardBody, CardHeader, Notice, Spinner } from '@wordpress/components';
 import type { ComponentRegistry, RendererComponentProps } from '@graft/renderer-react';
+import { cell, type Field, type Tone } from '../cells.ts';
 
 /**
  * WordPress implementations of the surface components (see
@@ -9,6 +10,11 @@ import type { ComponentRegistry, RendererComponentProps } from '@graft/renderer-
  */
 
 type Props = RendererComponentProps;
+
+/** WordPress admin colors for text that carries a tone. */
+const toneColors: Record<Tone, string> = { success: '#00a32a', warning: '#996800', error: '#d63638', info: '#2271b1' };
+
+const locale = () => document.documentElement.lang || undefined;
 
 const gaps = [0, 4, 8, 12, 16, 20, 24, 32, 40];
 
@@ -125,13 +131,6 @@ function EmptyState({ props }: Props) {
 	);
 }
 
-interface Field {
-	id: string;
-	label: string;
-	type?: string;
-	primary?: boolean;
-}
-
 interface TableAction {
 	id: string;
 	label: string;
@@ -143,7 +142,7 @@ interface TableAction {
 }
 
 function Table({ props, raw, evaluate, invoke }: Props) {
-	const fields = (props.fields as Field[] | undefined) ?? [];
+	const fields = (raw.fields as Field[] | undefined) ?? [];
 	const rows = props.rows as Array<Record<string, unknown>> | undefined;
 	const actions = (raw.actions as unknown[] | undefined) ?? [];
 	const columns = fields.length + (actions.length > 0 ? 1 : 0);
@@ -168,11 +167,15 @@ function Table({ props, raw, evaluate, invoke }: Props) {
 	} else {
 		body = rows.map((row, i) => (
 			<tr key={String(row.id ?? i)} data-graft-row={String(row.id ?? i)}>
-				{fields.map((field) => (
-					<td key={field.id} className={field.primary ? 'column-primary' : undefined} data-graft-field={field.id}>
-						{field.primary ? <strong>{formatValue(readPath(row, field.id), field.type)}</strong> : formatValue(readPath(row, field.id), field.type)}
-					</td>
-				))}
+				{fields.map((field) => {
+					const { text, tone } = cell(field, row, (value, r) => evaluate(value as never, r), locale());
+					const content = tone ? <span className={`graft-tone graft-tone-${tone}`} data-graft-tone={tone} style={{ color: toneColors[tone], fontWeight: 600 }}>{text}</span> : text;
+					return (
+						<td key={field.id} className={field.primary ? 'column-primary' : undefined} data-graft-field={field.id}>
+							{field.primary ? <strong>{content}</strong> : content}
+						</td>
+					);
+				})}
 				{actions.length > 0 ? (
 					<td>
 						<div style={{ display: 'flex', gap: 8 }}>
@@ -266,33 +269,3 @@ function flexValue(value: unknown): CSSProperties['alignItems'] {
 	return value === 'start' ? 'flex-start' : value === 'end' ? 'flex-end' : (value as CSSProperties['alignItems']);
 }
 
-function readPath(row: Record<string, unknown>, path: string): unknown {
-	return path.split('.').reduce<unknown>((value, key) => (value && typeof value === 'object' ? (value as Record<string, unknown>)[key] : undefined), row);
-}
-
-const statusLabels: Record<string, string> = {
-	publish: 'Published',
-	future: 'Scheduled',
-	draft: 'Draft',
-	pending: 'Pending',
-	private: 'Private',
-};
-
-export function formatValue(value: unknown, type = 'text'): string {
-	if (value === undefined || value === null || value === '') {
-		return '—';
-	}
-	if ((type === 'date' || type === 'datetime') && typeof value === 'string') {
-		const date = new Date(value);
-		if (!Number.isNaN(date.getTime())) {
-			return new Intl.DateTimeFormat(document.documentElement.lang || undefined, {
-				dateStyle: 'medium',
-				...(type === 'datetime' ? { timeStyle: 'short' } : {}),
-			}).format(date);
-		}
-	}
-	if (type === 'status' && typeof value === 'string') {
-		return statusLabels[value] ?? value;
-	}
-	return String(value);
-}

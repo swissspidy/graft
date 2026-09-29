@@ -42,6 +42,16 @@ foreach ( $posts as $i => list( $title, $status, $author ) ) {
 	);
 }
 
+// A draft nobody has touched for forty days, for stale-drafts.
+wp_insert_post(
+	array(
+		'post_title'  => 'Old draft D',
+		'post_status' => 'draft',
+		'post_author' => $users['editor'],
+		'post_date'   => gmdate( 'Y-m-d H:i:s', time() - 40 * DAY_IN_SECONDS ),
+	)
+);
+
 wp_set_current_user( 1 );
 $examples = json_decode( (string) file_get_contents( '/graft-fixtures/examples.json' ), true );
 foreach ( $examples as $spec_id => $example ) {

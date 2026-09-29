@@ -8,7 +8,8 @@ import { expect, test, type Page } from '@playwright/test';
  * in real wp-admin, and the gateway enforces grants.
  *
  * The site is seeded by playground/seed-e2e.php with Draft A and Draft E
- * (pending, by the contributor), Draft B (draft) and Post C (published).
+ * (pending, by the contributor), Draft B (draft), Post C (published) and
+ * Old draft D (a draft last updated forty days ago).
  * Tests run in order because they publish posts.
  */
 test.describe.configure({ mode: 'serial' });
@@ -98,6 +99,19 @@ test('editors see only pending posts with the right columns, and approve them', 
 	await expect(page.locator('#the-list')).toContainText('Draft A');
 });
 
+test('stale drafts show how many days ago each draft was updated, colored by age', async ({ page }) => {
+	await login(page, 'editor');
+	await page.goto('/wp-admin/index.php');
+	const widget = page.locator('#graft-stale-drafts');
+	const age = (title: string) => widget.locator('tbody tr', { hasText: title }).locator('[data-graft-field="age"] [data-graft-tone]');
+	await expect(age('Old draft D')).toHaveText('40');
+	await expect(age('Old draft D')).toHaveAttribute('data-graft-tone', 'error');
+	await expect(age('Draft B')).toHaveText('0');
+	await expect(age('Draft B')).toHaveAttribute('data-graft-tone', 'success');
+	await expect(widget.locator('tbody tr', { hasText: 'Draft A' })).toHaveCount(0);
+	await widget.screenshot({ path: 'test-results/stale-drafts.png' });
+});
+
 test('the served specs are verified, not flagged', async ({ page }) => {
 	await login(page, 'admin');
 	const specs = (await page.evaluate(() => window.wp.apiFetch({ path: '/graft/v1/specs' }))) as Array<{
@@ -107,6 +121,7 @@ test('the served specs are verified, not flagged', async ({ page }) => {
 	expect(specs.filter((s) => s.spec_id !== 'waiting-copy').map((s) => [s.spec_id, s.versions[0]!.state]).sort()).toEqual([
 		['quick-approve', 'active'],
 		['review-queue', 'active'],
+		['stale-drafts', 'active'],
 		['waiting-posts', 'needs_approval'],
 	]);
 	for (const spec of specs) {
@@ -207,8 +222,8 @@ test('graft site verify verifies the draft built in wp-admin, and the admin appr
 test('graft site pull exports the active customizations as a canary corpus', async () => {
 	const out = new URL('../../../test-results/pulled/e2e-site', import.meta.url).pathname;
 	const output = await graft('site', 'pull', '--out', out);
-	expect(output).toContain('Wrote 4 customization(s)');
-	for (const spec of ['review-queue', 'quick-approve', 'waiting-posts', 'waiting-copy']) {
+	expect(output).toContain('Wrote 5 customization(s)');
+	for (const spec of ['review-queue', 'quick-approve', 'stale-drafts', 'waiting-posts', 'waiting-copy']) {
 		expect(existsSync(`${out}/${spec}.md`) && existsSync(`${out}/${spec}.json`) && existsSync(`${out}/${spec}.grant.json`)).toBe(true);
 	}
 	expect(JSON.parse(readFileSync(`${out}/review-queue.grant.json`, 'utf8'))).toEqual({ scopes: ['posts:read', 'posts.status:write'] });

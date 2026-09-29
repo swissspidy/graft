@@ -1,0 +1,278 @@
+{
+	"graft": 1,
+	"spec": {
+		"id": "stale-drafts",
+		"hash": "sha256:41bfa1153acecd449d4ce7224006ba440bf93bf14b183c0d5cccaa2695442019"
+	},
+	"surface": {
+		"host": "wordpress",
+		"hostVersion": "7.1.2",
+		"hash": "sha256:4b21eabb9fe647fd0c718ac8d18c4c00cd3a27b80166ed98b1bd783ae68b4a1c"
+	},
+	"mount": {
+		"slot": "dashboard.widget",
+		"title": "Stale drafts"
+	},
+	"data": {
+		"drafts": {
+			"call": "posts.list",
+			"input": {
+				"status": [
+					"draft"
+				],
+				"per_page": 10,
+				"orderby": "modified",
+				"order": "asc"
+			}
+		}
+	},
+	"tree": {
+		"type": "table",
+		"props": {
+			"rows": {
+				"$data": "drafts.items"
+			},
+			"fields": [
+				{
+					"id": "title",
+					"label": "Title",
+					"primary": true
+				},
+				{
+					"id": "author.name",
+					"label": "Author",
+					"type": "user"
+				},
+				{
+					"id": "age",
+					"label": "Days since update",
+					"type": "integer",
+					"value": {
+						"$daysSince": {
+							"$field": "modified"
+						}
+					},
+					"tone": {
+						"$if": [
+							{
+								"$gte": [
+									{
+										"$daysSince": {
+											"$field": "modified"
+										}
+									},
+									30
+								]
+							},
+							"error",
+							{
+								"$if": [
+									{
+										"$gte": [
+											{
+												"$daysSince": {
+													"$field": "modified"
+												}
+											},
+											7
+										]
+									},
+									"warning",
+									"success"
+								]
+							}
+						]
+					}
+				}
+			],
+			"empty": "No drafts"
+		}
+	},
+	"checks": [
+		{
+			"criterion": "drafts-only",
+			"fixtures": {
+				"users": [
+					{
+						"as": "e",
+						"role": "editor"
+					}
+				],
+				"posts": [
+					{
+						"title": "Draft A",
+						"status": "draft"
+					},
+					{
+						"title": "Pending B",
+						"status": "pending"
+					},
+					{
+						"title": "Post C",
+						"status": "publish"
+					}
+				]
+			},
+			"view_as": "e",
+			"expect": [
+				{
+					"rows": [
+						"Draft A"
+					]
+				},
+				{
+					"columns": [
+						"Title",
+						"Author",
+						"Days since update"
+					]
+				}
+			]
+		},
+		{
+			"criterion": "days",
+			"fixtures": {
+				"users": [
+					{
+						"as": "e",
+						"role": "editor"
+					}
+				],
+				"posts": [
+					{
+						"title": "Draft A",
+						"status": "draft"
+					}
+				]
+			},
+			"view_as": "e",
+			"clock": {
+				"advanceDays": 12
+			},
+			"expect": [
+				{
+					"cell": {
+						"row": {
+							"title": "Draft A"
+						},
+						"column": "Days since update",
+						"text": "12"
+					}
+				}
+			]
+		},
+		{
+			"criterion": "age-tone",
+			"fixtures": {
+				"users": [
+					{
+						"as": "e",
+						"role": "editor"
+					}
+				],
+				"posts": [
+					{
+						"title": "Draft A",
+						"status": "draft"
+					}
+				]
+			},
+			"view_as": "e",
+			"expect": [
+				{
+					"cell": {
+						"row": {
+							"title": "Draft A"
+						},
+						"column": "Days since update",
+						"tone": "success"
+					}
+				}
+			]
+		},
+		{
+			"criterion": "age-tone",
+			"fixtures": {
+				"users": [
+					{
+						"as": "e",
+						"role": "editor"
+					}
+				],
+				"posts": [
+					{
+						"title": "Draft A",
+						"status": "draft"
+					}
+				]
+			},
+			"view_as": "e",
+			"clock": {
+				"advanceDays": 8
+			},
+			"expect": [
+				{
+					"cell": {
+						"row": {
+							"title": "Draft A"
+						},
+						"column": "Days since update",
+						"tone": "warning"
+					}
+				}
+			]
+		},
+		{
+			"criterion": "age-tone",
+			"fixtures": {
+				"users": [
+					{
+						"as": "e",
+						"role": "editor"
+					}
+				],
+				"posts": [
+					{
+						"title": "Draft A",
+						"status": "draft"
+					}
+				]
+			},
+			"view_as": "e",
+			"clock": {
+				"advanceDays": 31
+			},
+			"expect": [
+				{
+					"cell": {
+						"row": {
+							"title": "Draft A"
+						},
+						"column": "Days since update",
+						"tone": "error"
+					}
+				}
+			]
+		}
+	],
+	"refs": {
+		"slot": "dashboard.widget",
+		"components": {
+			"table": [
+				"empty",
+				"fields",
+				"rows"
+			]
+		},
+		"capabilities": [
+			"posts.list"
+		],
+		"scopes": [
+			"posts:read"
+		]
+	},
+	"provenance": {
+		"compiler": "handwritten",
+		"strategy": "handwritten"
+	}
+}

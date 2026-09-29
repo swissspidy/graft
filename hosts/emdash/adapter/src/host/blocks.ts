@@ -33,7 +33,7 @@ export interface NodeOutput {
 	actions: RenderedAction[];
 	/** Visible text, except table row labels. */
 	texts: string[];
-	table?: { columns: string[]; rows: Array<{ label: string; record: unknown; actions: RenderedAction[] }> };
+	table?: { columns: string[]; rows: Array<{ label: string; record: unknown; actions: RenderedAction[]; cells: Record<string, { text: string; tone?: Tone }> }> };
 }
 
 export interface NodeArgs {
@@ -46,6 +46,14 @@ export interface NodeArgs {
 	/** Prefix for action ids: unique per customization and node. */
 	actionPrefix: string;
 }
+
+export type Tone = 'success' | 'warning' | 'error' | 'info';
+
+/**
+ * Block Kit cannot color a table cell, so a tone shows as a marker before
+ * the value. Relative times are left unmarked: the admin formats them.
+ */
+export const toneMarkers: Record<Tone, string> = { success: '🟢', warning: '🟡', error: '🔴', info: '🔵' };
 
 const str = (value: unknown): string => (value === null || value === undefined ? '' : typeof value === 'string' ? value : typeof value === 'number' || typeof value === 'boolean' ? String(value) : JSON.stringify(value));
 
@@ -154,6 +162,8 @@ export function nodeOutput({ type, props, raw, evaluateRow, actionPrefix }: Node
 			const primary = columns.find((c) => c.primary) ?? columns[0];
 			const rows = Array.isArray(props.rows) ? (props.rows as unknown[]) : [];
 			const rawActions = (Array.isArray(raw.actions) ? raw.actions : []) as Value[];
+			// Computed values and tones are expressions per row, so read them unevaluated.
+			const rawColumns = (Array.isArray(raw.columns) ? raw.columns : []) as Array<{ value?: Value; tone?: Value } | undefined>;
 			const table: NonNullable<NodeOutput['table']> = { columns: columns.map((c) => c.label), rows: [] };
 			const blockColumns: Block[] = columns.map((c) => ({ key: `c${columns.indexOf(c)}`, label: c.label, ...(c.format && c.format !== 'text' ? { format: c.format } : {}) }) as unknown as Block);
 			const actionIds = rawActions.map((_, i) => `${actionPrefix}:${i}`);
@@ -162,8 +172,18 @@ export function nodeOutput({ type, props, raw, evaluateRow, actionPrefix }: Node
 			}
 			const blockRows = rows.map((row, index) => {
 				const cells: Record<string, unknown> = {};
+				const snapshotCells: Record<string, { text: string; tone?: Tone }> = {};
 				columns.forEach((c, i) => {
-					cells[`c${i}`] = str(getPath(row, c.key));
+					const computed = rawColumns[i];
+					const text = str(computed?.value !== undefined ? evaluateRow(computed.value, row) : getPath(row, c.key));
+					const tone = computed?.tone !== undefined ? evaluateRow(computed.tone, row) : undefined;
+					if (typeof tone === 'string' && tone in toneMarkers) {
+						snapshotCells[c.label] = { text, tone: tone as Tone };
+						cells[`c${i}`] = c.format === 'relative_time' || text === '' ? text : `${toneMarkers[tone as Tone]} ${text}`;
+					} else {
+						snapshotCells[c.label] = { text };
+						cells[`c${i}`] = text;
+					}
 				});
 				const value = rowKey(row, index);
 				const actions = rawActions.map((rawAction, i) => {
@@ -174,7 +194,7 @@ export function nodeOutput({ type, props, raw, evaluateRow, actionPrefix }: Node
 					}
 					return action;
 				});
-				table.rows.push({ label: primary ? str(getPath(row, primary.key)) : '', record: row, actions });
+				table.rows.push({ label: primary ? str(getPath(row, primary.key)) : '', record: row, actions, cells: snapshotCells });
 				return cells;
 			});
 			out.table = table;
