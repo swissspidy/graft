@@ -42,7 +42,7 @@ function rest_sandbox_package() {
 		return new WP_Error( 'graft_no_zip', __( 'This server cannot create zip files.', 'graft' ), array( 'status' => 501 ) );
 	}
 	$root = dirname( __DIR__ );
-	$file = wp_tempnam( 'graft-sandbox.zip' );
+	$file = tempnam( get_temp_dir(), 'graft' );
 	$zip  = new \ZipArchive();
 	if ( true !== $zip->open( $file, \ZipArchive::OVERWRITE ) ) {
 		return new WP_Error( 'graft_zip_failed', __( 'Could not create the package.', 'graft' ), array( 'status' => 500 ) );

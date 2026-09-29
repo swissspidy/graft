@@ -2,7 +2,11 @@ import { useCallback, useEffect, useState } from 'react';
 import { createRoot } from 'react-dom/client';
 import apiFetch from '@wordpress/api-fetch';
 import { Button, Card, CardBody, CardHeader, Notice, Spinner } from '@wordpress/components';
-import { describeCheck, type Build, type Surface } from '@graft/core';
+import { describeCheck, verifyBuild, type Build, type Surface } from '@graft/core';
+import { createCan } from '../can.ts';
+import { playgroundVersion } from '../playground-version.ts';
+import { semantics } from '../semantics.ts';
+import { browserSandbox } from './browser-sandbox.ts';
 import { parseSpec } from '@graft/core/parse';
 import { describers } from '../describe.ts';
 import { Authoring } from './authoring.tsx';
@@ -15,6 +19,7 @@ import { Authoring } from './authoring.tsx';
 
 interface AdminConfig {
 	scopes: Record<string, string>;
+	browserVerification: boolean;
 	surface: (Surface & { hash: string }) | null;
 }
 
@@ -197,6 +202,15 @@ function App({ config }: { config: AdminConfig }) {
 					<CardBody>
 						<Authoring
 							surface={config.surface}
+							{...(config.browserVerification
+								? {
+										startVerifier: async () => {
+											const sandbox = await browserSandbox(playgroundVersion(config.surface!.hostVersion));
+											return (build: Build, spec: Parameters<typeof verifyBuild>[0]['spec']) =>
+												verifyBuild({ build, spec, surface: config.surface!, sandbox, semantics, createCan });
+										},
+									}
+								: {})}
 							onCancel={() => setAuthoring(false)}
 							onSaved={(message) => {
 								setAuthoring(false);

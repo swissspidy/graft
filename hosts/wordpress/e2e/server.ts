@@ -30,7 +30,15 @@ await writeFile(
 		preferredVersions: { php: DEFAULT_PHP, wp },
 		steps: [
 			// Application passwords need HTTPS or a local environment.
-			{ step: 'defineWpConfigConsts', consts: { WP_ENVIRONMENT_TYPE: 'local' } },
+			{
+				step: 'defineWpConfigConsts',
+				consts: {
+					WP_ENVIRONMENT_TYPE: 'local',
+					// Verifying in the admin's browser needs playground.wordpress.net;
+					// CI turns it on with GRAFT_E2E_BROWSER_VERIFY=1.
+					GRAFT_BROWSER_VERIFICATION: process.env.GRAFT_E2E_BROWSER_VERIFY === '1',
+				},
+			},
 			{ step: 'activatePlugin', pluginPath: 'graft/graft.php' },
 			{ step: 'runPHP', code: "<?php require '/graft-playground/seed-e2e.php';" },
 			{

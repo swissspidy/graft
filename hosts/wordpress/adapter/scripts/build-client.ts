@@ -52,6 +52,8 @@ const options = {
 	sourcemap: watch ? ('inline' as const) : false,
 	legalComments: 'none' as const,
 	plugins: [wordpressGlobals],
+	// The sandbox endpoint is embedded as text for the in-browser sandbox.
+	loader: { '.php': 'text' as const },
 	logLevel: 'info' as const,
 };
 

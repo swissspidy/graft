@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import apiFetch from '@wordpress/api-fetch';
 import { Button, Notice } from '@wordpress/components';
-import { compileSpec, hashSpec, validateSpec, type CompileEvent, type ModelClient, type Surface } from '@graft/core';
+import { compileSpec, hashSpec, validateSpec, type Build, type CompileEvent, type ModelClient, type Spec, type Surface, type Verification } from '@graft/core';
 import { hostGuide } from '../guide.ts';
 
 /**
@@ -53,11 +53,14 @@ export interface AuthoringProps {
 	surface: Surface;
 	onSaved(message: string): void;
 	onCancel(): void;
-	/** Runs checks in a sandbox; without it builds are saved unverified. */
-	verify?: Parameters<typeof compileSpec>[0]['verify'];
+	/**
+	 * Starts a sandbox and returns a function that runs a build's checks in
+	 * it. Without it, or when it fails to start, builds are saved unverified.
+	 */
+	startVerifier?: () => Promise<(build: Build, spec: Spec) => Promise<Verification>>;
 }
 
-export function Authoring({ surface, onSaved, onCancel, verify }: AuthoringProps) {
+export function Authoring({ surface, onSaved, onCancel, startVerifier }: AuthoringProps) {
 	const [source, setSource] = useState(TEMPLATE);
 	const [log, setLog] = useState<string[]>([]);
 	const [busy, setBusy] = useState(false);
@@ -81,13 +84,25 @@ export function Authoring({ surface, onSaved, onCancel, verify }: AuthoringProps
 		setLog([]);
 		try {
 			const specHash = await hashSpec(source);
+			const spec = parsed.spec;
+			let verify: ((build: Build, spec: Spec) => Promise<Verification>) | undefined;
+			let sandboxFailed: string | null = null;
+			if (startVerifier) {
+				setLog(['Starting a private WordPress in this browser to run the checks…']);
+				try {
+					verify = await startVerifier();
+				} catch (e) {
+					sandboxFailed = (e as { message?: string }).message ?? 'it did not start';
+					setLog((lines) => [...lines, `The private WordPress could not start (${sandboxFailed}); the build will be saved unverified.`]);
+				}
+			}
 			const result = await compileSpec({
 				spec: parsed.spec,
 				specHash,
 				surface,
 				model: restModel,
 				host: hostGuide,
-				...(verify ? { verify } : {}),
+				...(verify ? { verify: (candidate: Build) => verify(candidate, spec) } : {}),
 				onEvent: (event) => setLog((lines) => [...lines, describe(event)]),
 			});
 			if (result.unverifiable?.length) {
@@ -112,10 +127,11 @@ export function Authoring({ surface, onSaved, onCancel, verify }: AuthoringProps
 				method: 'POST',
 				data: { build: result.build, verification: result.verification ?? null },
 			});
+			const verified = result.verification?.passed === true;
 			onSaved(
-				result.verification?.passed
+				verified
 					? `"${parsed.spec.title}" was built and verified. Review and approve it below.`
-					: `"${parsed.spec.title}" was built. It needs verification before it can be approved.`,
+					: `"${parsed.spec.title}" was built. It needs verification before it can be approved${sandboxFailed ? ` (the in-browser check could not run: ${sandboxFailed})` : ''}.`,
 			);
 		} catch (e) {
 			setError((e as { message?: string }).message ?? 'Building failed.');

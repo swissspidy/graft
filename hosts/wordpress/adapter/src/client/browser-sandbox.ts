@@ -60,6 +60,7 @@ async function start(wp: string): Promise<ProtocolSandbox> {
 			steps: [
 				{ step: 'defineWpConfigConsts', consts: { GRAFT_SANDBOX_TOKEN: token } },
 				{ step: 'installPlugin', pluginData: { resource: 'literal', name: 'graft.zip', contents: base64ToBytes(zip) } },
+				{ step: 'mkdir', path: '/wordpress/graft-sandbox' },
 				{ step: 'writeFile', path: '/wordpress/graft-sandbox/index.php', data: sandboxIndex },
 				{ step: 'writeFile', path: '/wordpress/graft-sandbox/canary.php', data: sandboxCanary },
 				{ step: 'writeFile', path: '/wordpress/wp-content/mu-plugins/graft-canary.php', data: "<?php require '/wordpress/graft-sandbox/canary.php';" },

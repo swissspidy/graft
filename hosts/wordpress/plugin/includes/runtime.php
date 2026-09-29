@@ -248,7 +248,15 @@ function register_admin_screen(): void {
 							surface_scopes()
 						),
 						// The whole snapshot: the editor validates and compiles against it.
-						'surface' => $surface,
+						'surface'             => $surface,
+						/**
+						 * Filters whether wp-admin verifies builds in WordPress Playground
+						 * in the admin's browser (needs access to playground.wordpress.net).
+						 * GRAFT_BROWSER_VERIFICATION overrides the default.
+						 *
+						 * @param bool $enabled Default true.
+						 */
+						'browserVerification' => (bool) apply_filters( 'graft_browser_verification', defined( 'GRAFT_BROWSER_VERIFICATION' ) ? (bool) GRAFT_BROWSER_VERIFICATION : true ),
 					),
 					JSON_HEX_TAG | JSON_HEX_AMP
 				) . ';',

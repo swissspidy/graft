@@ -407,6 +407,27 @@ $understated                   = $qa['build'];
 $understated['refs']['scopes'] = array();
 check( 'scopes are derived on the server, not taken from the build', in_array( 'posts.status:write', Graft\build_scopes( $understated ), true ) );
 
+// The plugin package for the in-browser sandbox.
+wp_set_current_user( $admin );
+$package = rest( 'GET', '/graft/v1/sandbox-package' );
+$names   = array();
+if ( 200 === $package['status'] ) {
+	$zip_file = tempnam( get_temp_dir(), 'graft' );
+	file_put_contents( $zip_file, base64_decode( $package['data']['zip'] ) );
+	$zip = new ZipArchive();
+	$zip->open( $zip_file );
+	for ( $i = 0; $i < $zip->numFiles; $i++ ) {
+		$names[] = $zip->getNameIndex( $i );
+	}
+}
+check(
+	'the sandbox package has the plugin but not its browser bundles',
+	in_array( 'graft/graft.php', $names, true ) && in_array( 'graft/includes/store.php', $names, true ) && ! preg_grep( '#^graft/build/.*\.js$#', $names ),
+	array_slice( $names, 0, 20 )
+);
+wp_set_current_user( $contributor3 );
+check( 'only administrators get the sandbox package', 403 === rest( 'GET', '/graft/v1/sandbox-package' )['status'] );
+
 global $wp_version;
 echo wp_json_encode(
 	array(

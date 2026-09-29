@@ -29,12 +29,14 @@ require_once __DIR__ . '/includes/runtime.php';
 require_once __DIR__ . '/includes/slots.php';
 require_once __DIR__ . '/includes/rest.php';
 require_once __DIR__ . '/includes/generate.php';
+require_once __DIR__ . '/includes/sandbox-package.php';
 
 add_action( 'wp_abilities_api_categories_init', __NAMESPACE__ . '\register_ability_category' );
 add_action( 'wp_abilities_api_init', __NAMESPACE__ . '\register_abilities' );
 add_action( 'init', __NAMESPACE__ . '\register_post_types' );
 add_action( 'rest_api_init', __NAMESPACE__ . '\register_routes' );
 add_action( 'rest_api_init', __NAMESPACE__ . '\register_generate_route' );
+add_action( 'rest_api_init', __NAMESPACE__ . '\register_sandbox_package_route' );
 add_action( 'admin_menu', __NAMESPACE__ . '\mount_admin_pages' );
 add_action( 'wp_dashboard_setup', __NAMESPACE__ . '\mount_dashboard_widgets' );
 add_filter( 'post_row_actions', __NAMESPACE__ . '\mount_row_actions', 10, 2 );

@@ -141,11 +141,15 @@ test('admins review a customization in plain language, approve it, and it appear
 	await expect(widget.locator('[data-graft-empty]')).toHaveText('Nothing is waiting');
 });
 
+/** Whether wp-admin verifies builds in Playground in the browser (CI only). */
+const browserVerify = process.env.GRAFT_E2E_BROWSER_VERIFY === '1';
+
 const copySource = readFileSync(new URL('../../../examples/specs/waiting-posts.md', import.meta.url), 'utf8')
 	.replace('id: waiting-posts', 'id: waiting-copy')
 	.replace('# Waiting for review', '# Waiting (copy)');
 
 test('admins write a spec in wp-admin, see it validated, and build it', async ({ page }) => {
+	test.setTimeout(240_000);
 	await login(page, 'admin');
 	await page.goto('/wp-admin/tools.php?page=graft-customizations');
 	await page.getByRole('button', { name: 'New customization' }).click();
@@ -158,12 +162,18 @@ test('admins write a spec in wp-admin, see it validated, and build it', async ({
 	await editor.fill(copySource);
 	await expect(page.locator('.graft-diagnostics')).toContainText('Valid for this site.');
 	await page.getByRole('button', { name: 'Build it' }).click();
-	await expect(page.locator('.components-notice__content', { hasText: '"Waiting (copy)" was built.' })).toBeVisible({ timeout: 30_000 });
-	await expect(page.locator('.graft-build-log')).toHaveCount(0);
-
 	const card = page.locator('[data-graft-spec="waiting-copy"]');
-	await expect(card.locator('[data-graft-state]')).toHaveText('Draft');
-	await expect(card).toContainText('not verified yet');
+	if (browserVerify) {
+		// Checks ran in a private WordPress in this browser.
+		await expect(page.locator('.components-notice__content', { hasText: '"Waiting (copy)" was built and verified.' })).toBeVisible({ timeout: 180_000 });
+		await expect(card.locator('[data-graft-state]').first()).toHaveText('Needs approval');
+		await expect(card).toContainText('verified');
+	} else {
+		await expect(page.locator('.components-notice__content', { hasText: '"Waiting (copy)" was built.' })).toBeVisible({ timeout: 30_000 });
+		await expect(card.locator('[data-graft-state]')).toHaveText('Draft');
+		await expect(card).toContainText('not verified yet');
+	}
+	await expect(page.locator('.graft-build-log')).toHaveCount(0);
 	await expect(card.locator('.graft-checks')).toContainText('Shows at most five posts');
 });
 
@@ -180,7 +190,9 @@ const graft = async (...args: string[]) => {
 test('graft site verify verifies the draft built in wp-admin, and the admin approves it', async ({ page }) => {
 	test.setTimeout(360_000);
 	const output = await graft('site', 'verify');
-	expect(output).toContain('waiting-copy v1  ✔ verified → needs approval');
+	expect(output).toContain(
+		browserVerify ? 'Nothing to verify: every build on the site has a passing verification.' : 'waiting-copy v1  ✔ verified → needs approval',
+	);
 
 	await login(page, 'admin');
 	await page.goto('/wp-admin/tools.php?page=graft-customizations');

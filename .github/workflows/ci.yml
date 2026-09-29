@@ -53,6 +53,8 @@ jobs:
         run: pnpm test:e2e
         env:
           CI: '1'
+          # Runners can reach playground.wordpress.net: verify in the browser.
+          GRAFT_E2E_BROWSER_VERIFY: '1'
       - uses: actions/upload-artifact@v4
         if: always()
         with:
@@ -90,18 +92,3 @@ jobs:
         run: pnpm surface:generate --wp nightly --out-dir "$RUNNER_TEMP/surfaces"
       - name: Upgrade the corpus to nightly
         run: pnpm graft canary --corpus fixtures/canary/tenants --from hosts/wordpress/plugin/surfaces/7.1.json --to "$RUNNER_TEMP/surfaces/nightly.json"
-
-  probe-playground-web:
-    # Temporary: checks that Playground runs in headless Chromium here.
-    runs-on: ubuntu-latest
-    continue-on-error: true
-    steps:
-      - uses: actions/checkout@v4
-      - uses: pnpm/action-setup@v4
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 22
-          cache: pnpm
-      - run: pnpm install --frozen-lockfile
-      - run: pnpm exec playwright install --with-deps chromium
-      - run: node hosts/wordpress/e2e/probes/playground-web.mjs
