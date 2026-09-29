@@ -58,3 +58,7 @@ foreach ( $examples as $spec_id => $example ) {
 		Graft\approve_version( $spec_id, $version['version'] );
 	}
 }
+
+// An application password for the CLI (graft site ...), read by the tests.
+list( $app_password ) = WP_Application_Passwords::create_new_application_password( 1, array( 'name' => 'graft-e2e' ) );
+file_put_contents( '/graft-fixtures/app-password.txt', $app_password );

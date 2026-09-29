@@ -3,6 +3,7 @@ import { anthropicModel, DEFAULT_MODEL } from './anthropic.ts';
 import { checkBuildFile } from './build.ts';
 import { canaryCommand } from './canary.ts';
 import { compileFile } from './compile.ts';
+import { sitePull, siteVerify, type Site } from './site.ts';
 import { formatCanaryReport } from '@graft/core';
 import { formatVerification, verifyFiles } from './verify.ts';
 import { formatResults, loadSurface, validateFiles } from './validate.ts';
@@ -40,6 +41,13 @@ Commands:
     --regenerate       Let Claude regenerate builds nothing else can save (needs a key)
     --out <dir>        Write upgraded builds and report.json
     --json             Print the report as JSON
+  site verify          Verify a site's unverified builds (e.g. built in wp-admin) and send the results
+  site pull            Export a site's active customizations as a canary corpus tenant
+    --site <url>       Site with the Graft plugin (or GRAFT_SITE)
+    --user <login>     Administrator (or GRAFT_USER)
+    --password <app>   Application password (or GRAFT_APP_PASSWORD)
+    --surfaces <dir>   Surface snapshots (default: hosts/wordpress/plugin/surfaces)
+    --out <dir>        pull: tenant directory to write
 
 See docs/adr/0001-architecture.md for how the pieces fit together.`;
 
@@ -187,6 +195,51 @@ export async function main(argv: string[]): Promise<number> {
 		});
 		console.log(values.json ? JSON.stringify({ ...report, entries: report.entries.map(({ build: _b, ...e }) => e) }, null, 2) : formatCanaryReport(report));
 		return report.counts.failed > 0 ? 1 : 0;
+	}
+	if (command === 'site') {
+		const [action, ...args] = rest;
+		const { values } = parseArgs({
+			args,
+			options: {
+				site: { type: 'string', default: process.env.GRAFT_SITE },
+				user: { type: 'string', default: process.env.GRAFT_USER },
+				password: { type: 'string', default: process.env.GRAFT_APP_PASSWORD },
+				surfaces: { type: 'string', default: 'hosts/wordpress/plugin/surfaces' },
+				out: { type: 'string' },
+				json: { type: 'boolean', default: false },
+			},
+		});
+		if (!values.site || !values.user || !values.password) {
+			console.error('graft site: pass --site, --user and --password (an application password).');
+			return 2;
+		}
+		const site: Site = { url: values.site, user: values.user, password: values.password };
+		if (action === 'verify') {
+			const results = await siteVerify(site, values.surfaces, (line) => console.error(line));
+			if (values.json) {
+				console.log(JSON.stringify(results, null, 2));
+			} else if (results.length === 0) {
+				console.log('Nothing to verify: every build on the site has a passing verification.');
+			} else {
+				for (const r of results) {
+					const status = r.skipped ? `skipped: ${r.skipped}` : `${r.passed ? '✔ verified' : '✖ failed'} → ${r.state?.replace('_', ' ')}`;
+					console.log(`${r.spec} v${r.version}  ${status}`);
+					r.failures?.forEach((f) => console.log(`    ${f}`));
+				}
+			}
+			return results.every((r) => r.passed !== false) ? 0 : 1;
+		}
+		if (action === 'pull') {
+			if (!values.out) {
+				console.error('graft site pull: pass --out <dir>.');
+				return 2;
+			}
+			const written = await sitePull(site, values.out);
+			console.log(`Wrote ${written.length} customization(s) to ${values.out}: ${written.join(', ') || '(none)'}`);
+			return 0;
+		}
+		console.error('graft site: use "verify" or "pull".');
+		return 2;
 	}
 	if (command === undefined || command === 'help' || command === '--help' || command === '-h') {
 		console.log(USAGE);

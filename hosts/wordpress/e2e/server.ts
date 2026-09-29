@@ -1,7 +1,7 @@
 import { spawn } from 'node:child_process';
-import { mkdtemp, readFile, writeFile } from 'node:fs/promises';
-import { tmpdir } from 'node:os';
+import { mkdir, readFile, rm, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { exampleFixtures, examplesDir, modelAnswers } from '../adapter/src/fixtures.ts';
 import { DEFAULT_PHP, PLAYGROUND_CLI, paths } from '../adapter/src/playground.ts';
 
@@ -14,7 +14,11 @@ import { DEFAULT_PHP, PLAYGROUND_CLI, paths } from '../adapter/src/playground.ts
 
 const port = process.env.GRAFT_E2E_PORT ?? '9400';
 const wp = process.env.GRAFT_E2E_WP ?? '7.1';
-const dir = await mkdtemp(join(tmpdir(), 'graft-e2e-'));
+// A fixed directory, so tests can read what the seed writes (the admin's
+// application password).
+const dir = fileURLToPath(new URL('../../../test-results/e2e-fixtures', import.meta.url));
+await rm(dir, { recursive: true, force: true });
+await mkdir(dir, { recursive: true });
 // Verify the example builds first: the site only serves verified builds.
 const surface = JSON.parse(await readFile(join(paths.surfaces, `${wp}.json`), 'utf8'));
 await writeFile(join(dir, 'examples.json'), JSON.stringify(await exampleFixtures({ verifyAgainst: surface })));
@@ -25,6 +29,8 @@ await writeFile(
 	JSON.stringify({
 		preferredVersions: { php: DEFAULT_PHP, wp },
 		steps: [
+			// Application passwords need HTTPS or a local environment.
+			{ step: 'defineWpConfigConsts', consts: { WP_ENVIRONMENT_TYPE: 'local' } },
 			{ step: 'activatePlugin', pluginPath: 'graft/graft.php' },
 			{ step: 'runPHP', code: "<?php require '/graft-playground/seed-e2e.php';" },
 			{

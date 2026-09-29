@@ -68,6 +68,25 @@ function register_routes(): void {
 
 	register_rest_route(
 		REST_NAMESPACE,
+		'/surface',
+		array(
+			'methods'             => WP_REST_Server::READABLE,
+			'callback'            => static function () {
+				$surface = current_surface();
+				return new WP_REST_Response(
+					array(
+						'hash'        => $surface['hash'] ?? null,
+						'hostVersion' => $GLOBALS['wp_version'],
+						'fingerprint' => host_fingerprint(),
+					)
+				);
+			},
+			'permission_callback' => $manage,
+		)
+	);
+
+	register_rest_route(
+		REST_NAMESPACE,
 		'/specs/(?P<spec_id>[a-z0-9-]+)/versions/(?P<version>\d+)/builds',
 		array(
 			'methods'             => WP_REST_Server::CREATABLE,

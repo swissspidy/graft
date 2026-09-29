@@ -21,7 +21,7 @@ Status: all six MVP milestones of ADR 0001 are implemented as a prototype (contr
 | `schemas/spec-lifecycle.json` | The spec version state machine, shared by the core and the plugin. |
 | `packages/core`  | Host-agnostic core, no I/O: spec parser and validator, surface validation and hashing, build validation, refs, expression evaluator, lifecycle, the verifier (semantic snapshots and check runner over a host `Sandbox`) and the compiler (checks first, then a tree verified against them, with an injected model), and the upgrade ladder and canary. |
 | `packages/renderer-react` | Renders a build tree with React, given a host's components and capability gateway. |
-| `packages/cli`   | The `graft` command: `validate`, `build`, `verify`, `compile` (Claude via the Anthropic SDK), `canary`. |
+| `packages/cli`   | The `graft` command: `validate`, `build`, `verify`, `compile` (Claude via the Anthropic SDK), `canary`, and `site verify` / `site pull` against a live site. |
 | `hosts/wordpress` | WordPress adapter: plugin, abilities, surface generator, surface snapshots. See [its README](hosts/wordpress/README.md). |
 | `examples/specs` | Sample specs, also the future canary corpus.                |
 | `examples/builds` | Hand-written builds of the sample specs for WordPress 7.1 (the compiler can produce these too). The three examples cover every slot: an admin page, a row action on the Posts screen and a Dashboard widget. |
@@ -113,3 +113,20 @@ hidden (and flagged to admins) until a build for the new surface arrives.
 host changes are applied inside the sandbox through the plugin's surface
 filters (`hosts/wordpress/playground/sandbox/canary.php`), and the new
 surface is generated from that patched host like any other snapshot.
+
+## Authoring in wp-admin
+
+1. An administrator opens Tools → Customizations → New customization,
+   writes a spec (validated against the site as they type) and clicks
+   "Build it". The compiler runs in the browser; model requests go through
+   the site's AI client, so provider keys never reach the browser.
+2. The build is saved as a draft: it has not been verified.
+3. `graft site verify --site <url> --user <admin> --password <application password>`
+   runs the draft's checks in a local WordPress sandbox and sends the
+   result back; the version moves to "Needs approval".
+4. The administrator reviews the permissions and the checks in plain
+   language, and approves it.
+
+Verifying inside the admin's browser (WordPress Playground in an iframe)
+would remove step 3; it is not built yet. `graft site pull --out <dir>`
+exports a site's active customizations as a canary corpus tenant.

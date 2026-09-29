@@ -80,8 +80,9 @@ export const scenarios: Scenario[] = [
 
 /**
  * Loads a corpus directory: one directory per tenant with spec files and
- * their active builds (`<name>.md` next to `<name>.json`). The grant is the
- * permissions each spec requests, as if approved.
+ * their active builds (`<name>.md` next to `<name>.json`), and optionally the
+ * grant (`<name>.grant.json`, as written by `graft site pull`). Without it,
+ * the grant is the permissions the spec requests, as if approved.
  */
 export async function loadCorpus(dir: string): Promise<CorpusEntry[]> {
 	const entries: CorpusEntry[] = [];
@@ -90,7 +91,13 @@ export async function loadCorpus(dir: string): Promise<CorpusEntry[]> {
 			const source = await readFile(join(dir, tenant, file), 'utf8');
 			const build = JSON.parse(await readFile(join(dir, tenant, file.replace(/\.md$/, '.json')), 'utf8')) as Build;
 			const { spec } = validateSpec(source);
-			entries.push({ tenant, source, build, grant: spec?.manifest.permissions ?? [] });
+			let grant = spec?.manifest.permissions ?? [];
+			try {
+				grant = (JSON.parse(await readFile(join(dir, tenant, file.replace(/\.md$/, '.grant.json')), 'utf8')) as { scopes: string[] }).scopes;
+			} catch {
+				// No stored grant: assume the requested permissions were approved.
+			}
+			entries.push({ tenant, source, build, grant });
 		}
 	}
 	return entries;

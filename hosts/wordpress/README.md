@@ -72,9 +72,11 @@ a hash and need no rebuild.
   (administrators only), which answers through `wp_ai_client_prompt()`, so
   provider keys stay in the site's AI settings; the `graft_pre_generate`
   filter can answer instead (the e2e tests script it). Compiled builds are
-  saved as drafts until they are verified. Needs a secure context (HTTPS or
-  localhost) for hashing.
-- **REST.** `GET/POST /graft/v1/specs`,
+  saved as drafts until they are verified, e.g. with `graft site verify`,
+  which verifies them in a local sandbox and posts the result back. Needs a
+  secure context (HTTPS or localhost) for hashing.
+- **REST.** `GET /graft/v1/surface` (the site's current surface),
+  `GET/POST /graft/v1/specs`,
   `POST /graft/v1/specs/<id>/versions/<n>/builds|approve|decline|archive`
   (administrators; users may create `user`-scoped specs).
 

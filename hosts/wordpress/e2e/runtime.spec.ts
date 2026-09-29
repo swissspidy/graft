@@ -1,4 +1,6 @@
-import { readFileSync } from 'node:fs';
+import { execFile } from 'node:child_process';
+import { existsSync, readFileSync } from 'node:fs';
+import { promisify } from 'node:util';
 import { expect, test, type Page } from '@playwright/test';
 
 /**
@@ -163,6 +165,41 @@ test('admins write a spec in wp-admin, see it validated, and build it', async ({
 	await expect(card.locator('[data-graft-state]')).toHaveText('Draft');
 	await expect(card).toContainText('not verified yet');
 	await expect(card.locator('.graft-checks')).toContainText('Shows at most five posts');
+});
+
+const graft = async (...args: string[]) => {
+	const password = readFileSync(new URL('../../../test-results/e2e-fixtures/app-password.txt', import.meta.url), 'utf8').trim();
+	const { stdout } = await promisify(execFile)(
+		'npx',
+		['tsx', 'packages/cli/src/main.ts', ...args, '--site', 'http://127.0.0.1:9400', '--user', 'admin', '--password', password],
+		{ cwd: new URL('../../..', import.meta.url).pathname, timeout: 300_000 },
+	);
+	return stdout;
+};
+
+test('graft site verify verifies the draft built in wp-admin, and the admin approves it', async ({ page }) => {
+	test.setTimeout(360_000);
+	const output = await graft('site', 'verify');
+	expect(output).toContain('waiting-copy v1  ✔ verified → needs approval');
+
+	await login(page, 'admin');
+	await page.goto('/wp-admin/tools.php?page=graft-customizations');
+	const card = page.locator('[data-graft-spec="waiting-copy"]');
+	await expect(card.locator('[data-graft-state]')).toHaveText('Needs approval');
+	await card.getByRole('button', { name: 'Approve' }).click();
+	await expect(card.locator('[data-graft-state]')).toHaveText('Active');
+	await page.goto('/wp-admin/index.php');
+	await expect(page.locator('#graft-waiting-copy [data-graft-empty]')).toHaveText('Nothing is waiting');
+});
+
+test('graft site pull exports the active customizations as a canary corpus', async () => {
+	const out = new URL('../../../test-results/pulled/e2e-site', import.meta.url).pathname;
+	const output = await graft('site', 'pull', '--out', out);
+	expect(output).toContain('Wrote 4 customization(s)');
+	for (const spec of ['review-queue', 'quick-approve', 'waiting-posts', 'waiting-copy']) {
+		expect(existsSync(`${out}/${spec}.md`) && existsSync(`${out}/${spec}.json`) && existsSync(`${out}/${spec}.grant.json`)).toBe(true);
+	}
+	expect(JSON.parse(readFileSync(`${out}/review-queue.grant.json`, 'utf8'))).toEqual({ scopes: ['posts:read', 'posts.status:write'] });
 });
 
 test('only administrators may use the model proxy', async ({ page }) => {
