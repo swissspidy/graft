@@ -74,14 +74,20 @@ jobs:
           node-version: 22
           cache: pnpm
       - run: pnpm install --frozen-lockfile
-      - name: Check the checked-in surface is up to date
-        run: pnpm surface:emdash --check
+      - name: Check the checked-in surface and plugin manifest are up to date
+        run: pnpm surface:emdash --check && pnpm manifest:emdash --check
+      - name: Validate the plugin manifest with EmDash's plugin CLI
+        run: pnpm dlx @emdash-cms/plugin-cli@0.13.1 validate hosts/emdash/adapter
       - name: Validate the example specs against the EmDash surface
         run: pnpm graft validate --surface hosts/emdash/adapter/surfaces/1.0.json examples/emdash/specs
       - name: Verify the example builds in an EmDash sandbox
         run: pnpm verify:emdash
       - name: Smoke test the plugin in EmDash (install, approve, serve, refuse)
         run: pnpm test:emdash
+      - name: The same, with the plugin in EmDash's plugin sandbox (workerd)
+        run: pnpm test:emdash:sandboxed
+      - name: Writing a customization in the admin, with a stubbed Claude API (both formats)
+        run: pnpm test:author:emdash
       - name: Compile pipeline with a scripted model against EmDash
         run: pnpm test:compile:emdash
       - name: Every synthetic EmDash change reaches its expected rung

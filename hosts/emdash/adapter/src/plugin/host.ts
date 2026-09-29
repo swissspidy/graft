@@ -1,4 +1,4 @@
-import { canActOnOwn, hasPermission, type Permission, type RoleLevel } from '@emdash-cms/auth';
+import { canActOnOwn, hasPermission, type Permission } from '../host/permissions.ts';
 import type { PluginContext } from 'emdash';
 import { capabilities, scopes, STATUSES } from '../host/surface.ts';
 
@@ -26,7 +26,7 @@ export class HostError extends Error {
 
 type Item = Awaited<ReturnType<NonNullable<PluginContext['content']>['list']>>['items'][number];
 
-const asUser = (viewer: Viewer) => ({ id: viewer.id, role: viewer.role as RoleLevel });
+const asUser = (viewer: Viewer) => ({ id: viewer.id, role: viewer.role });
 
 /** Whether the viewer's role has any of the EmDash permissions a scope maps to. */
 export function scopeUsable(viewer: Viewer, scope: string, table: Record<string, { host?: string[] }> = scopes): boolean {

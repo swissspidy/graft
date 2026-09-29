@@ -19,7 +19,7 @@ async function signIn(page: Page, user: keyof typeof roles, path: string): Promi
 	}
 }
 
-const customizations = '/_emdash/admin/plugins/graft/';
+const customizations = '/_emdash/admin/plugins/graft/customizations';
 
 test('contributors see the publish queue without Publish buttons', async ({ page }) => {
 	await signIn(page, 'contributor', customizations);
@@ -77,4 +77,20 @@ test('editors take a post live from the editor panel', async ({ page }) => {
 	await expect(page.getByText('The post is live.')).toBeVisible();
 	await expect(page.getByText('Live', { exact: true })).toBeVisible();
 	await expect(page.getByRole('button', { name: 'Take offline' })).toBeVisible();
+});
+
+test('administrators write a customization in the admin', async ({ page }) => {
+	const { authoredSpec } = await import('./authoring.ts');
+	await signIn(page, 'admin', customizations);
+	await page.getByRole('tab', { name: 'Manage' }).click();
+	const editor = page.getByLabel('Spec');
+	await editor.fill(authoredSpec);
+	await page.getByRole('button', { name: 'Build it' }).click();
+	// One model call per step: the checks first...
+	await expect(page.getByText('Step 1 done. Continue to take the next step.')).toBeVisible();
+	await page.getByRole('button', { name: 'Continue building' }).click();
+	// ...then the tree, which is stored as a draft until it is verified.
+	await expect(page.getByText('"Recent drafts" is built. Verify it, then approve it.')).toBeVisible();
+	await expect(page.getByText('Built (not verified)')).toBeVisible();
+	await expect(page.getByText('Draft (not verified)')).toBeVisible();
 });

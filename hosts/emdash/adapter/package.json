@@ -9,16 +9,19 @@
     ".": "./src/index.ts",
     "./plugin": "./src/plugin/index.ts",
     "./host": "./src/host/index.ts",
-    "./node": "./src/node/index.ts"
+    "./node": "./src/node/index.ts",
+    "./standard": "./src/plugin/standard.ts"
   },
   "dependencies": {
-    "@emdash-cms/auth": "1.0.1",
+    "@anthropic-ai/sdk": "^0.129.0",
     "@graft/core": "workspace:*"
   },
   "peerDependencies": {
     "emdash": "^1.0.1"
   },
   "devDependencies": {
-    "emdash": "1.0.1"
+    "@emdash-cms/auth": "1.0.1",
+    "emdash": "1.0.1",
+    "esbuild": "^0.28.2"
   }
 }

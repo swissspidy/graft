@@ -30,6 +30,7 @@ export interface SpecRecord {
 export interface KV {
 	get<T>(key: string): Promise<T | null>;
 	set(key: string, value: unknown): Promise<void>;
+	delete(key: string): Promise<boolean>;
 	list(prefix?: string): Promise<Array<{ key: string; value: unknown }>>;
 }
 

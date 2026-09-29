@@ -1,7 +1,9 @@
 import { readFileSync } from 'node:fs';
 import { createRequire } from 'node:module';
 import { dirname, join } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import type { PluginDescriptor } from 'emdash';
+import { adminPages, adminWidgets, allowedHosts, capabilities, editorPanels, PLUGIN_ID, PLUGIN_VERSION, routePermissions, settingsSchema } from './plugin/manifest.ts';
 
 /**
  * The Graft plugin descriptor for astro.config:
@@ -10,12 +12,39 @@ import type { PluginDescriptor } from 'emdash';
  *
  * Runs at config time only; the plugin itself is ./plugin/index.ts.
  */
-export function graft(options: { sandbox?: boolean } = {}): PluginDescriptor {
+export function graft(options: { sandbox?: boolean; allowedHosts?: string[] } = {}): PluginDescriptor {
 	return {
-		id: 'graft',
-		version: '0.1.0',
+		id: PLUGIN_ID,
+		version: PLUGIN_VERSION,
 		entrypoint: '@graft/emdash/plugin',
-		options: { emdashVersion: emdashVersion(), sandbox: options.sandbox === true },
+		options: { emdashVersion: emdashVersion(), sandbox: options.sandbox === true, allowedHosts: options.allowedHosts ?? [] },
+	};
+}
+
+/**
+ * The same plugin in EmDash's standard format, run in the plugin sandbox:
+ *
+ *   emdash({ sandboxed: [graftSandboxed()], sandboxRunner: '@emdash-cms/sandbox-workerd' })
+ *
+ * Needs the bundle built first (pnpm build:emdash). The verification
+ * sandbox route is not offered here.
+ */
+export function graftSandboxed(options: { allowedHosts?: string[] } = {}): PluginDescriptor {
+	const { sandbox: _sandbox, ...routes } = routePermissions;
+	return {
+		id: PLUGIN_ID,
+		version: PLUGIN_VERSION,
+		format: 'standard',
+		entrypoint: fileURLToPath(new URL('../dist/sandbox-entry.mjs', import.meta.url)),
+		capabilities: [...capabilities],
+		allowedHosts: [...allowedHosts, ...(options.allowedHosts ?? [])],
+		storage: {},
+		hooks: [],
+		routes: Object.entries(routes).map(([name, permission]) => ({ name, permission })) as NonNullable<PluginDescriptor['routes']>,
+		adminPages,
+		adminWidgets,
+		editorPanels,
+		settingsSchema,
 	};
 }
 

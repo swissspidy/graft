@@ -1,11 +1,12 @@
-import { hasPermission, type RoleLevel } from '@emdash-cms/auth';
-import { createAjv, evaluate, extractRefs, validateSpec, type Build, type Surface } from '@graft/core';
+import { hasPermission } from '../host/permissions.ts';
+import { compileSchema, evaluate, extractRefs, validateSpec, type Build, type Surface } from '@graft/core';
 import { findAction, renderTree, type Block, type Rendered } from '../host/blocks.ts';
 import { createCan } from '../host/can.ts';
 import { roleName } from '../host/surface.ts';
 import { HostError, runCapability, usableScopes, type Viewer } from './host.ts';
 import { activeVersion, pendingVersion, type SpecRecord, type Store, type Version } from './store.ts';
 import { describeVersion } from './describe.ts';
+import { authoringAction, authoringBlocks, type Authoring, type AuthoringResult } from './author-ui.ts';
 import type { PluginContext } from 'emdash';
 
 /**
@@ -33,8 +34,6 @@ export interface Served {
 
 export type Call = (capability: string, input: unknown) => Promise<unknown>;
 
-const ajv = createAjv();
-const validators = new Map<string, ReturnType<typeof ajv.compile>>();
 
 /** Active customizations whose build targets the current surface. */
 export async function servable(store: Store, surface: Surface): Promise<Served[]> {
@@ -67,11 +66,7 @@ export function gateway(ctx: PluginContext, viewer: Viewer, served: Served, surf
 		if (!declared.scopes.every((scope) => served.record.grant.includes(scope))) {
 			throw new HostError('graft_not_granted', `"${capability}" needs a permission that was not approved.`);
 		}
-		let validate = validators.get(capability);
-		if (!validate) {
-			validate = ajv.compile(declared.input as object);
-			validators.set(capability, validate);
-		}
+		const validate = compileSchema(declared.input as object);
 		const value = input ?? {};
 		if (!validate(value)) {
 			throw new HostError('graft_invalid_input', `Invalid input for "${capability}".`);
@@ -152,19 +147,24 @@ export interface Interaction {
 	page?: string;
 	action_id?: string;
 	value?: unknown;
+	values?: Record<string, unknown>;
 }
 
-const isAdmin = (viewer: Viewer) => hasPermission({ role: viewer.role as RoleLevel }, 'plugins:manage');
+const isAdmin = (viewer: Viewer) => hasPermission(viewer, 'plugins:manage');
 
-/** The Manage tab: every customization with its state, for administrators. */
-async function manage(store: Store, surface: Surface): Promise<Block[]> {
+/** The Manage tab, for administrators: writing new customizations, and every customization with its state. */
+async function manage(store: Store, surface: Surface, authoring: Authoring | undefined, result: AuthoringResult | undefined): Promise<Block[]> {
+	const blocks: Block[] = authoring ? await authoringBlocks(authoring, result) : [];
 	const records = await store.list();
-	if (records.length === 0) {
-		return [{ type: 'empty', title: 'No customizations yet', description: 'Install one with graft site install.' }];
+	if (blocks.length > 0) {
+		blocks.push({ type: 'divider' }, { type: 'header', text: 'Customizations' });
 	}
-	const blocks: Block[] = [];
-	for (const record of records) {
-		if (blocks.length > 0) {
+	if (records.length === 0) {
+		blocks.push({ type: 'empty', title: 'No customizations yet', description: authoring ? 'Write one above, or install one with graft site install.' : 'Install one with graft site install.' });
+		return blocks;
+	}
+	for (const [i, record] of records.entries()) {
+		if (i > 0) {
 			blocks.push({ type: 'divider' });
 		}
 		blocks.push(...describeVersion(record, surface));
@@ -181,10 +181,12 @@ export interface ServeOptions {
 	viewer: Viewer;
 	store: Store;
 	surface: Surface;
+	/** Writing customizations in the admin; absent where it is not offered. */
+	authoring?: Authoring;
 }
 
 /** The admin route: plugin pages and the dashboard widget. */
-export async function serveAdmin({ ctx, viewer, store, surface }: ServeOptions, interaction: Interaction, where: 'admin-page' | 'dashboard-widget'): Promise<Response> {
+export async function serveAdmin({ ctx, viewer, store, surface, authoring }: ServeOptions, interaction: Interaction, where: 'admin-page' | 'dashboard-widget'): Promise<Response> {
 	const served = await servable(store, surface);
 	let toast: Response['toast'];
 
@@ -203,7 +205,11 @@ export async function serveAdmin({ ctx, viewer, store, surface }: ServeOptions, 
 	const pageInstances = (list: Served[]) => list.filter((s) => s.build.mount.slot === 'admin.page' && inAudience(s, viewer)).map((s) => ({ served: s, slot: {} }));
 	let instances = pageInstances(served);
 	let open = 0;
-	if (interaction.type === 'block_action' && interaction.action_id === 'graft:approve') {
+	const authored = authoring && isAdmin(viewer) ? await authoringAction(authoring, { store, surface }, interaction) : undefined;
+	if (authored) {
+		toast = authored.toast;
+		open = instances.length; // the Manage tab
+	} else if (interaction.type === 'block_action' && interaction.action_id === 'graft:approve') {
 		if (!isAdmin(viewer)) {
 			toast = { message: 'Only administrators approve customizations.', type: 'error' };
 		} else {
@@ -226,7 +232,7 @@ export async function serveAdmin({ ctx, viewer, store, surface }: ServeOptions, 
 		panels.push({ label: instance.served.title, blocks });
 	}
 	if (isAdmin(viewer)) {
-		panels.push({ label: 'Manage', blocks: await manage(store, surface) });
+		panels.push({ label: 'Manage', blocks: await manage(store, surface, authoring, authored) });
 	}
 	if (panels.length === 0) {
 		return withToast({ blocks: [{ type: 'empty', title: 'No customizations for you yet' }] }, toast);

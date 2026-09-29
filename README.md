@@ -16,8 +16,9 @@ The design is in [ADR 0001](docs/adr/0001-architecture.md), with later
 decisions (authoring in wp-admin, operating live sites, hardening) in
 [ADR 0002](docs/adr/0002-authoring-and-operations.md). There are two hosts:
 WordPress 7.1+ (wp-admin), and [EmDash](hosts/emdash/README.md)
-([ADR 0003](docs/adr/0003-emdash-host.md)). The core needed no changes for
-the second one.
+([ADR 0003](docs/adr/0003-emdash-host.md)), in-process or in EmDash's plugin
+sandbox, with customizations written in either admin
+([ADR 0004](docs/adr/0004-emdash-sandbox-and-authoring.md)).
 
 Status: a working prototype. All six MVP milestones of the ADR are built, and
 each is tested against real WordPress in [Playground](https://wordpress.org/playground/).
@@ -174,6 +175,9 @@ pnpm graft site verify --site <url> --token <token>
 | `pnpm test:compile:emdash` | The compile pipeline with a scripted model against EmDash |
 | `pnpm test:canary:emdash` | Six synthetic EmDash changes, each forcing one rung, against a two-tenant corpus |
 | `pnpm test:site:emdash` | `graft site` against a live EmDash: install with local verification, verify drafts, pull into the canary |
+| `pnpm test:emdash:sandboxed` | The same, with Graft in EmDash's plugin sandbox (workerd) |
+| `pnpm test:author:emdash` | Writing a customization in the EmDash admin, with a stubbed Claude API, in both formats |
+| `pnpm test:cfworker` | The unit tests again on the schema engine used where code generation is forbidden |
 | `pnpm test:emdash` | EmDash plugin smoke test: install, approve, serve per role, forged and refused actions |
 | `pnpm test:e2e:emdash` | Playwright in the EmDash admin: the page, the widget and the editor panel |
 

@@ -1,6 +1,6 @@
 import { hashSurface, type Surface } from '@graft/core';
 import { baseSlot, patchSurface, resolveCall, type HostPatch } from '../host/patch.ts';
-import type { PluginContext, RouteContext } from 'emdash';
+import type { PluginContext } from 'emdash';
 import { roles, type RoleName } from '../host/surface.ts';
 import { HostError, runCapability, usableScopes, type Viewer } from './host.ts';
 
@@ -57,8 +57,8 @@ async function allEntries(ctx: PluginContext, collection: string) {
 	return items;
 }
 
-export async function handleSandbox(ctx: RouteContext, surface: Surface): Promise<unknown> {
-	const request = (ctx.input ?? {}) as Record<string, unknown>;
+export async function handleSandbox(input: unknown, ctx: PluginContext, surface: Surface): Promise<unknown> {
+	const request = (input ?? {}) as Record<string, unknown>;
 	const content = api(ctx);
 	const patch = (await ctx.kv.get<HostPatch>(PATCH)) ?? {};
 	const patched = patchSurface(surface, patch);

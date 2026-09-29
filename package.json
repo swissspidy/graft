@@ -26,7 +26,11 @@
     "test:compile:emdash": "tsx hosts/emdash/adapter/src/node/compile-smoke.ts",
     "test:canary:emdash": "tsx hosts/emdash/adapter/src/node/canary-test.ts",
     "test:site:emdash": "tsx hosts/emdash/adapter/src/node/site-test.ts",
-    "test:cfworker": "GRAFT_SCHEMA_ENGINE=cfworker vitest run"
+    "test:cfworker": "GRAFT_SCHEMA_ENGINE=cfworker vitest run",
+    "build:emdash": "tsx hosts/emdash/adapter/scripts/build-sandboxed.ts",
+    "manifest:emdash": "tsx hosts/emdash/adapter/scripts/write-manifest.ts",
+    "test:emdash:sandboxed": "pnpm build:emdash && tsx hosts/emdash/adapter/src/node/smoke.ts --format sandboxed",
+    "test:author:emdash": "pnpm build:emdash && tsx hosts/emdash/adapter/src/node/author-test.ts --format native && tsx hosts/emdash/adapter/src/node/author-test.ts --format sandboxed"
   },
   "pnpm": {
     "onlyBuiltDependencies": [

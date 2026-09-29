@@ -26,16 +26,22 @@ importers:
 
   hosts/emdash/adapter:
     dependencies:
-      '@emdash-cms/auth':
-        specifier: 1.0.1
-        version: 1.0.1(astro@7.3.5(@types/node@22.20.4)(tsx@4.23.15)(yaml@2.9.1))(kysely@0.29.6)
+      '@anthropic-ai/sdk':
+        specifier: ^0.129.0
+        version: 0.129.0(zod@4.5.4)
       '@graft/core':
         specifier: workspace:*
         version: link:../../../packages/core
     devDependencies:
+      '@emdash-cms/auth':
+        specifier: 1.0.1
+        version: 1.0.1(astro@7.3.5(@types/node@22.20.4)(tsx@4.23.15)(yaml@2.9.1))(kysely@0.29.6)
       emdash:
         specifier: 1.0.1
         version: 1.0.1(@astrojs/react@6.0.6(@types/node@22.20.4)(@types/react-dom@18.3.7(@types/react@18.3.31))(@types/react@18.3.31)(esbuild@0.28.2)(react-dom@19.2.4(react@19.2.4))(react@19.2.4)(tsx@4.23.15)(yaml@2.9.1))(@atcute/cbor@2.3.8(@atcute/cid@2.5.0))(@atcute/cid@2.5.0)(@atcute/identity@2.0.2(@atcute/lexicons@2.1.1)(typescript@5.9.3))(@cfworker/json-schema@4.1.1)(@date-fns/tz@1.5.0)(@floating-ui/dom@1.8.0)(@tiptap/extensions@3.31.3(@tiptap/core@3.31.3(@tiptap/pm@3.31.3))(@tiptap/pm@3.31.3))(@types/react-dom@18.3.7(@types/react@18.3.31))(@types/react@18.3.31)(astro@7.3.5(@types/node@22.20.4)(tsx@4.23.15)(yaml@2.9.1))(date-fns@4.4.0)(echarts@6.1.0)(prosemirror-model@1.25.12)(prosemirror-state@1.4.4)(prosemirror-view@1.42.6)(react-dom@19.2.4(react@19.2.4))(react@19.2.4)(typescript@5.9.3)
+      esbuild:
+        specifier: ^0.28.2
+        version: 0.28.2
 
   hosts/emdash/site:
     dependencies:
@@ -4231,6 +4237,13 @@ packages:
     resolution: {integrity: sha512-bXE4cR/kVZhKZX/RjPEflHaKVhUVl85noU3v6b8apfQEc1x4A+zBxjZ4lN8LqGd6WZ3dl98pY4o717VFmoPp+A==}
 
 snapshots:
+
+  '@anthropic-ai/sdk@0.129.0(zod@4.5.4)':
+    dependencies:
+      json-schema-to-ts: 3.1.1
+      standardwebhooks: 1.1.1
+    optionalDependencies:
+      zod: 4.5.4
 
   '@anthropic-ai/sdk@0.129.0(zod@4.6.5)':
     dependencies:

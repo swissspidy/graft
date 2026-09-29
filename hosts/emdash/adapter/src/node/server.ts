@@ -35,6 +35,10 @@ export interface StartOptions {
 	testLogin?: boolean;
 	/** Extra environment for the site. */
 	env?: Record<string, string>;
+	/** How EmDash runs the plugin: in-process (default) or in its plugin sandbox. */
+	format?: 'native' | 'sandboxed';
+	/** Hosts the plugin may call besides api.anthropic.com. */
+	allowedHosts?: string[];
 }
 
 async function waitFor(url: string, child: ChildProcess, output: () => string, timeoutMs = 180_000): Promise<void> {
@@ -68,6 +72,9 @@ async function portInUse(port: number): Promise<boolean> {
 }
 
 export async function startEmDash(options: StartOptions = {}): Promise<EmDashServer> {
+	if (options.format === 'sandboxed' && options.sandbox) {
+		throw new Error('The verification sandbox route is native only.');
+	}
 	const port = options.port ?? 4460 + Math.floor(Math.random() * 400);
 	// Astro would move to another port; a stale server would answer instead.
 	if (await portInUse(port)) {
@@ -83,6 +90,10 @@ export async function startEmDash(options: StartOptions = {}): Promise<EmDashSer
 			EMDASH_TEST_DB: `file:${database}`,
 			GRAFT_SANDBOX: options.sandbox ? '1' : '',
 			GRAFT_TEST_LOGIN: options.testLogin ? '1' : '',
+			GRAFT_FORMAT: options.format ?? 'native',
+			// A fixed test key: plugin settings with secrets need one.
+			EMDASH_ENCRYPTION_KEY: 'emdash_enc_v1_AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA',
+			GRAFT_ALLOWED_HOSTS: (options.allowedHosts ?? []).join(','),
 			ASTRO_TELEMETRY_DISABLED: '1',
 			...options.env,
 		},
@@ -171,4 +182,47 @@ export async function pluginRoute<T>(server: Pick<EmDashServer, 'url' | 'token'>
 		throw new Error(`${route}: ${response.status} ${json.error?.message ?? JSON.stringify(json)}${details}`);
 	}
 	return json.data as T;
+}
+
+/** EmDash's content REST API as the dev admin: seeding and checking a site without the sandbox route. */
+export function contentApi(server: Pick<EmDashServer, 'url' | 'token'>) {
+	const call = async <T>(method: string, path: string, body?: unknown): Promise<T> => {
+		const response = await fetch(`${server.url}/_emdash/api/content/${path}`, {
+			method,
+			headers: { Authorization: `Bearer ${server.token}`, 'X-EmDash-Request': '1', ...(body !== undefined ? { 'Content-Type': 'application/json' } : {}) },
+			...(body !== undefined ? { body: JSON.stringify(body) } : {}),
+		});
+		const json = (await response.json().catch(() => ({}))) as { data?: T; error?: { message?: string } };
+		if (!response.ok) {
+			throw new Error(`${method} ${path}: ${response.status} ${json.error?.message ?? ''}`);
+		}
+		return json.data as T;
+	};
+	type Item = { id: string; status: string; data: { title?: string } };
+	const list = async (collection = 'posts') => (await call<{ items: Item[] }>('GET', `${collection}?limit=100`)).items;
+	return {
+		list,
+		async find(title: string, collection = 'posts') {
+			return (await list(collection)).find((item) => item.data.title === title);
+		},
+		/** Creates entries oldest first; status draft, published or scheduled. */
+		async seed(entries: Array<{ title: string; status?: string; collection?: string }>) {
+			for (const entry of entries) {
+				const collection = entry.collection ?? 'posts';
+				const created = await call<{ item: Item }>('POST', collection, { data: { title: entry.title } });
+				const status = entry.status ?? 'published';
+				if (status === 'published') {
+					await call('POST', `${collection}/${created.item.id}/publish`, {});
+				} else if (status === 'scheduled') {
+					await call('POST', `${collection}/${created.item.id}/schedule`, { scheduledAt: new Date(Date.now() + 7 * 24 * 3600 * 1000).toISOString() });
+				}
+				await new Promise((resolve) => setTimeout(resolve, 5));
+			}
+		},
+		async clear(collection = 'posts') {
+			for (const item of await list(collection)) {
+				await call('DELETE', `${collection}/${item.id}`);
+			}
+		},
+	};
 }

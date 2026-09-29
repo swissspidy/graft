@@ -129,8 +129,6 @@ changes. The snapshot is `hosts/emdash/adapter/surfaces/1.0.json`.
   scope). `install` verifies a build in a local sandbox before sending
   it, `verify` attaches verifications to drafts (the `attach` route), and
   `pull` exports a site as a canary tenant.
-- Not done yet for EmDash:
-  - authoring in its admin;
-  - the sandboxed plugin format (needed for installs from EmDash's
-    registry);
-  - editor actions as a slot.
+- The sandboxed plugin format and authoring in the admin followed in
+  [ADR 0004](0004-emdash-sandbox-and-authoring.md).
+- Not done yet for EmDash: editor actions as a slot.

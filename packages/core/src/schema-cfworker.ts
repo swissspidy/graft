@@ -108,6 +108,11 @@ export function cfworkerEngine(): SchemaEngine {
 		compile(schema) {
 			// The library annotates the schema objects it is given; keep ours intact.
 			const own = typeof schema === 'boolean' ? schema : (structuredClone(schema) as Schema);
+			// Graft's schemas only use local refs (#/...). Resolving them against
+			// an absolute $id goes wrong under workerd, so resolve them locally.
+			if (typeof own === 'object') {
+				delete own.$id;
+			}
 			const reference = typeof schema === 'boolean' ? schema : structuredClone(schema);
 			const validator = new CfValidator(own, '2020-12', false);
 			const validate: Validator = (data: unknown) => {

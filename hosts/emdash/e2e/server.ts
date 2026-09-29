@@ -3,7 +3,11 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { loadExamples } from '../adapter/src/node/examples.ts';
 import { startSandbox, verifyInEmDash } from '../adapter/src/node/sandbox.ts';
+import { readFile } from 'node:fs/promises';
+import { modelAnswers, type Build } from '../../../packages/core/src/index.ts';
+import { saveSettings, startModelStub } from '../adapter/src/node/model-stub.ts';
 import { pluginRoute } from '../adapter/src/node/server.ts';
+import { authoredBuildFile } from './authoring.ts';
 
 /**
  * A seeded EmDash for the browser tests and for trying Graft by hand: the
@@ -19,15 +23,19 @@ import { pluginRoute } from '../adapter/src/node/server.ts';
 const port = Number(process.env.GRAFT_E2E_PORT ?? 4480);
 const marker = await mkdtemp(join(tmpdir(), 'graft-e2e-'));
 const ready = join(marker, 'ready');
+// Writing a customization in the admin talks to this stand-in for the Claude API.
+const authored = modelAnswers(JSON.parse(await readFile(authoredBuildFile, 'utf8')) as Build);
+const stub = await startModelStub([authored.checks, authored.tree]);
 const sandbox = await startSandbox({
 	port,
 	testLogin: true,
-	env: { GRAFT_READY_FILE: ready },
+	env: { GRAFT_READY_FILE: ready, GRAFT_TEST_MODEL_URL: stub.url },
 	log: process.env.GRAFT_E2E_VERBOSE ? (l) => process.stderr.write(l) : undefined,
 });
 const server = sandbox.server;
 const shutdown = async () => {
 	await rm(marker, { recursive: true, force: true });
+	stub.close();
 	await sandbox.close();
 	process.exit(0);
 };
@@ -51,5 +59,6 @@ await pluginRoute(server, 'sandbox', {
 if (process.env.GRAFT_E2E_INFO) {
 	await writeFile(process.env.GRAFT_E2E_INFO, JSON.stringify({ url: server.url, token: server.token }));
 }
+await saveSettings(server, { anthropicApiKey: 'sk-test-key', effort: 'low' });
 await writeFile(ready, '');
 console.log(`Graft on EmDash is ready at ${server.url}/_emdash/admin`);

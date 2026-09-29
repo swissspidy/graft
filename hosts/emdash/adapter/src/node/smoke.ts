@@ -1,14 +1,22 @@
 import type { Verification } from '@graft/core';
 import { loadExamples } from './examples.ts';
 import { startSandbox, verifyInEmDash } from './sandbox.ts';
-import { asUser, login, pluginRoute } from './server.ts';
+import { asUser, contentApi, login, pluginRoute, startEmDash } from './server.ts';
 
 /**
- * Plugin smoke test against a real EmDash: verifies the examples, installs
- * them, approves them, and serves them to real editor and contributor
- * sessions through the Block Kit routes, including refused and forged
- * interactions. Exit code 1 if any check fails.
+ * Plugin smoke test against a real EmDash: verifies the examples (in a
+ * separate, throwaway EmDash), installs them on a site, approves them, and
+ * serves them to real editor and contributor sessions through the Block Kit
+ * routes, including refused and forged interactions. Exit code 1 if any
+ * check fails.
+ *
+ *   tsx smoke.ts [--format native|sandboxed]
+ *
+ * With --format sandboxed the site runs Graft in EmDash's plugin sandbox
+ * (build it first: pnpm build:emdash).
  */
+
+const format = process.argv.includes('--format') ? (process.argv[process.argv.indexOf('--format') + 1] as 'native' | 'sandboxed') : 'native';
 
 type Block = Record<string, unknown> & { type: string };
 
@@ -38,10 +46,9 @@ function rows(blocks?: Block[]) {
 
 async function main(): Promise<number> {
 	const examples = await loadExamples();
-	const sandbox = await startSandbox({ testLogin: true });
-	const server = sandbox.server;
+	const [sandbox, server] = await Promise.all([startSandbox(), startEmDash({ format, testLogin: true })]);
+	const content = contentApi(server);
 	try {
-		// Verify in the same EmDash (each check resets it).
 		const verifications = await verifyInEmDash(examples, { sandbox });
 		verifications.forEach((v, i) => check(`${examples[i]!.name} passes its checks`, v.passed, v.results.filter((r) => !r.passed)));
 		const verification = (name: string) => verifications[examples.findIndex((e) => e.name === name)]!;
@@ -67,10 +74,11 @@ async function main(): Promise<number> {
 		const wrongScopes = structuredClone(example('drafts-glance').build);
 		(wrongScopes.data.drafts as { call: string }).call = 'content.publish';
 		const refused = await pluginRoute(server, 'install', { source: example('drafts-glance').source, build: wrongScopes }).then(
-			() => false,
-			(error: Error) => error.message.includes('400'),
+			() => 'accepted',
+			(error: Error) => error.message,
 		);
-		check('a build that does not match its spec is refused', refused);
+		// The sandbox reports route errors as 500s with the message.
+		check('a build that does not match its spec is refused', refused.includes('not valid for this spec'), refused);
 
 		// People.
 		const editor = await login(server, 'editor', 40);
@@ -82,51 +90,50 @@ async function main(): Promise<number> {
 		const page = (cookie: string, body: unknown) => asUser<{ blocks: Block[]; toast?: { message: string; type: string } }>(server, cookie, '/_emdash/api/plugins/graft/admin', body);
 
 		// Before approval nothing is served.
-		const before = await page(editor.cookie, { type: 'page_load', page: '/' });
+		const before = await page(editor.cookie, { type: 'page_load', page: '/customizations' });
 		check('nothing is served before approval', before.status === 200 && texts(before.data?.blocks).includes('No customizations for you yet'), before);
-		const manage = await admin({ type: 'page_load', page: '/' });
+		const manage = await admin({ type: 'page_load', page: '/customizations' });
 		check('admins see what waits for approval', texts(manage.data?.blocks).includes('Waiting for approval') && texts(manage.data?.blocks).includes('Only draft posts are listed'), manage);
 
 		// Approve from the admin screen, as an administrator would.
 		for (const id of ['publish-queue', 'drafts-glance', 'go-live']) {
-			const approved = await admin({ type: 'block_action', page: '/', action_id: 'graft:approve', value: id });
+			const approved = await admin({ type: 'block_action', page: '/customizations', action_id: 'graft:approve', value: id });
 			check(`${id}: approved from the Manage tab`, approved.data?.toast?.type === 'success', approved);
 		}
-		const editorApproves = await page(editor.cookie, { type: 'block_action', page: '/', action_id: 'graft:approve', value: 'publish-queue' });
+		const editorApproves = await page(editor.cookie, { type: 'block_action', page: '/customizations', action_id: 'graft:approve', value: 'publish-queue' });
 		check('editors cannot approve', editorApproves.data?.toast?.type === 'error', editorApproves);
 
-		// Content, created as the sandbox would.
-		await pluginRoute(server, 'sandbox', { op: 'reset' });
-		await pluginRoute(server, 'sandbox', { op: 'seed', fixtures: { entries: [{ title: 'Draft A', status: 'draft' }, { title: 'Post B', status: 'published' }] } });
+		// Content, through EmDash's own API.
+		await content.seed([{ title: 'Draft A', status: 'draft' }, { title: 'Post B', status: 'published' }]);
 
 		// The publish queue, as an editor.
-		const queue = await page(editor.cookie, { type: 'page_load', page: '/' });
+		const queue = await page(editor.cookie, { type: 'page_load', page: '/customizations' });
 		const editorRows = rows(queue.data?.blocks);
 		check('editors see the draft in the publish queue', editorRows?.length === 1 && editorRows[0]!.title === 'Draft A', queue);
 		const publish = editorRows?.[0]?.buttons[0];
 		check('editors get a Publish button', publish?.label === 'Publish', editorRows);
 
 		// As a contributor: the row, no button.
-		const contributorRows = rows((await page(contributor.cookie, { type: 'page_load', page: '/' })).data?.blocks);
+		const contributorRows = rows((await page(contributor.cookie, { type: 'page_load', page: '/customizations' })).data?.blocks);
 		check('contributors see the draft without a Publish button', contributorRows?.length === 1 && contributorRows[0]!.buttons.length === 0, contributorRows);
 
 		// Forged and refused interactions.
-		const forgedByContributor = await page(contributor.cookie, { type: 'block_action', page: '/', action_id: publish?.action_id, value: publish?.value });
+		const forgedByContributor = await page(contributor.cookie, { type: 'block_action', page: '/customizations', action_id: publish?.action_id, value: publish?.value });
 		check("a contributor replaying an editor's button is refused", forgedByContributor.data?.toast?.type === 'error', forgedByContributor);
-		const forgedValue = await page(editor.cookie, { type: 'block_action', page: '/', action_id: publish?.action_id, value: 'not-an-entry' });
+		const forgedValue = await page(editor.cookie, { type: 'block_action', page: '/customizations', action_id: publish?.action_id, value: 'not-an-entry' });
 		check('an action for a row that is not listed is refused', forgedValue.data?.toast?.type === 'error', forgedValue);
-		const draftStill = await pluginRoute<{ ok: boolean }>(server, 'sandbox', { op: 'assert', kind: 'entry', expected: { title: 'Draft A', status: 'draft' } });
-		check('refused actions change nothing', draftStill.ok, draftStill);
+		const draftStill = await content.find('Draft A');
+		check('refused actions change nothing', draftStill?.status === 'draft', draftStill);
 
 		// Publish for real.
-		const published = await page(editor.cookie, { type: 'block_action', page: '/', action_id: publish?.action_id, value: publish?.value });
+		const published = await page(editor.cookie, { type: 'block_action', page: '/customizations', action_id: publish?.action_id, value: publish?.value });
 		check('Publish shows its notice', published.data?.toast?.message === 'Published.', published);
 		check('the published post leaves the queue', rows(published.data?.blocks)?.length === 0 && texts(published.data?.blocks).includes('Nothing waiting'), published);
-		const isLive = await pluginRoute<{ ok: boolean; actual: unknown }>(server, 'sandbox', { op: 'assert', kind: 'entry', expected: { title: 'Draft A', status: 'published' } });
-		check('the post is published in EmDash', isLive.ok, isLive);
+		const isLive = await content.find('Draft A');
+		check('the post is published in EmDash', isLive?.status === 'published', isLive);
 
 		// The dashboard widget.
-		await pluginRoute(server, 'sandbox', { op: 'seed', fixtures: { entries: [{ title: 'Draft C', status: 'draft' }] } });
+		await content.seed([{ title: 'Draft C', status: 'draft' }]);
 		const widget = await page(editor.cookie, { type: 'page_load', page: 'widget:customizations' });
 		check('the dashboard widget lists drafts under its title', texts(widget.data?.blocks).includes('"text":"Drafts"') && rows(widget.data?.blocks)?.[0]?.title === 'Draft C', widget);
 		const contributorWidget = await page(contributor.cookie, { type: 'page_load', page: 'widget:customizations' });
@@ -149,17 +156,17 @@ async function main(): Promise<number> {
 		const authorPanel = await asUser<{ blocks: Block[] }>(server, author.cookie, panelPath, { type: 'panel_load' });
 		check('the panel is not shown outside its audience', authorPanel.status === 200 ? texts(authorPanel.data?.blocks).includes('No customizations for this entry.') : authorPanel.status === 403, authorPanel);
 	} finally {
-		await sandbox.close();
+		await Promise.all([sandbox.close(), server.close()]);
 	}
 
 	for (const c of checks) {
 		console.log(`  ${c.ok ? '✔' : '✖'} ${c.name}`);
 		if (!c.ok) {
-			console.log(`      ${JSON.stringify(c.detail).slice(0, 2000)}`);
+			console.log(`      ${String(JSON.stringify(c.detail)).slice(0, 2000)}`);
 		}
 	}
 	const failed = checks.filter((c) => !c.ok).length;
-	console.log(failed ? `\n${failed} check(s) failed` : `\nAll ${checks.length} checks passed`);
+	console.log(failed ? `\n${failed} check(s) failed (${format})` : `\nAll ${checks.length} checks passed (${format})`);
 	return failed ? 1 : 0;
 }
 

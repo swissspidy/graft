@@ -4,5 +4,5 @@
     "noEmit": true,
     "jsx": "react-jsx"
   },
-  "include": ["src", "test", "e2e"]
+  "include": ["src", "test", "scripts"]
 }
