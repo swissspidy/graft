@@ -80,6 +80,8 @@ jobs:
         run: pnpm verify:emdash
       - name: Smoke test the plugin in EmDash (install, approve, serve, refuse)
         run: pnpm test:emdash
+      - name: Compile pipeline with a scripted model against EmDash
+        run: pnpm test:compile:emdash
       - name: Install Chromium
         run: pnpm exec playwright install --with-deps chromium
       - name: End-to-end tests in the EmDash admin

@@ -169,6 +169,7 @@ pnpm graft site pull --site <url> --user <admin> --password <app password> --out
 | `pnpm test:canary` | Six synthetic host changes, each forcing one rung, against a four-tenant corpus |
 | `pnpm test:e2e` | Playwright in wp-admin: serving, gateway, approval, authoring, `graft site` |
 | `pnpm verify:emdash` | The EmDash example builds' checks in a throwaway EmDash |
+| `pnpm test:compile:emdash` | The compile pipeline with a scripted model against EmDash |
 | `pnpm test:emdash` | EmDash plugin smoke test: install, approve, serve per role, forged and refused actions |
 | `pnpm test:e2e:emdash` | Playwright in the EmDash admin: the page, the widget and the editor panel |
 
