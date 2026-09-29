@@ -1,9 +1,9 @@
 import type { Build } from '../build/types.ts';
-import { createAjv } from '../ajv.ts';
+import '../ajv.ts';
+import { compileSchema } from '../schema.ts';
 import type { Slot, Surface } from '../surface/types.ts';
 import { slotPropsUsed } from './static-check.ts';
 
-const ajv = createAjv();
 
 /** Slots in `to` that could host this build instead of its current one. */
 export function reanchorCandidates(build: Build, from: Surface, to: Surface): string[] {
@@ -32,7 +32,7 @@ function fits(slot: Slot, before: Slot | undefined, build: Build, needed: string
 	if (!needed.every((prop) => prop in provides)) {
 		return false;
 	}
-	return slot.options === undefined || ajv.compile(slot.options)(options) === true;
+	return slot.options === undefined || compileSchema(slot.options)(options) === true;
 }
 
 /**

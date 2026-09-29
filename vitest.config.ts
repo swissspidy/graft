@@ -13,5 +13,6 @@ export default defineConfig({
 	},
 	test: {
 		include: ['packages/*/test/**/*.test.{ts,tsx}', 'hosts/*/adapter/test/**/*.test.{ts,tsx}'],
+		setupFiles: ['packages/core/test/setup/engine.ts'],
 	},
 });

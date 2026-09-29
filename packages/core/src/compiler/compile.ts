@@ -1,5 +1,7 @@
 import buildSchema from '../../../../schemas/build.schema.json' with { type: 'json' };
-import { createAjv } from '../ajv.ts';
+import '../ajv.ts';
+import { describeSchemaError } from '../schema-errors.ts';
+import { lazyValidator, type Validator } from '../schema.ts';
 import { extractRefs } from '../build/refs.ts';
 import type { Build, Check } from '../build/types.ts';
 import { validateBuild } from '../build/validate.ts';
@@ -11,9 +13,8 @@ import type { CompileAttempt, CompileOptions, CompileResult } from './types.ts';
 
 export const COMPILER_VERSION = 'graft-compiler/0.1.0';
 
-const ajv = createAjv();
-ajv.addSchema(buildSchema);
-const validateCheck = ajv.getSchema(`${buildSchema.$id}#/$defs/check`)!;
+// The check definition, with the definitions it refers to.
+const validateCheck: Validator = lazyValidator({ $defs: buildSchema.$defs, $ref: '#/$defs/check' });
 
 /**
  * Compiles a spec into a build for one surface, in two phases:
@@ -150,7 +151,7 @@ function checkProblems(checks: Check[], criteria: string[]): string[] {
 	const problems: string[] = [];
 	checks.forEach((check, i) => {
 		if (!validateCheck(check)) {
-			problems.push(`Check ${i + 1} (${check.criterion}) is malformed: ${ajv.errorsText(validateCheck.errors)}.`);
+			problems.push(`Check ${i + 1} (${check.criterion}) is malformed: ${(validateCheck.errors ?? []).map((e) => describeSchemaError(e, '', 'the check')).join(' ')}.`);
 		}
 	});
 	for (const id of criteria) {

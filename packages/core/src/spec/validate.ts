@@ -1,5 +1,6 @@
 import specSchema from '../../../../schemas/spec.schema.json' with { type: 'json' };
-import { createAjv } from '../ajv.ts';
+import '../ajv.ts';
+import { lazyValidator } from '../schema.ts';
 import { hasErrors, type Diagnostic } from '../diagnostics.ts';
 import { describeSchemaError, schemaErrorPath } from '../schema-errors.ts';
 import type { Surface } from '../surface/types.ts';
@@ -7,7 +8,7 @@ import { parseSpec } from './parse.ts';
 import { checkManifestAgainstSurface } from './surface.ts';
 import type { Spec, SpecManifest } from './types.ts';
 
-const validateManifest = createAjv().compile<SpecManifest>(specSchema);
+const validateManifest = lazyValidator<SpecManifest>(specSchema);
 
 export interface SpecValidation {
 	ok: boolean;

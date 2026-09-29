@@ -1,4 +1,4 @@
-import type { ErrorObject } from 'ajv';
+import type { SchemaError as ErrorObject } from './schema.ts';
 
 /** JSON pointer of the value an Ajv error is about. */
 export function schemaErrorPath(error: ErrorObject): string {

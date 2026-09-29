@@ -8,9 +8,11 @@
   "exports": {
     ".": "./src/index.ts",
     "./runtime": "./src/runtime.ts",
-    "./parse": "./src/spec/parse.ts"
+    "./parse": "./src/spec/parse.ts",
+    "./cfworker": "./src/schema-cfworker.ts"
   },
   "dependencies": {
+    "@cfworker/json-schema": "^4.1.1",
     "ajv": "^8.17.0",
     "ajv-formats": "^3.0.1",
     "yaml": "^2.8.0"

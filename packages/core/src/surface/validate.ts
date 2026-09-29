@@ -1,12 +1,12 @@
 import surfaceSchema from '../../../../schemas/surface.schema.json' with { type: 'json' };
-import { createAjv } from '../ajv.ts';
+import '../ajv.ts';
+import { compileSchema, lazyValidator } from '../schema.ts';
 import { hasErrors, type Diagnostic } from '../diagnostics.ts';
 import { describeSchemaError, schemaErrorPath } from '../schema-errors.ts';
 import { hashSurface } from './hash.ts';
 import type { JsonSchema, Surface } from './types.ts';
 
-const ajv = createAjv();
-const validateShape = ajv.compile<Surface>(surfaceSchema);
+const validateShape = lazyValidator<Surface>(surfaceSchema);
 
 export interface SurfaceValidation {
 	ok: boolean;
@@ -97,7 +97,7 @@ function checkEmbedded(schema: JsonSchema | undefined, path: string, diagnostics
 		return;
 	}
 	try {
-		ajv.compile(schema);
+		compileSchema(schema);
 	} catch (e) {
 		diagnostics.push({
 			severity: 'error',

@@ -93,7 +93,8 @@ describe('validateSurface', () => {
 		]);
 	});
 
-	it('rejects embedded schemas that do not compile', async () => {
+	// Ajv only: the cfworker engine does not reject unknown keywords.
+	it.skipIf(process.env.GRAFT_SCHEMA_ENGINE === 'cfworker')('rejects embedded schemas that do not compile', async () => {
 		const s = surface();
 		s.components.button!.props = { type: 'object', properties: { label: { type: 'strin' } } };
 		expect((await validateSurface(s)).diagnostics).toEqual([

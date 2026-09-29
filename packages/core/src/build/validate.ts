@@ -1,6 +1,7 @@
-import type { ErrorObject, ValidateFunction } from 'ajv';
+import type { SchemaError as ErrorObject, Validator } from '../schema.ts';
 import buildSchema from '../../../../schemas/build.schema.json' with { type: 'json' };
-import { createAjv } from '../ajv.ts';
+import '../ajv.ts';
+import { compileSchema, lazyValidator } from '../schema.ts';
 import { hasErrors, type Diagnostic } from '../diagnostics.ts';
 import { describeSchemaError, schemaErrorPath } from '../schema-errors.ts';
 import type { Spec } from '../spec/types.ts';
@@ -10,9 +11,7 @@ import { isBinding, isCall, isCan, isDataRef, isSlotRef, walkTree, walkValue } f
 import { extractRefs } from './refs.ts';
 import type { Build, Refs, Value } from './types.ts';
 
-const ajv = createAjv();
-const validateShape = ajv.compile<Build>(buildSchema);
-const compiled = new WeakMap<object, ValidateFunction>();
+const validateShape = lazyValidator<Build>(buildSchema);
 
 export interface BuildValidation {
 	ok: boolean;
@@ -242,14 +241,6 @@ function replaceBindings(value: unknown, path: string, found: string[]): unknown
 	return value;
 }
 
-function compile(schema: JsonSchema): ValidateFunction {
-	if (typeof schema === 'boolean') {
-		return ajv.compile(schema);
-	}
-	let validate = compiled.get(schema);
-	if (!validate) {
-		validate = ajv.compile(schema);
-		compiled.set(schema, validate);
-	}
-	return validate;
+function compile(schema: JsonSchema): Validator {
+	return compileSchema(schema);
 }

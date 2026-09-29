@@ -1,12 +1,10 @@
-import type { ValidateFunction } from 'ajv';
-import { createAjv } from '../ajv.ts';
+import '../ajv.ts';
+import { compileSchema, type Validator } from '../schema.ts';
 import type { Diagnostic } from '../diagnostics.ts';
 import { describeSchemaError, schemaErrorPath } from '../schema-errors.ts';
 import type { Surface } from '../surface/types.ts';
 import type { SpecManifest } from './types.ts';
 
-const ajv = createAjv();
-const optionValidators = new WeakMap<object, ValidateFunction>();
 
 /**
  * Phase two of spec validation: checks the manifest's mount, audience and
@@ -87,14 +85,6 @@ export function checkManifestAgainstSurface(
 	return diagnostics;
 }
 
-function optionsValidator(schema: object | boolean): ValidateFunction {
-	if (typeof schema === 'boolean') {
-		return ajv.compile(schema);
-	}
-	let validate = optionValidators.get(schema);
-	if (!validate) {
-		validate = ajv.compile(schema);
-		optionValidators.set(schema, validate);
-	}
-	return validate;
+function optionsValidator(schema: object | boolean): Validator {
+	return compileSchema(schema);
 }

@@ -1,5 +1,6 @@
 export { hasErrors, type Diagnostic, type Severity } from './diagnostics.ts';
-export { createAjv } from './ajv.ts';
+export { ajvEngine, createAjv } from './ajv.ts';
+export { compileSchema, setSchemaEngine, type SchemaEngine, type SchemaError, type Validator } from './schema.ts';
 export { parseSpec, type ParsedSpec } from './spec/parse.ts';
 export { validateSpec, type SpecValidation, type ValidateSpecOptions } from './spec/validate.ts';
 export { checkManifestAgainstSurface } from './spec/surface.ts';

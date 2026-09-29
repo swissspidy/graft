@@ -25,6 +25,8 @@ jobs:
       - run: pnpm install --frozen-lockfile
       - run: pnpm typecheck
       - run: pnpm test
+      - name: Tests again on the schema engine used in sandboxes (no code generation)
+        run: pnpm test:cfworker
       - run: pnpm validate:examples
 
   wordpress:
