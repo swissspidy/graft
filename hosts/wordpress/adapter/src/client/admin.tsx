@@ -2,9 +2,10 @@ import { useCallback, useEffect, useState } from 'react';
 import { createRoot } from 'react-dom/client';
 import apiFetch from '@wordpress/api-fetch';
 import { Button, Card, CardBody, CardHeader, Notice, Spinner } from '@wordpress/components';
-import { describeCheck, type Build } from '@graft/core/runtime';
+import { describeCheck, type Build, type Surface } from '@graft/core';
 import { parseSpec } from '@graft/core/parse';
 import { describers } from '../describe.ts';
+import { Authoring } from './authoring.tsx';
 
 /**
  * Tools → Customizations: every spec on the site with its state, the
@@ -14,7 +15,7 @@ import { describers } from '../describe.ts';
 
 interface AdminConfig {
 	scopes: Record<string, string>;
-	surface: { hash: string; hostVersion: string } | null;
+	surface: (Surface & { hash: string }) | null;
 }
 
 interface VersionRecord {
@@ -80,7 +81,9 @@ function Version({ version, config, onEvent, busy }: { version: VersionRecord; c
 				<strong data-graft-state={version.state}>{stateLabels[version.state] ?? version.state}</strong>
 				{` · version ${version.version}`}
 				{version.unverified ? ' · not verified' : ''}
-				{current ? ` · build ${current.build.provenance.strategy ?? 'compiled'}${current.verification?.passed ? ', verified' : ''}` : ' · no build for this WordPress'}
+				{current
+					? ` · build ${current.build.provenance.strategy ?? 'compiled'}${current.verification?.passed ? ', verified' : ', not verified yet'}`
+					: ' · no build for this WordPress'}
 			</p>
 
 			<h4>Permissions</h4>
@@ -137,6 +140,8 @@ function App({ config }: { config: AdminConfig }) {
 	const [specs, setSpecs] = useState<SpecRecord[] | null>(null);
 	const [error, setError] = useState<string | null>(null);
 	const [busy, setBusy] = useState<string | null>(null);
+	const [authoring, setAuthoring] = useState(false);
+	const [saved, setSaved] = useState<string | null>(null);
 
 	const load = useCallback(async () => {
 		try {
@@ -171,6 +176,36 @@ function App({ config }: { config: AdminConfig }) {
 				<Notice status="error" onRemove={() => setError(null)}>
 					{error}
 				</Notice>
+			) : null}
+			{saved ? (
+				<Notice status="success" onRemove={() => setSaved(null)}>
+					{saved}
+				</Notice>
+			) : null}
+			{config.surface && !authoring ? (
+				<div>
+					<Button variant="primary" onClick={() => setAuthoring(true)}>
+						New customization
+					</Button>
+				</div>
+			) : null}
+			{config.surface && authoring ? (
+				<Card>
+					<CardHeader>
+						<strong>New customization</strong>
+					</CardHeader>
+					<CardBody>
+						<Authoring
+							surface={config.surface}
+							onCancel={() => setAuthoring(false)}
+							onSaved={(message) => {
+								setAuthoring(false);
+								setSaved(message);
+								void load();
+							}}
+						/>
+					</CardBody>
+				</Card>
 			) : null}
 			{specs === null ? <Spinner /> : null}
 			{specs?.length === 0 ? <p>No customizations yet.</p> : null}

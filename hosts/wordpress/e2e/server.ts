@@ -2,7 +2,7 @@ import { spawn } from 'node:child_process';
 import { mkdtemp, readFile, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { exampleFixtures } from '../adapter/src/fixtures.ts';
+import { exampleFixtures, examplesDir, modelAnswers } from '../adapter/src/fixtures.ts';
 import { DEFAULT_PHP, PLAYGROUND_CLI, paths } from '../adapter/src/playground.ts';
 
 /**
@@ -18,6 +18,8 @@ const dir = await mkdtemp(join(tmpdir(), 'graft-e2e-'));
 // Verify the example builds first: the site only serves verified builds.
 const surface = JSON.parse(await readFile(join(paths.surfaces, `${wp}.json`), 'utf8'));
 await writeFile(join(dir, 'examples.json'), JSON.stringify(await exampleFixtures({ verifyAgainst: surface })));
+// The scripted model answers with the waiting-posts build, for authoring tests.
+await writeFile(join(dir, 'model.json'), JSON.stringify(modelAnswers(JSON.parse(await readFile(join(examplesDir, 'builds/waiting-posts.json'), 'utf8')))));
 await writeFile(
 	join(dir, 'blueprint.json'),
 	JSON.stringify({
@@ -25,6 +27,11 @@ await writeFile(
 		steps: [
 			{ step: 'activatePlugin', pluginPath: 'graft/graft.php' },
 			{ step: 'runPHP', code: "<?php require '/graft-playground/seed-e2e.php';" },
+			{
+				step: 'writeFile',
+				path: '/wordpress/wp-content/mu-plugins/graft-e2e-model.php',
+				data: "<?php require '/graft-playground/e2e-model.php';",
+			},
 		],
 	}),
 );

@@ -66,6 +66,14 @@ a hash and need no rebuild.
   (granted or not), and each check rendered as a sentence next to the
   criterion it proves, with Approve, Decline, Archive and upgrade actions.
   Built from `adapter/src/client/admin.tsx` into `plugin/build/admin.js`.
+- **Authoring.** "New customization" on the same screen opens a spec
+  editor that validates against the site's surface as you type and
+  compiles in the browser. Model requests go to `POST /graft/v1/generate`
+  (administrators only), which answers through `wp_ai_client_prompt()`, so
+  provider keys stay in the site's AI settings; the `graft_pre_generate`
+  filter can answer instead (the e2e tests script it). Compiled builds are
+  saved as drafts until they are verified. Needs a secure context (HTTPS or
+  localhost) for hashing.
 - **REST.** `GET/POST /graft/v1/specs`,
   `POST /graft/v1/specs/<id>/versions/<n>/builds|approve|decline|archive`
   (administrators; users may create `user`-scoped specs).

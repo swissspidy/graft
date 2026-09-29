@@ -237,10 +237,8 @@ function register_admin_screen(): void {
 							},
 							surface_scopes()
 						),
-						'surface' => $surface ? array(
-							'hash'        => $surface['hash'],
-							'hostVersion' => $surface['hostVersion'],
-						) : null,
+						// The whole snapshot: the editor validates and compiles against it.
+						'surface' => $surface,
 					),
 					JSON_HEX_TAG | JSON_HEX_AMP
 				) . ';',

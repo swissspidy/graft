@@ -1,3 +1,4 @@
+import { readFileSync } from 'node:fs';
 import { expect, test, type Page } from '@playwright/test';
 
 /**
@@ -101,7 +102,7 @@ test('the served specs are verified, not flagged', async ({ page }) => {
 		spec_id: string;
 		versions: Array<{ state: string; unverified: boolean; builds: Record<string, { verification: { passed: boolean } | null }> }>;
 	}>;
-	expect(specs.map((s) => [s.spec_id, s.versions[0]!.state]).sort()).toEqual([
+	expect(specs.filter((s) => s.spec_id !== 'waiting-copy').map((s) => [s.spec_id, s.versions[0]!.state]).sort()).toEqual([
 		['quick-approve', 'active'],
 		['review-queue', 'active'],
 		['waiting-posts', 'needs_approval'],
@@ -136,6 +137,45 @@ test('admins review a customization in plain language, approve it, and it appear
 	const widget = page.locator('#graft-waiting-posts');
 	await expect(widget).toContainText('Waiting for review');
 	await expect(widget.locator('[data-graft-empty]')).toHaveText('Nothing is waiting');
+});
+
+const copySource = readFileSync(new URL('../../../examples/specs/waiting-posts.md', import.meta.url), 'utf8')
+	.replace('id: waiting-posts', 'id: waiting-copy')
+	.replace('# Waiting for review', '# Waiting (copy)');
+
+test('admins write a spec in wp-admin, see it validated, and build it', async ({ page }) => {
+	await login(page, 'admin');
+	await page.goto('/wp-admin/tools.php?page=graft-customizations');
+	await page.getByRole('button', { name: 'New customization' }).click();
+	const editor = page.locator('#graft-spec-source');
+
+	await editor.fill(copySource.replace('posts:read', 'posts:delete'));
+	await expect(page.locator('.graft-diagnostics')).toContainText('Line 10:');
+	await expect(page.getByRole('button', { name: 'Build it' })).toBeDisabled();
+
+	await editor.fill(copySource);
+	await expect(page.locator('.graft-diagnostics')).toContainText('Valid for this site.');
+	await page.getByRole('button', { name: 'Build it' }).click();
+	await expect(page.locator('.components-notice__content', { hasText: '"Waiting (copy)" was built.' })).toBeVisible({ timeout: 30_000 });
+	await expect(page.locator('.graft-build-log')).toHaveCount(0);
+
+	const card = page.locator('[data-graft-spec="waiting-copy"]');
+	await expect(card.locator('[data-graft-state]')).toHaveText('Draft');
+	await expect(card).toContainText('not verified yet');
+	await expect(card.locator('.graft-checks')).toContainText('Shows at most five posts');
+});
+
+test('only administrators may use the model proxy', async ({ page }) => {
+	await login(page, 'editor');
+	const status = await page.evaluate(async () => {
+		try {
+			await window.wp.apiFetch({ path: '/graft/v1/generate', method: 'POST', data: { purpose: 'tree', system: '', prompt: '', schema: {} } });
+			return 'allowed';
+		} catch (error) {
+			return (error as { code: string }).code;
+		}
+	});
+	expect(status).toBe('rest_forbidden');
 });
 
 test('subscribers get no review queue', async ({ page }) => {

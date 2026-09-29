@@ -1,6 +1,6 @@
 import { readdir, readFile } from 'node:fs/promises';
 import { fileURLToPath } from 'node:url';
-import { hashSpec, validateSpec, type Build, type Surface, type Verification } from '@graft/core';
+import { hashSpec, validateSpec, type Build, type Check, type Surface, type TreeNode, type Verification } from '@graft/core';
 import { verifyInWordPress } from './verify.ts';
 
 export const examplesDir = fileURLToPath(new URL('../../../../examples', import.meta.url));
@@ -57,4 +57,39 @@ export async function exampleFixtures(options: { verifyAgainst?: Surface } = {})
 		});
 	}
 	return fixtures;
+}
+
+/**
+ * A build expressed as the compiler's model output (flat nodes, JSON
+ * strings), for scripted models in tests.
+ */
+export function modelAnswers(build: Build, dataInput?: Record<string, unknown>) {
+	const nodes: Array<{ id: string; parent: string | null; type: string; props_json: string; text: string | null }> = [];
+	const visit = (node: TreeNode, parent: string | null) => {
+		const id = `n${nodes.length}`;
+		nodes.push({ id, parent, type: node.type, props_json: JSON.stringify(node.props ?? {}), text: typeof node.children === 'string' ? node.children : null });
+		if (Array.isArray(node.children)) {
+			node.children.forEach((child) => visit(child, id));
+		}
+	};
+	visit(build.tree, null);
+	return {
+		checks: {
+			checks: build.checks.map((c: Check) => ({
+				criterion: c.criterion,
+				fixtures_json: JSON.stringify(c.fixtures ?? {}),
+				view_as: c.view_as ?? '',
+				steps_json: JSON.stringify(c.steps ?? []),
+				expect_json: JSON.stringify(c.expect),
+			})),
+		},
+		tree: {
+			nodes,
+			data: Object.entries(build.data).map(([name, source]) => ({
+				name,
+				call: source.call,
+				input_json: JSON.stringify(dataInput?.[name] ?? source.input ?? null),
+			})),
+		},
+	};
 }

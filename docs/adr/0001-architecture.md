@@ -618,7 +618,9 @@ Still open: 1 (partly addressed, see below), 2 and 4.
    settings and one compiler serves both the plugin and the CLI (which calls
    a provider directly). The alternative is a PHP port of the compiler,
    which avoids the round trips but doubles the code to maintain.
-   *Resolved: TypeScript core.*
+   *Resolved: TypeScript core.* *Implemented: wp-admin compiles in the browser through
+   `POST /graft/v1/generate`, which calls `wp_ai_client_prompt()` with
+   `as_json_response()`.*
 6. **Minimum WordPress version.** The WordPress AI client and client-side
    abilities arrived in 7.0, so the plugin targets 7.0+. Is 6.9 support
    (server abilities only, no in-admin compilation) worth anything?
