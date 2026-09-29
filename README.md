@@ -153,9 +153,11 @@ pnpm graft canary --corpus fixtures/canary/tenants \
   --from hosts/wordpress/plugin/surfaces/7.1.json --scenario move-row-actions   # or --to <surface.json>
 pnpm surface:generate [--wp nightly] [--check]
 
-# A live site (application password)
+# A live site: WordPress (application password) or EmDash (API token with the admin scope)
 pnpm graft site verify --site <url> --user <admin> --password <app password>
 pnpm graft site pull --site <url> --user <admin> --password <app password> --out corpus/<tenant>
+pnpm graft site install examples/emdash/specs/publish-queue.md examples/emdash/builds/publish-queue.json --site <url> --token <token>
+pnpm graft site verify --site <url> --token <token>
 ```
 
 ## Tests
@@ -171,6 +173,7 @@ pnpm graft site pull --site <url> --user <admin> --password <app password> --out
 | `pnpm verify:emdash` | The EmDash example builds' checks in a throwaway EmDash |
 | `pnpm test:compile:emdash` | The compile pipeline with a scripted model against EmDash |
 | `pnpm test:canary:emdash` | Six synthetic EmDash changes, each forcing one rung, against a two-tenant corpus |
+| `pnpm test:site:emdash` | `graft site` against a live EmDash: install with local verification, verify drafts, pull into the canary |
 | `pnpm test:emdash` | EmDash plugin smoke test: install, approve, serve per role, forged and refused actions |
 | `pnpm test:e2e:emdash` | Playwright in the EmDash admin: the page, the widget and the editor panel |
 

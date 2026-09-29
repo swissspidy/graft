@@ -125,8 +125,11 @@ changes. The snapshot is `hosts/emdash/adapter/surfaces/1.0.json`.
   change an input, move a slot) to the surface it reports and to the calls
   it runs. Six scenarios each force one rung of the ladder
   (`pnpm test:canary:emdash`).
+- `graft site` works with EmDash (`--token`, an API token with the admin
+  scope). `install` verifies a build in a local sandbox before sending
+  it, `verify` attaches verifications to drafts (the `attach` route), and
+  `pull` exports a site as a canary tenant.
 - Not done yet for EmDash:
-  - `graft site` against a live EmDash;
   - authoring in its admin;
   - the sandboxed plugin format (needed for installs from EmDash's
     registry);

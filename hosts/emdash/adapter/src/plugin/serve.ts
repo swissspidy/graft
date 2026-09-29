@@ -160,7 +160,7 @@ const isAdmin = (viewer: Viewer) => hasPermission({ role: viewer.role as RoleLev
 async function manage(store: Store, surface: Surface): Promise<Block[]> {
 	const records = await store.list();
 	if (records.length === 0) {
-		return [{ type: 'empty', title: 'No customizations yet', description: 'Customizations are installed through POST /_emdash/api/plugins/graft/install.' }];
+		return [{ type: 'empty', title: 'No customizations yet', description: 'Install one with graft site install.' }];
 	}
 	const blocks: Block[] = [];
 	for (const record of records) {

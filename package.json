@@ -24,7 +24,8 @@
     "test:emdash": "tsx hosts/emdash/adapter/src/node/smoke.ts",
     "test:e2e:emdash": "playwright test -c hosts/emdash/e2e/playwright.config.ts",
     "test:compile:emdash": "tsx hosts/emdash/adapter/src/node/compile-smoke.ts",
-    "test:canary:emdash": "tsx hosts/emdash/adapter/src/node/canary-test.ts"
+    "test:canary:emdash": "tsx hosts/emdash/adapter/src/node/canary-test.ts",
+    "test:site:emdash": "tsx hosts/emdash/adapter/src/node/site-test.ts"
   },
   "pnpm": {
     "onlyBuiltDependencies": [

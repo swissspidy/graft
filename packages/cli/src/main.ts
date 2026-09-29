@@ -3,6 +3,7 @@ import { anthropicModel, DEFAULT_MODEL } from './anthropic.ts';
 import { checkBuildFile } from './build.ts';
 import { canaryCommand } from './canary.ts';
 import { compileFile } from './compile.ts';
+import { emdashSiteInstall, emdashSitePull, emdashSiteVerify } from './site-emdash.ts';
 import { sitePull, siteVerify, type Site } from './site.ts';
 import { formatCanaryReport } from '@graft/core';
 import { formatVerification, verifyFiles } from './verify.ts';
@@ -44,11 +45,15 @@ Commands:
     --json             Print the report as JSON
   site verify          Verify a site's unverified builds (e.g. built in wp-admin) and send the results
   site pull            Export a site's active customizations as a canary corpus tenant
+  site install <spec> <build>
+                       EmDash: verify a build locally and install it on the site
     --site <url>       Site with the Graft plugin (or GRAFT_SITE)
-    --user <login>     Administrator (or GRAFT_USER)
-    --password <app>   Application password (or GRAFT_APP_PASSWORD)
-    --surfaces <dir>   Surface snapshots (default: hosts/wordpress/plugin/surfaces)
+    --user <login>     WordPress: administrator (or GRAFT_USER)
+    --password <app>   WordPress: application password (or GRAFT_APP_PASSWORD)
+    --token <token>    EmDash: API token with the admin scope (or GRAFT_TOKEN)
+    --surfaces <dir>   Surface snapshots (default: the host's surfaces directory)
     --out <dir>        pull: tenant directory to write
+    --no-verify        install: send the build unverified (it stays a draft)
 
 See docs/adr/0001-architecture.md for how the pieces fit together.`;
 
@@ -199,24 +204,31 @@ export async function main(argv: string[]): Promise<number> {
 	}
 	if (command === 'site') {
 		const [action, ...args] = rest;
-		const { values } = parseArgs({
+		const { values, positionals } = parseArgs({
 			args,
+			allowPositionals: true,
 			options: {
 				site: { type: 'string', default: process.env.GRAFT_SITE },
 				user: { type: 'string', default: process.env.GRAFT_USER },
 				password: { type: 'string', default: process.env.GRAFT_APP_PASSWORD },
-				surfaces: { type: 'string', default: 'hosts/wordpress/plugin/surfaces' },
+				token: { type: 'string', default: process.env.GRAFT_TOKEN },
+				surfaces: { type: 'string' },
 				out: { type: 'string' },
 				json: { type: 'boolean', default: false },
+				'no-verify': { type: 'boolean', default: false },
 			},
 		});
-		if (!values.site || !values.user || !values.password) {
-			console.error('graft site: pass --site, --user and --password (an application password).');
+		// A token means EmDash; a user and application password mean WordPress.
+		const emdash = values.site && values.token ? { url: values.site, token: values.token } : undefined;
+		const wordpress: Site | undefined = values.site && values.user && values.password ? { url: values.site, user: values.user, password: values.password } : undefined;
+		if (!emdash && !wordpress) {
+			console.error('graft site: pass --site and either --token (EmDash) or --user and --password (WordPress).');
 			return 2;
 		}
-		const site: Site = { url: values.site, user: values.user, password: values.password };
 		if (action === 'verify') {
-			const results = await siteVerify(site, values.surfaces, (line) => console.error(line));
+			const results = emdash
+				? await emdashSiteVerify(emdash, values.surfaces ?? 'hosts/emdash/adapter/surfaces', (line) => console.error(line))
+				: await siteVerify(wordpress!, values.surfaces ?? 'hosts/wordpress/plugin/surfaces', (line) => console.error(line));
 			if (values.json) {
 				console.log(JSON.stringify(results, null, 2));
 			} else if (results.length === 0) {
@@ -235,11 +247,27 @@ export async function main(argv: string[]): Promise<number> {
 				console.error('graft site pull: pass --out <dir>.');
 				return 2;
 			}
-			const written = await sitePull(site, values.out);
+			const written = emdash ? await emdashSitePull(emdash, values.out) : await sitePull(wordpress!, values.out);
 			console.log(`Wrote ${written.length} customization(s) to ${values.out}: ${written.join(', ') || '(none)'}`);
 			return 0;
 		}
-		console.error('graft site: use "verify" or "pull".');
+		if (action === 'install') {
+			const [specFile, buildFile] = positionals;
+			if (!emdash || !specFile || !buildFile) {
+				console.error('graft site install: pass --site, --token (EmDash), a spec and a build. On WordPress, install from Tools → Customizations.');
+				return 2;
+			}
+			const result = await emdashSiteInstall(emdash, specFile, buildFile, { verify: !values['no-verify'], log: (line) => console.error(line) });
+			if (values.json) {
+				console.log(JSON.stringify(result, null, 2));
+			} else {
+				const checks = result.verification ? ` (${result.verification.results.filter((r) => r.passed).length}/${result.verification.results.length} checks passed)` : ' (not verified)';
+				console.log(`${result.id} v${result.version}: ${result.state.replace('_', ' ')}${checks}`);
+				result.verification?.results.filter((r) => !r.passed).forEach((r) => r.failures.forEach((f) => console.log(`    ${r.criterion}: ${f}`)));
+			}
+			return result.verification?.passed === false ? 1 : 0;
+		}
+		console.error('graft site: use "verify", "pull" or "install".');
 		return 2;
 	}
 	if (command === undefined || command === 'help' || command === '--help' || command === '-h') {

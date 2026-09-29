@@ -84,6 +84,8 @@ jobs:
         run: pnpm test:compile:emdash
       - name: Every synthetic EmDash change reaches its expected rung
         run: pnpm test:canary:emdash
+      - name: graft site against a live EmDash (install, verify, pull)
+        run: pnpm test:site:emdash
       - name: Install Chromium
         run: pnpm exec playwright install --with-deps chromium
       - name: End-to-end tests in the EmDash admin

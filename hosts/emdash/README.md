@@ -26,6 +26,19 @@ Customizations appear under **Plugins → Customizations** as tabs, in a
 **Customizations** widget on the dashboard, and in a **Customizations**
 panel in the entry editor.
 
+Install and verify them from a terminal with an API token that has the
+admin scope:
+
+```sh
+pnpm graft site install <spec.md> <build.json> --site https://example.com --token <token>
+pnpm graft site verify --site https://example.com --token <token>   # drafts installed with --no-verify
+pnpm graft site pull --site https://example.com --token <token> --out corpus/<tenant>
+```
+
+`install` checks the build against the site's surface and verifies it in a
+local EmDash sandbox before sending it. Administrators then approve its
+permissions in the Manage tab.
+
 ## Try it
 
 ```sh
@@ -45,6 +58,7 @@ pnpm verify:emdash              # verify examples/emdash builds in an EmDash san
 pnpm test:emdash                # plugin smoke test
 pnpm test:compile:emdash        # compile pipeline with a scripted model
 pnpm test:canary:emdash         # synthetic EmDash changes against fixtures/canary/emdash
+pnpm test:site:emdash           # graft site against a live EmDash
 pnpm graft canary --corpus fixtures/canary/emdash --from hosts/emdash/adapter/surfaces/1.0.json --scenario move-editor-panel
 pnpm test:e2e:emdash            # Playwright in the EmDash admin
 pnpm graft verify --surface hosts/emdash/adapter/surfaces/1.0.json --spec examples/emdash/specs examples/emdash/builds/*.json

@@ -76,6 +76,29 @@ export function createStore(kv: KV, surface: () => Promise<Surface>) {
 		}
 	};
 
+	/**
+	 * A build that passed its checks for this spec version on the current
+	 * surface goes live when the grant covers it, else waits for approval.
+	 * Anything else leaves the version a draft.
+	 */
+	const settle = (record: SpecRecord, version: Version, verification: Verification, current: Surface) => {
+		const verified =
+			verification.passed === true &&
+			verification.spec.hash === version.specHash &&
+			verification.surface.hash === current.hash &&
+			version.build?.surface.hash === current.hash;
+		if (!verified) {
+			return;
+		}
+		version.verification = verification;
+		transition(version, 'submit');
+		if (version.scopes.every((scope) => record.grant.includes(scope))) {
+			activate(record, version, 'verified_within_grant');
+		} else {
+			transition(version, 'verified_needs_grant');
+		}
+	};
+
 	return {
 		read,
 
@@ -115,23 +138,29 @@ export function createStore(kv: KV, surface: () => Promise<Surface>) {
 				}
 				version.build = result.build;
 				version.scopes = buildScopes(result.build, current);
-				const verified =
-					input.verification?.passed === true &&
-					input.verification.spec.hash === specHash &&
-					input.verification.surface.hash === current.hash &&
-					result.build.surface.hash === current.hash;
-				if (verified) {
-					version.verification = input.verification;
-					transition(version, 'submit');
-					const covered = version.scopes.every((scope) => record.grant.includes(scope));
-					if (covered) {
-						activate(record, version, 'verified_within_grant');
-					} else {
-						transition(version, 'verified_needs_grant');
-					}
+				if (input.verification) {
+					settle(record, version, input.verification, current);
 				}
 			}
 			await kv.set(key(record.id), record);
+			return { record, version };
+		},
+
+		/**
+		 * Adds a verification to a draft version that has a build (for
+		 * example one verified by `graft site verify`).
+		 */
+		async attach(id: string, n: number, verification: Verification): Promise<{ record: SpecRecord; version: Version }> {
+			const record = await read(id);
+			const version = record?.versions.find((v) => v.n === n);
+			if (!record || !version) {
+				throw new StoreError(`"${id}" has no version ${n}.`);
+			}
+			if (version.state !== 'draft' || !version.build) {
+				throw new StoreError(`Version ${n} of "${id}" is ${version.state}${version.build ? '' : ' without a build'}; only built drafts take a verification.`);
+			}
+			settle(record, version, verification, await surface());
+			await kv.set(key(id), record);
 			return { record, version };
 		},
 

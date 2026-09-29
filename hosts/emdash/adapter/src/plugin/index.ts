@@ -105,6 +105,18 @@ export function createPlugin(options: GraftOptions = {}) {
 					return { id: record.id, version: stored.n, state: stored.state, scopes: stored.scopes };
 				},
 			},
+			attach: {
+				permission: 'plugins:manage',
+				handler: async (ctx) => {
+					const input = (ctx.input ?? {}) as { id?: unknown; version?: unknown; verification?: Verification };
+					if (typeof input.id !== 'string' || typeof input.version !== 'number' || !input.verification) {
+						throw PluginRouteError.badRequest('Pass "id", "version" and "verification".');
+					}
+					const verification = input.verification;
+					const { record, version: stored } = await guarded(() => storeFor(ctx, version).attach(input.id as string, input.version as number, verification));
+					return { id: record.id, version: stored.n, state: stored.state };
+				},
+			},
 			approve: {
 				permission: 'plugins:manage',
 				handler: async (ctx) => {
