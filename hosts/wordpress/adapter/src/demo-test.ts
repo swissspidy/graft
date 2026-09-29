@@ -33,8 +33,9 @@ const server = createServer(async (req, res) => {
 	}
 }).listen(files);
 
-// The CLI does not apply the blueprint's preferredVersions; the web Playground does.
-const playground = spawn('npx', ['--yes', PLAYGROUND_CLI, 'server', `--port=${site}`, '--wp=7.1', `--php=${DEFAULT_PHP}`, `--blueprint=${join(out, 'blueprint.json')}`], { stdio: ['ignore', 'pipe', 'inherit'], detached: true });
+// The CLI does not apply the blueprint's preferredVersions; the web Playground does. Six
+// workers, as in the e2e server: fewer can deadlock on file locks.
+const playground = spawn('npx', ['--yes', PLAYGROUND_CLI, 'server', `--port=${site}`, '--wp=7.1', `--php=${DEFAULT_PHP}`, '--workers=6', `--blueprint=${join(out, 'blueprint.json')}`], { stdio: ['ignore', 'pipe', 'inherit'], detached: true });
 const failures: string[] = [];
 try {
 	await new Promise<void>((resolve, reject) => {
