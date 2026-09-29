@@ -4,7 +4,7 @@ import type { Surface } from './types.ts';
  * Fields that describe where a surface came from rather than what it
  * offers. Two host versions exposing the same contract hash the same.
  */
-const PROVENANCE_FIELDS = ['hash', 'hostVersion', 'previous', 'migrations'] as const;
+const PROVENANCE_FIELDS = ['hash', 'hostVersion', 'fingerprint', 'previous', 'migrations'] as const;
 
 /** JSON with object keys sorted, so equal values serialize identically. */
 export function canonicalJson(value: unknown): string {

@@ -18,8 +18,15 @@ const action: JsonSchema = {
 };
 
 const condition: JsonSchema = {
-	description: 'true, false, or a permission check: { $can, on }.',
-	anyOf: [{ type: 'boolean' }, { type: 'object', required: ['$can'] }],
+	description: 'true, false, a permission check { $can, on }, or logic over them: $eq, $and, $or, $not.',
+	anyOf: [
+		{ type: 'boolean' },
+		{ type: 'object', required: ['$can'] },
+		{ type: 'object', required: ['$eq'] },
+		{ type: 'object', required: ['$and'] },
+		{ type: 'object', required: ['$or'] },
+		{ type: 'object', required: ['$not'] },
+	],
 };
 
 const label: JsonSchema = { type: 'string', minLength: 1, maxLength: 80 };
@@ -110,7 +117,7 @@ export const components: Record<string, Component> = {
 		children: 'none',
 	},
 	table: {
-		description: 'A list of records with fields and per-row actions, backed by DataViews.',
+		description: 'A list of records with fields and per-row actions. DataViews-shaped props: fields and actions.',
 		props: {
 			type: 'object',
 			properties: {

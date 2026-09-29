@@ -12,6 +12,7 @@ export interface HostDump {
 	capabilities: Record<string, Surface['capabilities'][string]> | [];
 	scopes: Record<string, Surface['scopes'][string]> | [];
 	audiences: string[];
+	fingerprint: string;
 }
 
 /**
@@ -46,7 +47,7 @@ export async function assembleSurface(dump: HostDump): Promise<Surface> {
 	const header = { graft: 1, host: dump.host, hostVersion: dump.hostVersion } as const;
 	const hash = await hashSurface({ ...header, ...contract });
 	// Key order is for readable diffs: header, hash, then the contract.
-	return { ...header, hash, ...contract, migrations: [] };
+	return { ...header, hash, fingerprint: dump.fingerprint, ...contract, migrations: [] };
 }
 
 export interface GeneratedSurface {

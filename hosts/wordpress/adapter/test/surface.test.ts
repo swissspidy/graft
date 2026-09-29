@@ -1,7 +1,7 @@
 import { readFileSync, readdirSync } from 'node:fs';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
-import { createAjv, validateSpec, validateSurface, type Surface } from '@graft/core';
+import { createAjv, hashSpec, validateBuild, validateSpec, validateSurface, type Surface } from '@graft/core';
 import { assembleSurface, components, paths, type HostDump } from '../src/index.ts';
 
 const examplesDir = join(import.meta.dirname, '../../../../examples/specs');
@@ -27,6 +27,18 @@ describe('checked-in surfaces', () => {
 		for (const example of readdirSync(examplesDir)) {
 			const result = validateSpec(readFileSync(join(examplesDir, example), 'utf8'), { surface });
 			expect(result.diagnostics, example).toEqual([]);
+		}
+	});
+
+	it('the example builds are valid for 7.1 and their specs', async () => {
+		const surface = load('7.1.json');
+		const buildsDir = join(examplesDir, '../builds');
+		for (const file of readdirSync(buildsDir)) {
+			const build = JSON.parse(readFileSync(join(buildsDir, file), 'utf8'));
+			const source = readFileSync(join(examplesDir, file.replace(/\.json$/, '.md')), 'utf8');
+			const spec = validateSpec(source, { surface }).spec!;
+			const result = await validateBuild(build, surface, { spec: { spec, hash: await hashSpec(source) } });
+			expect(result.diagnostics, file).toEqual([]);
 		}
 	});
 
@@ -93,6 +105,7 @@ describe('assembleSurface', () => {
 			},
 			scopes: { 'site:read': { title: 'See site settings' } },
 			audiences: ['administrator'],
+			fingerprint: 'sha256:' + '0'.repeat(64),
 		};
 		const surface = await assembleSurface(dump);
 		expect(Object.keys(surface.slots)).toEqual(['a.slot', 'z.slot']);

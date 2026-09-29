@@ -17,7 +17,7 @@ export const DEFAULT_PHP = '8.3';
 export const paths = {
 	plugin: fileURLToPath(new URL('../../plugin', import.meta.url)),
 	playground: fileURLToPath(new URL('../../playground', import.meta.url)),
-	surfaces: fileURLToPath(new URL('../../surfaces', import.meta.url)),
+	surfaces: fileURLToPath(new URL('../../plugin/surfaces', import.meta.url)),
 };
 
 export interface RunPhpOptions {
@@ -27,13 +27,15 @@ export interface RunPhpOptions {
 	php?: string;
 	/** Script path inside the Playground file system, under /graft-playground. */
 	script: string;
+	/** Extra mounts: host path → Playground path. */
+	mounts?: Record<string, string>;
 }
 
 /**
  * Boots WordPress in Playground with the Graft plugin mounted and active,
  * runs one PHP script and returns its standard output.
  */
-export async function runPhp({ wp, php = DEFAULT_PHP, script }: RunPhpOptions): Promise<string> {
+export async function runPhp({ wp, php = DEFAULT_PHP, script, mounts = {} }: RunPhpOptions): Promise<string> {
 	// With a blueprint, Playground takes versions from the blueprint and
 	// ignores --php, so each run gets a copy with preferredVersions set.
 	const blueprint = JSON.parse(await readFile(join(paths.playground, 'blueprint.json'), 'utf8')) as object;
@@ -49,6 +51,7 @@ export async function runPhp({ wp, php = DEFAULT_PHP, script }: RunPhpOptions): 
 		'--verbosity=quiet',
 		`--mount=${paths.plugin}:/wordpress/wp-content/plugins/graft`,
 		`--mount=${paths.playground}:/graft-playground`,
+		...Object.entries(mounts).map(([from, to]) => `--mount=${from}:${to}`),
 		`--blueprint=${blueprintFile}`,
 		'--',
 		script,

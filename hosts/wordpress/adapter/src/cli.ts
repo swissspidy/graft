@@ -8,7 +8,7 @@ import { paths } from './playground.ts';
 const USAGE = `Usage: surface:generate [--wp <version>]... [--out-dir <dir>] [--check] [--from-dump <file> --name <name>]
 
 Boots each WordPress version in Playground with the Graft plugin active and
-writes its surface to <out-dir>/<version>.json (default: hosts/wordpress/surfaces).
+writes its surface to <out-dir>/<version>.json (default: hosts/wordpress/plugin/surfaces).
 
   --wp <version>      WordPress version: 7.1, latest, beta, nightly. Repeatable. Default: 7.1
   --check             Do not write; fail if a generated contract differs from the

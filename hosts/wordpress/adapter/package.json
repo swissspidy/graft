@@ -12,6 +12,14 @@
     "surface:generate": "tsx src/cli.ts"
   },
   "dependencies": {
-    "@graft/core": "workspace:*"
+    "@graft/core": "workspace:*",
+    "@graft/renderer-react": "workspace:*"
+  },
+  "devDependencies": {
+    "@types/react": "^18.3.31",
+    "@types/react-dom": "^18.3.7",
+    "esbuild": "^0.25.12",
+    "react": "18.3.1",
+    "react-dom": "18.3.1"
   }
 }

@@ -1,4 +1,8 @@
+import { mkdtemp, rm, writeFile } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import { parseArgs } from 'node:util';
+import { exampleFixtures } from './fixtures.ts';
 import { lastJsonLine, runPhp } from './playground.ts';
 
 interface SmokeResult {
@@ -19,10 +23,13 @@ async function main(argv: string[]): Promise<number> {
 			php: { type: 'string', multiple: true },
 		},
 	});
+	const fixtures = await mkdtemp(join(tmpdir(), 'graft-fixtures-'));
+	await writeFile(join(fixtures, 'examples.json'), JSON.stringify(await exampleFixtures()));
 	let failed = 0;
 	for (const wp of values.wp ?? ['7.1']) {
 		for (const php of values.php ?? ['7.4', '8.4']) {
-			const result = lastJsonLine(await runPhp({ wp, php, script: '/graft-playground/smoke.php' })) as SmokeResult;
+			const output = await runPhp({ wp, php, script: '/graft-playground/smoke.php', mounts: { [fixtures]: '/graft-fixtures' } });
+			const result = lastJsonLine(output) as SmokeResult;
 			console.log(`WordPress ${result.wp}, PHP ${result.php}`);
 			for (const check of result.checks) {
 				console.log(`  ${check.ok ? '✔' : '✖'} ${check.name}`);
@@ -33,6 +40,7 @@ async function main(argv: string[]): Promise<number> {
 			}
 		}
 	}
+	await rm(fixtures, { recursive: true, force: true });
 	console.log(failed ? `\n${failed} check(s) failed` : '\nAll checks passed');
 	return failed ? 1 : 0;
 }

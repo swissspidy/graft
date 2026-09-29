@@ -2,7 +2,8 @@
 	"graft": 1,
 	"host": "wordpress",
 	"hostVersion": "7.1.2",
-	"hash": "sha256:58eaa0ef341adfba16718d0716df4da04d1b7cc17b253ace6e20ad7a71f5e285",
+	"hash": "sha256:11755c9980d0a6e0653cd3f09a56211edb0d6438205e49a9ed5539cf822e7e43",
+	"fingerprint": "sha256:aac93a247c479496ea0abe8ea8b948c5af6bed66a04e8ae3f1ff729ee262cce8",
 	"slots": {
 		"admin.page": {
 			"kind": "owned",
@@ -180,7 +181,7 @@
 						]
 					},
 					"disabled": {
-						"description": "true, false, or a permission check: { $can, on }.",
+						"description": "true, false, a permission check { $can, on }, or logic over them: $eq, $and, $or, $not.",
 						"anyOf": [
 							{
 								"type": "boolean"
@@ -190,11 +191,35 @@
 								"required": [
 									"$can"
 								]
+							},
+							{
+								"type": "object",
+								"required": [
+									"$eq"
+								]
+							},
+							{
+								"type": "object",
+								"required": [
+									"$and"
+								]
+							},
+							{
+								"type": "object",
+								"required": [
+									"$or"
+								]
+							},
+							{
+								"type": "object",
+								"required": [
+									"$not"
+								]
 							}
 						]
 					},
 					"visible": {
-						"description": "true, false, or a permission check: { $can, on }.",
+						"description": "true, false, a permission check { $can, on }, or logic over them: $eq, $and, $or, $not.",
 						"anyOf": [
 							{
 								"type": "boolean"
@@ -203,6 +228,30 @@
 								"type": "object",
 								"required": [
 									"$can"
+								]
+							},
+							{
+								"type": "object",
+								"required": [
+									"$eq"
+								]
+							},
+							{
+								"type": "object",
+								"required": [
+									"$and"
+								]
+							},
+							{
+								"type": "object",
+								"required": [
+									"$or"
+								]
+							},
+							{
+								"type": "object",
+								"required": [
+									"$not"
 								]
 							}
 						]
@@ -315,7 +364,7 @@
 						]
 					},
 					"visible": {
-						"description": "true, false, or a permission check: { $can, on }.",
+						"description": "true, false, a permission check { $can, on }, or logic over them: $eq, $and, $or, $not.",
 						"anyOf": [
 							{
 								"type": "boolean"
@@ -324,6 +373,30 @@
 								"type": "object",
 								"required": [
 									"$can"
+								]
+							},
+							{
+								"type": "object",
+								"required": [
+									"$eq"
+								]
+							},
+							{
+								"type": "object",
+								"required": [
+									"$and"
+								]
+							},
+							{
+								"type": "object",
+								"required": [
+									"$or"
+								]
+							},
+							{
+								"type": "object",
+								"required": [
+									"$not"
 								]
 							}
 						]
@@ -381,7 +454,7 @@
 			"children": "any"
 		},
 		"table": {
-			"description": "A list of records with fields and per-row actions, backed by DataViews.",
+			"description": "A list of records with fields and per-row actions. DataViews-shaped props: fields and actions.",
 			"props": {
 				"type": "object",
 				"properties": {
@@ -453,7 +526,7 @@
 									]
 								},
 								"visible": {
-									"description": "true, false, or a permission check: { $can, on }.",
+									"description": "true, false, a permission check { $can, on }, or logic over them: $eq, $and, $or, $not.",
 									"anyOf": [
 										{
 											"type": "boolean"
@@ -462,6 +535,30 @@
 											"type": "object",
 											"required": [
 												"$can"
+											]
+										},
+										{
+											"type": "object",
+											"required": [
+												"$eq"
+											]
+										},
+										{
+											"type": "object",
+											"required": [
+												"$and"
+											]
+										},
+										{
+											"type": "object",
+											"required": [
+												"$or"
+											]
+										},
+										{
+											"type": "object",
+											"required": [
+												"$not"
 											]
 										}
 									]

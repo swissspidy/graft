@@ -1,4 +1,5 @@
 import { parseArgs } from 'node:util';
+import { checkBuildFile } from './build.ts';
 import { formatResults, loadSurface, validateFiles } from './validate.ts';
 
 const USAGE = `Usage: graft <command> [options]
@@ -6,11 +7,15 @@ const USAGE = `Usage: graft <command> [options]
 Commands:
   validate <path...>   Validate spec files or directories of specs
     --surface <file>   Also check mount, audience and permissions against a
-                       host surface, e.g. hosts/wordpress/surfaces/7.1.json
+                       host surface, e.g. hosts/wordpress/plugin/surfaces/7.1.json
     --json             Print results as JSON
+  build <file>         Validate a build against a surface
+    --surface <file>   Surface the build targets (required)
+    --spec <file>      Also check it against the spec it implements
+    --fix-refs         Recompute refs and hashes and rewrite the file
 
 Coming next (see docs/adr/0001-architecture.md, section 9):
-  compile, verify, canary`;
+  verify, compile, canary`;
 
 export async function main(argv: string[]): Promise<number> {
 	const [command, ...rest] = argv;
@@ -38,6 +43,32 @@ export async function main(argv: string[]): Promise<number> {
 			console.log(formatResults(results, process.cwd()));
 		}
 		return results.every((r) => r.ok) ? 0 : 1;
+	}
+	if (command === 'build') {
+		const { values, positionals } = parseArgs({
+			args: rest,
+			allowPositionals: true,
+			options: {
+				surface: { type: 'string' },
+				spec: { type: 'string' },
+				'fix-refs': { type: 'boolean', default: false },
+			},
+		});
+		const [file] = positionals;
+		if (!file || !values.surface) {
+			console.error('graft build: pass a build file and --surface.');
+			return 2;
+		}
+		const result = await checkBuildFile(file, {
+			surface: values.surface,
+			...(values.spec ? { spec: values.spec } : {}),
+			fixRefs: values['fix-refs'],
+		});
+		console.log(`${result.ok ? '✔' : '✖'} ${file}${result.fixed ? '  (refs recomputed)' : ''}`);
+		for (const d of result.diagnostics) {
+			console.log(`  ${d.severity.padEnd(7)} ${d.path ?? ''}  ${d.message}  [${d.code}]`);
+		}
+		return result.ok ? 0 : 1;
 	}
 	if (command === undefined || command === 'help' || command === '--help' || command === '-h') {
 		console.log(USAGE);

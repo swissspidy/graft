@@ -54,6 +54,8 @@ export interface Surface {
 	hostVersion: string;
 	/** Content hash, see hashSurface(). Optional in files; verified when present. */
 	hash?: string;
+	/** Host-computed fingerprint of the host half; provenance, not hashed. */
+	fingerprint?: string;
 	previous?: string;
 	slots: Record<string, Slot>;
 	components: Record<string, Component>;

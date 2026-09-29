@@ -4,7 +4,7 @@
   "title": "Graft build",
   "description": "A disposable build of one spec version against one surface: a declarative UI tree, its data sources, frozen checks, computed refs and provenance. A pure function of (spec hash, surface hash, compiler version).",
   "type": "object",
-  "required": ["graft", "spec", "surface", "tree", "data", "checks", "refs", "provenance"],
+  "required": ["graft", "spec", "surface", "mount", "tree", "data", "checks", "refs", "provenance"],
   "additionalProperties": false,
   "properties": {
     "graft": { "const": 1 },
@@ -41,7 +41,32 @@
         "required": ["call"],
         "additionalProperties": false,
         "properties": {
-          "call": { "type": "string" },
+          "eq": {
+      "description": "True when both values are equal (strict, JSON equality).",
+      "type": "object",
+      "required": ["$eq"],
+      "additionalProperties": false,
+      "properties": { "$eq": { "type": "array", "minItems": 2, "maxItems": 2, "items": { "$ref": "#/$defs/value" } } }
+    },
+    "and": {
+      "type": "object",
+      "required": ["$and"],
+      "additionalProperties": false,
+      "properties": { "$and": { "type": "array", "minItems": 1, "items": { "$ref": "#/$defs/value" } } }
+    },
+    "or": {
+      "type": "object",
+      "required": ["$or"],
+      "additionalProperties": false,
+      "properties": { "$or": { "type": "array", "minItems": 1, "items": { "$ref": "#/$defs/value" } } }
+    },
+    "not": {
+      "type": "object",
+      "required": ["$not"],
+      "additionalProperties": false,
+      "properties": { "$not": { "$ref": "#/$defs/value" } }
+    },
+    "call": { "type": "string" },
           "input": { "$ref": "#/$defs/value" }
         }
       }
@@ -109,6 +134,10 @@
         { "$ref": "#/$defs/slotRef" },
         { "$ref": "#/$defs/can" },
         { "$ref": "#/$defs/call" },
+        { "$ref": "#/$defs/eq" },
+        { "$ref": "#/$defs/and" },
+        { "$ref": "#/$defs/or" },
+        { "$ref": "#/$defs/not" },
         {
           "description": "A plain object. Keys starting with $ are reserved for expressions.",
           "type": "object",
@@ -144,6 +173,31 @@
         "on": { "$ref": "#/$defs/value" }
       }
     },
+    "eq": {
+      "description": "True when both values are equal (strict, JSON equality).",
+      "type": "object",
+      "required": ["$eq"],
+      "additionalProperties": false,
+      "properties": { "$eq": { "type": "array", "minItems": 2, "maxItems": 2, "items": { "$ref": "#/$defs/value" } } }
+    },
+    "and": {
+      "type": "object",
+      "required": ["$and"],
+      "additionalProperties": false,
+      "properties": { "$and": { "type": "array", "minItems": 1, "items": { "$ref": "#/$defs/value" } } }
+    },
+    "or": {
+      "type": "object",
+      "required": ["$or"],
+      "additionalProperties": false,
+      "properties": { "$or": { "type": "array", "minItems": 1, "items": { "$ref": "#/$defs/value" } } }
+    },
+    "not": {
+      "type": "object",
+      "required": ["$not"],
+      "additionalProperties": false,
+      "properties": { "$not": { "$ref": "#/$defs/value" } }
+    },
     "call": {
       "type": "object",
       "required": ["$call"],
@@ -152,9 +206,11 @@
         "$call": { "description": "Capability name from the surface.", "type": "string" },
         "input": { "$ref": "#/$defs/value" },
         "then": {
+          "description": "What to do after the call succeeds: refresh:<source> reloads a data source, remove-row:<source> drops the current row from it, reload:page reloads the host page.",
           "type": "array",
-          "items": { "type": "string", "pattern": "^(refresh|remove-row|notice):[a-zA-Z0-9_.-]+$" }
-        }
+          "items": { "type": "string", "pattern": "^((refresh|remove-row):[a-z][a-zA-Z0-9_-]*|reload:page)$" }
+        },
+        "notice": { "description": "Message shown after the call succeeds.", "type": "string", "maxLength": 200 }
       }
     },
     "check": {

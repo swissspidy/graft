@@ -245,3 +245,41 @@ function host_surface(): array {
 		'audiences'    => array_keys( wp_roles()->roles ),
 	);
 }
+
+/**
+ * Fingerprint of the host half of the surface, used at runtime to find the
+ * surface snapshot this install matches.
+ *
+ * Human-readable text (titles, descriptions, labels) is left out because it
+ * is translated, and so are the WordPress version and the roles, which vary
+ * between sites without changing the contract. What remains is structure:
+ * slot, capability and scope ids, anchors, schemas and ability bindings.
+ *
+ * @param array<string, mixed>|null $surface Host surface; computed when null.
+ * @return string `sha256:<hex>`
+ */
+function host_fingerprint( ?array $surface = null ): string {
+	$surface = $surface ?? host_surface();
+	unset( $surface['hostVersion'], $surface['audiences'], $surface['fingerprint'] );
+	return 'sha256:' . hash( 'sha256', (string) wp_json_encode( strip_text( $surface ) ) );
+}
+
+/**
+ * Removes translatable strings from a nested array.
+ *
+ * @param mixed $value Value.
+ * @return mixed
+ */
+function strip_text( $value ) {
+	if ( ! is_array( $value ) ) {
+		return $value;
+	}
+	foreach ( $value as $key => $item ) {
+		if ( in_array( $key, array( 'title', 'description', 'label' ), true ) && is_string( $item ) ) {
+			unset( $value[ $key ] );
+		} else {
+			$value[ $key ] = strip_text( $item );
+		}
+	}
+	return $value;
+}

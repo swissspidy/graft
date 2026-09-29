@@ -12,4 +12,7 @@ if ( ! function_exists( 'Graft\host_surface' ) ) {
 	exit( 1 );
 }
 
-echo wp_json_encode( Graft\host_surface(), JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE ), "\n";
+$surface                = Graft\host_surface();
+$surface['fingerprint'] = Graft\host_fingerprint( $surface );
+
+echo wp_json_encode( $surface, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE ), "\n";

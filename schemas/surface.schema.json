@@ -15,6 +15,11 @@
       "type": "string",
       "pattern": "^sha256:[0-9a-f]{64}$"
     },
+    "fingerprint": {
+      "description": "Host-computed fingerprint of the host half (structure only, no text, version or roles). The plugin uses it at runtime to find the snapshot it matches.",
+      "type": "string",
+      "pattern": "^sha256:[0-9a-f]{64}$"
+    },
     "previous": {
       "description": "Content hash of the surface the migrations start from.",
       "type": "string"
