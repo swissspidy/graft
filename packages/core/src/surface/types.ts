@@ -79,4 +79,11 @@ export interface SurfaceFunctions {
 		/** Largest `code.source`, in bytes. */
 		sourceBytes: number;
 	};
+	/** Present when builds may use interactive widgets: what their functions may draw with. */
+	widgets?: {
+		/** Components a widget's tree may use. */
+		components: string[];
+		/** Most nodes one render may return. */
+		maxNodes: number;
+	};
 }

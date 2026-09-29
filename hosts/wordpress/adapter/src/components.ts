@@ -166,6 +166,22 @@ export const components: Record<string, Component> = {
 		},
 		children: 'none',
 	},
+	widget: {
+		description:
+			'An interactive widget drawn by the build\'s code: render(input, state) returns a tree of components, and update(state, event, payload, input) the next state when a button sends {"$event": name, "payload": ...}.',
+		props: {
+			type: 'object',
+			properties: {
+				render: { description: 'The function that draws the widget.', type: 'string' },
+				update: { description: 'The function that computes the next state from an event.', type: 'string' },
+				input: { description: 'What the widget draws from, e.g. {"$data": "queue.items"}.' },
+				state: { description: 'The initial state.' },
+			},
+			required: ['render'],
+			additionalProperties: false,
+		},
+		children: 'none',
+	},
 	'row-action': {
 		description: 'A link in a list table row\'s action bar.',
 		props: {

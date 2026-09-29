@@ -188,4 +188,6 @@ time; a model writing JavaScript per build isn't that.
   are the next step and need a render bridge. `@arrow-js/sandbox` shows
   one shape for it: templates rendered by trusted host code from a
   QuickJS realm. That would be a new component kind in the surface, with
-  its own checks, and is not part of this decision.
+  its own checks, and is not part of this decision. It became
+  [ADR 0006](0006-interactive-widgets.md), which keeps the host's own
+  components drawing instead.

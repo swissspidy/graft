@@ -155,7 +155,10 @@ function rebase(candidate: Build, to: Surface, rung: LadderStart, replaces: stri
 
 export function describeChange(change: RefChange): string {
 	if (change.kind === 'functions') {
-		return change.change === 'removed' ? 'the host no longer runs build functions' : 'the limits on build functions changed';
+		if (change.change === 'removed') {
+			return change.symbol === 'widgets' ? 'the host no longer runs interactive widgets' : 'the host no longer runs build functions';
+		}
+		return 'what build functions may use changed';
 	}
 	const label = change.kind === 'prop' ? `prop ${change.symbol}` : `${change.kind} ${change.symbol}`;
 	const how = change.migration

@@ -177,6 +177,9 @@ function enqueue_runtime(): void {
 			'wasm'   => plugins_url( 'build/quickjs.wasm', __DIR__ ),
 			'limits' => $surface['functions']['limits'],
 		);
+		if ( isset( $surface['functions']['widgets'] ) ) {
+			$config['functions']['widgets'] = $surface['functions']['widgets'];
+		}
 	}
 	wp_add_inline_script(
 		'graft-runtime',

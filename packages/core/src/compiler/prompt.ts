@@ -114,6 +114,7 @@ export function treeSystem(spec: Spec, surface: Surface, host: HostGuide): strin
 		'You build customizations of a web application as declarative UI trees. The tree may only use the components, slot props and capabilities listed below; it is rendered by a trusted renderer and every capability call is permission-checked. Keep it minimal: build what the spec asks, nothing it puts out of scope.',
 		EXPRESSIONS,
 		surface.functions ? functionsGuide(surface.functions.limits) : '',
+		surface.functions?.widgets ? widgetsGuide(surface.functions.widgets) : '',
 		host.notes ?? '',
 		describeSurface(spec, surface),
 	]
@@ -129,6 +130,15 @@ function functionsGuide(limits: NonNullable<Surface['functions']>['limits']): st
 - Functions are pure: they get their arguments and nothing else. No window, document, fetch, storage, timers or promises; nothing can be read or written. Return strings, numbers, booleans, arrays or plain objects; keys starting with "$" are dropped, so a function cannot make an action.
 - $fn may only compute values to show: never inside a $call input or a data source input.
 - Each call must finish within ${limits.timeMs} ms; the source may be at most ${limits.sourceBytes} bytes.`;
+}
+
+/** Only on surfaces that run interactive widgets. */
+function widgetsGuide(widgets: NonNullable<NonNullable<Surface['functions']>['widgets']>): string {
+	return `Interactive widgets (use only when the spec needs state that changes as the viewer clicks, e.g. filtering or switching views):
+- A "widget" node names two functions from "code": {"type": "widget", "props": {"render": "draw", "update": "choose", "input": {"$data": "queue.items"}, "state": {"author": null}}}.
+- render(input, state) returns a tree of nodes {type, props, children} using only: ${widgets.components.join(', ')}; at most ${widgets.maxNodes} nodes. Props are plain data (no expressions); give every button an "id" the checks can use.
+- A button's onClick is {"$event": "name", "payload": <data>}: clicking it calls update(state, "name", payload, input), which returns the next state, and render draws again. Buttons in a widget can never call capabilities.
+- Checks click widget buttons with steps: {"action": "<button id>"}.`;
 }
 
 export function treePrompt(spec: Spec, checks: Check[], previous: Build | undefined, feedback: string[]): string {

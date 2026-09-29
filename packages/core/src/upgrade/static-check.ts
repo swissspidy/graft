@@ -119,10 +119,15 @@ export function staticCheck(build: Build, from: Surface, to: Surface): StaticChe
 
 	// Build functions: the host must still run them. New limits only need a re-verification.
 	if (build.code) {
-		if (!to.functions) {
-			add({ kind: 'functions', symbol: from.functions?.runtime ?? 'quickjs', change: 'removed' });
-		} else if (canonicalJson(from.functions ?? null) !== canonicalJson(to.functions)) {
-			add({ kind: 'functions', symbol: to.functions.runtime, change: 'changed', refsOnly: true });
+		const usesWidgets = Object.hasOwn(build.refs.components, 'widget');
+		if (!to.functions || (usesWidgets && !to.functions.widgets)) {
+			add({ kind: 'functions', symbol: usesWidgets && to.functions ? 'widgets' : (from.functions?.runtime ?? 'quickjs'), change: 'removed' });
+		} else {
+			// Only what the build relies on: the runtime and limits, and what widgets may draw if it has one.
+			const relied = (f: Surface['functions']) => ({ runtime: f?.runtime, limits: f?.limits, ...(usesWidgets ? { widgets: f?.widgets } : {}) });
+			if (canonicalJson(relied(from.functions)) !== canonicalJson(relied(to.functions))) {
+				add({ kind: 'functions', symbol: to.functions.runtime, change: 'changed', refsOnly: true });
+			}
 		}
 	}
 

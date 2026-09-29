@@ -9,7 +9,8 @@ import { hashSurface } from '../surface/hash.ts';
 import type { JsonSchema, Surface } from '../surface/types.ts';
 import { isDynamic, isCall, isCan, isDataRef, isFn, isSlotRef, walkTree, walkValue } from './expressions.ts';
 import { extractRefs } from './refs.ts';
-import type { Build, Refs, Value } from './types.ts';
+import { isWidgetEvent, WIDGET } from './widgets.ts';
+import type { Build, Refs, TreeNode, Value } from './types.ts';
 
 const validateShape = lazyValidator<Build>(buildSchema);
 
@@ -138,6 +139,17 @@ export async function validateBuild(value: unknown, surface: Surface, options: V
 		}
 		checkAgainstSchema(component.props, node.props ?? {}, `${path}/props`, `Props of "${node.type}"`, diagnostics);
 		checkExpressions(node.props as Value | undefined, `${path}/props`);
+		if (node.type === WIDGET) {
+			if (!surface.functions?.widgets) {
+				error('build-widgets-unsupported', `${path}/type`, `${surface.host} does not run interactive widgets.`);
+			}
+			for (const prop of ['render', 'update'] as const) {
+				const name = node.props?.[prop];
+				if (name !== undefined && (typeof name !== 'string' || !functions.has(name))) {
+					error('build-unknown-function', `${path}/props/${prop}`, `The widget's ${prop} must name one of the build's functions (${[...functions].join(', ') || 'none'}).`);
+				}
+			}
+		}
 	});
 
 	// Data sources.
@@ -265,7 +277,8 @@ function underBindingAlternative(error: ErrorObject, bindingPaths: string[]): bo
 }
 
 function replaceBindings(value: unknown, path: string, found: string[]): unknown {
-	if (isDynamic(value)) {
+	// Widget events stand where actions go; only code can produce them.
+	if (isDynamic(value) || isWidgetEvent(value)) {
 		found.push(path);
 		return null;
 	}
@@ -282,4 +295,27 @@ function replaceBindings(value: unknown, path: string, found: string[]): unknown
 
 function compile(schema: JsonSchema): Validator {
 	return compileSchema(schema);
+}
+
+/**
+ * Checks a tree a widget drew against the surface, as a build's tree is
+ * checked: known components, children rules, and props against their
+ * schemas (event markers stand where actions go). Returns plain-language
+ * problems.
+ */
+export function validateWidgetTree(tree: TreeNode, surface: Surface): string[] {
+	const diagnostics: Diagnostic[] = [];
+	walkTree(tree, '', (node, path) => {
+		const component = surface.components[node.type];
+		if (!component) {
+			diagnostics.push({ severity: 'error', code: 'widget-unknown-component', path, message: `Unknown component "${node.type}".` });
+			return;
+		}
+		const children = component.children ?? 'none';
+		if (node.children !== undefined && (children === 'none' || (children === 'text' && typeof node.children !== 'string'))) {
+			diagnostics.push({ severity: 'error', code: 'widget-children', path, message: `"${node.type}" does not take these children.` });
+		}
+		checkAgainstSchema(component.props, node.props ?? {}, `${path}/props`, `Props of "${node.type}"`, diagnostics);
+	});
+	return diagnostics.map((d) => `${d.path ? `${d.path}: ` : ''}${d.message}`);
 }

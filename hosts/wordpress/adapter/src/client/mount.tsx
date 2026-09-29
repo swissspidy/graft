@@ -21,7 +21,7 @@ export interface RuntimeConfig {
 		}
 	>;
 	/** Present when a build on this screen has code: where the functions worker is, and its limits. */
-	functions?: { worker: string; wasm: string; limits: SurfaceFunctions['limits'] };
+	functions?: { worker: string; wasm: string; limits: SurfaceFunctions['limits']; widgets?: SurfaceFunctions['widgets'] };
 }
 
 declare global {
@@ -82,6 +82,7 @@ function Mounted({ spec, config, slot }: { spec: string; config: RuntimeConfig['
 				onNotice={onNotice}
 				onReload={() => window.location.reload()}
 				functions={functions}
+				{...(window.graftRuntime?.functions?.widgets ? { widgets: window.graftRuntime.functions.widgets } : {})}
 			/>
 		</>
 	);

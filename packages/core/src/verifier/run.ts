@@ -1,6 +1,8 @@
 import { evaluate, isAction, type EvalContext } from '../build/evaluate.ts';
 import { removeRow } from '../build/rows.ts';
 import type { FunctionRunner } from '../build/functions.ts';
+import { validateWidgetTree } from '../build/validate.ts';
+import { updateArgs } from '../build/widgets.ts';
 import type { Build, BuildCode, Check } from '../build/types.ts';
 import type { Spec } from '../spec/types.ts';
 import { canonicalJson } from '../surface/hash.ts';
@@ -48,6 +50,8 @@ export interface Verification {
 interface Instance {
 	slot: Record<string, unknown>;
 	data: Record<string, unknown>;
+	/** Widget states by node path; a widget without one is in its initial state. */
+	widgets: Record<string, unknown>;
 	snapshot: Snapshot;
 }
 
@@ -160,8 +164,19 @@ async function runCheck(options: VerifyOptions, check: Check, index: number, fun
 		return next;
 	};
 
+	const widgetLimits = options.surface.functions?.widgets;
 	const snap = (instance: Omit<Instance, 'snapshot'>): Instance => {
-		const snapshot = snapshotTree(build.tree, { data: instance.data, slot: instance.slot, can, now, fn }, semantics);
+		const snapshot = snapshotTree(
+			build.tree,
+			{ data: instance.data, slot: instance.slot, can, now, fn },
+			semantics,
+			widgetLimits ? { limits: widgetLimits, state: (path) => instance.widgets[path], validate: (tree) => validateWidgetTree(tree, options.surface) } : undefined,
+		);
+		for (const problem of snapshot.problems ?? []) {
+			if (!failures.includes(problem)) {
+				failures.push(problem);
+			}
+		}
 		// Actions outside tables apply to the slot instance (e.g. the row's post).
 		snapshot.actions = snapshot.actions.map((action) => (action.row === undefined ? { ...action, row: instance.slot } : action));
 		return { ...instance, snapshot };
@@ -173,7 +188,7 @@ async function runCheck(options: VerifyOptions, check: Check, index: number, fun
 		}
 		const instances: Instance[] = [];
 		for (const slot of await sandbox.slotInstances(viewer, build.mount.slot)) {
-			instances.push(snap({ slot, data: await loadData(slot) }));
+			instances.push(snap({ slot, data: await loadData(slot), widgets: {} }));
 		}
 		return instances;
 	};
@@ -187,6 +202,18 @@ async function runCheck(options: VerifyOptions, check: Check, index: number, fun
 			return result();
 		}
 		const { instance, action } = found;
+		if (action.event) {
+			// A widget's button: its update function computes the widget's next state.
+			const drawn = instance.snapshot.widgets?.[action.event.widget];
+			if (!drawn?.props.update || !fn) {
+				failures.push(`Step ${i + 1}: "${step.action}" does nothing.`);
+				return result();
+			}
+			const next = fn(drawn.props.update, updateArgs(drawn.props, drawn.state, { $event: action.event.name, payload: action.event.payload }));
+			const widgets = { ...instance.widgets, [action.event.widget]: next };
+			view = view.map((item) => (item === instance ? snap({ slot: item.slot, data: item.data, widgets }) : item));
+			continue;
+		}
 		if (!isAction(action.action)) {
 			failures.push(`Step ${i + 1}: "${step.action}" does nothing.`);
 			return result();
@@ -209,7 +236,7 @@ async function runCheck(options: VerifyOptions, check: Check, index: number, fun
 				reload = true;
 			}
 		}
-		view = reload ? await render() : view.map((item) => (item === instance ? snap({ slot: item.slot, data }) : item));
+		view = reload ? await render() : view.map((item) => (item === instance ? snap({ slot: item.slot, data, widgets: item.widgets }) : item));
 	}
 
 	const merged: Snapshot = {

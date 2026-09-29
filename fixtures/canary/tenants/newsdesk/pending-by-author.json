@@ -1,0 +1,309 @@
+{
+	"graft": 1,
+	"spec": {
+		"id": "pending-by-author",
+		"hash": "sha256:29ee4faf29cc1db94f4e2aa22c826ef5a2ae8fbe55c4e96fd725ecc2fd146dfc"
+	},
+	"surface": {
+		"host": "wordpress",
+		"hostVersion": "7.1.2",
+		"hash": "sha256:c00f62a89f32ae9f1e0c5275974aa8fdecc248c790d51a256139edb95ae21e98"
+	},
+	"mount": {
+		"slot": "dashboard.widget",
+		"title": "Pending by author"
+	},
+	"data": {
+		"pending": {
+			"call": "posts.list",
+			"input": {
+				"status": [
+					"pending"
+				],
+				"per_page": 50,
+				"orderby": "date",
+				"order": "desc"
+			}
+		}
+	},
+	"tree": {
+		"type": "widget",
+		"props": {
+			"render": "draw",
+			"update": "choose",
+			"input": {
+				"$data": "pending.items"
+			},
+			"state": {
+				"author": null
+			}
+		}
+	},
+	"checks": [
+		{
+			"criterion": "authors",
+			"fixtures": {
+				"users": [
+					{
+						"as": "e",
+						"role": "editor"
+					},
+					{
+						"as": "ada",
+						"role": "contributor",
+						"name": "Ada"
+					},
+					{
+						"as": "bob",
+						"role": "contributor",
+						"name": "Bob"
+					}
+				],
+				"posts": [
+					{
+						"title": "Ada one",
+						"status": "pending",
+						"author": "ada"
+					},
+					{
+						"title": "Ada two",
+						"status": "pending",
+						"author": "ada"
+					},
+					{
+						"title": "Bob one",
+						"status": "pending",
+						"author": "bob"
+					},
+					{
+						"title": "Ada draft",
+						"status": "draft",
+						"author": "ada"
+					}
+				]
+			},
+			"view_as": "e",
+			"expect": [
+				{
+					"rows": [
+						"Ada one",
+						"Ada two",
+						"Bob one"
+					]
+				},
+				{
+					"action": "author-ada"
+				},
+				{
+					"action": "author-bob"
+				},
+				{
+					"action": "everyone"
+				}
+			]
+		},
+		{
+			"criterion": "filter",
+			"fixtures": {
+				"users": [
+					{
+						"as": "e",
+						"role": "editor"
+					},
+					{
+						"as": "ada",
+						"role": "contributor",
+						"name": "Ada"
+					},
+					{
+						"as": "bob",
+						"role": "contributor",
+						"name": "Bob"
+					}
+				],
+				"posts": [
+					{
+						"title": "Ada one",
+						"status": "pending",
+						"author": "ada"
+					},
+					{
+						"title": "Ada two",
+						"status": "pending",
+						"author": "ada"
+					},
+					{
+						"title": "Bob one",
+						"status": "pending",
+						"author": "bob"
+					},
+					{
+						"title": "Ada draft",
+						"status": "draft",
+						"author": "ada"
+					}
+				]
+			},
+			"view_as": "e",
+			"steps": [
+				{
+					"action": "author-bob"
+				}
+			],
+			"expect": [
+				{
+					"rows": [
+						"Bob one"
+					]
+				}
+			]
+		},
+		{
+			"criterion": "filter",
+			"fixtures": {
+				"users": [
+					{
+						"as": "e",
+						"role": "editor"
+					},
+					{
+						"as": "ada",
+						"role": "contributor",
+						"name": "Ada"
+					},
+					{
+						"as": "bob",
+						"role": "contributor",
+						"name": "Bob"
+					}
+				],
+				"posts": [
+					{
+						"title": "Ada one",
+						"status": "pending",
+						"author": "ada"
+					},
+					{
+						"title": "Ada two",
+						"status": "pending",
+						"author": "ada"
+					},
+					{
+						"title": "Bob one",
+						"status": "pending",
+						"author": "bob"
+					},
+					{
+						"title": "Ada draft",
+						"status": "draft",
+						"author": "ada"
+					}
+				]
+			},
+			"view_as": "e",
+			"steps": [
+				{
+					"action": "author-ada"
+				}
+			],
+			"expect": [
+				{
+					"rows": [
+						"Ada one",
+						"Ada two"
+					]
+				}
+			]
+		},
+		{
+			"criterion": "everyone",
+			"fixtures": {
+				"users": [
+					{
+						"as": "e",
+						"role": "editor"
+					},
+					{
+						"as": "ada",
+						"role": "contributor",
+						"name": "Ada"
+					},
+					{
+						"as": "bob",
+						"role": "contributor",
+						"name": "Bob"
+					}
+				],
+				"posts": [
+					{
+						"title": "Ada one",
+						"status": "pending",
+						"author": "ada"
+					},
+					{
+						"title": "Ada two",
+						"status": "pending",
+						"author": "ada"
+					},
+					{
+						"title": "Bob one",
+						"status": "pending",
+						"author": "bob"
+					},
+					{
+						"title": "Ada draft",
+						"status": "draft",
+						"author": "ada"
+					}
+				]
+			},
+			"view_as": "e",
+			"steps": [
+				{
+					"action": "author-bob"
+				},
+				{
+					"action": "everyone"
+				}
+			],
+			"expect": [
+				{
+					"rows": [
+						"Ada one",
+						"Ada two",
+						"Bob one"
+					]
+				}
+			]
+		}
+	],
+	"refs": {
+		"slot": "dashboard.widget",
+		"components": {
+			"widget": [
+				"input",
+				"render",
+				"state",
+				"update"
+			]
+		},
+		"capabilities": [
+			"posts.list"
+		],
+		"scopes": [
+			"posts:read"
+		]
+	},
+	"code": {
+		"language": "javascript",
+		"source": "// The buttons (one per author, with how many posts each has waiting)\n// and the pending posts of the chosen author, or everyone's.\nfunction draw(posts, state) {\n\tconst all = Array.isArray(posts) ? posts : [];\n\tconst chosen = state && state.author;\n\tconst authors = [];\n\tfor (const post of all) {\n\t\tconst found = authors.find((a) => a.name === post.author.name);\n\t\tif (found) {\n\t\t\tfound.count += 1;\n\t\t} else {\n\t\t\tauthors.push({ name: post.author.name, count: 1 });\n\t\t}\n\t}\n\tauthors.sort((a, b) => a.name.localeCompare(b.name));\n\tconst slug = (text) => text.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '');\n\tconst button = (id, label, author) => ({\n\t\ttype: 'button',\n\t\tprops: {\n\t\t\tid,\n\t\t\tlabel,\n\t\t\tvariant: (chosen || null) === author ? 'primary' : 'secondary',\n\t\t\tonClick: { $event: 'choose', payload: { author } },\n\t\t},\n\t});\n\treturn {\n\t\ttype: 'stack',\n\t\tprops: { gap: 3 },\n\t\tchildren: [\n\t\t\t{\n\t\t\t\ttype: 'stack',\n\t\t\t\tprops: { direction: 'row', gap: 2 },\n\t\t\t\tchildren: [button('everyone', `Everyone (${all.length})`, null)].concat(\n\t\t\t\t\tauthors.map((a) => button(`author-${slug(a.name)}`, `${a.name} (${a.count})`, a.name)),\n\t\t\t\t),\n\t\t\t},\n\t\t\t{\n\t\t\t\ttype: 'table',\n\t\t\t\tprops: {\n\t\t\t\t\trows: all.filter((post) => !chosen || post.author.name === chosen),\n\t\t\t\t\tfields: [\n\t\t\t\t\t\t{ id: 'title', label: 'Title', primary: true },\n\t\t\t\t\t\t{ id: 'author.name', label: 'Author' },\n\t\t\t\t\t],\n\t\t\t\t\tempty: 'Nothing is waiting',\n\t\t\t\t},\n\t\t\t},\n\t\t],\n\t};\n}\n\n// Choosing an author, or everyone.\nfunction choose(state, event, payload) {\n\treturn event === 'choose' ? { author: payload && payload.author ? payload.author : null } : state;\n}\n",
+		"functions": [
+			"draw",
+			"choose"
+		]
+	},
+	"provenance": {
+		"compiler": "handwritten",
+		"strategy": "handwritten"
+	}
+}
