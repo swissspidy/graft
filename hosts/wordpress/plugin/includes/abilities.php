@@ -142,7 +142,7 @@ function register_abilities(): void {
 						'default' => 1,
 					),
 					'orderby'   => array(
-						'description' => __( 'meta.<key> orders by a custom field; posts without a value come first in ascending order.', 'graft' ),
+						'description' => __( 'meta.<key> orders by a custom field; posts without a value come last.', 'graft' ),
 						'type'        => 'string',
 						'enum'        => array_merge( array( 'date', 'modified', 'title' ), meta_orderby() ),
 						'default'     => 'date',
@@ -648,21 +648,13 @@ function execute_posts_list( $input = null ): array {
 	if ( 0 === strpos( $input['orderby'], 'meta.' ) ) {
 		$key    = substr( $input['orderby'], 5 );
 		$fields = exposed_fields( $input['post_type'] );
-		$type   = in_array( $fields[ $key ]['type'] ?? 'string', array( 'integer', 'number' ), true ) ? 'NUMERIC' : 'CHAR';
-		// A named EXISTS clause orders by the field without dropping posts that have no value.
-		$args['meta_query'] = array( // phpcs:ignore WordPress.DB.SlowDBQuery.slow_db_query_meta_query
-			'relation'    => 'OR',
-			'graft_order' => array(
-				'key'     => $key,
-				'compare' => 'EXISTS',
-				'type'    => $type,
-			),
-			array(
-				'key'     => $key,
-				'compare' => 'NOT EXISTS',
-			),
+		// Ordered by order_by_meta() for this query only.
+		$args['graft_order_meta'] = array(
+			'key'     => $key,
+			'numeric' => in_array( $fields[ $key ]['type'] ?? 'string', array( 'integer', 'number' ), true ),
+			'order'   => 'asc' === $input['order'] ? 'ASC' : 'DESC',
 		);
-		$args['orderby']    = array( 'graft_order' => strtoupper( $input['order'] ) );
+		$args['orderby'] = 'none';
 	}
 
 	$query = new WP_Query( $args );
@@ -672,6 +664,29 @@ function execute_posts_list( $input = null ): array {
 		'total' => (int) $query->found_posts,
 		'pages' => (int) $query->max_num_pages,
 	);
+}
+
+/**
+ * Orders a posts.list query by one custom field (graft_order_meta): a join
+ * on that key only, so a post without the field is never ordered by another
+ * one of its fields and still comes back, last. Hooked to posts_clauses.
+ *
+ * @param array<string, string> $clauses Query clauses.
+ * @param WP_Query              $query   Query.
+ * @return array<string, string>
+ */
+function order_by_meta( array $clauses, WP_Query $query ): array {
+	$order = $query->get( 'graft_order_meta' );
+	if ( ! is_array( $order ) || empty( $order['key'] ) ) {
+		return $clauses;
+	}
+	global $wpdb;
+	$direction          = 'ASC' === $order['order'] ? 'ASC' : 'DESC';
+	// +0 compares numbers as numbers in MySQL and in SQLite (Playground).
+	$value              = $order['numeric'] ? 'graft_order.meta_value+0' : 'graft_order.meta_value';
+	$clauses['join']   .= $wpdb->prepare( " LEFT JOIN {$wpdb->postmeta} AS graft_order ON ( graft_order.post_id = {$wpdb->posts}.ID AND graft_order.meta_key = %s )", $order['key'] );
+	$clauses['orderby'] = "graft_order.meta_value IS NULL ASC, {$value} {$direction}, {$wpdb->posts}.ID {$direction}";
+	return $clauses;
 }
 
 /**

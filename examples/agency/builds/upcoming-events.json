@@ -141,6 +141,14 @@
 				],
 				"posts": [
 					{
+						"title": "Date to be announced",
+						"type": "event",
+						"status": "publish",
+						"meta": {
+							"venue": "1st floor studio"
+						}
+					},
+					{
 						"title": "Jazz night",
 						"type": "event",
 						"status": "publish",
@@ -174,7 +182,8 @@
 				{
 					"rows": [
 						"Poetry slam",
-						"Jazz night"
+						"Jazz night",
+						"Date to be announced"
 					]
 				}
 			]
@@ -301,7 +310,8 @@
 						"meta": {
 							"event_date": "2026-10-05",
 							"venue": "Studio",
-							"capacity": 60
+							"capacity": 60,
+							"sold_out": false
 						}
 					}
 				]
@@ -337,6 +347,14 @@
 						"title": "Poetry slam"
 					},
 					"available": true
+				},
+				{
+					"post": {
+						"title": "Poetry slam",
+						"meta": {
+							"sold_out": false
+						}
+					}
 				}
 			]
 		}

@@ -43,6 +43,7 @@ add_action( 'admin_menu', __NAMESPACE__ . '\mount_admin_pages' );
 add_action( 'wp_dashboard_setup', __NAMESPACE__ . '\mount_dashboard_widgets' );
 add_filter( 'post_row_actions', __NAMESPACE__ . '\mount_row_actions', 10, 2 );
 add_filter( 'page_row_actions', __NAMESPACE__ . '\mount_row_actions', 10, 2 );
+add_filter( 'posts_clauses', __NAMESPACE__ . '\order_by_meta', 10, 2 );
 add_action( 'enqueue_block_editor_assets', __NAMESPACE__ . '\mount_editor_panels' );
 add_action( 'admin_footer', __NAMESPACE__ . '\enqueue_runtime' );
 add_action( 'admin_init', __NAMESPACE__ . '\check_surface_change' );

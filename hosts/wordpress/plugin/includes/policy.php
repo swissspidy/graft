@@ -245,15 +245,17 @@ function sync_managed( bool $force = false ): array {
 	if ( ! $force && get_option( 'graft_managed_digest' ) === $digest ) {
 		return array();
 	}
-	update_option( 'graft_managed_digest', $digest, false );
 	$bundles = managed_bundles();
 
 	$report = array();
 	$seen   = array();
+	$failed = false;
 	foreach ( $bundles as $file => $bundle ) {
 		$result          = install_managed( $bundle );
 		$report[ $file ] = is_wp_error( $result ) ? $result->get_error_message() : $result;
-		if ( ! is_wp_error( $result ) ) {
+		$failed          = $failed || is_wp_error( $result );
+		// A bundle that still ships keeps its customization, even when this sync failed.
+		if ( isset( $bundle['spec']['manifest']['id'] ) ) {
 			$seen[] = (string) $bundle['spec']['manifest']['id'];
 		}
 	}
@@ -274,6 +276,10 @@ function sync_managed( bool $force = false ): array {
 		$report[ $spec['spec_id'] ] = 'archived';
 	}
 	update_option( 'graft_managed_report', $report, false );
+	// Only a complete sync is remembered; a failed one is retried on the next request.
+	if ( ! $failed ) {
+		update_option( 'graft_managed_digest', $digest, false );
+	}
 	return $report;
 }
 

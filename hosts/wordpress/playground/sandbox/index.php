@@ -261,8 +261,15 @@ switch ( $request['op'] ?? '' ) {
 				foreach ( (array) $expected['meta'] as $key => $value ) {
 					$stored                 = metadata_exists( 'post', $post->ID, $key ) ? get_post_meta( $post->ID, $key, true ) : null;
 					$actual['meta'][ $key ] = $stored;
-					// Stored values are strings; null expects no value.
-					$ok = $ok && ( null === $value ? null === $stored : null !== $stored && (string) ( is_bool( $value ) ? (int) $value : $value ) === (string) $stored );
+					// Stored values are strings (false is ''); null expects no value.
+					if ( null === $value ) {
+						$match = null === $stored;
+					} elseif ( is_bool( $value ) ) {
+						$match = null !== $stored && (bool) $stored === $value;
+					} else {
+						$match = null !== $stored && (string) $value === (string) $stored;
+					}
+					$ok = $ok && $match;
 				}
 			}
 			if ( $post && isset( $expected['terms'] ) ) {
