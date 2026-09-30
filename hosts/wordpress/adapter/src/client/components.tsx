@@ -1,4 +1,4 @@
-import { useState, type CSSProperties } from 'react';
+import { useLayoutEffect, useRef, useState, type CSSProperties } from 'react';
 import { Button, Card, CardBody, CardHeader, CheckboxControl, Notice, SelectControl, Spinner, TextareaControl, TextControl } from '@wordpress/components';
 import type { ComponentRegistry, RendererComponentProps } from '@graft/renderer-react';
 import { cell, type Field, type Tone } from '../cells.ts';
@@ -102,12 +102,23 @@ function GraftButton({ props, invoke }: Props) {
 
 function GraftNotice({ props, children }: Props) {
 	const [open, setOpen] = useState(true);
+	// Notice renders its children to a string for screen readers, running
+	// their hooks as its own, so a button that comes and goes breaks it. It
+	// gets the rendered text instead.
+	const content = useRef<HTMLDivElement>(null);
+	const [spoken, setSpoken] = useState('');
+	useLayoutEffect(() => {
+		const text = content.current?.textContent ?? '';
+		if (text !== spoken) {
+			setSpoken(text);
+		}
+	});
 	if (!open) {
 		return null;
 	}
 	return (
-		<Notice status={(props.status as 'info') ?? 'info'} isDismissible={props.dismissible === true} onRemove={() => setOpen(false)}>
-			{children}
+		<Notice status={(props.status as 'info') ?? 'info'} isDismissible={props.dismissible === true} spokenMessage={spoken} onRemove={() => setOpen(false)}>
+			<div ref={content}>{children}</div>
 		</Notice>
 	);
 }
