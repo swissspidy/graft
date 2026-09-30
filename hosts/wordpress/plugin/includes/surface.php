@@ -125,6 +125,62 @@ function surface_slots(): array {
 			),
 			'accepts'     => array( 'row-action' ),
 		),
+		'post.editor.panel'      => array(
+			'kind'        => 'extension',
+			'title'       => __( 'Post editor panel', 'graft' ),
+			'description' => __( 'A panel in the block editor sidebar, for a saved post. Actions that change the post reload the editor, and wait until the post has no unsaved changes.', 'graft' ),
+			'screen'      => 'post',
+			'anchor'      => 'component:PluginDocumentSettingPanel',
+			'options'     => array(
+				'type'                 => 'object',
+				'properties'           => array(
+					'title' => array(
+						'type'      => 'string',
+						'minLength' => 1,
+						'maxLength' => 60,
+					),
+				),
+				'required'             => array( 'title' ),
+				'additionalProperties' => false,
+			),
+			'provides'    => array(
+				'type'                 => 'object',
+				'properties'           => array(
+					'post' => array(
+						'type'                 => 'object',
+						'properties'           => array(
+							'id'      => array( 'type' => 'integer' ),
+							'title'   => array(
+								'description' => __( 'The title as saved, without formatting.', 'graft' ),
+								'type'        => 'string',
+							),
+							'excerpt' => array(
+								'description' => __( 'The excerpt as saved; empty when the post has none.', 'graft' ),
+								'type'        => 'string',
+							),
+							'status'  => array(
+								'type' => 'string',
+								'enum' => post_statuses(),
+							),
+							'type'    => array( 'type' => 'string' ),
+							'can'     => array(
+								'type'                 => 'object',
+								'properties'           => array(
+									'edit'    => array( 'type' => 'boolean' ),
+									'publish' => array( 'type' => 'boolean' ),
+								),
+								'required'             => array( 'edit', 'publish' ),
+								'additionalProperties' => false,
+							),
+						),
+						'required'             => array( 'id', 'title', 'excerpt', 'status', 'type', 'can' ),
+						'additionalProperties' => false,
+					),
+				),
+				'required'             => array( 'post' ),
+				'additionalProperties' => false,
+			),
+		),
 	);
 
 	/**
@@ -145,6 +201,10 @@ function surface_scopes(): array {
 	$scopes = array(
 		'posts:read'          => array(
 			'title' => __( 'See posts you can edit, including drafts and pending posts', 'graft' ),
+			'host'  => array( 'edit_posts' ),
+		),
+		'posts:write'         => array(
+			'title' => __( 'Change the title and excerpt of posts you can edit', 'graft' ),
 			'host'  => array( 'edit_posts' ),
 		),
 		'posts.status:write'  => array(
@@ -187,6 +247,10 @@ function surface_capability_map(): array {
 		'posts.update_status' => array(
 			'ability' => 'graft/post-update-status',
 			'scopes'  => array( 'posts.status:write' ),
+		),
+		'posts.update_fields' => array(
+			'ability' => 'graft/post-update-fields',
+			'scopes'  => array( 'posts:write' ),
 		),
 		'site.info'           => array(
 			'ability' => 'core/get-site-info',

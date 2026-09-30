@@ -4,9 +4,9 @@ import type { HostGuide } from '@graft/core';
 export const hostGuide: HostGuide = {
 	fixtures: `A JSON object:
 {"users": [{"as": "<alias>", "role": "administrator|editor|author|contributor|subscriber"}],
- "posts": [{"title": "<unique title>", "status": "publish|future|draft|pending|private", "author": "<user alias, optional; default the site admin>"}]}
+ "posts": [{"title": "<unique title>", "status": "publish|future|draft|pending|private", "author": "<user alias, optional; default the site admin>", "excerpt": "<optional>"}]}
 The site has no other posts and no users besides the admin. Posts are created oldest first, in list order. view_as is a user alias from "users". Remember WordPress permissions: authors and above publish their own posts, editors and administrators publish anyone's, contributors publish nothing and only see their own unpublished posts.`,
-	assertions: `{"post": {"title": "<title>", "status": "<status>"}}: the post with that title exists and has those fields after the steps.`,
+	assertions: `{"post": {"title": "<title>", "status": "<status>", "excerpt": "<excerpt>"}}: the post with that title exists and has those fields (any of status, excerpt) after the steps.`,
 	notes: `WordPress specifics:
 - posts.list returns {items: [{id, title, status, type, author: {id, name}, date, modified, edit_url, can: {edit, publish}}], total, pages}. Bind table rows to "<source>.items".
 - In a table, give fields an "id" path into the row (e.g. "author.name") and mark the title field "primary": true; its value is the row label checks refer to.
@@ -15,5 +15,8 @@ The site has no other posts and no users besides the admin. Posts are created ol
 - A widget's table takes the same "fields" as a table, with the rows as plain data (its render function filters or sorts them).
 - Per-post permission: {"$can": "posts.status:write"} inside a table row, or with "on": {"$slot": "post"} in a row action, uses the post's own can flags.
 - The posts.list.row-actions slot renders once per post on the Posts screen with {"post": {id, title, status, type, can}}. WordPress renders that list, so row actions should end with "then": ["reload:page"].
-- Every action (button, table action, row-action) needs an "id" matching the action ids the checks use.`,
+- Every action (button, table action, row-action) needs an "id" matching the action ids the checks use.
+- The post.editor.panel slot renders in the block editor's sidebar for each saved post the viewer can edit, with {"post": {id, title, excerpt, status, type, can}} (title and excerpt as saved). Actions that change the post should end with "then": ["reload:page"], which reloads the editor. Checks match its actions and inputs with "row": {"title": ...}.
+- Inside a widget, text-input, textarea, checkbox and select take an "id" and a "label"; "value" is what they start with. They show what the viewer enters; "onChange": {"$event": "<name>"} sends the entered value to update as the payload, so the code can react as the viewer types. Declared actions send entered values with {"$input": "<input id>"}, e.g. "input": {"id": {"$field": "id"}, "title": {"$input": "title"}}.
+- posts.update_fields changes a post's title and/or excerpt (scope posts:write; {"$can": "posts:write"} uses the post's own can.edit).`,
 };

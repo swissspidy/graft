@@ -151,8 +151,11 @@ function enqueue_runtime(): void {
 	if ( ! is_readable( $asset_file ) ) {
 		return;
 	}
-	$asset = require $asset_file;
-	wp_enqueue_script( 'graft-runtime', plugins_url( 'build/runtime.js', __DIR__ ), $asset['dependencies'], $asset['version'], true );
+	$asset  = require $asset_file;
+	$editor = editor_runtime_config();
+	// In the block editor, panels register with the editor's own plugin API.
+	$deps = $editor ? array_merge( $asset['dependencies'], array( 'wp-plugins', 'wp-editor', 'wp-data' ) ) : $asset['dependencies'];
+	wp_enqueue_script( 'graft-runtime', plugins_url( 'build/runtime.js', __DIR__ ), $deps, $asset['version'], true );
 	wp_enqueue_style( 'wp-components' );
 
 	$specs     = array();
@@ -168,6 +171,9 @@ function enqueue_runtime(): void {
 		}
 	}
 	$config = array( 'specs' => (object) $specs );
+	if ( $editor ) {
+		$config['editor'] = $editor;
+	}
 	// Only screens with code learn where the functions worker is; the page
 	// starts it (and fetches QuickJS) on the first function call.
 	$surface = current_surface();

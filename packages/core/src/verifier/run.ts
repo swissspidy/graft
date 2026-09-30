@@ -2,13 +2,13 @@ import { evaluate, isAction, type EvalContext } from '../build/evaluate.ts';
 import { removeRow } from '../build/rows.ts';
 import type { FunctionRunner } from '../build/functions.ts';
 import { validateWidgetTree } from '../build/validate.ts';
-import { updateArgs } from '../build/widgets.ts';
+import { inputEvent, updateArgs } from '../build/widgets.ts';
 import type { Build, BuildCode, Check } from '../build/types.ts';
 import type { Spec } from '../spec/types.ts';
 import { canonicalJson } from '../surface/hash.ts';
 import type { Surface } from '../surface/types.ts';
 import { SandboxCallError, type Sandbox } from './sandbox.ts';
-import { allActions, snapshotTree, type ComponentSemantics, type Snapshot, type SnapshotAction } from './snapshot.ts';
+import { allActions, snapshotTree, type ComponentSemantics, type Snapshot, type SnapshotAction, type SnapshotInput } from './snapshot.ts';
 
 export interface VerifyOptions {
 	build: Build;
@@ -52,6 +52,8 @@ interface Instance {
 	data: Record<string, unknown>;
 	/** Widget states by node path; a widget without one is in its initial state. */
 	widgets: Record<string, unknown>;
+	/** What the viewer entered in widgets' inputs: widget path, then input id. */
+	entered: Record<string, Record<string, unknown>>;
 	snapshot: Snapshot;
 }
 
@@ -171,7 +173,14 @@ async function runCheck(options: VerifyOptions, check: Check, index: number, fun
 			build.tree,
 			{ data: instance.data, slot: instance.slot, can, now, fn },
 			semantics,
-			widgetLimits ? { limits: widgetLimits, state: (path) => (Object.hasOwn(instance.widgets, path) ? { has: true, value: instance.widgets[path] } : { has: false }), validate: (tree) => validateWidgetTree(tree, options.surface) } : undefined,
+			widgetLimits
+				? {
+						limits: widgetLimits,
+						state: (path) => (Object.hasOwn(instance.widgets, path) ? { has: true, value: instance.widgets[path] } : { has: false }),
+						validate: (tree) => validateWidgetTree(tree, options.surface),
+						entered: (path) => instance.entered[path] ?? {},
+					}
+				: undefined,
 		);
 		for (const problem of snapshot.problems ?? []) {
 			if (!failures.includes(problem)) {
@@ -180,6 +189,9 @@ async function runCheck(options: VerifyOptions, check: Check, index: number, fun
 		}
 		// Actions outside tables apply to the slot instance (e.g. the row's post).
 		snapshot.actions = snapshot.actions.map((action) => (action.row === undefined ? { ...action, row: instance.slot } : action));
+		if (snapshot.inputs) {
+			snapshot.inputs = snapshot.inputs.map((input) => ({ ...input, row: instance.slot }));
+		}
 		return { ...instance, snapshot };
 	};
 
@@ -189,7 +201,7 @@ async function runCheck(options: VerifyOptions, check: Check, index: number, fun
 		}
 		const instances: Instance[] = [];
 		for (const slot of await sandbox.slotInstances(viewer, build.mount.slot)) {
-			instances.push(snap({ slot, data: await loadData(slot), widgets: {} }));
+			instances.push(snap({ slot, data: await loadData(slot), widgets: {}, entered: {} }));
 		}
 		return instances;
 	};
@@ -197,6 +209,24 @@ async function runCheck(options: VerifyOptions, check: Check, index: number, fun
 	let view = await render();
 
 	for (const [i, step] of (check.steps ?? []).entries()) {
+		if ('fill' in step) {
+			// Typing into an input: it now shows the value, and its change event (if any) updates the widget.
+			const target = findInput(view, step.fill, step.row);
+			if (!target) {
+				failures.push(`Step ${i + 1}: no "${step.fill}" input${step.row ? ` for ${describeMatcher(step.row)}` : ''}.`);
+				return result();
+			}
+			const { instance, input } = target;
+			const entered = { ...instance.entered, [input.widget]: { ...instance.entered[input.widget], [input.id]: step.value } };
+			let widgets = instance.widgets;
+			const drawn = instance.snapshot.widgets?.[input.widget];
+			const event = drawn?.inputs[input.id] ? inputEvent(drawn.inputs[input.id]!, step.value) : undefined;
+			if (drawn && event && drawn.props.update && fn) {
+				widgets = { ...widgets, [input.widget]: fn(drawn.props.update, updateArgs(drawn.props, drawn.state, event)) };
+			}
+			view = view.map((item) => (item === instance ? snap({ slot: item.slot, data: item.data, widgets, entered }) : item));
+			continue;
+		}
 		const found = findAction(view, step.action, step.row);
 		if (!found) {
 			failures.push(`Step ${i + 1}: no available "${step.action}" action${step.row ? ` for ${describeMatcher(step.row)}` : ''}.`);
@@ -212,7 +242,7 @@ async function runCheck(options: VerifyOptions, check: Check, index: number, fun
 			}
 			const next = fn(drawn.props.update, updateArgs(drawn.props, drawn.state, { $event: action.event.name, payload: action.event.payload }));
 			const widgets = { ...instance.widgets, [action.event.widget]: next };
-			view = view.map((item) => (item === instance ? snap({ slot: item.slot, data: item.data, widgets }) : item));
+			view = view.map((item) => (item === instance ? snap({ slot: item.slot, data: item.data, widgets, entered: item.entered }) : item));
 			continue;
 		}
 		if (!isAction(action.action)) {
@@ -237,13 +267,14 @@ async function runCheck(options: VerifyOptions, check: Check, index: number, fun
 				reload = true;
 			}
 		}
-		view = reload ? await render() : view.map((item) => (item === instance ? snap({ slot: item.slot, data, widgets: item.widgets }) : item));
+		view = reload ? await render() : view.map((item) => (item === instance ? snap({ slot: item.slot, data, widgets: item.widgets, entered: item.entered }) : item));
 	}
 
 	const merged: Snapshot = {
 		texts: view.flatMap((i) => i.snapshot.texts),
 		tables: view.flatMap((i) => i.snapshot.tables),
 		actions: view.flatMap((i) => i.snapshot.actions),
+		inputs: view.flatMap((i) => i.snapshot.inputs ?? []),
 	};
 	for (const expectation of check.expect) {
 		const failure = await evaluateExpectation(expectation, merged, sandbox);
@@ -252,6 +283,17 @@ async function runCheck(options: VerifyOptions, check: Check, index: number, fun
 		}
 	}
 	return result();
+}
+
+function findInput(view: Instance[], id: string, matcher?: Record<string, unknown>): { instance: Instance; input: SnapshotInput } | undefined {
+	for (const instance of view) {
+		for (const input of instance.snapshot.inputs ?? []) {
+			if (input.id === id && (!matcher || matchesRecord(matcher, input.row))) {
+				return { instance, input };
+			}
+		}
+	}
+	return undefined;
 }
 
 function findAction(view: Instance[], id: string, matcher?: Record<string, unknown>): { instance: Instance; action: SnapshotAction } | undefined {
@@ -304,6 +346,20 @@ async function evaluateExpectation(expectation: Record<string, unknown>, snapsho
 		}
 		if (cell.tone !== undefined && actual.tone !== cell.tone) {
 			return `Expected ${where} to be marked "${cell.tone}", found ${actual.tone ? `"${actual.tone}"` : 'no mark'}.`;
+		}
+		return undefined;
+	}
+	if ('input' in expectation) {
+		// What an input shows: {"input": "title", "value": "...", "row": {...}}.
+		const id = String(expectation.input);
+		const matcher = expectation.row as Record<string, unknown> | undefined;
+		const input = (snapshot.inputs ?? []).find((i) => i.id === id && (!matcher || matchesRecord(matcher, i.row)));
+		const where = matcher ? ` for ${describeMatcher(matcher)}` : '';
+		if (!input) {
+			return `Expected a "${id}" input${where}, but there is none.`;
+		}
+		if (canonicalJson(input.value ?? null) !== canonicalJson(expectation.value ?? null)) {
+			return `Expected the "${id}" input${where} to show ${canonicalJson(expectation.value ?? null)}, found ${canonicalJson(input.value ?? null)}.`;
 		}
 		return undefined;
 	}

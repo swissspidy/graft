@@ -16,13 +16,14 @@ const EXPRESSIONS = `Prop values are JSON. Besides literals, these expression ob
 - {"$call": "capability", "input": <value>, "then": [...], "notice": "text"}: an action run on click. "then" may contain "refresh:<source>", "remove-row:<source>" (drop the clicked row from a source) and "reload:page".`;
 
 const CHECK_VOCABULARY = `A check proves one acceptance criterion. It seeds its own fixtures, renders the customization for one fixture user (view_as), optionally performs steps, then evaluates expectations over what that user sees and can do.
-- steps: [{"action": "<action id>", "row": {<fields identifying the row, e.g. "title": "Draft A">}}]
+- steps: [{"action": "<action id>", "row": {<fields identifying the row, e.g. "title": "Draft A">}}], or, to type into a widget's input, {"fill": "<input id>", "value": "<text>" (true/false for a checkbox), "row": {...}}
 - expectations (each an object):
   {"rows": ["label", ...]}: the labels (primary field) of the listed rows, in any order; [] for none.
   {"columns": ["Label", ...]}: the column labels, in order.
   {"text": "..."}: this text is shown somewhere.
   {"action": "<action id>", "row": {...}, "available": true|false}: whether the action is available (for that row).
   {"cell": {"row": {...}, "column": "Label", "text": "...", "tone": "..."}}: what a table cell shows for that row (text: contained; tone: the mark, when the column has one).
+  {"input": "<input id>", "value": <value>, "row": {...}}: what a widget's input shows.
   plus the host assertions below.
 Fixtures are created when the check starts. To test anything that depends on age ("older than 30 days"), set advance_days: the check then looks that many days later.
 Write checks that would fail for a wrong implementation: include fixtures that must NOT show up, users who must NOT be able to act, and the empty case when a criterion mentions one.
@@ -139,7 +140,14 @@ function widgetsGuide(widgets: NonNullable<NonNullable<Surface['functions']>['wi
 - render(input, state) returns a tree of nodes {type, props, children} using only: ${widgets.components.join(', ')}; at most ${widgets.maxNodes} nodes. Props are plain data (no expressions); give every button an "id" the checks can use.
 - A button's onClick is {"$event": "name", "payload": <data>}: clicking it calls update(state, "name", payload, input), which returns the next state, and render draws again.
 - To change something, declare the action on the widget node: "actions": {"approve": {"call": {"$call": ..., "input": {"id": {"$field": "id"}}, "then": ["refresh:<source>"]}, "visible": {"$can": ...}}}, with "input" a list of records that have an "id". A drawn button then uses it with onClick {"$use": "approve", "row": <row id>}; in a table's actions, {"$use": "approve"} applies to each row. Code can only offer a declared action on a row of the input; it can never call a capability itself.
-- Checks click widget buttons with steps: {"action": "<button id>"}.`;
+- Checks click widget buttons with steps: {"action": "<button id>"}.${
+		widgets.inputs?.length
+			? `
+- Inputs (${widgets.inputs.join(', ')}) take an "id" and a "label"; "value" is what they start with. After that they show what the viewer enters, and the code cannot change it. With "onChange": {"$event": "name"}, each change calls update(state, "name", <entered value>, input), so the code can react as the viewer types (keep the value in state if render needs it).
+- A declared action sends what an input shows with {"$input": "<input id>"} in its "call" input, e.g. "input": {"id": {"$field": "id"}, "title": {"$input": "title"}}. $input works nowhere else.
+- Checks type into inputs with steps: {"fill": "<input id>", "value": ...}.`
+			: ''
+	}`;
 }
 
 export function treePrompt(spec: Spec, checks: Check[], previous: Build | undefined, feedback: string[]): string {

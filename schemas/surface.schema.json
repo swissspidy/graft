@@ -75,6 +75,12 @@
           "additionalProperties": false,
           "properties": {
             "components": { "type": "array", "items": { "type": "string" }, "uniqueItems": true },
+            "inputs": {
+              "description": "Which of those components are inputs: they take an id, show a value the viewer can change, and a widget's declared actions read it with $input.",
+              "type": "array",
+              "items": { "type": "string" },
+              "uniqueItems": true
+            },
             "maxNodes": { "type": "integer", "minimum": 1 }
           }
         }

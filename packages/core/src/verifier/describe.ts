@@ -39,7 +39,7 @@ export function describeCheck(check: Check, describers: CheckDescribers = {}): s
 	const later = check.clock?.advanceDays ? ` ${check.clock.advanceDays} day${check.clock.advanceDays === 1 ? '' : 's'} later` : '';
 	parts.push(`${parts.length ? 'when' : 'When'} ${check.view_as ? `"${check.view_as}"` : 'the viewer'} opens it${later}`);
 	for (const step of check.steps ?? []) {
-		parts.push(`and uses "${step.action}"${row(step.row)}`);
+		parts.push('fill' in step ? `and types ${quote(step.value)} into "${step.fill}"${row(step.row)}` : `and uses "${step.action}"${row(step.row)}`);
 	}
 	const outcomes = check.expect.map((e) => {
 		if ('rows' in e) {
@@ -56,6 +56,9 @@ export function describeCheck(check: Check, describers: CheckDescribers = {}): s
 			const cell = e.cell as { row?: Record<string, unknown>; column?: string; text?: string; tone?: string };
 			const shows = [cell.text !== undefined ? `shows ${quote(cell.text)}` : '', cell.tone !== undefined ? `is marked ${quote(cell.tone)}` : ''].filter(Boolean);
 			return `the ${quote(cell.column)} cell${row(cell.row)} ${list(shows)}`;
+		}
+		if ('input' in e) {
+			return `the "${String(e.input)}" field${row(e.row as Record<string, unknown> | undefined)} shows ${quote(e.value)}`;
 		}
 		if ('action' in e) {
 			return `"${String(e.action)}"${row(e.row)} is ${e.available === false ? 'not available' : 'available'}`;

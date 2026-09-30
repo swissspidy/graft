@@ -3,6 +3,8 @@ import {
 	evaluate,
 	functionKey,
 	initialState,
+	inputEvent,
+	inputValues,
 	isAction,
 	isWidgetEvent,
 	removeRow,
@@ -11,6 +13,7 @@ import {
 	sanitizeWidgetTree,
 	updateArgs,
 	WIDGET,
+	widgetInputs,
 	widgetProps,
 	type Action,
 	type AsyncFunctionRunner,
@@ -42,6 +45,11 @@ export interface RendererComponentProps {
 	/** Rendered children, or text for text components. */
 	children?: ReactNode;
 	node: TreeNode;
+	/**
+	 * For an input component in a widget: what it shows, and how to change
+	 * it. The host keeps the value; the component only displays it.
+	 */
+	field?: { value: unknown; change(value: unknown): void };
 }
 
 export type ComponentRegistry = Record<string, ComponentType<RendererComponentProps>>;
@@ -78,6 +86,8 @@ interface RuntimeValue {
 	widgets?: WidgetLimits;
 	/** Sends queued function calls to the runner. */
 	flush(): void;
+	/** Inside a widget: the value an input shows and how to change it, by input id. */
+	field?(id: string): RendererComponentProps['field'];
 }
 
 const Runtime = createContext<RuntimeValue | null>(null);
@@ -192,6 +202,7 @@ function Node({ node }: { node: TreeNode }) {
 			raw={raw}
 			evaluate={(value, row) => evaluate(value, row === undefined ? runtime.ctx : { ...runtime.ctx, row })}
 			invoke={runtime.invoke}
+			{...(runtime.field && typeof props.id === 'string' && runtime.widgets?.inputs?.includes(node.type) ? { field: runtime.field(props.id) } : {})}
 		>
 			{children}
 		</Component>
@@ -281,6 +292,13 @@ function Widget({ node }: { node: TreeNode }) {
 		}
 	});
 
+	const tree = useMemo(() => (drawn !== undefined && drawn !== null && runtime?.widgets ? sanitizeWidgetTree(drawn, runtime.widgets).tree : undefined), [drawn, runtime?.widgets]);
+	// What the viewer entered in the widget's inputs. Inputs show it, else what the code drew;
+	// declared actions read the same values ($input), so they send what is on screen.
+	const [entered, setEntered] = useState<Record<string, unknown>>({});
+	const inputs = useMemo(() => (tree && runtime?.widgets ? widgetInputs(tree, runtime.widgets) : {}), [tree, runtime?.widgets]);
+	const values = useMemo(() => inputValues(inputs, entered), [inputs, entered]);
+
 	const inner = useMemo<RuntimeValue | undefined>(() => {
 		if (!runtime) {
 			return undefined;
@@ -292,9 +310,25 @@ function Widget({ node }: { node: TreeNode }) {
 				...runtime.ctx,
 				// A use of a declared action becomes the action for that row of the input, or null.
 				use: (use) => {
-					const resolved = resolveWidgetUse(use, actions, props?.input, runtime.ctx);
+					const resolved = resolveWidgetUse(use, actions, props?.input, { ...runtime.ctx, inputs: values });
 					return resolved.available && resolved.action ? resolved.action : null;
 				},
+			},
+			field: (id) => {
+				const input = inputs[id];
+				if (!input) {
+					return undefined;
+				}
+				return {
+					value: values[id],
+					change: (value) => {
+						setEntered((current) => ({ ...current, [id]: value }));
+						const event = inputEvent(input, value);
+						if (event) {
+							setPending((events) => [...events, event]);
+						}
+					},
+				};
 			},
 			// Inside a widget, only its own events and its resolved actions do anything; any
 			// $call the code drew was made null by the sanitizer.
@@ -306,8 +340,7 @@ function Widget({ node }: { node: TreeNode }) {
 				}
 			},
 		};
-	}, [runtime, node, props?.input]);
-	const tree = useMemo(() => (drawn !== undefined && drawn !== null && runtime?.widgets ? sanitizeWidgetTree(drawn, runtime.widgets).tree : undefined), [drawn, runtime?.widgets]);
+	}, [runtime, node, props?.input, inputs, values]);
 
 	if (!tree || !inner) {
 		return null;

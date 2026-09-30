@@ -49,6 +49,15 @@ export interface DaysSinceExpr {
 	$daysSince: Value;
 }
 
+/**
+ * `{ $input: "title" }`: what the viewer sees in one of a widget's input
+ * components, by its id. Only in a widget's declared actions, so an action
+ * sends what is on screen, never a value the code keeps out of sight.
+ */
+export interface InputRef {
+	$input: string;
+}
+
 export type Binding = DataRef | FieldRef | SlotRef;
 export type Logic = EqExpr | AndExpr | OrExpr | NotExpr | CompareExpr;
 /** Expressions whose value is computed at render time from other values. */
@@ -63,7 +72,7 @@ export interface FnExpr {
 }
 
 export type Computed = IfExpr | DaysSinceExpr | CompareExpr | FnExpr;
-export type Expression = Binding | CanExpr | CallExpr | Logic | Computed;
+export type Expression = Binding | InputRef | CanExpr | CallExpr | Logic | Computed;
 
 export type Value = null | string | number | boolean | Value[] | Expression | { [key: string]: Value };
 
@@ -79,13 +88,20 @@ export interface DataSource {
 	input?: Value;
 }
 
+/**
+ * What a check does before its expectations: use an action (a button, a
+ * row action), or type a value into an input component. `row` picks the
+ * row (or slot instance, e.g. the post) the action or input belongs to.
+ */
+export type CheckStep = { action: string; row?: Record<string, unknown> } | { fill: string; value: string | boolean; row?: Record<string, unknown> };
+
 export interface Check {
 	criterion: string;
 	fixtures?: Record<string, unknown>;
 	/** When the check looks, relative to when its fixtures were seeded. */
 	clock?: { advanceDays: number };
 	view_as?: string;
-	steps?: Array<{ action: string; row?: Record<string, unknown> }>;
+	steps?: CheckStep[];
 	expect: Array<Record<string, unknown>>;
 }
 

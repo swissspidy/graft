@@ -1,6 +1,6 @@
 import { evaluate, isAction, type Action, type EvalContext } from '../build/evaluate.ts';
 import type { TreeNode, Value } from '../build/types.ts';
-import { initialState, isWidgetEvent, renderArgs, resolveWidgetUse, sanitizeWidgetTree, WIDGET, widgetProps, type WidgetLimits, type WidgetProps, type WidgetUse } from '../build/widgets.ts';
+import { initialState, inputValues, isWidgetEvent, renderArgs, resolveWidgetUse, sanitizeWidgetTree, WIDGET, widgetInputs, widgetProps, type WidgetInput, type WidgetLimits, type WidgetProps, type WidgetUse } from '../build/widgets.ts';
 
 /**
  * A semantic snapshot of a rendered build for one user: what they can read
@@ -12,8 +12,10 @@ export interface Snapshot {
 	tables: SnapshotTable[];
 	/** Actions outside tables (buttons, row actions). */
 	actions: SnapshotAction[];
-	/** Widgets drawn, by node path: what they were given and the state they drew. */
-	widgets?: Record<string, { props: WidgetProps; state: unknown }>;
+	/** Widgets drawn, by node path: what they were given, the state they drew, and their inputs. */
+	widgets?: Record<string, { props: WidgetProps; state: unknown; inputs: Record<string, WidgetInput> }>;
+	/** Input components drawn, with what they show. */
+	inputs?: SnapshotInput[];
 	/** What went wrong while drawing (a widget's render failing, or drawing something invalid). */
 	problems?: string[];
 }
@@ -25,6 +27,19 @@ export interface SnapshotWidgets {
 	state(path: string): { has: boolean; value?: unknown };
 	/** Problems with a sanitized tree, e.g. props that do not match the surface. */
 	validate?(tree: TreeNode): string[];
+	/** What the viewer entered in a widget's inputs, by input id. */
+	entered?(path: string): Record<string, unknown>;
+}
+
+/** An input component in a widget, and what it shows. */
+export interface SnapshotInput {
+	/** The widget's node path. */
+	widget: string;
+	id: string;
+	label?: string;
+	value: unknown;
+	/** The record it belongs to: the slot instance (e.g. the post). */
+	row?: unknown;
 }
 
 export interface SnapshotTable {
@@ -144,7 +159,8 @@ export function snapshotTree(tree: TreeNode, ctx: EvalContext, semantics: Compon
 		}
 		const stored = widgets.state(path);
 		const state = stored.has ? stored.value : initialState(wp);
-		(snapshot.widgets ??= {})[path] = { props: wp, state };
+		const drawnWidget = { props: wp, state, inputs: {} as Record<string, WidgetInput> };
+		(snapshot.widgets ??= {})[path] = drawnWidget;
 		const drawn = ctx.fn(wp.render, renderArgs(wp, state));
 		if (drawn === null || drawn === undefined) {
 			problem(`The widget at ${path} drew nothing.`);
@@ -156,6 +172,12 @@ export function snapshotTree(tree: TreeNode, ctx: EvalContext, semantics: Compon
 			return;
 		}
 		widgets.validate?.(sub).forEach((p) => problem(`The widget at ${path}: ${p}`));
+		// Inputs show what the viewer entered, else what the code drew; declared actions read them.
+		drawnWidget.inputs = widgetInputs(sub, widgets.limits);
+		const values = inputValues(drawnWidget.inputs, widgets.entered?.(path) ?? {});
+		for (const input of Object.values(drawnWidget.inputs)) {
+			(snapshot.inputs ??= []).push({ widget: path, id: input.id, ...(input.label !== undefined ? { label: input.label } : {}), value: values[input.id] });
+		}
 		// Buttons in a widget: events update it; uses of its declared actions resolve, while
 		// drawing, to the action for one of its rows (or null when it is not offered).
 		const fromWidget = (action: SnapshotAction): SnapshotAction => {
@@ -176,7 +198,7 @@ export function snapshotTree(tree: TreeNode, ctx: EvalContext, semantics: Compon
 			table: (table) => emit.table({ ...table, rows: table.rows.map((row) => ({ ...row, actions: row.actions.map(fromWidget) })) }),
 		};
 		const use = (marker: WidgetUse): unknown => {
-			const resolved = resolveWidgetUse(marker, raw.actions, props.input, ctx);
+			const resolved = resolveWidgetUse(marker, raw.actions, props.input, { ...ctx, inputs: values });
 			if (resolved.problem) {
 				problem(`The widget at ${path}: ${resolved.problem}`);
 			}

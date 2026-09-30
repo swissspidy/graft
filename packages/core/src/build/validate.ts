@@ -7,7 +7,7 @@ import { describeSchemaError, schemaErrorPath } from '../schema-errors.ts';
 import type { Spec } from '../spec/types.ts';
 import { hashSurface } from '../surface/hash.ts';
 import type { JsonSchema, Surface } from '../surface/types.ts';
-import { isDynamic, isCall, isCan, isDataRef, isFn, isSlotRef, walkTree, walkValue } from './expressions.ts';
+import { isDynamic, isCall, isCan, isDataRef, isFn, isInputRef, isSlotRef, walkTree, walkValue } from './expressions.ts';
 import { extractRefs } from './refs.ts';
 import { isWidgetEvent, isWidgetUse, WIDGET } from './widgets.ts';
 import type { Build, Refs, TreeNode, Value } from './types.ts';
@@ -86,9 +86,16 @@ export async function validateBuild(value: unknown, surface: Surface, options: V
 			}
 		});
 
+	// $input only where a widget's declared action reads what the viewer sees.
+	const inputAllowed = /^\/props\/actions\/[^/]+\/call\/input(\/|$)/;
+	const widgetPaths: string[] = [];
+
 	// Expressions anywhere in the build.
 	const checkExpressions = (root: Value | undefined, base: string) =>
 		walkValue(root, base, (item, path) => {
+			if (isInputRef(item) && !widgetPaths.some((widget) => path.startsWith(widget) && inputAllowed.test(path.slice(widget.length)))) {
+				error('build-input-not-allowed', path, `"$input" only reads an input in a widget's declared actions (props.actions.<name>.call.input).`);
+			}
 			if (isFn(item)) {
 				if (!surface.functions) {
 					error('build-functions-unsupported', path, `${surface.host} does not run build functions, so "$fn" cannot be used.`);
@@ -138,6 +145,9 @@ export async function validateBuild(value: unknown, surface: Surface, options: V
 			}
 		}
 		checkAgainstSchema(component.props, node.props ?? {}, `${path}/props`, `Props of "${node.type}"`, diagnostics);
+		if (node.type === WIDGET) {
+			widgetPaths.push(path);
+		}
 		checkExpressions(node.props as Value | undefined, `${path}/props`);
 		if (node.type === WIDGET) {
 			if (!surface.functions?.widgets) {

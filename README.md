@@ -25,7 +25,10 @@ in QuickJS compiled to WebAssembly, with no access to the page
 server, and as asm.js in its plugin sandbox).
 The same functions can draw interactive widgets that keep state as the
 viewer clicks, still with the host's own components
-([ADR 0006](docs/adr/0006-interactive-widgets.md)).
+([ADR 0006](docs/adr/0006-interactive-widgets.md)). On WordPress, widgets
+also take input (text fields, checkboxes, dropdowns), and can sit in the
+block editor next to the post being edited
+([ADR 0007](docs/adr/0007-editorial-tools.md)).
 
 ## Try it
 
@@ -38,7 +41,11 @@ author" widget. **Tools → Customizations** lists every customization with
 its checks in plain language, and "Waiting for review" is left for you to
 approve. Every account's password is `password`. Sign in as `edna` (editor)
 for the review queue under **Posts** and the quick-approve row action, or
-as `ada` (contributor) to see the same queue without the Approve button. The demo is rebuilt from `main` on every push
+as `ada` (contributor) to see the same queue without the Approve button.
+Open any draft in the editor (as `edna`, try "Year in review (outline)")
+for the **Publish checklist** in the sidebar: fix the headline and
+excerpt there, watch the checklist follow as you type, save, and publish.
+The demo is rebuilt from `main` on every push
 (`pnpm demo:build`, `pnpm test:demo`).
 
 Status: a working prototype. All six MVP milestones of the ADR are built, and
@@ -75,7 +82,8 @@ date, and can approve with one click.
 ```
 
 More in [`examples/specs`](examples/specs): an admin page, a row action on
-the existing Posts screen, and a Dashboard widget. The same ideas for
+the existing Posts screen, Dashboard widgets, and a publish checklist in
+the block editor with fields to fix the headline and excerpt. The same ideas for
 EmDash are in [`examples/emdash`](examples/emdash): a publish queue, a
 panel in the entry editor, dashboard widgets, and a status board drawn by
 code that switches between drafts and published posts.
@@ -192,7 +200,7 @@ pnpm graft site verify --site <url> --token <token>
 | `pnpm verify:examples` | The example builds' checks in a WordPress sandbox |
 | `pnpm test:compile` | The compile pipeline with a scripted model against WordPress, including a build whose code loops |
 | `pnpm test:canary` | Eight synthetic host changes, each forcing one rung, against a five-tenant corpus (one with code and a widget) |
-| `pnpm test:e2e` | Playwright in wp-admin: serving, gateway and its audit log, build functions and their lazy loading, an interactive widget, approval, authoring, `graft site` |
+| `pnpm test:e2e` | Playwright in wp-admin: serving, gateway and its audit log, build functions and their lazy loading, an interactive widget, the publish checklist in the block editor, approval, authoring, `graft site` |
 | `pnpm verify:emdash` | The EmDash example builds' checks in a throwaway EmDash |
 | `pnpm test:compile:emdash` | The compile pipeline with a scripted model against EmDash |
 | `pnpm test:canary:emdash` | Six synthetic EmDash changes, each forcing one rung, against a two-tenant corpus (one with code and a widget) |

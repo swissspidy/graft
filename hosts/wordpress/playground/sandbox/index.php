@@ -80,14 +80,15 @@ switch ( $request['op'] ?? '' ) {
 		foreach ( array_values( $fixtures['posts'] ?? array() ) as $i => $post ) {
 			$id = wp_insert_post(
 				array(
-					'post_title'  => $post['title'],
-					'post_status' => $post['status'] ?? 'publish',
-					'post_type'   => $post['type'] ?? 'post',
-					'post_author' => isset( $post['author'] ) ? alias_user( $post['author'] ) : 1,
+					'post_title'   => $post['title'],
+					'post_excerpt' => $post['excerpt'] ?? '',
+					'post_status'  => $post['status'] ?? 'publish',
+					'post_type'    => $post['type'] ?? 'post',
+					'post_author'  => isset( $post['author'] ) ? alias_user( $post['author'] ) : 1,
 					// Oldest first, one minute apart, so ordering is deterministic
 					// and dates stay on the day the fixtures were seeded (checks
 					// look later with a clock).
-					'post_date'   => gmdate( 'Y-m-d H:i:s', time() - ( 100 - $i ) * MINUTE_IN_SECONDS ),
+					'post_date'    => gmdate( 'Y-m-d H:i:s', time() - ( 100 - $i ) * MINUTE_IN_SECONDS ),
 				),
 				true
 			);
@@ -144,6 +145,27 @@ switch ( $request['op'] ?? '' ) {
 			$instances = array_map( 'Graft\post_slot_props', $query->posts );
 			respond( array( 'instances' => $instances ) );
 		}
+		if ( 'component:PluginDocumentSettingPanel' === ( $slot['anchor'] ?? '' ) ) {
+			// The editor of each saved post the viewer can edit.
+			$query     = new WP_Query(
+				array(
+					'post_type'      => 'post',
+					'post_status'    => array( 'publish', 'future', 'draft', 'pending', 'private' ),
+					'perm'           => 'editable',
+					'posts_per_page' => -1,
+					'orderby'        => 'date',
+					'order'          => 'DESC',
+				)
+			);
+			$editable  = array_filter(
+				$query->posts,
+				static function ( WP_Post $post ): bool {
+					return current_user_can( 'edit_post', $post->ID );
+				}
+			);
+			$instances = array_values( array_map( 'Graft\editor_slot_props', $editable ) );
+			respond( array( 'instances' => $instances ) );
+		}
 		respond( array( 'instances' => 'owned' === $slot['kind'] ? array( (object) array() ) : array() ) );
 
 	case 'patch':
@@ -168,9 +190,10 @@ switch ( $request['op'] ?? '' ) {
 			);
 			$post     = $posts[0] ?? null;
 			$actual   = $post ? array(
-				'title'  => $post->post_title,
-				'status' => $post->post_status,
-				'type'   => $post->post_type,
+				'title'   => $post->post_title,
+				'excerpt' => $post->post_excerpt,
+				'status'  => $post->post_status,
+				'type'    => $post->post_type,
 			) : null;
 			$ok       = null !== $actual && array() === array_diff_assoc( array_map( 'strval', $expected ), array_map( 'strval', $actual ) );
 			respond( array( 'ok' => $ok, 'actual' => $actual ) );

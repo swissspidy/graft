@@ -8,6 +8,8 @@ export { getPath, isBinding, isCall, isCan, isFn, walkTree, walkValue } from './
 export { removeRow } from './build/rows.ts';
 export {
 	initialState,
+	inputEvent,
+	inputValues,
 	isWidgetEvent,
 	isWidgetUse,
 	renderArgs,
@@ -15,11 +17,13 @@ export {
 	sanitizeWidgetTree,
 	updateArgs,
 	WIDGET,
+	widgetInputs,
 	widgetProps,
 	widgetRow,
 	type ResolvedUse,
 	type WidgetAction,
 	type WidgetEvent,
+	type WidgetInput,
 	type WidgetLimits,
 	type WidgetProps,
 	type WidgetUse,

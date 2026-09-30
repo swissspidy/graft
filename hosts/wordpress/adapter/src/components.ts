@@ -166,6 +166,84 @@ export const components: Record<string, Component> = {
 		},
 		children: 'none',
 	},
+	'text-input': {
+		description:
+			'A one-line text field, inside a widget. "value" is what it starts with; then it shows what the viewer types, and sends {"$event": ..., "payload": <the text>} to update when onChange names an event. Declared actions read it with {"$input": id}.',
+		props: {
+			type: 'object',
+			properties: {
+				id,
+				label,
+				value: { type: ['string', 'null'], maxLength: 1000 },
+				help: { description: 'Help text under the field.', type: 'string', maxLength: 200 },
+				placeholder: { type: 'string', maxLength: 100 },
+				onChange: { description: 'An event {"$event": name}; its payload is the entered text.' },
+			},
+			required: ['id', 'label'],
+			additionalProperties: false,
+		},
+		children: 'none',
+	},
+	textarea: {
+		description: 'A multi-line text field, inside a widget. Works like text-input.',
+		props: {
+			type: 'object',
+			properties: {
+				id,
+				label,
+				value: { type: ['string', 'null'], maxLength: 5000 },
+				help: { description: 'Help text under the field.', type: 'string', maxLength: 200 },
+				rows: { type: 'integer', minimum: 2, maximum: 12, default: 4 },
+				onChange: { description: 'An event {"$event": name}; its payload is the entered text.' },
+			},
+			required: ['id', 'label'],
+			additionalProperties: false,
+		},
+		children: 'none',
+	},
+	checkbox: {
+		description: 'A checkbox, inside a widget. "value" is whether it starts checked; its event payload is true or false.',
+		props: {
+			type: 'object',
+			properties: {
+				id,
+				label,
+				value: { type: ['boolean', 'null'] },
+				help: { description: 'Help text under the checkbox.', type: 'string', maxLength: 200 },
+				onChange: { description: 'An event {"$event": name}; its payload is true or false.' },
+			},
+			required: ['id', 'label'],
+			additionalProperties: false,
+		},
+		children: 'none',
+	},
+	select: {
+		description: 'A dropdown, inside a widget. "value" is the option it starts on; its event payload is the chosen option\'s value.',
+		props: {
+			type: 'object',
+			properties: {
+				id,
+				label,
+				value: { type: ['string', 'null'] },
+				options: {
+					type: 'array',
+					minItems: 1,
+					maxItems: 50,
+					items: {
+						type: 'object',
+						properties: { value: { type: 'string' }, label },
+						required: ['value', 'label'],
+						additionalProperties: false,
+					},
+				},
+				help: { description: 'Help text under the dropdown.', type: 'string', maxLength: 200 },
+				onChange: { description: 'An event {"$event": name}; its payload is the chosen value.' },
+			},
+			required: ['id', 'label', 'options'],
+			additionalProperties: false,
+		},
+		children: 'none',
+	},
 	widget: {
 		description:
 			'An interactive widget drawn by the build\'s code: render(input, state) returns a tree of components, and update(state, event, payload, input) the next state when a button sends {"$event": name, "payload": ...}.',

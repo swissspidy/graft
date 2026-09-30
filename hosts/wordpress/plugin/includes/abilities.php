@@ -163,6 +163,47 @@ function register_abilities(): void {
 	);
 
 	wp_register_ability(
+		'graft/post-update-fields',
+		array(
+			'label'               => __( 'Change post title or excerpt', 'graft' ),
+			'description'         => __( "Changes the title, the excerpt, or both, of one post. The post's content, status and other fields stay as they are.", 'graft' ),
+			'category'            => ABILITY_CATEGORY,
+			'input_schema'        => array(
+				'type'                 => 'object',
+				'properties'           => array(
+					'id'      => array(
+						'type'    => 'integer',
+						'minimum' => 1,
+					),
+					'title'   => array(
+						'type'      => 'string',
+						'minLength' => 1,
+						'maxLength' => 200,
+					),
+					'excerpt' => array(
+						'type'      => 'string',
+						'maxLength' => 1000,
+					),
+				),
+				'required'             => array( 'id' ),
+				'minProperties'        => 2,
+				'additionalProperties' => false,
+			),
+			'output_schema'       => $post_item,
+			'execute_callback'    => __NAMESPACE__ . '\execute_post_update_fields',
+			'permission_callback' => __NAMESPACE__ . '\can_update_post_fields',
+			'meta'                => array(
+				'annotations'  => array(
+					'readonly'    => false,
+					'destructive' => false,
+					'idempotent'  => true,
+				),
+				'show_in_rest' => true,
+			),
+		)
+	);
+
+	wp_register_ability(
 		'graft/post-update-status',
 		array(
 			'label'               => __( 'Change post status', 'graft' ),
@@ -196,6 +237,43 @@ function register_abilities(): void {
 			),
 		)
 	);
+}
+
+/**
+ * Whether the current user may edit the post's fields.
+ *
+ * @param array<string, mixed>|null $input Ability input.
+ * @return bool|WP_Error
+ */
+function can_update_post_fields( $input = null ) {
+	$input = is_array( $input ) ? $input : array();
+	$post  = get_post( (int) ( $input['id'] ?? 0 ) );
+	if ( ! $post ) {
+		return new WP_Error( 'graft_post_not_found', __( 'Post not found.', 'graft' ) );
+	}
+	return current_user_can( 'edit_post', $post->ID );
+}
+
+/**
+ * Changes a post's title and/or excerpt, as plain text.
+ *
+ * @param array<string, mixed> $input Ability input.
+ * @return array<string, mixed>|WP_Error
+ */
+function execute_post_update_fields( $input ) {
+	$changes = array( 'ID' => (int) $input['id'] );
+	if ( isset( $input['title'] ) ) {
+		$changes['post_title'] = sanitize_text_field( (string) $input['title'] );
+	}
+	if ( isset( $input['excerpt'] ) ) {
+		$changes['post_excerpt'] = sanitize_textarea_field( (string) $input['excerpt'] );
+	}
+	$result = wp_update_post( wp_slash( $changes ), true );
+	if ( is_wp_error( $result ) ) {
+		return $result;
+	}
+	clean_post_cache( $result );
+	return prepare_post( get_post( $result ) );
 }
 
 /**

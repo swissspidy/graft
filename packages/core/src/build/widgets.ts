@@ -7,6 +7,13 @@ import type { TreeNode, Value } from './types.ts';
  * `update(state, event, payload, input)` returns the next state when the
  * viewer uses one of the tree's `{"$event": name, "payload": ...}` markers.
  *
+ * Inputs (text fields, checkboxes, selects) are components too. The code
+ * sets an input's starting value; after that it shows what the viewer
+ * typed, which the code learns through the input's change event
+ * (`onChange: {"$event": name}`, with the entered value as the payload)
+ * and cannot change. Declared actions read inputs with `{"$input": id}`,
+ * so what an action sends is always what the viewer sees.
+ *
  * Code never touches the page and never calls a capability: what it
  * returns is sanitized here into inert props on allow-listed components,
  * rendered by the host's trusted components. Its only live values are
@@ -47,6 +54,8 @@ export interface WidgetAction {
 export interface WidgetLimits {
 	/** Components a widget's tree may use. */
 	components: string[];
+	/** Which of those are inputs, read by id with `$input`. */
+	inputs?: string[];
 	/** Most nodes one render may return. */
 	maxNodes: number;
 }
@@ -164,6 +173,50 @@ export function widgetProps(props: Record<string, unknown>): WidgetProps | undef
 		...(props.state !== undefined ? { state: props.state } : {}),
 	};
 }
+
+/** An input component a widget drew: its id, what it starts with, and its change event. */
+export interface WidgetInput {
+	id: string;
+	type: string;
+	label?: string;
+	/** The value the code drew it with, before the viewer types. */
+	initial: unknown;
+	onChange?: WidgetEvent;
+}
+
+/** The input components of a drawn (sanitized) tree, by id; the first of an id wins. */
+export function widgetInputs(tree: TreeNode, limits: WidgetLimits): Record<string, WidgetInput> {
+	const types = new Set(limits.inputs ?? []);
+	const found: Record<string, WidgetInput> = {};
+	const visit = (node: TreeNode) => {
+		const props = (node.props ?? {}) as Record<string, unknown>;
+		if (types.has(node.type) && typeof props.id === 'string' && !Object.hasOwn(found, props.id)) {
+			found[props.id] = {
+				id: props.id,
+				type: node.type,
+				...(typeof props.label === 'string' ? { label: props.label } : {}),
+				initial: props.value ?? null,
+				...(isWidgetEvent(props.onChange) ? { onChange: props.onChange } : {}),
+			};
+		}
+		if (Array.isArray(node.children)) {
+			node.children.forEach(visit);
+		}
+	};
+	visit(tree);
+	return found;
+}
+
+/**
+ * What each input shows: what the viewer entered, else what the code drew.
+ * Only ids the tree still draws count.
+ */
+export function inputValues(inputs: Record<string, WidgetInput>, entered: Record<string, unknown>): Record<string, unknown> {
+	return Object.fromEntries(Object.values(inputs).map((input) => [input.id, Object.hasOwn(entered, input.id) ? entered[input.id] : input.initial]));
+}
+
+/** The event an input sends when the viewer changes it: its onChange, with the value as payload. */
+export const inputEvent = (input: WidgetInput, value: unknown): WidgetEvent | undefined => (input.onChange ? { $event: input.onChange.$event, payload: inert(value) } : undefined);
 
 /** The row of a widget's input a use refers to, by id; undefined when it names none. */
 export function widgetRow(input: unknown, ref: unknown): Record<string, unknown> | undefined {

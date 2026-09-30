@@ -124,6 +124,7 @@
         { "$ref": "#/$defs/dataRef" },
         { "$ref": "#/$defs/fieldRef" },
         { "$ref": "#/$defs/slotRef" },
+        { "$ref": "#/$defs/inputRef" },
         { "$ref": "#/$defs/can" },
         { "$ref": "#/$defs/call" },
         { "$ref": "#/$defs/eq" },
@@ -159,6 +160,13 @@
       "required": ["$slot"],
       "additionalProperties": false,
       "properties": { "$slot": { "description": "Prop provided by the slot, e.g. post.id.", "type": "string" } }
+    },
+    "inputRef": {
+      "description": "What the viewer sees in one of a widget's input components, by id. Only in a widget's declared actions.",
+      "type": "object",
+      "required": ["$input"],
+      "additionalProperties": false,
+      "properties": { "$input": { "type": "string", "pattern": "^[a-z][a-z0-9-]*$" } }
     },
     "can": {
       "type": "object",
@@ -268,12 +276,27 @@
           "description": "Actions performed before the expectations are evaluated.",
           "type": "array",
           "items": {
-            "type": "object",
-            "required": ["action"],
-            "properties": {
-              "action": { "type": "string" },
-              "row": { "type": "object" }
-            }
+            "oneOf": [
+              {
+                "description": "Use an action: a button, a row action.",
+                "type": "object",
+                "required": ["action"],
+                "properties": {
+                  "action": { "type": "string" },
+                  "row": { "type": "object" }
+                }
+              },
+              {
+                "description": "Type a value into a widget's input (a checkbox takes true or false).",
+                "type": "object",
+                "required": ["fill", "value"],
+                "properties": {
+                  "fill": { "type": "string" },
+                  "value": { "type": ["string", "boolean"] },
+                  "row": { "type": "object" }
+                }
+              }
+            ]
           }
         },
         "expect": {
