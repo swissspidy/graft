@@ -19,7 +19,8 @@ async function login(page: Page, user: string) {
 	await page.fill('#user_login', user);
 	await page.fill('#user_pass', 'password');
 	await page.click('#wp-submit');
-	await page.waitForURL(/wp-admin/);
+	// The admin page's DOM is enough: its images and feeds may be slow to finish loading.
+	await page.waitForURL(/wp-admin/, { waitUntil: 'domcontentloaded' });
 }
 
 const queue = (page: Page) => page.locator('.graft-page table');

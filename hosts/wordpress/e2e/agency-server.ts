@@ -28,7 +28,8 @@ await writeFile(
 		steps: [
 			{
 				step: 'defineWpConfigConsts',
-				consts: { WP_ENVIRONMENT_TYPE: 'local', GRAFT_BROWSER_VERIFICATION: process.env.GRAFT_E2E_BROWSER_VERIFY === '1' },
+				// No server-side requests to wordpress.org (see e2e/server.ts).
+				consts: { WP_ENVIRONMENT_TYPE: 'local', WP_HTTP_BLOCK_EXTERNAL: true, GRAFT_BROWSER_VERIFICATION: process.env.GRAFT_E2E_BROWSER_VERIFY === '1' },
 			},
 			{
 				step: 'writeFile',

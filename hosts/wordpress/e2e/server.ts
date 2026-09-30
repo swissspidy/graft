@@ -34,6 +34,9 @@ await writeFile(
 				step: 'defineWpConfigConsts',
 				consts: {
 					WP_ENVIRONMENT_TYPE: 'local',
+					// No update checks or other requests to wordpress.org from the server: the first
+					// admin page after login makes them inline, which can take over a minute on CI.
+					WP_HTTP_BLOCK_EXTERNAL: true,
 					// Verifying in the admin's browser needs playground.wordpress.net;
 					// CI turns it on with GRAFT_E2E_BROWSER_VERIFY=1.
 					GRAFT_BROWSER_VERIFICATION: process.env.GRAFT_E2E_BROWSER_VERIFY === '1',
