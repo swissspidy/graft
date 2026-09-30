@@ -23,6 +23,12 @@ export async function recordSiteSurface(): Promise<string> {
 	return hash;
 }
 
+// Notice renders its children to a string for screen readers, running their
+// hooks as its own; a Button or Spinner in there breaks it when they change.
+// So every Notice here with components in it is given its message as text.
+const failedMessage = 'No customization is shown: this site exposes content or a version of WordPress Graft has no surface for, and recording it failed.';
+const recordingMessage = 'This site exposes content Graft has not seen yet. Recording its surface…';
+
 /** Records the site's surface as soon as the screen opens, then reloads it with the new surface. */
 export function RecordSurface() {
 	const [error, setError] = useState<string | null>(null);
@@ -46,8 +52,10 @@ export function RecordSurface() {
 		};
 	}, [attempt]);
 	return error ? (
-		<Notice status="error" isDismissible={false}>
-			<p>No customization is shown: this site exposes content or a version of WordPress Graft has no surface for, and recording it failed. {error}</p>
+		<Notice status="error" isDismissible={false} spokenMessage={`${failedMessage} ${error}`}>
+			<p>
+				{failedMessage} {error}
+			</p>
 			<Button
 				variant="secondary"
 				onClick={() => {
@@ -59,9 +67,9 @@ export function RecordSurface() {
 			</Button>
 		</Notice>
 	) : (
-		<Notice status="info" isDismissible={false}>
+		<Notice status="info" isDismissible={false} spokenMessage={recordingMessage}>
 			<span data-graft-recording-surface="">
-				<Spinner /> This site exposes content Graft has not seen yet. Recording its surface…
+				<Spinner /> {recordingMessage}
 			</span>
 		</Notice>
 	);
@@ -133,22 +141,23 @@ export function Upgrades({
 		}
 	};
 
+	const intro =
+		candidates.length > 0
+			? `${candidates.length === 1 ? 'One customization is' : `${candidates.length} customizations are`} not shown because this site changed (${candidates.map((c) => c.title).join(', ')}). Graft can check ${candidates.length === 1 ? 'it' : 'them'} against the site as it is now, in a throwaway copy of WordPress in your browser.`
+			: null;
+	const lines = outcomes.map(
+		(o) =>
+			`${o.error ?? outcomeLabels[o.result!.outcome]}${o.result && o.result.outcome !== 'survived' ? ` (${o.result.path.map((step) => step.note).join('; ')})` : ''}`,
+	);
 	return (
-		<Notice status="warning" isDismissible={false}>
+		<Notice status="warning" isDismissible={false} spokenMessage={[intro, ...outcomes.map((o, i) => `${o.title} ${lines[i]}`)].filter(Boolean).join(' ')}>
 			<div data-graft-upgrades="">
-				{candidates.length > 0 ? (
-					<p>
-						{candidates.length === 1 ? 'One customization is' : `${candidates.length} customizations are`} not shown because this site changed (
-						{candidates.map((c) => c.title).join(', ')}). Graft can check {candidates.length === 1 ? 'it' : 'them'} against the site as it is now, in a
-						throwaway copy of WordPress in your browser.
-					</p>
-				) : null}
+				{intro ? <p>{intro}</p> : null}
 				{outcomes.length > 0 ? (
 					<ul>
 						{outcomes.map((o, i) => (
 							<li key={i} data-graft-upgrade-outcome={o.result?.outcome ?? 'error'}>
-								<strong>{o.title}</strong> {o.error ?? outcomeLabels[o.result!.outcome]}
-								{o.result && o.result.outcome !== 'survived' ? ` (${o.result.path.map((step) => step.note).join('; ')})` : ''}
+								<strong>{o.title}</strong> {lines[i]}
 							</li>
 						))}
 					</ul>
