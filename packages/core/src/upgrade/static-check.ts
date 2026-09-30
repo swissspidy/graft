@@ -12,6 +12,12 @@ export interface RefChange {
 	change: 'removed' | 'changed' | 'deprecated';
 	/** Only permission metadata changed (a capability's scopes); the tree is unaffected. */
 	refsOnly?: boolean;
+	/**
+	 * The schemas changed compatibly: the capability or slot accepts at
+	 * least what it did and still provides everything it did (for example a
+	 * new optional field). The build is re-verified as it is.
+	 */
+	compatible?: boolean;
 	/** A migration in the target surface covers this change. */
 	migration?: Migration;
 }
@@ -27,6 +33,11 @@ export interface StaticCheck {
 // Structural parts only: titles and descriptions change with translations
 // and copy edits without changing what a build can rely on.
 const slotContract = (slot: Surface['slots'][string]) => ({ kind: slot.kind, options: slot.options, provides: slot.provides, accepts: slot.accepts });
+const slotCompatible = (before: Surface['slots'][string], after: Surface['slots'][string]) =>
+	before.kind === after.kind &&
+	canonicalJson(before.accepts ?? null) === canonicalJson(after.accepts ?? null) &&
+	compatibleSchema(before.options ?? {}, after.options ?? {}, 'accepts') &&
+	compatibleSchema(before.provides ?? {}, after.provides ?? {}, 'provides');
 const componentContract = (c: Surface['components'][string]) => ({ props: c.props, children: c.children ?? 'none' });
 const propSchema = (c: Surface['components'][string] | undefined, prop: string) =>
 	typeof c?.props === 'object' ? ((c.props.properties as Record<string, unknown> | undefined) ?? {})[prop] : undefined;
@@ -65,7 +76,7 @@ export function staticCheck(build: Build, from: Surface, to: Surface): StaticChe
 	} else if (newSlot.deprecated) {
 		add({ kind: 'slot', symbol: slotId, change: 'deprecated' });
 	} else if (!oldSlot || canonicalJson(slotContract(oldSlot)) !== canonicalJson(slotContract(newSlot))) {
-		add({ kind: 'slot', symbol: slotId, change: 'changed' });
+		add({ kind: 'slot', symbol: slotId, change: 'changed', ...(oldSlot && slotCompatible(oldSlot, newSlot) ? { compatible: true } : {}) });
 	}
 
 	// Components and the props the build uses.
@@ -106,7 +117,9 @@ export function staticCheck(build: Build, from: Surface, to: Surface): StaticChe
 		} else if (before && canonicalJson({ ...before, description: null, binding: null }) !== canonicalJson({ ...after, description: null, binding: null })) {
 			const sameShape =
 				before.kind === after.kind && canonicalJson(before.input) === canonicalJson(after.input) && canonicalJson(before.output) === canonicalJson(after.output);
-			add({ kind: 'capability', symbol: name, change: 'changed', ...(sameShape ? { refsOnly: true } : {}) });
+			const compatible =
+				!sameShape && before.kind === after.kind && compatibleSchema(before.input, after.input, 'accepts') && compatibleSchema(before.output, after.output, 'provides');
+			add({ kind: 'capability', symbol: name, change: 'changed', ...(sameShape ? { refsOnly: true } : {}), ...(compatible ? { compatible: true } : {}) });
 		}
 	}
 
@@ -135,7 +148,7 @@ export function staticCheck(build: Build, from: Surface, to: Surface): StaticChe
 }
 
 function classify(changes: RefChange[]): LadderStart {
-	const relevant = changes.filter((c) => !c.refsOnly);
+	const relevant = changes.filter((c) => !c.refsOnly && !c.compatible);
 	if (relevant.length === 0) {
 		return 'reverify';
 	}
@@ -146,6 +159,77 @@ function classify(changes: RefChange[]): LadderStart {
 		return 'reanchor';
 	}
 	return 'regenerate';
+}
+
+// Keywords that document a schema without constraining it.
+const ANNOTATIONS = new Set(['title', 'description', 'default', 'examples', '$comment']);
+
+const typesOf = (schema: unknown): string[] => (typeof schema === 'string' ? [schema] : Array.isArray(schema) ? schema.map(String) : []);
+const isObject = (value: unknown): value is Record<string, unknown> => typeof value === 'object' && value !== null && !Array.isArray(value);
+const subset = (small: unknown[], large: unknown[]) => {
+	const keys = new Set(large.map((v) => canonicalJson(v)));
+	return small.every((v) => keys.has(canonicalJson(v)));
+};
+
+/**
+ * Whether a schema change keeps what a build relies on, conservatively.
+ * `accepts` (inputs, slot options): the new schema accepts every value the
+ * old one did: types and enums may grow, required properties may not, and
+ * no property goes away. `provides` (outputs, slot props): every value the
+ * new one describes has what the old one promised: every property is still
+ * there and still required where it was, and types and enums may only
+ * shrink. Anything else (other keywords, combinators) must stay the same.
+ */
+export function compatibleSchema(before: unknown, after: unknown, mode: 'accepts' | 'provides'): boolean {
+	if (canonicalJson(before ?? null) === canonicalJson(after ?? null)) {
+		return true;
+	}
+	if (!isObject(before) || !isObject(after)) {
+		return false;
+	}
+	const grows = (b: unknown[], a: unknown[]) => (mode === 'accepts' ? subset(b, a) : subset(a, b));
+	for (const key of new Set([...Object.keys(before), ...Object.keys(after)])) {
+		if (ANNOTATIONS.has(key)) {
+			continue;
+		}
+		const b = before[key];
+		const a = after[key];
+		if (key === 'type' || key === 'enum') {
+			// No type or enum allows anything: dropping one widens, adding one narrows.
+			const list = (value: unknown) => (key === 'type' ? typesOf(value) : (value as unknown[]));
+			const widened = a === undefined;
+			const narrowed = b === undefined;
+			if (widened || narrowed ? (mode === 'accepts') !== widened : !grows(list(b), list(a))) {
+				return false;
+			}
+		} else if (key === 'required') {
+			const br = (b as unknown[] | undefined) ?? [];
+			const ar = (a as unknown[] | undefined) ?? [];
+			if (!(mode === 'accepts' ? subset(ar, br) : subset(br, ar))) {
+				return false;
+			}
+		} else if (key === 'properties') {
+			const bp = isObject(b) ? b : {};
+			const ap = isObject(a) ? a : {};
+			for (const [name, schema] of Object.entries(bp)) {
+				if (!Object.hasOwn(ap, name) || !compatibleSchema(schema, ap[name], mode)) {
+					return false;
+				}
+			}
+		} else if (key === 'additionalProperties') {
+			// Inputs may not start refusing unknown fields; outputs may gain or lose the promise freely.
+			if (mode === 'accepts' && b !== false && a === false) {
+				return false;
+			}
+		} else if (key === 'items') {
+			if (!compatibleSchema(b ?? {}, a ?? {}, mode)) {
+				return false;
+			}
+		} else if (canonicalJson(b ?? null) !== canonicalJson(a ?? null)) {
+			return false;
+		}
+	}
+	return true;
 }
 
 /** The slot props a build reads (first path segment of every `$slot`). */

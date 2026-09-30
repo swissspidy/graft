@@ -91,17 +91,21 @@ function servable_specs(): array {
 
 /**
  * Granted scopes the current user can actually use: the grant intersected
- * with the WordPress capabilities each scope maps to.
+ * with the WordPress capabilities each scope maps to, and with the site's
+ * policy (see policy.php).
  *
  * @param array<string, mixed> $record Version record.
  * @return array<string, bool>
  */
 function usable_scopes( array $record ): array {
-	$usable = array();
-	$scopes = surface_scopes();
+	$usable  = array();
+	$scopes  = surface_scopes();
+	$managed = null !== managed_by( (string) ( $record['spec_id'] ?? '' ) );
 	foreach ( $record['grant']['scopes'] ?? array() as $scope ) {
 		$caps             = $scopes[ $scope ]['host'] ?? array();
-		$usable[ $scope ] = array() !== $caps && count( array_filter( $caps, 'current_user_can' ) ) === count( $caps );
+		$usable[ $scope ] = array() !== $caps && count( array_filter( $caps, 'current_user_can' ) ) === count( $caps )
+			// The policy as it is now, not as it was when the grant was approved.
+			&& ( $managed || true === policy_allows_scopes( array( $scope ) ) );
 	}
 	return $usable;
 }
@@ -245,6 +249,39 @@ function surface_change_notice(): void {
 }
 
 /**
+ * The policy as the admin screen shows it: who maintains the site, and
+ * what their customizations may do, in plain language.
+ *
+ * @return array<string, mixed>
+ */
+function admin_policy(): array {
+	$policy = policy();
+	$slots  = surface_slots();
+	$scopes = surface_scopes();
+	return array(
+		'managedBy' => $policy['managed_by'],
+		'contact'   => $policy['contact'],
+		'authoring' => $policy['authoring'],
+		'slots'     => null === $policy['slots'] ? null : array_values(
+			array_map(
+				static function ( string $slot ) use ( $slots ): string {
+					return (string) ( $slots[ $slot ]['title'] ?? $slot );
+				},
+				$policy['slots']
+			)
+		),
+		'scopes'    => null === $policy['scopes'] ? null : array_values(
+			array_map(
+				static function ( string $scope ) use ( $scopes ): string {
+					return (string) ( $scopes[ $scope ]['title'] ?? $scope );
+				},
+				$policy['scopes']
+			)
+		),
+	);
+}
+
+/**
  * Tools → Customizations: review and approve specs.
  */
 function register_admin_screen(): void {
@@ -283,6 +320,7 @@ function register_admin_screen(): void {
 						),
 						// The whole snapshot: the editor validates and compiles against it.
 						'surface'             => $surface,
+						'policy'              => admin_policy(),
 						// QuickJS, for verifying builds with code in the browser.
 						'quickjsWasm'         => plugins_url( 'build/quickjs.wasm', __DIR__ ),
 						/**

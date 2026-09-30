@@ -76,6 +76,12 @@ export interface SiteVerifyResult {
 export async function siteVerify(site: Site, surfacesDir: string, log: (line: string) => void = () => {}): Promise<SiteVerifyResult[]> {
 	const specs = await siteFetch<SpecRecord[]>(site, '/graft/v1/specs');
 	const snapshots = await loadSnapshots(surfacesDir);
+	// Surfaces the site recorded for itself (its own content model).
+	for (const surface of await siteFetch<Surface[]>(site, '/graft/v1/surfaces')) {
+		if (surface.hash && !snapshots.has(surface.hash)) {
+			snapshots.set(surface.hash, surface);
+		}
+	}
 	const results: SiteVerifyResult[] = [];
 	const targets: Array<{ record: VersionRecord; hash: string; build: Build; surface: Surface; spec: NonNullable<ReturnType<typeof validateSpec>['spec']> }> = [];
 

@@ -257,6 +257,8 @@ function validate_manifest( $manifest ) {
  *     @type string               $title    Spec title.
  *     @type array<string, mixed> $scope    { type: org|team|user, role?: string }. Default org.
  *     @type int                  $owner    Owner user id. Default current user.
+ *     @type bool                 $system   Created by the plugin itself (managed customizations):
+ *                                          no user limits apply. Never set from a request.
  * }
  * @return array<string, mixed>|WP_Error Version record.
  */
@@ -277,7 +279,7 @@ function create_version( array $args ) {
 	$owner   = (int) ( $args['owner'] ?? get_current_user_id() );
 	$spec_id = $manifest['id'];
 	$hash    = hash_spec( $source );
-	$admin   = current_user_can( 'manage_options' );
+	$admin   = ! empty( $args['system'] ) || current_user_can( 'manage_options' );
 
 	$spec = get_spec_post( $spec_id );
 	if ( $spec ) {
@@ -548,11 +550,13 @@ function attach_build( string $spec_id, int $version, array $build, ?array $veri
  * Approves a version waiting for approval: the grant becomes a snapshot of
  * the permissions the spec requests.
  *
- * @param string $spec_id Spec id.
- * @param int    $version Version number.
+ * @param string          $spec_id  Spec id.
+ * @param int             $version  Version number.
+ * @param string|int|null $approver Who approves: a user id (default the current user), or `policy` for
+ *                                  managed customizations.
  * @return array<string, mixed>|WP_Error Updated record.
  */
-function approve_version( string $spec_id, int $version ) {
+function approve_version( string $spec_id, int $version, $approver = null ) {
 	$post = get_version_post( $spec_id, $version );
 	if ( ! $post ) {
 		return new WP_Error( 'graft_not_found', __( 'Spec version not found.', 'graft' ), array( 'status' => 404 ) );
@@ -571,7 +575,7 @@ function approve_version( string $spec_id, int $version ) {
 		'_graft_grant',
 		array(
 			'scopes'      => array_values( array_unique( array_merge( $record['manifest']['permissions'], $needed ) ) ),
-			'approved_by' => get_current_user_id(),
+			'approved_by' => $approver ?? get_current_user_id(),
 			'approved_at' => gmdate( 'c' ),
 		)
 	);
@@ -618,6 +622,7 @@ function list_specs(): array {
 				'scope'          => get_json_meta( $spec->ID, '_graft_scope' ),
 				'owner'          => (int) $spec->post_author,
 				'active_version' => (int) get_post_meta( $spec->ID, '_graft_active_version', true ) ?: null,
+				'managed_by'     => managed_by( $spec->post_name ),
 				'versions'       => array_map( __NAMESPACE__ . '\version_record', get_version_posts( $spec ) ),
 			);
 		},

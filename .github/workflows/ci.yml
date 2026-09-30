@@ -55,6 +55,10 @@ jobs:
         run: pnpm surface:generate --check
       - name: Verify the example builds against their criteria
         run: pnpm verify:examples
+      - name: Check the agency example site's surface is up to date
+        run: pnpm surface:agency --check
+      - name: Verify the agency example builds against their criteria
+        run: pnpm verify:agency
       - name: Compile pipeline with a scripted model against WordPress
         run: pnpm test:compile
       - name: Install Chromium
@@ -66,6 +70,11 @@ jobs:
         env:
           CI: '1'
           # Runners can reach playground.wordpress.net: verify in the browser.
+          GRAFT_E2E_BROWSER_VERIFY: '1'
+      - name: End-to-end tests on an agency-built client site
+        run: pnpm test:e2e:agency
+        env:
+          CI: '1'
           GRAFT_E2E_BROWSER_VERIFY: '1'
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         if: always()

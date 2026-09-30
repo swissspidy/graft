@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
 	compileSpec,
+	describeSurface,
 	hashSpec,
 	hashSurface,
 	verifyBuild,
@@ -176,5 +177,14 @@ describe('compileSpec', () => {
 			'Data source name "Bad Name" must start with a lowercase letter and use letters, digits, _ or -.',
 			expect.stringContaining('Input of data source "Bad Name" is not valid JSON'),
 		]);
+	});
+});
+
+describe('describeSurface', () => {
+	it("shows the host's content model when the surface has one", () => {
+		expect(describeSurface(spec, surface)).not.toContain('content model');
+		const withModel = describeSurface(spec, { ...surface, model: { postTypes: { event: { fields: { venue: { type: 'string' } } } } } });
+		expect(withModel).toContain("The host's content model");
+		expect(withModel).toContain('"venue":{"type":"string"}');
 	});
 });

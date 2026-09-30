@@ -26,6 +26,7 @@ require_once __DIR__ . '/includes/surface.php';
 require_once __DIR__ . '/includes/current-surface.php';
 require_once __DIR__ . '/includes/lifecycle.php';
 require_once __DIR__ . '/includes/store.php';
+require_once __DIR__ . '/includes/policy.php';
 require_once __DIR__ . '/includes/runtime.php';
 require_once __DIR__ . '/includes/slots.php';
 require_once __DIR__ . '/includes/rest.php';
@@ -46,5 +47,7 @@ add_action( 'enqueue_block_editor_assets', __NAMESPACE__ . '\mount_editor_panels
 add_action( 'admin_footer', __NAMESPACE__ . '\enqueue_runtime' );
 add_action( 'admin_init', __NAMESPACE__ . '\check_surface_change' );
 add_action( 'rest_api_init', __NAMESPACE__ . '\check_surface_change' );
+add_action( 'admin_init', __NAMESPACE__ . '\maybe_sync_managed', 20 );
+add_action( 'rest_api_init', __NAMESPACE__ . '\maybe_sync_managed', 20 );
 add_action( 'admin_notices', __NAMESPACE__ . '\surface_change_notice' );
 add_action( 'admin_menu', __NAMESPACE__ . '\register_admin_screen' );

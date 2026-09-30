@@ -28,7 +28,11 @@ viewer clicks, still with the host's own components
 ([ADR 0006](docs/adr/0006-interactive-widgets.md)). On WordPress, widgets
 also take input (text fields, checkboxes, dropdowns), and can sit in the
 block editor next to the post being edited
-([ADR 0007](docs/adr/0007-editorial-tools.md)).
+([ADR 0007](docs/adr/0007-editorial-tools.md)). Sites an agency builds can
+expose their own post types, custom fields and taxonomies to
+customizations. The agency can also limit what the client's administrators
+may allow, and ship customizations it manages itself
+([ADR 0008](docs/adr/0008-agency-sites.md)).
 
 ## Try it
 
@@ -165,6 +169,12 @@ Review queue** and an **Approve** row action on pending posts. Admins find
 **Tools → Customizations**, where "Waiting for review" waits for approval
 before it appears on the Dashboard.
 
+`pnpm exec tsx hosts/wordpress/e2e/agency-server.ts` serves a client site an
+agency built instead, on :9402: the Riverside Arts Centre, with events and
+Lumen Studio's policy. Admins see the policy and the agency's managed
+**Upcoming events** widget in Tools → Customizations, and approve the
+centre's own **Family friendly** row action for **Events**.
+
 ## Commands
 
 ```sh
@@ -174,6 +184,8 @@ pnpm graft build examples/builds/review-queue.json \
   --surface hosts/wordpress/plugin/surfaces/7.1.json --spec examples/specs/review-queue.md [--fix-refs]
 pnpm graft verify --surface hosts/wordpress/plugin/surfaces/7.1.json --spec examples/specs examples/builds/*.json
 pnpm graft verify --surface hosts/emdash/adapter/surfaces/1.0.json --spec examples/emdash/specs examples/emdash/builds/*.json
+pnpm graft bundle --spec examples/agency/specs/upcoming-events.md --surface examples/agency/surface.json \
+  --out upcoming-events.bundle.json examples/agency/builds/upcoming-events.json   # a verified customization as one file
 
 # Compile with Claude (ANTHROPIC_API_KEY; default claude-opus-5-5)
 pnpm graft compile examples/specs/review-queue.md \
@@ -183,6 +195,7 @@ pnpm graft compile examples/specs/review-queue.md \
 pnpm graft canary --corpus fixtures/canary/tenants \
   --from hosts/wordpress/plugin/surfaces/7.1.json --scenario move-row-actions   # or --to <surface.json>
 pnpm surface:generate [--wp nightly] [--check]
+pnpm surface:generate --site <mu-plugin.php> --name <site> --out-dir <dir>   # a site with its own content model
 
 # A live site: WordPress (application password) or EmDash (API token with the admin scope)
 pnpm graft site verify --site <url> --user <admin> --password <app password>
@@ -198,9 +211,11 @@ pnpm graft site verify --site <url> --token <token>
 | `pnpm typecheck`, `pnpm test` | Types and unit tests (core, renderer, sandbox, CLI, adapter) |
 | `pnpm test:wp` | Plugin smoke test in Playground on PHP 7.4 and 8.4: abilities, store, lifecycle, gateway, host changes, security regressions |
 | `pnpm verify:examples` | The example builds' checks in a WordPress sandbox |
+| `pnpm verify:agency` | The agency example builds' checks, in a sandbox that reproduces the client site's content model |
 | `pnpm test:compile` | The compile pipeline with a scripted model against WordPress, including a build whose code loops |
 | `pnpm test:canary` | Eight synthetic host changes, each forcing one rung, against a five-tenant corpus (one with code and a widget) |
 | `pnpm test:e2e` | Playwright in wp-admin: serving, gateway and its audit log, build functions and their lazy loading, an interactive widget, the publish checklist in the block editor, approval, authoring, `graft site` |
+| `pnpm test:e2e:agency` | Playwright on a client site an agency built: custom post types, fields and terms, the agency's policy and managed customization, and upgrading after the agency changes the content model |
 | `pnpm verify:emdash` | The EmDash example builds' checks in a throwaway EmDash |
 | `pnpm test:compile:emdash` | The compile pipeline with a scripted model against EmDash |
 | `pnpm test:canary:emdash` | Six synthetic EmDash changes, each forcing one rung, against a two-tenant corpus (one with code and a widget) |
@@ -227,7 +242,7 @@ customization re-passes its checks there.
 | `packages/cli` | The `graft` command |
 | `hosts/wordpress` | The WordPress adapter: plugin, components, surface generator, sandbox, tests ([README](hosts/wordpress/README.md)) |
 | `hosts/emdash` | The EmDash adapter: a native plugin that serves builds as Block Kit, surface, sandbox, test site, tests ([README](hosts/emdash/README.md)) |
-| `examples/` | Example specs and hand-written builds (WordPress; EmDash in `examples/emdash`) |
+| `examples/` | Example specs and hand-written builds (WordPress; EmDash in `examples/emdash`; an agency-built client site in `examples/agency`) |
 | `fixtures/canary` | A multi-tenant corpus for the canary |
 
 ## License

@@ -115,13 +115,37 @@ add_action(
 );
 
 // What the agency lets customizations work with: posts, pages and events.
+// Later the agency also exposes the box office notes; tests switch that
+// release on with the riverside_release option, like a deploy would.
 add_filter(
 	'graft_content_model',
 	static function ( array $exposed ): array {
+		$fields = array( 'event_date', 'venue', 'capacity', 'sold_out' );
+		if ( get_option( 'riverside_release' ) >= 2 ) {
+			$fields[] = 'box_office_notes';
+		}
 		$exposed['event'] = array(
-			'fields'     => array( 'event_date', 'venue', 'capacity', 'sold_out' ),
+			'fields'     => $fields,
 			'taxonomies' => array( 'event_type' ),
 		);
 		return $exposed;
+	}
+);
+
+// What the agency lets the centre's own people do with Graft, and the
+// customizations it ships and looks after itself (graft bundle writes them).
+add_filter(
+	'graft_policy',
+	static function ( array $policy ): array {
+		return array_merge(
+			$policy,
+			array(
+				'managed_by' => 'Lumen Studio',
+				'contact'    => 'support@lumen.example',
+				'slots'      => array( 'dashboard.widget', 'posts.list.row-actions', 'post.editor.panel' ),
+				'scopes'     => array( 'posts:read', 'posts:write', 'posts.meta:write', 'posts.terms:write', 'users.current:read' ),
+				'managed'    => WP_CONTENT_DIR . '/graft-managed',
+			)
+		);
 	}
 );

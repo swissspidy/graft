@@ -95,6 +95,67 @@ function register_routes(): void {
 		)
 	);
 
+	// The host half of this site's surface, for assembling a site surface in
+	// the browser (see store_site_surface()).
+	register_rest_route(
+		REST_NAMESPACE,
+		'/host-surface',
+		array(
+			'methods'             => WP_REST_Server::READABLE,
+			'callback'            => static function () {
+				$dump                = host_surface();
+				$dump['fingerprint'] = host_fingerprint( $dump );
+				return new WP_REST_Response( $dump );
+			},
+			'permission_callback' => $manage,
+		)
+	);
+
+	register_rest_route(
+		REST_NAMESPACE,
+		'/surfaces',
+		array(
+			array(
+				'methods'             => WP_REST_Server::READABLE,
+				'callback'            => static function () {
+					return new WP_REST_Response( site_surfaces() );
+				},
+				'permission_callback' => $manage,
+			),
+			array(
+				'methods'             => WP_REST_Server::CREATABLE,
+				'callback'            => static function ( WP_REST_Request $request ) {
+					$stored = store_site_surface( $request['surface'] );
+					if ( is_wp_error( $stored ) ) {
+						return $stored;
+					}
+					check_surface_change();
+					return new WP_REST_Response( array( 'hash' => $stored['hash'] ), 201 );
+				},
+				'permission_callback' => $manage,
+				'args'                => array(
+					'surface' => array(
+						'type'     => 'object',
+						'required' => true,
+					),
+				),
+			),
+		)
+	);
+
+	register_rest_route(
+		REST_NAMESPACE,
+		'/surfaces/(?P<hash>sha256:[0-9a-f]{64})',
+		array(
+			'methods'             => WP_REST_Server::READABLE,
+			'callback'            => static function ( WP_REST_Request $request ) {
+				$surface = surface_snapshot( (string) $request['hash'] );
+				return $surface ? new WP_REST_Response( $surface ) : new WP_Error( 'graft_unknown_surface', __( 'No such surface.', 'graft' ), array( 'status' => 404 ) );
+			},
+			'permission_callback' => $manage,
+		)
+	);
+
 	register_rest_route(
 		REST_NAMESPACE,
 		'/specs/(?P<spec_id>[a-z0-9-]+)/versions/(?P<version>\d+)/builds',
@@ -129,6 +190,16 @@ function register_routes(): void {
 			array(
 				'methods'             => WP_REST_Server::CREATABLE,
 				'callback'            => static function ( WP_REST_Request $request ) use ( $event ) {
+					$allowed = policy_allows_changing( $request['spec_id'] );
+					if ( is_wp_error( $allowed ) ) {
+						return $allowed;
+					}
+					if ( 'approve' === $event ) {
+						$allowed = policy_allows_version( $request['spec_id'], (int) $request['version'] );
+						if ( is_wp_error( $allowed ) ) {
+							return $allowed;
+						}
+					}
 					$result = 'approve' === $event
 						? approve_version( $request['spec_id'], (int) $request['version'] )
 						: apply_event( $request['spec_id'], (int) $request['version'], $event );
@@ -171,6 +242,12 @@ function register_routes(): void {
  * @return WP_REST_Response|WP_Error
  */
 function rest_create_version( WP_REST_Request $request ) {
+	$manifest = is_array( $request['manifest'] ) ? $request['manifest'] : array();
+	foreach ( array( policy_allows_authoring(), policy_allows_manifest( $manifest ), policy_allows_changing( (string) ( $manifest['id'] ?? '' ) ) ) as $allowed ) {
+		if ( is_wp_error( $allowed ) ) {
+			return $allowed;
+		}
+	}
 	$args = array(
 		'source'   => $request['source'],
 		'manifest' => $request['manifest'],
@@ -209,6 +286,11 @@ function rest_call( WP_REST_Request $request ) {
 	$map = surface_capability_map();
 	if ( ! isset( $map[ $capability ] ) || ! grant_covers( $record['grant'], $map[ $capability ]['scopes'] ) ) {
 		return audit_refusal( $spec_id, $capability, new WP_Error( 'graft_not_granted', __( 'This customization has not been granted that permission.', 'graft' ), array( 'status' => 403 ) ) );
+	}
+	// A policy tightened after approval applies at once; the maintainer's own customizations are exempt.
+	$allowed = null === managed_by( $spec_id ) ? policy_allows_scopes( $map[ $capability ]['scopes'] ) : true;
+	if ( is_wp_error( $allowed ) ) {
+		return audit_refusal( $spec_id, $capability, $allowed );
 	}
 	$ability = wp_get_ability( $map[ $capability ]['ability'] );
 	if ( ! $ability ) {

@@ -167,6 +167,8 @@ export function describeChange(change: RefChange): string {
 			: `renamed to ${change.migration.to}`
 		: change.refsOnly
 			? 'permissions changed'
-			: change.change;
+			: change.compatible
+				? 'changed compatibly'
+				: change.change;
 	return `${label} ${how}`;
 }

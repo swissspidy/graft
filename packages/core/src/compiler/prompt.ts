@@ -59,6 +59,9 @@ export function describeSurface(spec: Spec, surface: Surface): string {
 	for (const [name, scope] of Object.entries(surface.scopes)) {
 		lines.push(`- ${name}: ${scope.title}`);
 	}
+	if (surface.model) {
+		lines.push("\nThe host's content model (what exists on the site, and what fixtures can create):", json(surface.model));
+	}
 	return lines.join('\n');
 }
 

@@ -21,17 +21,18 @@ export interface ExampleFixture {
  * surface, every build is verified in a WordPress sandbox first and the
  * verification record is included.
  */
-export async function exampleFixtures(options: { verifyAgainst?: Surface } = {}): Promise<Record<string, ExampleFixture>> {
+export async function exampleFixtures(options: { verifyAgainst?: Surface; dir?: string } = {}): Promise<Record<string, ExampleFixture>> {
+	const dir = options.dir ?? examplesDir;
 	const fixtures: Record<string, ExampleFixture> = {};
-	for (const file of (await readdir(`${examplesDir}/specs`)).filter((f) => f.endsWith('.md'))) {
-		const source = await readFile(`${examplesDir}/specs/${file}`, 'utf8');
+	for (const file of (await readdir(`${dir}/specs`)).filter((f) => f.endsWith('.md'))) {
+		const source = await readFile(`${dir}/specs/${file}`, 'utf8');
 		const { spec } = validateSpec(source);
 		if (!spec) {
 			throw new Error(`Invalid example spec ${file}`);
 		}
 		let build: Record<string, unknown> | null = null;
 		try {
-			build = JSON.parse(await readFile(`${examplesDir}/builds/${file.replace(/\.md$/, '.json')}`, 'utf8')) as Record<string, unknown>;
+			build = JSON.parse(await readFile(`${dir}/builds/${file.replace(/\.md$/, '.json')}`, 'utf8')) as Record<string, unknown>;
 		} catch {
 			// No hand-written build for this spec.
 		}
