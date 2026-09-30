@@ -83,6 +83,8 @@ export interface SurfaceFunctions {
 	widgets?: {
 		/** Components a widget's tree may use. */
 		components: string[];
+		/** Which of those are inputs: they have an id and show a value the viewer can change ($input). */
+		inputs?: string[];
 		/** Most nodes one render may return. */
 		maxNodes: number;
 	};

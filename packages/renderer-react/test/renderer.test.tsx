@@ -286,6 +286,80 @@ describe('GraftRoot with widgets', () => {
 	});
 });
 
+describe('GraftRoot with widget inputs', () => {
+	const renaming = {
+		...build,
+		code: { language: 'javascript', source: '', functions: ['draw', 'typed'] },
+		tree: {
+			type: 'widget',
+			props: {
+				render: 'draw',
+				update: 'typed',
+				input: [{ id: 7, title: 'Old' }],
+				state: '',
+				actions: { rename: { call: { $call: 'items.rename', input: { id: { $field: 'id' }, title: { $input: 'title' } } } } },
+			},
+		},
+	} as unknown as Build;
+	// The code echoes what it was told was typed, and redraws the field with another value to try to hide it.
+	const run = (calls: FunctionCall[]): FunctionResult[] =>
+		calls.map(({ name, args }) =>
+			name === 'typed'
+				? { ok: true, value: args[2] }
+				: {
+						ok: true,
+						value: {
+							type: 'stack',
+							children: [
+								{ type: 'text', children: `Told: ${String(args[1])}` },
+								{ type: 'field', props: { id: 'title', label: 'Title', value: args[1] ? 'Hidden' : (args[0] as Array<{ title: string }>)[0]!.title, onChange: { $event: 'typed' } } },
+								{ type: 'button', props: { label: 'Rename', onClick: { $use: 'rename', row: 7 } } },
+							],
+						},
+					},
+		);
+	const withField: ComponentRegistry = {
+		...components,
+		button: ({ props, invoke }) => <button onClick={() => void invoke(props.onClick)}>{String(props.label)}</button>,
+		field: ({ field }) => (field ? <input aria-label="Title" value={String(field.value ?? '')} onChange={(e) => field.change(e.target.value)} /> : null),
+	};
+
+	it('shows what the viewer types, tells update, and sends what is on screen', async () => {
+		const call = vi.fn(async () => ({}));
+		container = document.createElement('div');
+		document.body.append(container);
+		await act(async () => {
+			createRoot(container).render(
+				<GraftRoot
+					build={renaming}
+					components={withField}
+					gateway={{ call }}
+					can={() => true}
+					functions={() => ({ call: async (calls) => run(calls) })}
+					widgets={{ components: ['stack', 'text', 'button', 'field'], inputs: ['field'], maxNodes: 20 }}
+				/>,
+			);
+		});
+		const input = container.querySelector('input')!;
+		expect(input.value).toBe('Old');
+		await act(async () => {
+			const setValue = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')!.set!;
+			setValue.call(input, 'New');
+			input.dispatchEvent(new Event('input', { bubbles: true }));
+		});
+		for (let i = 0; i < 10 && !container.textContent?.includes('Told: New'); i++) {
+			await act(async () => {
+				await new Promise((r) => setTimeout(r, 5));
+			});
+		}
+		expect(container.textContent).toContain('Told: New');
+		// The code redrew the field with "Hidden"; it keeps showing what the viewer typed.
+		expect(container.querySelector('input')!.value).toBe('New');
+		await act(async () => container.querySelector('button')!.click());
+		expect(call).toHaveBeenCalledWith('items.rename', { id: 7, title: 'New' });
+	});
+});
+
 describe('removeRow', () => {
 	it('removes by identity or id without touching rows that stay', () => {
 		const keep = { id: 2, tags: [{ id: 1 }] };

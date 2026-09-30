@@ -10,8 +10,8 @@ export { validateSurface, type SurfaceValidation } from './surface/validate.ts';
 export { canonicalJson, hashSurface, sha256 } from './surface/hash.ts';
 export type { Capability, Component, JsonSchema, Migration, Scope, Slot, Surface, SurfaceFunctions } from './surface/types.ts';
 export { hashSpec, normalizeSpecSource } from './spec/hash.ts';
-export type { AndExpr, Binding, Build, BuildCode, CallExpr, CanExpr, Check, DataRef, DataSource, EqExpr, Expression, FieldRef, FnExpr, Logic, NotExpr, OrExpr, Refs, SlotRef, TreeNode, Value } from './build/types.ts';
-export { getPath, isAnd, isBinding, isCall, isCan, isDataRef, isEq, isExpression, isFieldRef, isFn, isNot, isOr, isSlotRef, walkTree, walkValue } from './build/expressions.ts';
+export type { AndExpr, Binding, Build, CheckStep, InputRef, BuildCode, CallExpr, CanExpr, Check, DataRef, DataSource, EqExpr, Expression, FieldRef, FnExpr, Logic, NotExpr, OrExpr, Refs, SlotRef, TreeNode, Value } from './build/types.ts';
+export { getPath, isAnd, isBinding, isInputRef, isCall, isCan, isDataRef, isEq, isExpression, isFieldRef, isFn, isNot, isOr, isSlotRef, walkTree, walkValue } from './build/expressions.ts';
 export { evaluate, inert, isAction, type Action, type EvalContext } from './build/evaluate.ts';
 export { FunctionError, functionKey, type AsyncFunctionRunner, type FunctionCall, type FunctionErrorKind, type FunctionResult, type FunctionRunner } from './build/functions.ts';
 export { extractRefs } from './build/refs.ts';
@@ -20,6 +20,8 @@ export { nextSpecState, specEvents, specLifecycle, type SpecEvent, type SpecStat
 export { removeRow } from './build/rows.ts';
 export {
 	initialState,
+	inputEvent,
+	inputValues,
 	isWidgetEvent,
 	isWidgetUse,
 	renderArgs,
@@ -27,11 +29,13 @@ export {
 	sanitizeWidgetTree,
 	updateArgs,
 	WIDGET,
+	widgetInputs,
 	widgetProps,
 	widgetRow,
 	type ResolvedUse,
 	type WidgetAction,
 	type WidgetEvent,
+	type WidgetInput,
 	type WidgetLimits,
 	type WidgetProps,
 	type WidgetUse,

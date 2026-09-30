@@ -83,9 +83,9 @@ describe('components', () => {
 		expect(validate({ ...props, actions: [{ id: 'x', label: 'X', onClick: 'alert(1)' }] })).toBe(false);
 	});
 
-	it('are about eight, as the ADR planned', () => {
-		// Plus the widget, which draws with the others (ADR 0006).
-		expect(Object.keys(components).sort()).toEqual(['button', 'card', 'empty-state', 'heading', 'notice', 'row-action', 'stack', 'table', 'text', 'widget']);
+	it('are about eight, as the ADR planned, plus widgets and their inputs', () => {
+		// The widget draws with the others (ADR 0006); inputs only work inside one (ADR 0007).
+		expect(Object.keys(components).sort()).toEqual(['button', 'card', 'checkbox', 'empty-state', 'heading', 'notice', 'row-action', 'select', 'stack', 'table', 'text', 'text-input', 'textarea', 'widget']);
 	});
 });
 

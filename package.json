@@ -18,7 +18,7 @@
     "demo:build": "tsx hosts/wordpress/adapter/src/demo.ts",
     "test:demo": "tsx hosts/wordpress/adapter/src/demo-test.ts",
     "test:e2e": "playwright test -c hosts/wordpress/e2e/playwright.config.ts",
-    "verify:examples": "tsx packages/cli/src/main.ts verify --surface hosts/wordpress/plugin/surfaces/7.1.json --spec examples/specs examples/builds/review-queue.json examples/builds/quick-approve.json examples/builds/waiting-posts.json examples/builds/stale-drafts.json examples/builds/headline-check.json examples/builds/pending-by-author.json",
+    "verify:examples": "tsx packages/cli/src/main.ts verify --surface hosts/wordpress/plugin/surfaces/7.1.json --spec examples/specs examples/builds/review-queue.json examples/builds/quick-approve.json examples/builds/waiting-posts.json examples/builds/stale-drafts.json examples/builds/headline-check.json examples/builds/pending-by-author.json examples/builds/publish-checklist.json",
     "test:compile": "tsx hosts/wordpress/adapter/src/compile-smoke.ts",
     "test:canary": "tsx hosts/wordpress/adapter/src/canary-test.ts",
     "surface:emdash": "tsx hosts/emdash/adapter/src/node/surface-cli.ts",

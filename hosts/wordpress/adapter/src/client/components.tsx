@@ -1,5 +1,5 @@
 import { useState, type CSSProperties } from 'react';
-import { Button, Card, CardBody, CardHeader, Notice, Spinner } from '@wordpress/components';
+import { Button, Card, CardBody, CardHeader, CheckboxControl, Notice, SelectControl, Spinner, TextareaControl, TextControl } from '@wordpress/components';
 import type { ComponentRegistry, RendererComponentProps } from '@graft/renderer-react';
 import { cell, type Field, type Tone } from '../cells.ts';
 
@@ -255,6 +255,82 @@ function RowAction({ props, invoke }: Props) {
 	);
 }
 
+// Inputs: the renderer keeps the value (props.field); they only display it and
+// report changes. Outside a widget there is no field, and they render nothing.
+
+const text = (value: unknown) => (typeof value === 'string' ? value : '');
+const help = (props: Props['props']) => (typeof props.help === 'string' ? props.help : undefined);
+
+function GraftTextInput({ props, field }: Props) {
+	if (!field) {
+		return null;
+	}
+	return (
+		<TextControl
+			__nextHasNoMarginBottom
+			__next40pxDefaultSize
+			label={String(props.label ?? '')}
+			help={help(props)}
+			placeholder={typeof props.placeholder === 'string' ? props.placeholder : undefined}
+			value={text(field.value)}
+			onChange={(value: string) => field.change(value)}
+			data-graft-input={String(props.id ?? '')}
+		/>
+	);
+}
+
+function GraftTextarea({ props, field }: Props) {
+	if (!field) {
+		return null;
+	}
+	return (
+		<TextareaControl
+			__nextHasNoMarginBottom
+			label={String(props.label ?? '')}
+			help={help(props)}
+			rows={Number(props.rows ?? 4)}
+			value={text(field.value)}
+			onChange={(value: string) => field.change(value)}
+			data-graft-input={String(props.id ?? '')}
+		/>
+	);
+}
+
+function GraftCheckbox({ props, field }: Props) {
+	if (!field) {
+		return null;
+	}
+	return (
+		<CheckboxControl
+			__nextHasNoMarginBottom
+			label={String(props.label ?? '')}
+			help={help(props)}
+			checked={field.value === true}
+			onChange={(checked: boolean) => field.change(checked)}
+			data-graft-input={String(props.id ?? '')}
+		/>
+	);
+}
+
+function GraftSelect({ props, field }: Props) {
+	if (!field) {
+		return null;
+	}
+	const options = (Array.isArray(props.options) ? props.options : []) as Array<{ value: string; label: string }>;
+	return (
+		<SelectControl
+			__nextHasNoMarginBottom
+			__next40pxDefaultSize
+			label={String(props.label ?? '')}
+			help={help(props)}
+			value={text(field.value)}
+			options={options.map((option) => ({ value: String(option.value), label: String(option.label) }))}
+			onChange={(value: string) => field.change(value)}
+			data-graft-input={String(props.id ?? '')}
+		/>
+	);
+}
+
 export const components: ComponentRegistry = {
 	stack: Stack,
 	heading: Heading,
@@ -265,6 +341,10 @@ export const components: ComponentRegistry = {
 	'empty-state': EmptyState,
 	table: Table,
 	'row-action': RowAction,
+	'text-input': GraftTextInput,
+	textarea: GraftTextarea,
+	checkbox: GraftCheckbox,
+	select: GraftSelect,
 };
 
 function flexValue(value: unknown): CSSProperties['alignItems'] {

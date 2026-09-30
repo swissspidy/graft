@@ -8,7 +8,12 @@ import type { SurfaceFunctions } from '@graft/core';
 export const functions: SurfaceFunctions = {
 	runtime: 'quickjs',
 	limits: { timeMs: 50, memoryBytes: 8 * 1024 * 1024, outputBytes: 16 * 1024, sourceBytes: 32 * 1024 },
-	// What a widget's render function may draw with: display components and
-	// buttons, whose clicks only reach the widget's update function.
-	widgets: { components: ['button', 'card', 'empty-state', 'heading', 'notice', 'stack', 'table', 'text'], maxNodes: 200 },
+	// What a widget's render function may draw with: display components,
+	// inputs and buttons, whose events only reach the widget's update function.
+	widgets: {
+		components: ['button', 'card', 'checkbox', 'empty-state', 'heading', 'notice', 'select', 'stack', 'table', 'text', 'text-input', 'textarea'],
+		// Inputs show what the viewer entered; declared actions read them with $input.
+		inputs: ['checkbox', 'select', 'text-input', 'textarea'],
+		maxNodes: 200,
+	},
 };

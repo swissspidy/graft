@@ -24,6 +24,17 @@ declare module '@wordpress/components' {
 	export const CardHeader: ComponentType<{ children?: ReactNode }>;
 	export const CardBody: ComponentType<{ children?: ReactNode }>;
 	export const Spinner: ComponentType<Record<string, never>>;
+	interface ControlProps {
+		label?: string;
+		help?: string;
+		__nextHasNoMarginBottom?: boolean;
+		__next40pxDefaultSize?: boolean;
+		[data: `data-${string}`]: string | undefined;
+	}
+	export const TextControl: ComponentType<ControlProps & { value: string; placeholder?: string; onChange(value: string): void }>;
+	export const TextareaControl: ComponentType<ControlProps & { value: string; rows?: number; onChange(value: string): void }>;
+	export const CheckboxControl: ComponentType<ControlProps & { checked: boolean; onChange(checked: boolean): void }>;
+	export const SelectControl: ComponentType<ControlProps & { value: string; options: Array<{ value: string; label: string }>; onChange(value: string): void }>;
 }
 
 declare module '@wordpress/api-fetch' {

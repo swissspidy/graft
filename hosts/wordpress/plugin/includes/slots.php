@@ -120,3 +120,74 @@ function post_slot_props( WP_Post $post ): array {
 		),
 	);
 }
+
+/**
+ * Slot props for the post being edited, for the current user. The title and
+ * excerpt are as saved, unformatted: what the editor shows. Shared with the
+ * verification sandbox.
+ *
+ * @param WP_Post $post Post.
+ * @return array<string, mixed>
+ */
+function editor_slot_props( WP_Post $post ): array {
+	return array(
+		'post' => array(
+			'id'      => $post->ID,
+			'title'   => $post->post_title,
+			'excerpt' => $post->post_excerpt,
+			'status'  => $post->post_status,
+			'type'    => $post->post_type,
+			'can'     => array(
+				'edit'    => current_user_can( 'edit_post', $post->ID ),
+				'publish' => current_user_can( 'publish_post', $post->ID ),
+			),
+		),
+	);
+}
+
+/**
+ * Slot post.editor.panel: on the block editor for a saved post, marks the
+ * specs to render and returns what the runtime needs to put them in the
+ * sidebar (see editor_runtime_config()).
+ */
+function mount_editor_panels(): void {
+	$screen = function_exists( 'get_current_screen' ) ? get_current_screen() : null;
+	$post   = get_post();
+	if ( ! $screen || 'post' !== $screen->base || ! $screen->is_block_editor() || ! $post || 'post' !== $post->post_type ) {
+		return;
+	}
+	// A new post is not saved yet: an action would change another post than the one reloaded.
+	if ( 'auto-draft' === $post->post_status || ! current_user_can( 'edit_post', $post->ID ) ) {
+		return;
+	}
+	$panels = array();
+	foreach ( specs_in_slot( 'post.editor.panel' ) as $spec_id => $entry ) {
+		rendered_specs( $spec_id );
+		$panels[] = array(
+			'spec'  => $spec_id,
+			'title' => (string) ( $entry['build']['mount']['title'] ?? $entry['record']['title'] ),
+		);
+	}
+	if ( $panels ) {
+		editor_runtime_config(
+			array(
+				'panels' => $panels,
+				'slot'   => (object) editor_slot_props( $post ),
+			)
+		);
+	}
+}
+
+/**
+ * The editor panels on this screen, once mount_editor_panels() has run.
+ *
+ * @param array<string, mixed>|null $config Sets the config when given.
+ * @return array<string, mixed>|null
+ */
+function editor_runtime_config( ?array $config = null ): ?array {
+	static $current = null;
+	if ( null !== $config ) {
+		$current = $config;
+	}
+	return $current;
+}

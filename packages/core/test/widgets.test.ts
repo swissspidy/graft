@@ -1,6 +1,7 @@
-import { describe, expect, it } from 'vitest';
+import { beforeAll, describe, expect, it } from 'vitest';
 import {
 	describeChange,
+	evaluate,
 	extractRefs,
 	hashSurface,
 	resolveWidgetUse,
@@ -255,5 +256,105 @@ describe('widgets in builds', () => {
 		const check = staticCheck(build([]), surface, { ...surface, functions: noWidgets });
 		expect(check.start).toBe('regenerate');
 		expect(check.changes.map(describeChange)).toEqual(['the host no longer runs interactive widgets']);
+	});
+});
+
+describe('widget inputs', () => {
+	const inputLimits = { components: ['stack', 'text', 'button', 'field'], inputs: ['field'], maxNodes: 10 };
+	const withInputs: Surface = {
+		...surface,
+		components: {
+			...surface.components,
+			field: { props: { type: 'object', properties: { id: { type: 'string' }, label: { type: 'string' }, value: {}, onChange: {} }, required: ['id', 'label'], additionalProperties: false } },
+		},
+		capabilities: { ...surface.capabilities, 'items.rename': { kind: 'write', input: { type: 'object' }, output: {}, scopes: ['items:write'] } },
+		functions: { ...surface.functions!, widgets: inputLimits },
+	};
+	beforeAll(async () => {
+		withInputs.hash = await hashSurface(withInputs);
+	});
+
+	const rename = { call: { $call: 'items.rename', input: { id: { $field: 'id' }, title: { $input: 'title' } } } };
+	const props = { render: 'draw', update: 'step', input: [{ id: 1, title: 'One' }], state: '', actions: { rename } };
+	function inputBuild(checks: Build['checks'], widgetProps: Record<string, unknown> = props): Build {
+		const b = build(checks, widgetProps);
+		b.surface.hash = withInputs.hash!;
+		b.refs = extractRefs(b, withInputs);
+		return b;
+	}
+	/** Draws a field that starts with the row's title (or `redraw` after an event), and a Rename button. */
+	const drawing = (redraw?: string) => async () => ({
+		call(name: string, args: unknown[]) {
+			if (name === 'step') {
+				return args[2];
+			}
+			const [rows, state] = args as [Array<{ title: string }>, string];
+			return {
+				type: 'stack',
+				children: [
+					{ type: 'text', children: `Typed: ${state}` },
+					{ type: 'field', props: { id: 'title', label: 'Title', value: state && redraw ? redraw : rows[0]!.title, onChange: { $event: 'typed' } } },
+					{ type: 'button', props: { id: 'rename', label: 'Rename', onClick: { $use: 'rename', row: 1 } } },
+				],
+			};
+		},
+	});
+	const recording = (calls: Array<[string, unknown]>): Sandbox => ({
+		...sandbox,
+		async call(_user, capability, input) {
+			calls.push([capability, input]);
+			return {};
+		},
+	});
+
+	it('read what the viewer sees with $input, and only there', () => {
+		const ctx = { data: {}, slot: {}, can: () => true, inputs: { title: 'Uno' } };
+		expect(evaluate({ $input: 'title' }, ctx)).toBe('Uno');
+		expect(evaluate({ $input: 'other' }, ctx)).toBeNull();
+		expect(evaluate({ $input: 'title' }, { data: {}, slot: {}, can: () => true })).toBeNull();
+	});
+
+	it('may only be read in a widget’s declared actions', async () => {
+		const ok = await validateBuild(inputBuild([{ criterion: 'count', expect: [{ text: 'x' }] }]), withInputs);
+		expect(ok.diagnostics.filter((d) => d.severity === 'error')).toEqual([]);
+		const inState = await validateBuild(inputBuild([{ criterion: 'count', expect: [{ text: 'x' }] }], { ...props, state: { $input: 'title' } }), withInputs);
+		expect(inState.diagnostics.map((d) => d.code)).toContain('build-input-not-allowed');
+		const inVisible = await validateBuild(inputBuild([{ criterion: 'count', expect: [{ text: 'x' }] }], { ...props, actions: { rename: { ...rename, visible: { $eq: [{ $input: 'title' }, 'x'] } } } }), withInputs);
+		expect(inVisible.diagnostics.map((d) => d.code)).toContain('build-input-not-allowed');
+	});
+
+	it('take steps that either use an action or fill an input, never both', async () => {
+		const mixed = await validateBuild(inputBuild([{ criterion: 'count', steps: [{ action: 'rename', fill: 'title' }], expect: [{ text: 'x' }] }]), withInputs);
+		expect(mixed.diagnostics.map((d) => d.code)).toContain('build-schema');
+	});
+
+	it('send what the viewer typed, and tell update as they type', async () => {
+		const calls: Array<[string, unknown]> = [];
+		const b = inputBuild([
+			{ criterion: 'count', view_as: 'v', steps: [{ fill: 'title', value: 'Uno' }, { action: 'rename' }], expect: [{ text: 'Typed: Uno' }, { input: 'title', value: 'Uno' }] },
+		]);
+		const result = await verifyBuild({ build: b, spec, surface: withInputs, sandbox: recording(calls), semantics, createCan: () => () => true, loadFunctions: drawing() });
+		expect(result.results.flatMap((r) => r.failures)).toEqual([]);
+		expect(calls).toEqual([['items.rename', { id: 1, title: 'Uno' }]]);
+	});
+
+	it('send what the code drew until the viewer types, and never what the code redraws over their typing', async () => {
+		const calls: Array<[string, unknown]> = [];
+		const b = inputBuild([
+			{ criterion: 'count', view_as: 'v', steps: [{ action: 'rename' }], expect: [{ input: 'title', value: 'One' }] },
+			{ criterion: 'count', view_as: 'v', steps: [{ fill: 'title', value: 'Uno' }, { action: 'rename' }], expect: [{ input: 'title', value: 'Uno' }] },
+		]);
+		const result = await verifyBuild({ build: b, spec, surface: withInputs, sandbox: recording(calls), semantics, createCan: () => () => true, loadFunctions: drawing('Hidden') });
+		expect(result.results.flatMap((r) => r.failures)).toEqual([]);
+		expect(calls).toEqual([
+			['items.rename', { id: 1, title: 'One' }],
+			['items.rename', { id: 1, title: 'Uno' }],
+		]);
+	});
+
+	it('fail a check that types into an input that is not there', async () => {
+		const b = inputBuild([{ criterion: 'count', view_as: 'v', steps: [{ fill: 'nope', value: 'x' }], expect: [{ text: 'x' }] }]);
+		const result = await verifyBuild({ build: b, spec, surface: withInputs, sandbox, semantics, createCan: () => () => true, loadFunctions: drawing() });
+		expect(result.results[0]!.failures).toEqual(['Step 1: no "nope" input.']);
 	});
 });

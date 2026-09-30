@@ -1,0 +1,555 @@
+{
+	"graft": 1,
+	"spec": {
+		"id": "publish-checklist",
+		"hash": "sha256:ebd759b1f139f0217a8c24767cdc631ee61feb2382b08b26b336f0a52e4f2bad"
+	},
+	"surface": {
+		"host": "wordpress",
+		"hostVersion": "7.1.2",
+		"hash": "sha256:d8b175a5187c29e53e231197e32aa74e34711ee0a397df32fec0a55f27b15ba0"
+	},
+	"mount": {
+		"slot": "post.editor.panel",
+		"title": "Publish checklist"
+	},
+	"data": {},
+	"tree": {
+		"type": "widget",
+		"props": {
+			"render": "draw",
+			"update": "edit",
+			"input": [
+				{
+					"$slot": "post"
+				}
+			],
+			"state": {
+				"title": null,
+				"excerpt": null,
+				"facts": false
+			},
+			"actions": {
+				"save": {
+					"call": {
+						"$call": "posts.update_fields",
+						"input": {
+							"id": {
+								"$field": "id"
+							},
+							"title": {
+								"$input": "title"
+							},
+							"excerpt": {
+								"$input": "excerpt"
+							}
+						},
+						"then": [
+							"reload:page"
+						],
+						"notice": "Saved."
+					},
+					"visible": {
+						"$can": "posts:write"
+					}
+				},
+				"publish": {
+					"call": {
+						"$call": "posts.update_status",
+						"input": {
+							"id": {
+								"$field": "id"
+							},
+							"status": "publish"
+						},
+						"then": [
+							"reload:page"
+						],
+						"notice": "Published."
+					},
+					"visible": {
+						"$can": "posts.status:write"
+					}
+				}
+			}
+		}
+	},
+	"code": {
+		"language": "javascript",
+		"source": "// The checklist for a headline and excerpt, and whether facts were checked.\nfunction checklist(title, excerpt, facts) {\n\tconst headline = String(title || '').trim();\n\tconst summary = String(excerpt || '').trim();\n\tconst letters = headline.replace(/[^A-Za-zÀ-ɏ]/g, '');\n\treturn [\n\t\t{ label: 'Headline is 20 to 70 characters', ok: headline.length >= 20 && headline.length <= 70, now: headline.length },\n\t\t{ label: 'Headline is not in capitals', ok: !(letters.length >= 4 && letters === letters.toUpperCase()) },\n\t\t{ label: 'Excerpt of at least 50 characters', ok: summary.length >= 50, now: summary.length },\n\t\t{ label: 'Facts and names checked', ok: facts === true },\n\t];\n}\n\n// The fields, the checklist as they read now, and the buttons that fit.\nfunction draw(posts, state) {\n\tconst post = posts[0];\n\tif (!post) {\n\t\treturn { type: 'text', children: 'Save the post to see its checklist.' };\n\t}\n\tconst title = state.title === null ? post.title : state.title;\n\tconst excerpt = state.excerpt === null ? post.excerpt : state.excerpt;\n\tconst items = checklist(title, excerpt, state.facts);\n\tconst ready = items.every((item) => item.ok);\n\tconst changed = title !== post.title || excerpt !== post.excerpt;\n\tconst buttons = [];\n\tif (changed) {\n\t\tbuttons.push({ type: 'button', props: { id: 'save', label: 'Save', variant: 'secondary', onClick: { $use: 'save', row: post.id } } });\n\t}\n\tif (ready && !changed && post.status !== 'publish') {\n\t\tbuttons.push({ type: 'button', props: { id: 'publish', label: 'Publish', variant: 'primary', onClick: { $use: 'publish', row: post.id } } });\n\t}\n\treturn {\n\t\ttype: 'stack',\n\t\tprops: { gap: 3 },\n\t\tchildren: [\n\t\t\t{ type: 'text-input', props: { id: 'title', label: 'Headline', value: post.title, onChange: { $event: 'title' } } },\n\t\t\t{ type: 'textarea', props: { id: 'excerpt', label: 'Excerpt', value: post.excerpt, rows: 3, onChange: { $event: 'excerpt' } } },\n\t\t\t{ type: 'checkbox', props: { id: 'facts', label: 'Facts and names checked', value: false, onChange: { $event: 'facts' } } },\n\t\t\t{\n\t\t\t\ttype: 'stack',\n\t\t\t\tprops: { gap: 1 },\n\t\t\t\tchildren: items.map((item) => ({\n\t\t\t\t\ttype: 'text',\n\t\t\t\t\tprops: { variant: item.ok ? 'body' : 'strong' },\n\t\t\t\t\tchildren: `${item.ok ? '✓' : '✗'} ${item.label}${!item.ok && typeof item.now === 'number' ? ` (${item.now} now)` : ''}`,\n\t\t\t\t})),\n\t\t\t},\n\t\t\tchanged && ready ? { type: 'text', props: { variant: 'muted' }, children: 'Save your changes before publishing.' } : null,\n\t\t\tbuttons.length ? { type: 'stack', props: { direction: 'row', gap: 2 }, children: buttons } : null,\n\t\t].filter(Boolean),\n\t};\n}\n\n// What the writer typed or ticked.\nfunction edit(state, event, value) {\n\tif (event === 'title' || event === 'excerpt') {\n\t\treturn { ...state, [event]: String(value) };\n\t}\n\tif (event === 'facts') {\n\t\treturn { ...state, facts: value === true };\n\t}\n\treturn state;\n}\n",
+		"functions": [
+			"draw",
+			"edit"
+		]
+	},
+	"checks": [
+		{
+			"criterion": "prefilled",
+			"fixtures": {
+				"users": [
+					{
+						"as": "e",
+						"role": "editor"
+					}
+				],
+				"posts": [
+					{
+						"title": "City council approves the new cycling plan",
+						"status": "draft",
+						"excerpt": "The plan adds forty kilometres of protected bike lanes by 2028."
+					}
+				]
+			},
+			"view_as": "e",
+			"expect": [
+				{
+					"input": "title",
+					"value": "City council approves the new cycling plan",
+					"row": {
+						"title": "City council approves the new cycling plan"
+					}
+				},
+				{
+					"input": "excerpt",
+					"value": "The plan adds forty kilometres of protected bike lanes by 2028.",
+					"row": {
+						"title": "City council approves the new cycling plan"
+					}
+				}
+			]
+		},
+		{
+			"criterion": "checklist",
+			"fixtures": {
+				"users": [
+					{
+						"as": "e",
+						"role": "editor"
+					}
+				],
+				"posts": [
+					{
+						"title": "Budget vote",
+						"status": "draft"
+					}
+				]
+			},
+			"view_as": "e",
+			"expect": [
+				{
+					"text": "✗ Headline is 20 to 70 characters (11 now)"
+				},
+				{
+					"text": "✓ Headline is not in capitals"
+				},
+				{
+					"text": "✗ Excerpt of at least 50 characters (0 now)"
+				}
+			]
+		},
+		{
+			"criterion": "checklist",
+			"fixtures": {
+				"users": [
+					{
+						"as": "e",
+						"role": "editor"
+					}
+				],
+				"posts": [
+					{
+						"title": "BUDGET SHOWDOWN TONIGHT AT CITY HALL",
+						"status": "draft"
+					}
+				]
+			},
+			"view_as": "e",
+			"expect": [
+				{
+					"text": "✓ Headline is 20 to 70 characters"
+				},
+				{
+					"text": "✗ Headline is not in capitals"
+				}
+			]
+		},
+		{
+			"criterion": "facts",
+			"fixtures": {
+				"users": [
+					{
+						"as": "e",
+						"role": "editor"
+					}
+				],
+				"posts": [
+					{
+						"title": "City council approves the new cycling plan",
+						"status": "draft",
+						"excerpt": "The plan adds forty kilometres of protected bike lanes by 2028."
+					}
+				]
+			},
+			"view_as": "e",
+			"expect": [
+				{
+					"input": "facts",
+					"value": false,
+					"row": {
+						"title": "City council approves the new cycling plan"
+					}
+				},
+				{
+					"text": "✗ Facts and names checked"
+				}
+			]
+		},
+		{
+			"criterion": "facts",
+			"fixtures": {
+				"users": [
+					{
+						"as": "e",
+						"role": "editor"
+					}
+				],
+				"posts": [
+					{
+						"title": "City council approves the new cycling plan",
+						"status": "draft",
+						"excerpt": "The plan adds forty kilometres of protected bike lanes by 2028."
+					}
+				]
+			},
+			"view_as": "e",
+			"steps": [
+				{
+					"fill": "facts",
+					"value": true,
+					"row": {
+						"title": "City council approves the new cycling plan"
+					}
+				}
+			],
+			"expect": [
+				{
+					"text": "✓ Facts and names checked"
+				}
+			]
+		},
+		{
+			"criterion": "live",
+			"fixtures": {
+				"users": [
+					{
+						"as": "e",
+						"role": "editor"
+					}
+				],
+				"posts": [
+					{
+						"title": "Budget vote",
+						"status": "draft"
+					}
+				]
+			},
+			"view_as": "e",
+			"steps": [
+				{
+					"fill": "title",
+					"value": "Budget vote passes after a long night",
+					"row": {
+						"title": "Budget vote"
+					}
+				}
+			],
+			"expect": [
+				{
+					"text": "✓ Headline is 20 to 70 characters"
+				},
+				{
+					"post": {
+						"title": "Budget vote",
+						"status": "draft"
+					}
+				}
+			]
+		},
+		{
+			"criterion": "save",
+			"fixtures": {
+				"users": [
+					{
+						"as": "e",
+						"role": "editor"
+					}
+				],
+				"posts": [
+					{
+						"title": "Budget vote",
+						"status": "draft"
+					}
+				]
+			},
+			"view_as": "e",
+			"steps": [
+				{
+					"fill": "title",
+					"value": "Budget vote passes after a long night",
+					"row": {
+						"title": "Budget vote"
+					}
+				},
+				{
+					"fill": "excerpt",
+					"value": "Councillors agreed on the budget at two in the morning.",
+					"row": {
+						"title": "Budget vote"
+					}
+				},
+				{
+					"action": "save",
+					"row": {
+						"title": "Budget vote"
+					}
+				}
+			],
+			"expect": [
+				{
+					"post": {
+						"title": "Budget vote passes after a long night",
+						"excerpt": "Councillors agreed on the budget at two in the morning."
+					}
+				},
+				{
+					"input": "title",
+					"value": "Budget vote passes after a long night"
+				}
+			]
+		},
+		{
+			"criterion": "publish",
+			"fixtures": {
+				"users": [
+					{
+						"as": "e",
+						"role": "editor"
+					}
+				],
+				"posts": [
+					{
+						"title": "City council approves the new cycling plan",
+						"status": "draft",
+						"excerpt": "The plan adds forty kilometres of protected bike lanes by 2028."
+					}
+				]
+			},
+			"view_as": "e",
+			"steps": [
+				{
+					"fill": "facts",
+					"value": true,
+					"row": {
+						"title": "City council approves the new cycling plan"
+					}
+				},
+				{
+					"action": "publish",
+					"row": {
+						"title": "City council approves the new cycling plan"
+					}
+				}
+			],
+			"expect": [
+				{
+					"post": {
+						"title": "City council approves the new cycling plan",
+						"status": "publish"
+					}
+				}
+			]
+		},
+		{
+			"criterion": "publish",
+			"fixtures": {
+				"users": [
+					{
+						"as": "e",
+						"role": "editor"
+					}
+				],
+				"posts": [
+					{
+						"title": "City council approves the new cycling plan",
+						"status": "draft",
+						"excerpt": "The plan adds forty kilometres of protected bike lanes by 2028."
+					}
+				]
+			},
+			"view_as": "e",
+			"expect": [
+				{
+					"action": "publish",
+					"row": {
+						"title": "City council approves the new cycling plan"
+					},
+					"available": false
+				}
+			]
+		},
+		{
+			"criterion": "publish",
+			"fixtures": {
+				"users": [
+					{
+						"as": "e",
+						"role": "editor"
+					}
+				],
+				"posts": [
+					{
+						"title": "City council approves the new cycling plan",
+						"status": "draft",
+						"excerpt": "The plan adds forty kilometres of protected bike lanes by 2028."
+					}
+				]
+			},
+			"view_as": "e",
+			"steps": [
+				{
+					"fill": "facts",
+					"value": true,
+					"row": {
+						"title": "City council approves the new cycling plan"
+					}
+				},
+				{
+					"fill": "title",
+					"value": "City council approves the new cycling plan tonight",
+					"row": {
+						"title": "City council approves the new cycling plan"
+					}
+				}
+			],
+			"expect": [
+				{
+					"action": "publish",
+					"row": {
+						"title": "City council approves the new cycling plan"
+					},
+					"available": false
+				},
+				{
+					"text": "Save your changes before publishing."
+				}
+			]
+		},
+		{
+			"criterion": "contributors",
+			"fixtures": {
+				"users": [
+					{
+						"as": "c",
+						"role": "contributor"
+					}
+				],
+				"posts": [
+					{
+						"title": "City council approves the new cycling plan",
+						"status": "draft",
+						"excerpt": "The plan adds forty kilometres of protected bike lanes by 2028.",
+						"author": "c"
+					}
+				]
+			},
+			"view_as": "c",
+			"steps": [
+				{
+					"fill": "facts",
+					"value": true,
+					"row": {
+						"title": "City council approves the new cycling plan"
+					}
+				}
+			],
+			"expect": [
+				{
+					"text": "✓ Facts and names checked"
+				},
+				{
+					"action": "publish",
+					"row": {
+						"title": "City council approves the new cycling plan"
+					},
+					"available": false
+				}
+			]
+		},
+		{
+			"criterion": "contributors",
+			"fixtures": {
+				"users": [
+					{
+						"as": "c",
+						"role": "contributor"
+					}
+				],
+				"posts": [
+					{
+						"title": "Budget vote",
+						"status": "draft",
+						"author": "c"
+					}
+				]
+			},
+			"view_as": "c",
+			"steps": [
+				{
+					"fill": "title",
+					"value": "Budget vote passes after a long night",
+					"row": {
+						"title": "Budget vote"
+					}
+				},
+				{
+					"action": "save",
+					"row": {
+						"title": "Budget vote"
+					}
+				}
+			],
+			"expect": [
+				{
+					"post": {
+						"title": "Budget vote passes after a long night",
+						"status": "draft"
+					}
+				}
+			]
+		}
+	],
+	"refs": {
+		"slot": "post.editor.panel",
+		"components": {
+			"widget": [
+				"actions",
+				"input",
+				"render",
+				"state",
+				"update"
+			]
+		},
+		"capabilities": [
+			"posts.update_fields",
+			"posts.update_status"
+		],
+		"scopes": [
+			"posts.status:write",
+			"posts:write"
+		]
+	},
+	"provenance": {
+		"compiler": "handwritten",
+		"strategy": "handwritten"
+	}
+}

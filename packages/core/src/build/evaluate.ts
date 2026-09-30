@@ -1,5 +1,5 @@
 import { canonicalJson } from '../surface/hash.ts';
-import { compareOp, getPath, isAnd, isCall, isCan, isDataRef, isDaysSince, isEq, isFieldRef, isFn, isIf, isNot, isOr, isSlotRef } from './expressions.ts';
+import { compareOp, getPath, isAnd, isCall, isCan, isDataRef, isDaysSince, isEq, isFieldRef, isFn, isIf, isInputRef, isNot, isOr, isSlotRef } from './expressions.ts';
 import type { Value } from './types.ts';
 
 export interface EvalContext {
@@ -23,6 +23,8 @@ export interface EvalContext {
 	 * action for that row, or null when it is not offered.
 	 */
 	use?(use: { $use: string; row?: unknown }): unknown;
+	/** Inside a widget: what its input components show, by id (for `$input`). */
+	inputs?: Record<string, unknown>;
 }
 
 /**
@@ -109,6 +111,9 @@ export function evaluate(value: Value | undefined, ctx: EvalContext): unknown {
 	}
 	if (isSlotRef(value)) {
 		return getPath(ctx.slot, value.$slot);
+	}
+	if (isInputRef(value)) {
+		return ctx.inputs && Object.hasOwn(ctx.inputs, value.$input) ? (ctx.inputs[value.$input] ?? null) : null;
 	}
 	if (isCan(value)) {
 		const on = value.on === undefined ? ctx.row : evaluate(value.on, ctx);

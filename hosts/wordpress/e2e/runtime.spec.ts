@@ -218,6 +218,7 @@ test('the served specs are verified, not flagged', async ({ page }) => {
 	expect(specs.filter((s) => s.spec_id !== 'waiting-copy').map((s) => [s.spec_id, s.versions[0]!.state]).sort()).toEqual([
 		['headline-check', 'active'],
 		['pending-by-author', 'active'],
+		['publish-checklist', 'active'],
 		['quick-approve', 'active'],
 		['review-queue', 'active'],
 		['stale-drafts', 'active'],
@@ -321,8 +322,8 @@ test('graft site verify verifies the draft built in wp-admin, and the admin appr
 test('graft site pull exports the active customizations as a canary corpus', async () => {
 	const out = new URL('../../../test-results/pulled/e2e-site', import.meta.url).pathname;
 	const output = await graft('site', 'pull', '--out', out);
-	expect(output).toContain('Wrote 7 customization(s)');
-	for (const spec of ['review-queue', 'quick-approve', 'stale-drafts', 'headline-check', 'pending-by-author', 'waiting-posts', 'waiting-copy']) {
+	expect(output).toContain('Wrote 8 customization(s)');
+	for (const spec of ['review-queue', 'quick-approve', 'stale-drafts', 'headline-check', 'pending-by-author', 'publish-checklist', 'waiting-posts', 'waiting-copy']) {
 		expect(existsSync(`${out}/${spec}.md`) && existsSync(`${out}/${spec}.json`) && existsSync(`${out}/${spec}.grant.json`)).toBe(true);
 	}
 	expect(JSON.parse(readFileSync(`${out}/review-queue.grant.json`, 'utf8'))).toEqual({ scopes: ['posts:read', 'posts.status:write'] });
@@ -346,6 +347,66 @@ test('subscribers get no review queue', async ({ page }) => {
 	const response = await page.goto('/wp-admin/admin.php?page=graft-review-queue');
 	expect(response?.status()).toBe(403);
 });
+
+// Last, because it renames and publishes Draft B.
+test('the publish checklist sits in the block editor: it follows typing, saves, and publishes', async ({ page }) => {
+	await login(page, 'editor');
+	// The editor greets first-time users with a guide.
+	const guide = page.getByRole('dialog', { name: /welcome/i });
+	await page.addLocatorHandler(guide, () => guide.getByRole('button', { name: /close/i }).click());
+	await page.goto('/wp-admin/edit.php');
+	await page.locator('#the-list').getByRole('link', { name: 'Draft B', exact: true }).first().click();
+	const panel = page.locator('.graft-editor-panel');
+	const toggle = page.getByRole('button', { name: 'Publish checklist' });
+	await toggle.waitFor({ timeout: 60_000 });
+	if ((await toggle.getAttribute('aria-expanded')) === 'false') {
+		await toggle.click();
+	}
+
+	// Drawn by the build's code in the sandbox, from the post as saved.
+	await expect(panel.getByLabel('Headline')).toHaveValue('Draft B', { timeout: 30_000 });
+	await expect(panel.getByText('✗ Headline is 20 to 70 characters (7 now)')).toBeVisible();
+	await expect(panel.getByText('✗ Excerpt of at least 50 characters (0 now)')).toBeVisible();
+
+	// It follows typing, before anything is saved.
+	await panel.getByLabel('Headline').fill('Draft B gets a headline that fits');
+	await expect(panel.getByText('✓ Headline is 20 to 70 characters')).toBeVisible();
+	await panel.getByLabel('Excerpt').fill('A short summary of the post, for search results and social media.');
+	await panel.getByLabel('Facts and names checked').check();
+	await expect(panel.getByText('✓ Facts and names checked')).toBeVisible();
+	await expect(panel.getByText('Save your changes before publishing.')).toBeVisible();
+	await expect(panel.getByRole('button', { name: 'Publish' })).toHaveCount(0);
+
+	// While the editor has unsaved changes of its own, nothing is written.
+	await page.evaluate(() => (window.wp as unknown as EditorData).data.dispatch('core/editor').editPost({ title: 'Draft B, edited in the editor' }));
+	await panel.getByRole('button', { name: 'Save' }).click();
+	await expect(panel.getByText('Save or discard your changes to the post first.')).toBeVisible();
+	await page.evaluate(() => (window.wp as unknown as EditorData).data.dispatch('core/editor').editPost({ title: 'Draft B' }));
+	await expect.poll(() => page.evaluate(() => (window.wp as unknown as EditorData).data.select('core/editor').isEditedPostDirty())).toBe(false);
+
+	// Saving writes what is on screen and reloads the editor with it. (The fields show the typed
+	// values before the reload too, so wait for the reload itself.)
+	const saved = page.waitForEvent('load', { timeout: 60_000 });
+	await panel.getByRole('button', { name: 'Save' }).click();
+	await saved;
+	await expect(panel.getByLabel('Headline')).toHaveValue('Draft B gets a headline that fits', { timeout: 60_000 });
+	await expect(panel.getByLabel('Excerpt')).toHaveValue('A short summary of the post, for search results and social media.');
+
+	// Once everything is ticked and saved, editors can publish.
+	await panel.getByLabel('Facts and names checked').check();
+	const published = page.waitForEvent('load', { timeout: 60_000 });
+	await panel.getByRole('button', { name: 'Publish' }).click();
+	await published;
+	await page.goto('/wp-admin/edit.php?post_status=publish&post_type=post');
+	await expect(page.locator('#the-list')).toContainText('Draft B gets a headline that fits');
+});
+
+interface EditorData {
+	data: {
+		dispatch(store: 'core/editor'): { editPost(edits: Record<string, unknown>): void };
+		select(store: 'core/editor'): { isEditedPostDirty(): boolean };
+	};
+}
 
 declare global {
 	interface Window {
