@@ -2,8 +2,8 @@
 	"graft": 1,
 	"host": "wordpress",
 	"hostVersion": "7.1.2",
-	"hash": "sha256:d8b175a5187c29e53e231197e32aa74e34711ee0a397df32fec0a55f27b15ba0",
-	"fingerprint": "sha256:9a1a00458447af4563e47ea16d755e85102653e3b717121274116ba4a3a41061",
+	"hash": "sha256:6f170822cb71accfa0c59633044953ce846b218fbcbd1f6406323c4f38e17cdc",
+	"fingerprint": "sha256:dae69d492f09778b9d048cda8b6f258a0b15e25ec55b60cacaadb3805110b152",
 	"slots": {
 		"admin.page": {
 			"kind": "owned",
@@ -83,7 +83,7 @@
 		"post.editor.panel": {
 			"kind": "extension",
 			"title": "Post editor panel",
-			"description": "A panel in the block editor sidebar, for a saved post. Actions that change the post reload the editor, and wait until the post has no unsaved changes.",
+			"description": "A panel in the block editor sidebar, for a saved post of one type (posts unless post_type says otherwise). Actions that change the post reload the editor, and wait until the post has no unsaved changes.",
 			"screen": "post",
 			"anchor": "component:PluginDocumentSettingPanel",
 			"options": {
@@ -93,6 +93,15 @@
 						"type": "string",
 						"minLength": 1,
 						"maxLength": 60
+					},
+					"post_type": {
+						"description": "The post type whose screen the slot is on. Defaults to post.",
+						"type": "string",
+						"enum": [
+							"page",
+							"post"
+						],
+						"default": "post"
 					}
 				},
 				"required": [
@@ -130,6 +139,65 @@
 							"type": {
 								"type": "string"
 							},
+							"meta": {
+								"description": "The post's custom fields that the site exposes, by meta key; null when it has no value.",
+								"type": "object",
+								"properties": {},
+								"additionalProperties": false
+							},
+							"terms": {
+								"description": "The post's terms in each exposed taxonomy, by taxonomy.",
+								"type": "object",
+								"properties": {
+									"category": {
+										"type": "array",
+										"items": {
+											"type": "object",
+											"properties": {
+												"id": {
+													"type": "integer"
+												},
+												"name": {
+													"type": "string"
+												},
+												"slug": {
+													"type": "string"
+												}
+											},
+											"required": [
+												"id",
+												"name",
+												"slug"
+											],
+											"additionalProperties": false
+										}
+									},
+									"post_tag": {
+										"type": "array",
+										"items": {
+											"type": "object",
+											"properties": {
+												"id": {
+													"type": "integer"
+												},
+												"name": {
+													"type": "string"
+												},
+												"slug": {
+													"type": "string"
+												}
+											},
+											"required": [
+												"id",
+												"name",
+												"slug"
+											],
+											"additionalProperties": false
+										}
+									}
+								},
+								"additionalProperties": false
+							},
 							"can": {
 								"type": "object",
 								"properties": {
@@ -153,6 +221,8 @@
 							"excerpt",
 							"status",
 							"type",
+							"meta",
+							"terms",
 							"can"
 						],
 						"additionalProperties": false
@@ -167,12 +237,22 @@
 		"posts.list.row-actions": {
 			"kind": "extension",
 			"title": "Posts list row actions",
-			"description": "Actions under each post title on the Posts screen.",
+			"description": "Actions under each title on the list screen of one post type (Posts unless post_type says otherwise).",
 			"screen": "edit-post",
 			"anchor": "filter:post_row_actions",
 			"options": {
 				"type": "object",
-				"properties": {},
+				"properties": {
+					"post_type": {
+						"description": "The post type whose screen the slot is on. Defaults to post.",
+						"type": "string",
+						"enum": [
+							"page",
+							"post"
+						],
+						"default": "post"
+					}
+				},
 				"additionalProperties": false
 			},
 			"provides": {
@@ -200,6 +280,65 @@
 							"type": {
 								"type": "string"
 							},
+							"meta": {
+								"description": "The post's custom fields that the site exposes, by meta key; null when it has no value.",
+								"type": "object",
+								"properties": {},
+								"additionalProperties": false
+							},
+							"terms": {
+								"description": "The post's terms in each exposed taxonomy, by taxonomy.",
+								"type": "object",
+								"properties": {
+									"category": {
+										"type": "array",
+										"items": {
+											"type": "object",
+											"properties": {
+												"id": {
+													"type": "integer"
+												},
+												"name": {
+													"type": "string"
+												},
+												"slug": {
+													"type": "string"
+												}
+											},
+											"required": [
+												"id",
+												"name",
+												"slug"
+											],
+											"additionalProperties": false
+										}
+									},
+									"post_tag": {
+										"type": "array",
+										"items": {
+											"type": "object",
+											"properties": {
+												"id": {
+													"type": "integer"
+												},
+												"name": {
+													"type": "string"
+												},
+												"slug": {
+													"type": "string"
+												}
+											},
+											"required": [
+												"id",
+												"name",
+												"slug"
+											],
+											"additionalProperties": false
+										}
+									}
+								},
+								"additionalProperties": false
+							},
 							"can": {
 								"type": "object",
 								"properties": {
@@ -222,6 +361,8 @@
 							"title",
 							"status",
 							"type",
+							"meta",
+							"terms",
 							"can"
 						],
 						"additionalProperties": false
@@ -996,13 +1137,39 @@
 	"capabilities": {
 		"posts.list": {
 			"kind": "read",
-			"description": "Lists posts the current user can edit, filtered by status, newest first.",
+			"description": "Lists posts of one type the current user can edit, filtered by status and optionally by a term, newest first unless ordered otherwise.",
 			"input": {
 				"type": "object",
 				"properties": {
 					"post_type": {
 						"type": "string",
+						"enum": [
+							"page",
+							"post"
+						],
 						"default": "post"
+					},
+					"term": {
+						"description": "Only posts with this term.",
+						"type": "object",
+						"properties": {
+							"taxonomy": {
+								"type": "string",
+								"enum": [
+									"category",
+									"post_tag"
+								]
+							},
+							"slug": {
+								"type": "string",
+								"minLength": 1
+							}
+						},
+						"required": [
+							"taxonomy",
+							"slug"
+						],
+						"additionalProperties": false
 					},
 					"status": {
 						"type": "array",
@@ -1033,6 +1200,7 @@
 						"default": 1
 					},
 					"orderby": {
+						"description": "meta.<key> orders by a custom field; posts without a value come last.",
 						"type": "string",
 						"enum": [
 							"date",
@@ -1108,6 +1276,65 @@
 									"type": "string",
 									"format": "uri"
 								},
+								"meta": {
+									"description": "The post's custom fields that the site exposes, by meta key; null when it has no value.",
+									"type": "object",
+									"properties": {},
+									"additionalProperties": false
+								},
+								"terms": {
+									"description": "The post's terms in each exposed taxonomy, by taxonomy.",
+									"type": "object",
+									"properties": {
+										"category": {
+											"type": "array",
+											"items": {
+												"type": "object",
+												"properties": {
+													"id": {
+														"type": "integer"
+													},
+													"name": {
+														"type": "string"
+													},
+													"slug": {
+														"type": "string"
+													}
+												},
+												"required": [
+													"id",
+													"name",
+													"slug"
+												],
+												"additionalProperties": false
+											}
+										},
+										"post_tag": {
+											"type": "array",
+											"items": {
+												"type": "object",
+												"properties": {
+													"id": {
+														"type": "integer"
+													},
+													"name": {
+														"type": "string"
+													},
+													"slug": {
+														"type": "string"
+													}
+												},
+												"required": [
+													"id",
+													"name",
+													"slug"
+												],
+												"additionalProperties": false
+											}
+										}
+									},
+									"additionalProperties": false
+								},
 								"can": {
 									"description": "What the current user may do with this post.",
 									"type": "object",
@@ -1134,6 +1361,8 @@
 								"author",
 								"date",
 								"modified",
+								"meta",
+								"terms",
 								"can"
 							],
 							"additionalProperties": false
@@ -1160,6 +1389,202 @@
 				"ability": "graft/posts-list",
 				"annotations": {
 					"readonly": true,
+					"destructive": false,
+					"idempotent": true
+				}
+			}
+		},
+		"posts.set_terms": {
+			"kind": "write",
+			"description": "Changes a post's terms in one taxonomy, by slug: replaces them (an empty list removes them all), adds to them, or removes some. Only existing terms.",
+			"input": {
+				"type": "object",
+				"properties": {
+					"id": {
+						"type": "integer",
+						"minimum": 1
+					},
+					"taxonomy": {
+						"type": "string",
+						"enum": [
+							"category",
+							"post_tag"
+						]
+					},
+					"terms": {
+						"type": "array",
+						"items": {
+							"type": "string",
+							"minLength": 1
+						},
+						"maxItems": 50,
+						"uniqueItems": true
+					},
+					"mode": {
+						"type": "string",
+						"enum": [
+							"replace",
+							"add",
+							"remove"
+						],
+						"default": "replace"
+					}
+				},
+				"required": [
+					"id",
+					"taxonomy",
+					"terms"
+				],
+				"additionalProperties": false
+			},
+			"output": {
+				"type": "object",
+				"properties": {
+					"id": {
+						"type": "integer"
+					},
+					"title": {
+						"type": "string"
+					},
+					"status": {
+						"type": "string",
+						"enum": [
+							"publish",
+							"future",
+							"draft",
+							"pending",
+							"private"
+						]
+					},
+					"type": {
+						"type": "string"
+					},
+					"author": {
+						"type": "object",
+						"properties": {
+							"id": {
+								"type": "integer"
+							},
+							"name": {
+								"type": "string"
+							}
+						},
+						"required": [
+							"id",
+							"name"
+						],
+						"additionalProperties": false
+					},
+					"date": {
+						"type": "string",
+						"format": "date-time"
+					},
+					"modified": {
+						"type": "string",
+						"format": "date-time"
+					},
+					"edit_url": {
+						"type": "string",
+						"format": "uri"
+					},
+					"meta": {
+						"description": "The post's custom fields that the site exposes, by meta key; null when it has no value.",
+						"type": "object",
+						"properties": {},
+						"additionalProperties": false
+					},
+					"terms": {
+						"description": "The post's terms in each exposed taxonomy, by taxonomy.",
+						"type": "object",
+						"properties": {
+							"category": {
+								"type": "array",
+								"items": {
+									"type": "object",
+									"properties": {
+										"id": {
+											"type": "integer"
+										},
+										"name": {
+											"type": "string"
+										},
+										"slug": {
+											"type": "string"
+										}
+									},
+									"required": [
+										"id",
+										"name",
+										"slug"
+									],
+									"additionalProperties": false
+								}
+							},
+							"post_tag": {
+								"type": "array",
+								"items": {
+									"type": "object",
+									"properties": {
+										"id": {
+											"type": "integer"
+										},
+										"name": {
+											"type": "string"
+										},
+										"slug": {
+											"type": "string"
+										}
+									},
+									"required": [
+										"id",
+										"name",
+										"slug"
+									],
+									"additionalProperties": false
+								}
+							}
+						},
+						"additionalProperties": false
+					},
+					"can": {
+						"description": "What the current user may do with this post.",
+						"type": "object",
+						"properties": {
+							"edit": {
+								"type": "boolean"
+							},
+							"publish": {
+								"type": "boolean"
+							}
+						},
+						"required": [
+							"edit",
+							"publish"
+						],
+						"additionalProperties": false
+					}
+				},
+				"required": [
+					"id",
+					"title",
+					"status",
+					"type",
+					"author",
+					"date",
+					"modified",
+					"meta",
+					"terms",
+					"can"
+				],
+				"additionalProperties": false
+			},
+			"scopes": [
+				"posts.terms:write"
+			],
+			"binding": {
+				"ability": "graft/post-set-terms",
+				"annotations": {
+					"readonly": false,
 					"destructive": false,
 					"idempotent": true
 				}
@@ -1241,6 +1666,65 @@
 						"type": "string",
 						"format": "uri"
 					},
+					"meta": {
+						"description": "The post's custom fields that the site exposes, by meta key; null when it has no value.",
+						"type": "object",
+						"properties": {},
+						"additionalProperties": false
+					},
+					"terms": {
+						"description": "The post's terms in each exposed taxonomy, by taxonomy.",
+						"type": "object",
+						"properties": {
+							"category": {
+								"type": "array",
+								"items": {
+									"type": "object",
+									"properties": {
+										"id": {
+											"type": "integer"
+										},
+										"name": {
+											"type": "string"
+										},
+										"slug": {
+											"type": "string"
+										}
+									},
+									"required": [
+										"id",
+										"name",
+										"slug"
+									],
+									"additionalProperties": false
+								}
+							},
+							"post_tag": {
+								"type": "array",
+								"items": {
+									"type": "object",
+									"properties": {
+										"id": {
+											"type": "integer"
+										},
+										"name": {
+											"type": "string"
+										},
+										"slug": {
+											"type": "string"
+										}
+									},
+									"required": [
+										"id",
+										"name",
+										"slug"
+									],
+									"additionalProperties": false
+								}
+							}
+						},
+						"additionalProperties": false
+					},
 					"can": {
 						"description": "What the current user may do with this post.",
 						"type": "object",
@@ -1267,6 +1751,8 @@
 					"author",
 					"date",
 					"modified",
+					"meta",
+					"terms",
 					"can"
 				],
 				"additionalProperties": false
@@ -1359,6 +1845,65 @@
 						"type": "string",
 						"format": "uri"
 					},
+					"meta": {
+						"description": "The post's custom fields that the site exposes, by meta key; null when it has no value.",
+						"type": "object",
+						"properties": {},
+						"additionalProperties": false
+					},
+					"terms": {
+						"description": "The post's terms in each exposed taxonomy, by taxonomy.",
+						"type": "object",
+						"properties": {
+							"category": {
+								"type": "array",
+								"items": {
+									"type": "object",
+									"properties": {
+										"id": {
+											"type": "integer"
+										},
+										"name": {
+											"type": "string"
+										},
+										"slug": {
+											"type": "string"
+										}
+									},
+									"required": [
+										"id",
+										"name",
+										"slug"
+									],
+									"additionalProperties": false
+								}
+							},
+							"post_tag": {
+								"type": "array",
+								"items": {
+									"type": "object",
+									"properties": {
+										"id": {
+											"type": "integer"
+										},
+										"name": {
+											"type": "string"
+										},
+										"slug": {
+											"type": "string"
+										}
+									},
+									"required": [
+										"id",
+										"name",
+										"slug"
+									],
+									"additionalProperties": false
+								}
+							}
+						},
+						"additionalProperties": false
+					},
 					"can": {
 						"description": "What the current user may do with this post.",
 						"type": "object",
@@ -1385,6 +1930,8 @@
 					"author",
 					"date",
 					"modified",
+					"meta",
+					"terms",
 					"can"
 				],
 				"additionalProperties": false
@@ -1479,6 +2026,82 @@
 			],
 			"binding": {
 				"ability": "core/get-site-info",
+				"annotations": {
+					"readonly": true,
+					"destructive": false,
+					"idempotent": true
+				}
+			}
+		},
+		"terms.list": {
+			"kind": "read",
+			"description": "Lists the terms of one taxonomy, by name.",
+			"input": {
+				"type": "object",
+				"properties": {
+					"taxonomy": {
+						"type": "string",
+						"enum": [
+							"category",
+							"post_tag"
+						]
+					},
+					"search": {
+						"type": "string"
+					},
+					"per_page": {
+						"type": "integer",
+						"minimum": 1,
+						"maximum": 100,
+						"default": 100
+					}
+				},
+				"required": [
+					"taxonomy"
+				],
+				"additionalProperties": false
+			},
+			"output": {
+				"type": "object",
+				"properties": {
+					"items": {
+						"type": "array",
+						"items": {
+							"type": "object",
+							"properties": {
+								"id": {
+									"type": "integer"
+								},
+								"name": {
+									"type": "string"
+								},
+								"slug": {
+									"type": "string"
+								},
+								"count": {
+									"type": "integer"
+								}
+							},
+							"required": [
+								"id",
+								"name",
+								"slug",
+								"count"
+							],
+							"additionalProperties": false
+						}
+					}
+				},
+				"required": [
+					"items"
+				],
+				"additionalProperties": false
+			},
+			"scopes": [
+				"posts:read"
+			],
+			"binding": {
+				"ability": "graft/terms-list",
 				"annotations": {
 					"readonly": true,
 					"destructive": false,
@@ -1606,11 +2229,23 @@
 				"edit_posts"
 			]
 		},
+		"posts.meta:write": {
+			"title": "Change the custom fields of posts you can edit",
+			"host": [
+				"edit_posts"
+			]
+		},
 		"posts.status:write": {
 			"title": "Publish, unpublish or change the status of posts",
 			"host": [
 				"edit_posts",
 				"publish_posts"
+			]
+		},
+		"posts.terms:write": {
+			"title": "Change the categories, tags and other terms of posts you can edit",
+			"host": [
+				"edit_posts"
 			]
 		},
 		"site:read": {
@@ -1663,6 +2298,39 @@
 				"textarea"
 			],
 			"maxNodes": 200
+		}
+	},
+	"model": {
+		"postTypes": {
+			"page": {
+				"label": "Pages",
+				"hierarchical": true,
+				"capabilityType": "page",
+				"editor": true,
+				"fields": {},
+				"taxonomies": []
+			},
+			"post": {
+				"label": "Posts",
+				"hierarchical": false,
+				"capabilityType": "post",
+				"editor": true,
+				"fields": {},
+				"taxonomies": [
+					"category",
+					"post_tag"
+				]
+			}
+		},
+		"taxonomies": {
+			"category": {
+				"label": "Categories",
+				"hierarchical": true
+			},
+			"post_tag": {
+				"label": "Tags",
+				"hierarchical": false
+			}
 		}
 	},
 	"migrations": []

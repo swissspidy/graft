@@ -428,6 +428,158 @@ check(
 wp_set_current_user( $contributor3 );
 check( 'only administrators get the sandbox package', 403 === rest( 'GET', '/graft/v1/sandbox-package' )['status'] );
 
+// Builds are stored exactly as sent: an empty object stays an object.
+wp_set_current_user( $admin );
+$faithful                 = json_decode( (string) wp_json_encode( $qa['build'] ) );
+$faithful->data           = new stdClass();
+$faithful->provenance->id = 'faithful';
+$request                  = new WP_REST_Request( 'POST', '/graft/v1/specs/quick-approve/versions/1/builds' );
+$request->set_header( 'Content-Type', 'application/json' );
+$request->set_body(
+	(string) wp_json_encode(
+		array(
+			'build'        => $faithful,
+			'verification' => array( 'passed' => true ),
+		)
+	)
+);
+$sent   = rest_do_request( $request );
+$listed = rest_do_request( new WP_REST_Request( 'GET', '/graft/v1/specs' ) )->get_data();
+$qa_out = null;
+foreach ( $listed as $spec ) {
+	if ( 'quick-approve' === $spec['spec_id'] ) {
+		$qa_out = $spec['versions'][ count( $spec['versions'] ) - 1 ]['builds']->{ $faithful->surface->hash }->build ?? null;
+	}
+}
+check( 'builds are returned exactly as sent, empty objects included', 200 === $sent->get_status() && is_object( $qa_out ) && is_object( $qa_out->data ) && 'faithful' === ( $qa_out->provenance->id ?? null ), array( $sent->get_status(), $qa_out->data ?? null ) );
+
+// ---------------------------------------------------------------------------
+// Content model, site surfaces and policy (ADR 0008).
+// ---------------------------------------------------------------------------
+
+wp_set_current_user( $admin );
+$model = Graft\content_model();
+check( 'posts and pages are exposed by default, with categories and tags', array( 'page', 'post' ) === array_keys( $model['postTypes'] ) && array( 'category', 'post_tag' ) === $model['postTypes']['post']['taxonomies'], $model );
+check( 'no custom fields by default, so no posts.update_meta', ! isset( Graft\host_surface()['capabilities']['posts.update_meta'] ) && isset( Graft\host_surface()['capabilities']['posts.set_terms'] ) );
+
+$block = wp_insert_post(
+	array(
+		'post_type'   => 'wp_block',
+		'post_title'  => 'A pattern',
+		'post_status' => 'publish',
+	)
+);
+$refused = run( 'graft/post-update-status', array( 'id' => $block, 'status' => 'draft' ) );
+check( 'abilities refuse posts of types that are not exposed', isset( $refused['error'] ) && 'publish' === get_post_status( $block ), $refused );
+check( 'posts.list refuses a type that is not exposed', isset( run( 'graft/posts-list', array( 'post_type' => 'wp_block' ) )['error'] ) );
+
+$news   = wp_insert_term( 'News', 'category' )['term_id'];
+$sports = wp_insert_term( 'Sports', 'category' )['term_id'];
+$story  = wp_insert_post(
+	array(
+		'post_title'    => 'Story',
+		'post_status'   => 'draft',
+		'post_author'   => $editor,
+		'post_category' => array( $news ),
+	)
+);
+wp_set_current_user( $editor );
+$added = run( 'graft/post-set-terms', array( 'id' => $story, 'taxonomy' => 'category', 'terms' => array( 'sports' ), 'mode' => 'add' ) );
+check( 'set_terms adds a term and keeps the others', array( 'news', 'sports' ) === wp_list_pluck( ( (array) ( $added['terms'] ?? array() ) )['category'] ?? array(), 'slug' ), $added );
+$removed = run( 'graft/post-set-terms', array( 'id' => $story, 'taxonomy' => 'category', 'terms' => array( 'news' ), 'mode' => 'remove' ) );
+check( 'set_terms removes a term', array( 'sports' ) === wp_list_pluck( ( (array) ( $removed['terms'] ?? array() ) )['category'] ?? array(), 'slug' ), $removed );
+$unknown = run( 'graft/post-set-terms', array( 'id' => $story, 'taxonomy' => 'category', 'terms' => array( 'nope' ) ) );
+check( 'set_terms never creates terms', 'graft_term_not_found' === ( $unknown['error'] ?? null ), $unknown );
+$filtered = run( 'graft/posts-list', array( 'status' => array( 'draft' ), 'term' => array( 'taxonomy' => 'category', 'slug' => 'sports' ) ) );
+check( 'posts.list filters by term', ids( $filtered ) === array( $story ), $filtered );
+$terms = run( 'graft/terms-list', array( 'taxonomy' => 'category' ) );
+check( 'terms.list lists a taxonomy with counts', in_array( 'sports', wp_list_pluck( $terms['items'] ?? array(), 'slug' ), true ), $terms );
+wp_set_current_user( $contributor );
+$theirs = run( 'graft/post-set-terms', array( 'id' => $story, 'taxonomy' => 'category', 'terms' => array( 'news' ) ) );
+check( "contributors cannot change others' terms", isset( $theirs['error'] ) && array( 'sports' ) === wp_get_post_terms( $story, 'category', array( 'fields' => 'slugs' ) ), $theirs );
+
+// Site surfaces.
+wp_set_current_user( $admin );
+$shipped = Graft\shipped_snapshots();
+$known   = end( $shipped );
+$forged  = $known;
+$forged['hash']        = 'sha256:' . str_repeat( 'a', 64 );
+$forged['fingerprint'] = 'sha256:' . str_repeat( 'b', 64 );
+$stored                = Graft\store_site_surface( $forged );
+check( 'a site surface must describe this site', is_wp_error( $stored ) && 'graft_invalid_surface' === $stored->get_error_code() );
+$forged['fingerprint'] = Graft\host_fingerprint();
+$forged['components']  = array( 'script' => array( 'props' => array() ) );
+check( "a site surface must carry the plugin's components", is_wp_error( Graft\store_site_surface( $forged ) ) );
+// Earlier checks filter the host's surface, so give the shipped snapshot this host's fingerprint.
+$same                = $known;
+$same['fingerprint'] = Graft\host_fingerprint();
+$again               = Graft\store_site_surface( $same );
+check( 'a surface the plugin ships is not stored again', ! is_wp_error( $again ) && array() === Graft\site_surfaces(), is_wp_error( $again ) ? $again->get_error_message() : Graft\site_surfaces() );
+wp_set_current_user( $contributor );
+check( 'only administrators record site surfaces', 403 === rest( 'POST', '/graft/v1/surfaces', array( 'surface' => $known ) )['status'] );
+
+// Policy.
+wp_set_current_user( $admin );
+$policy = array(
+	'managed_by' => 'Acme Agency',
+	'slots'      => array( 'dashboard.widget', 'admin.page' ),
+	'scopes'     => array( 'posts:read' ),
+);
+add_filter(
+	'graft_policy',
+	static function () use ( &$policy ): array {
+		return $policy;
+	}
+);
+$row_manifest = $examples['quick-approve']['manifest'];
+$slot_refused = rest( 'POST', '/graft/v1/specs', array( 'source' => 'x', 'manifest' => array_merge( $row_manifest, array( 'id' => 'row-thing' ) ) ) );
+check( 'the policy refuses slots it does not allow', 403 === $slot_refused['status'] && 'graft_policy_slot' === $slot_refused['code'], $slot_refused );
+$scope_refused = rest( 'POST', '/graft/v1/specs', array( 'source' => 'y', 'manifest' => array_merge( $queue['manifest'], array( 'id' => 'queue-thing' ) ) ) );
+check( 'the policy refuses permissions it does not allow', 403 === $scope_refused['status'] && 'graft_policy_scope' === $scope_refused['code'], $scope_refused );
+$policy_editor = user_named( 'editor', 'policy-editor' );
+wp_set_current_user( $policy_editor );
+$call = call( 'quick-approve', 'posts.update_status', array( 'id' => $story, 'status' => 'pending' ) );
+check( 'a policy tightened after approval applies in the gateway', 403 === $call['status'] && 'graft_policy_scope' === $call['code'] && 'draft' === get_post_status( $story ), $call );
+$served = Graft\servable_specs()['quick-approve']['record'] ?? null;
+check( 'and in the scopes the page may use', is_array( $served ) && false === ( Graft\usable_scopes( $served )['posts.status:write'] ?? null ), $served ? Graft\usable_scopes( $served ) : null );
+wp_set_current_user( $admin );
+$policy['authoring'] = false;
+$off                 = rest( 'POST', '/graft/v1/specs', array( 'source' => 'z', 'manifest' => array_merge( $queue['manifest'], array( 'id' => 'any-thing', 'permissions' => array( 'posts:read' ) ) ) ) );
+check( 'the policy can turn authoring off', 403 === $off['status'] && 'graft_policy_authoring' === $off['code'], $off );
+
+// Managed customizations ship as bundles.
+$dir = get_temp_dir() . 'graft-managed-' . wp_generate_password( 6, false );
+wp_mkdir_p( $dir );
+$stale  = $examples['stale-drafts'];
+$bundle = array(
+	'graft'  => 1,
+	'kind'   => 'customization',
+	'title'  => $stale['title'],
+	'spec'   => array(
+		'source'   => $stale['source'],
+		'manifest' => $stale['manifest'],
+		'hash'     => $stale['hash'],
+	),
+	'builds' => array(
+		array(
+			'build'        => $stale['build'],
+			'verification' => array( 'passed' => true ),
+		),
+	),
+);
+file_put_contents( "$dir/stale-drafts.json", wp_json_encode( $bundle ) );
+$policy['managed'] = $dir;
+$report            = Graft\sync_managed( true );
+$installed         = Graft\version_record( Graft\get_version_post( 'stale-drafts', 1 ) );
+check( 'a managed bundle is installed and active without an administrator', 'active' === $installed['state'] && 'policy' === ( $installed['grant']['approved_by'] ?? null ), $report );
+check( 'it is marked as managed', 'Acme Agency' === Graft\managed_by( 'stale-drafts' ) );
+$archive = rest( 'POST', '/graft/v1/specs/stale-drafts/versions/1/archive' );
+check( 'administrators cannot change a managed customization', 403 === $archive['status'] && 'graft_managed' === $archive['code'], $archive );
+unlink( "$dir/stale-drafts.json" );
+Graft\sync_managed( true );
+check( 'a managed customization whose bundle is gone is archived', 'archived' === Graft\version_record( Graft\get_version_post( 'stale-drafts', 1 ) )['state'] && null === Graft\managed_by( 'stale-drafts' ) );
+rmdir( $dir );
+
 global $wp_version;
 echo wp_json_encode(
 	array(

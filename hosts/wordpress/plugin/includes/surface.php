@@ -85,12 +85,14 @@ function surface_slots(): array {
 		'posts.list.row-actions' => array(
 			'kind'        => 'extension',
 			'title'       => __( 'Posts list row actions', 'graft' ),
-			'description' => __( 'Actions under each post title on the Posts screen.', 'graft' ),
+			'description' => __( 'Actions under each title on the list screen of one post type (Posts unless post_type says otherwise).', 'graft' ),
 			'screen'      => 'edit-post',
 			'anchor'      => 'filter:post_row_actions',
 			'options'     => array(
 				'type'                 => 'object',
-				'properties'           => array(),
+				'properties'           => array(
+					'post_type' => post_type_option( false ),
+				),
 				'additionalProperties' => false,
 			),
 			'provides'    => array(
@@ -106,6 +108,8 @@ function surface_slots(): array {
 								'enum' => post_statuses(),
 							),
 							'type'   => array( 'type' => 'string' ),
+							'meta'   => meta_schema(),
+							'terms'  => terms_schema(),
 							'can'    => array(
 								'type'                 => 'object',
 								'properties'           => array(
@@ -116,7 +120,7 @@ function surface_slots(): array {
 								'additionalProperties' => false,
 							),
 						),
-						'required'             => array( 'id', 'title', 'status', 'type', 'can' ),
+						'required'             => array( 'id', 'title', 'status', 'type', 'meta', 'terms', 'can' ),
 						'additionalProperties' => false,
 					),
 				),
@@ -128,17 +132,18 @@ function surface_slots(): array {
 		'post.editor.panel'      => array(
 			'kind'        => 'extension',
 			'title'       => __( 'Post editor panel', 'graft' ),
-			'description' => __( 'A panel in the block editor sidebar, for a saved post. Actions that change the post reload the editor, and wait until the post has no unsaved changes.', 'graft' ),
+			'description' => __( 'A panel in the block editor sidebar, for a saved post of one type (posts unless post_type says otherwise). Actions that change the post reload the editor, and wait until the post has no unsaved changes.', 'graft' ),
 			'screen'      => 'post',
 			'anchor'      => 'component:PluginDocumentSettingPanel',
 			'options'     => array(
 				'type'                 => 'object',
 				'properties'           => array(
-					'title' => array(
+					'title'     => array(
 						'type'      => 'string',
 						'minLength' => 1,
 						'maxLength' => 60,
 					),
+					'post_type' => post_type_option( true ),
 				),
 				'required'             => array( 'title' ),
 				'additionalProperties' => false,
@@ -163,6 +168,8 @@ function surface_slots(): array {
 								'enum' => post_statuses(),
 							),
 							'type'    => array( 'type' => 'string' ),
+							'meta'    => meta_schema(),
+							'terms'   => terms_schema(),
 							'can'     => array(
 								'type'                 => 'object',
 								'properties'           => array(
@@ -173,7 +180,7 @@ function surface_slots(): array {
 								'additionalProperties' => false,
 							),
 						),
-						'required'             => array( 'id', 'title', 'excerpt', 'status', 'type', 'can' ),
+						'required'             => array( 'id', 'title', 'excerpt', 'status', 'type', 'meta', 'terms', 'can' ),
 						'additionalProperties' => false,
 					),
 				),
@@ -192,6 +199,21 @@ function surface_slots(): array {
 }
 
 /**
+ * Schema of a slot's `post_type` option.
+ *
+ * @param bool $editor Only post types the block editor edits.
+ * @return array<string, mixed>
+ */
+function post_type_option( bool $editor ): array {
+	return array(
+		'description' => __( 'The post type whose screen the slot is on. Defaults to post.', 'graft' ),
+		'type'        => 'string',
+		'enum'        => exposed_post_types( $editor ),
+		'default'     => 'post',
+	);
+}
+
+/**
  * Permission scopes a spec can request, with the WordPress capabilities they
  * map to. Scopes are what an admin approves; they survive host API renames.
  *
@@ -205,6 +227,14 @@ function surface_scopes(): array {
 		),
 		'posts:write'         => array(
 			'title' => __( 'Change the title and excerpt of posts you can edit', 'graft' ),
+			'host'  => array( 'edit_posts' ),
+		),
+		'posts.meta:write'    => array(
+			'title' => __( 'Change the custom fields of posts you can edit', 'graft' ),
+			'host'  => array( 'edit_posts' ),
+		),
+		'posts.terms:write'   => array(
+			'title' => __( 'Change the categories, tags and other terms of posts you can edit', 'graft' ),
 			'host'  => array( 'edit_posts' ),
 		),
 		'posts.status:write'  => array(
@@ -251,6 +281,18 @@ function surface_capability_map(): array {
 		'posts.update_fields' => array(
 			'ability' => 'graft/post-update-fields',
 			'scopes'  => array( 'posts:write' ),
+		),
+		'posts.update_meta'   => array(
+			'ability' => 'graft/post-update-meta',
+			'scopes'  => array( 'posts.meta:write' ),
+		),
+		'posts.set_terms'     => array(
+			'ability' => 'graft/post-set-terms',
+			'scopes'  => array( 'posts.terms:write' ),
+		),
+		'terms.list'          => array(
+			'ability' => 'graft/terms-list',
+			'scopes'  => array( 'posts:read' ),
 		),
 		'site.info'           => array(
 			'ability' => 'core/get-site-info',
@@ -307,6 +349,7 @@ function host_surface(): array {
 		'capabilities' => $capabilities,
 		'scopes'       => surface_scopes(),
 		'audiences'    => array_keys( wp_roles()->roles ),
+		'model'        => content_model(),
 	);
 }
 

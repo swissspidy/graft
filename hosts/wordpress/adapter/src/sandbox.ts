@@ -42,7 +42,7 @@ export async function startSandbox({ wp = '7.1', php = DEFAULT_PHP, verbose = fa
 				{
 					step: 'writeFile',
 					path: '/wordpress/wp-content/mu-plugins/graft-canary.php',
-					data: "<?php require '/wordpress/graft-sandbox/canary.php';",
+					data: "<?php require '/wordpress/graft-sandbox/canary.php'; require '/wordpress/graft-sandbox/model.php';",
 				},
 			],
 		}),

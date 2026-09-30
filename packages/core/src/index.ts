@@ -6,6 +6,7 @@ export { validateSpec, type SpecValidation, type ValidateSpecOptions } from './s
 export { checkManifestAgainstSurface } from './spec/surface.ts';
 export { deriveCriterionId } from './spec/criteria.ts';
 export type { Criterion, Section, Spec, SpecManifest } from './spec/types.ts';
+export { createBundle, type CustomizationBundle } from './bundle.ts';
 export { validateSurface, type SurfaceValidation } from './surface/validate.ts';
 export { canonicalJson, hashSurface, sha256 } from './surface/hash.ts';
 export type { Capability, Component, JsonSchema, Migration, Scope, Slot, Surface, SurfaceFunctions } from './surface/types.ts';
@@ -70,7 +71,7 @@ export type {
 	ModelRequest,
 	ModelResponse,
 } from './compiler/types.ts';
-export { staticCheck, slotPropsUsed, type LadderStart, type RefChange, type RefKind, type StaticCheck } from './upgrade/static-check.ts';
+export { compatibleSchema, staticCheck, slotPropsUsed, type LadderStart, type RefChange, type RefKind, type StaticCheck } from './upgrade/static-check.ts';
 export { applyMigrations } from './upgrade/migrate.ts';
 export { reanchor, reanchorCandidates } from './upgrade/reanchor.ts';
 export { describeChange, UPGRADE_LADDER, upgradeBuild, type UpgradeOptions, type UpgradeOutcome, type UpgradeResult, type UpgradeStep } from './upgrade/ladder.ts';

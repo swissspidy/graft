@@ -86,6 +86,10 @@
         }
       }
     },
+    "model": {
+      "description": "The host's content model the surface was generated from, in a host-defined shape (for WordPress: the exposed post types with their fields and taxonomies). Verification sandboxes use it to reproduce the site. Part of the contract, so it is hashed.",
+      "type": "object"
+    },
     "migrations": {
       "type": "array",
       "items": { "$ref": "#/$defs/migration" }

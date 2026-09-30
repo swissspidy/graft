@@ -1,6 +1,7 @@
 import { parseArgs } from 'node:util';
 import { anthropicModel, DEFAULT_MODEL } from './anthropic.ts';
 import { checkBuildFile } from './build.ts';
+import { bundleFiles } from './bundle.ts';
 import { canaryCommand } from './canary.ts';
 import { compileFile } from './compile.ts';
 import { emdashSiteInstall, emdashSitePull, emdashSiteVerify } from './site-emdash.ts';
@@ -26,6 +27,11 @@ Commands:
     --out <dir>        Write one verification record per spec
     --json             Print results as JSON
     --verbose          Show the sandbox's output
+  bundle <build...>    Verify builds and write them with their spec as one customization
+                       bundle (for a WordPress site's managed directory, or to share)
+    --spec <file>      The spec the builds implement (required)
+    --surface <file>   A surface a build targets (required; repeatable)
+    --out <file>       Where to write the bundle (required)
   compile <spec>       Compile a spec into a verified build with Claude
     --surface <file>   Surface to build for (required)
     --out <file>       Where to write the build (default: <spec id>.build.json)
@@ -134,6 +140,28 @@ export async function main(argv: string[]): Promise<number> {
 		});
 		console.log(values.json ? JSON.stringify(results, null, 2) : formatVerification(results));
 		return results.every((r) => r.verification?.passed) ? 0 : 1;
+	}
+	if (command === 'bundle') {
+		const { values, positionals } = parseArgs({
+			args: rest,
+			allowPositionals: true,
+			options: {
+				spec: { type: 'string' },
+				surface: { type: 'string', multiple: true },
+				out: { type: 'string' },
+				verbose: { type: 'boolean', default: false },
+			},
+		});
+		if (positionals.length === 0 || !values.spec || !values.surface?.length || !values.out) {
+			console.error('graft bundle: pass build files, --spec, --surface and --out.');
+			return 2;
+		}
+		const result = await bundleFiles({ spec: values.spec, builds: positionals, surfaces: values.surface, out: values.out, verbose: values.verbose });
+		result.problems.forEach((problem) => console.error(`  ${problem}`));
+		if (result.bundle) {
+			console.log(`✔ ${values.out}  ${result.bundle.spec.manifest.id} with ${result.bundle.builds.length} verified build(s)`);
+		}
+		return result.bundle && result.problems.length === 0 ? 0 : 1;
 	}
 	if (command === 'compile') {
 		const { values, positionals } = parseArgs({

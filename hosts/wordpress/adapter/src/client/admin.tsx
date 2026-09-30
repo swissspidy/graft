@@ -11,6 +11,7 @@ import { browserSandbox } from './browser-sandbox.ts';
 import { parseSpec } from '@graft/core/parse';
 import { describers } from '../describe.ts';
 import { Authoring } from './authoring.tsx';
+import { RecordSurface, Upgrades, type UpgradeCandidate } from './site-surface.tsx';
 
 /**
  * Tools → Customizations: every spec on the site with its state, the
@@ -23,6 +24,15 @@ interface AdminConfig {
 	browserVerification: boolean;
 	surface: (Surface & { hash: string }) | null;
 	quickjsWasm: string;
+	policy: {
+		managedBy: string | null;
+		contact: string | null;
+		authoring: boolean;
+		/** Slot titles customizations may use; null for all. */
+		slots: string[] | null;
+		/** What administrators may allow; null for everything. */
+		scopes: string[] | null;
+	};
 }
 
 interface VersionRecord {
@@ -34,6 +44,7 @@ interface VersionRecord {
 	source: string;
 	manifest: { permissions: string[]; audience?: string[]; mount: { slot: string } };
 	grant: { scopes: string[] } | null;
+	hash: string;
 	builds: Record<string, { build: Build; verification: { passed: boolean } | null; attached: string }>;
 }
 
@@ -41,6 +52,8 @@ interface SpecRecord {
 	spec_id: string;
 	title: string;
 	active_version: number | null;
+	/** Who ships and manages it, for customizations that come with the site's code. */
+	managed_by: string | null;
 	versions: VersionRecord[];
 }
 
@@ -75,7 +88,7 @@ const actions: Record<string, Array<{ event: string; label: string; primary?: bo
 	],
 };
 
-function Version({ version, config, onEvent, busy }: { version: VersionRecord; config: AdminConfig; onEvent(event: string): void; busy: boolean }) {
+function Version({ version, config, onEvent, busy, managed }: { version: VersionRecord; config: AdminConfig; onEvent(event: string): void; busy: boolean; managed: boolean }) {
 	const current = config.surface ? version.builds[config.surface.hash] : undefined;
 	const granted = version.grant?.scopes ?? [];
 	const needed = [...new Set([...version.manifest.permissions, ...(current?.build.refs.scopes ?? [])])];
@@ -133,7 +146,7 @@ function Version({ version, config, onEvent, busy }: { version: VersionRecord; c
 			) : null}
 
 			<div style={{ display: 'flex', gap: 8, marginTop: 12 }}>
-				{(actions[version.state] ?? []).map((action) => (
+				{(managed ? [] : (actions[version.state] ?? [])).map((action) => (
 					<Button key={action.event} variant={action.primary ? 'primary' : 'secondary'} isBusy={busy} disabled={busy} onClick={() => onEvent(action.event)}>
 						{action.label}
 					</Button>
@@ -159,6 +172,22 @@ function App({ config }: { config: AdminConfig }) {
 	}, []);
 	useEffect(() => void load(), [load]);
 
+	// Starts Playground in this browser and returns a verifier for builds on this site's surface.
+	const startVerifier = async () => {
+		const sandbox = await browserSandbox(playgroundVersion(config.surface!.hostVersion));
+		return (build: Build, spec: Parameters<typeof verifyBuild>[0]['spec'], grant?: string[]) =>
+			verifyBuild({
+				build,
+				spec,
+				surface: config.surface!,
+				sandbox,
+				semantics,
+				createCan,
+				...(grant ? { grant } : {}),
+				loadFunctions: (code, limits) => loadFunctions(code, limits, { wasmLocation: config.quickjsWasm }),
+			});
+	};
+
 	const onEvent = async (spec: SpecRecord, version: VersionRecord, event: string) => {
 		setBusy(spec.spec_id);
 		setError(null);
@@ -174,11 +203,19 @@ function App({ config }: { config: AdminConfig }) {
 
 	return (
 		<div className="graft-admin" style={{ display: 'flex', flexDirection: 'column', gap: 16, maxWidth: 960 }}>
-			{config.surface ? null : (
-				<Notice status="warning" isDismissible={false}>
-					This version of WordPress exposes a surface Graft has no snapshot for, so no customization is shown. Run the canary for it.
-				</Notice>
-			)}
+			{config.policy.managedBy || config.policy.slots || config.policy.scopes || !config.policy.authoring ? <PolicyNotice policy={config.policy} /> : null}
+			{config.surface ? null : <RecordSurface />}
+			{config.surface && config.browserVerification && specs ? (
+				<Upgrades
+					candidates={upgradeCandidates(specs, config.surface.hash)}
+					surface={config.surface}
+					startVerifier={async () => {
+						const verify = await startVerifier();
+						return (build, grant, spec) => verify(build, spec, grant);
+					}}
+					onDone={() => void load()}
+				/>
+			) : null}
 			{error ? (
 				<Notice status="error" onRemove={() => setError(null)}>
 					{error}
@@ -189,7 +226,7 @@ function App({ config }: { config: AdminConfig }) {
 					{saved}
 				</Notice>
 			) : null}
-			{config.surface && !authoring ? (
+			{config.surface && !authoring && config.policy.authoring ? (
 				<div>
 					<Button variant="primary" onClick={() => setAuthoring(true)}>
 						New customization
@@ -207,17 +244,8 @@ function App({ config }: { config: AdminConfig }) {
 							{...(config.browserVerification
 								? {
 										startVerifier: async () => {
-											const sandbox = await browserSandbox(playgroundVersion(config.surface!.hostVersion));
-											return (build: Build, spec: Parameters<typeof verifyBuild>[0]['spec']) =>
-												verifyBuild({
-													build,
-													spec,
-													surface: config.surface!,
-													sandbox,
-													semantics,
-													createCan,
-													loadFunctions: (code, limits) => loadFunctions(code, limits, { wasmLocation: config.quickjsWasm }),
-												});
+											const verify = await startVerifier();
+											return (build: Build, spec: Parameters<typeof verifyBuild>[0]['spec']) => verify(build, spec);
 										},
 									}
 								: {})}
@@ -249,12 +277,19 @@ function App({ config }: { config: AdminConfig }) {
 						<Card>
 							<CardHeader>
 								<strong>{spec.title}</strong> <code>{spec.spec_id}</code>
+								{spec.managed_by ? <span data-graft-managed-by={spec.managed_by}> · Managed by {spec.managed_by}</span> : null}
 							</CardHeader>
 							<CardBody>
 								{shown.map((version, i) => (
 									<div key={version.version} data-graft-role={i === 0 && version === active ? 'active' : 'pending'}>
 										{i > 0 ? <h3>Newer version</h3> : null}
-										<Version version={version} config={config} busy={busy === spec.spec_id} onEvent={(event) => void onEvent(spec, version, event)} />
+										<Version
+											version={version}
+											config={config}
+											busy={busy === spec.spec_id}
+											managed={spec.managed_by !== null}
+											onEvent={(event) => void onEvent(spec, version, event)}
+										/>
 									</div>
 								))}
 							</CardBody>
@@ -264,6 +299,50 @@ function App({ config }: { config: AdminConfig }) {
 			})}
 		</div>
 	);
+}
+
+/** Who maintains the site, and what they let customizations do. */
+function PolicyNotice({ policy }: { policy: AdminConfig['policy'] }) {
+	const who = policy.managedBy ?? 'Whoever maintains this site';
+	return (
+		<Notice status="info" isDismissible={false}>
+			<div data-graft-policy="">
+				<p>
+					{policy.managedBy ? <>This site is maintained by <strong>{policy.managedBy}</strong>. </> : null}
+					{policy.authoring ? null : `${who} does not allow new customizations here; the ones below come with the site.`}
+				</p>
+				{policy.authoring && policy.slots ? <p>Customizations can go in: {policy.slots.join(', ')}.</p> : null}
+				{policy.authoring && policy.scopes ? <p>Customizations may: {policy.scopes.map((s) => s.charAt(0).toLowerCase() + s.slice(1)).join('; ')}.</p> : null}
+				{policy.contact ? (
+					<p>
+						For anything else, ask {policy.managedBy ?? 'them'}:{' '}
+						<a href={policy.contact.includes('@') && !policy.contact.startsWith('http') ? `mailto:${policy.contact}` : policy.contact}>{policy.contact}</a>
+					</p>
+				) : null}
+			</div>
+		</Notice>
+	);
+}
+
+/**
+ * Active versions waiting for a build for this surface that have a verified
+ * build for another one: what the upgrade ladder can try to carry over.
+ */
+function upgradeCandidates(specs: SpecRecord[], hash: string): UpgradeCandidate[] {
+	const candidates: UpgradeCandidate[] = [];
+	for (const spec of specs) {
+		const version = spec.versions.find((v) => v.version === spec.active_version);
+		if (!version || version.state !== 'upgrading' || version.builds[hash]?.verification?.passed) {
+			continue;
+		}
+		const previous = Object.values(version.builds)
+			.filter((entry) => entry.verification?.passed)
+			.sort((a, b) => b.attached.localeCompare(a.attached))[0];
+		if (previous) {
+			candidates.push({ specId: spec.spec_id, title: spec.title, version: version.version, source: version.source, grant: version.grant?.scopes ?? [], build: previous.build });
+		}
+	}
+	return candidates;
 }
 
 const root = document.getElementById('graft-admin');

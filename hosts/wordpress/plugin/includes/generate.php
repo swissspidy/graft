@@ -59,6 +59,10 @@ function register_generate_route(): void {
  * @return WP_REST_Response|WP_Error `{ output, model }`.
  */
 function rest_generate( WP_REST_Request $request ) {
+	$allowed = policy_allows_authoring();
+	if ( is_wp_error( $allowed ) ) {
+		return $allowed;
+	}
 	$args = array(
 		'purpose' => (string) $request['purpose'],
 		'system'  => (string) $request['system'],

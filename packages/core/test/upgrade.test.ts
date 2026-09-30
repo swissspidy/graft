@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
 	applyMigrations,
+	compatibleSchema,
 	extractRefs,
 	hashSpec,
 	staticCheck,
@@ -95,6 +96,41 @@ describe('staticCheck', () => {
 	});
 });
 
+describe('compatibleSchema', () => {
+	const post = {
+		type: 'object',
+		properties: { id: { type: 'integer' }, status: { type: 'string', enum: ['draft', 'publish'] }, meta: { type: 'object', properties: { venue: { type: ['string', 'null'] } }, additionalProperties: false } },
+		required: ['id', 'status'],
+		additionalProperties: false,
+	};
+	const change = (edit: (schema: typeof post & Record<string, unknown>) => void) => {
+		const schema = structuredClone(post) as typeof post & Record<string, unknown>;
+		edit(schema);
+		return schema;
+	};
+
+	it('lets outputs gain properties and keep what they promised', () => {
+		const more = change((s) => {
+			(s.properties.meta.properties as Record<string, unknown>).notes = { type: ['string', 'null'] };
+		});
+		expect(compatibleSchema(post, more, 'provides')).toBe(true);
+		expect(compatibleSchema(post, change((s) => void delete (s.properties as Record<string, unknown>).status), 'provides')).toBe(false);
+		expect(compatibleSchema(post, change((s) => (s.required = ['id'])), 'provides')).toBe(false);
+		expect(compatibleSchema(post, change((s) => (s.properties.status.enum = ['draft', 'publish', 'trash'])), 'provides')).toBe(false);
+		expect(compatibleSchema(post, change((s) => (s.properties.id = { type: ['integer', 'null'] as never })), 'provides')).toBe(false);
+	});
+
+	it('lets inputs accept more, never less', () => {
+		expect(compatibleSchema(post, change((s) => (s.properties.status.enum = ['draft', 'publish', 'pending'])), 'accepts')).toBe(true);
+		expect(compatibleSchema(post, change((s) => (s.required = ['id'])), 'accepts')).toBe(true);
+		expect(compatibleSchema(post, change((s) => ((s.properties as Record<string, unknown>).search = { type: 'string' })), 'accepts')).toBe(true);
+		expect(compatibleSchema(post, change((s) => (s.required = ['id', 'status', 'search'])), 'accepts')).toBe(false);
+		expect(compatibleSchema(post, change((s) => (s.properties.status.enum = ['draft'])), 'accepts')).toBe(false);
+		expect(compatibleSchema(post, change((s) => (s.properties.id = { type: 'integer', minimum: 5 } as never)), 'accepts')).toBe(false);
+		expect(compatibleSchema({ type: 'object' }, { type: 'object', additionalProperties: false }, 'accepts')).toBe(false);
+	});
+});
+
 describe('applyMigrations', () => {
 	it('renames capabilities in data and actions, and props with value maps', async () => {
 		const build = await pageBuild();
@@ -118,6 +154,38 @@ describe('upgradeBuild', () => {
 		expect(result.outcome).toBe('survived');
 		expect(result.build!.surface.hostVersion).toBe('2.0');
 		expect(result.path.map((p) => p.state)).toEqual(['static_check', 'reverify']);
+	});
+
+	it('re-verifies a build when a capability and its slot only gained optional fields', async () => {
+		const typed = surfaceB((s) => {
+			s.hostVersion = '1.0';
+			s.capabilities['items.list']!.input = { type: 'object', properties: { status: { type: 'string' } }, additionalProperties: false };
+			s.capabilities['items.list']!.output = { type: 'object', properties: { items: { type: 'array', items: { type: 'object', properties: { id: { type: 'integer' } } } } } };
+		});
+		const wider = structuredClone(typed);
+		wider.hostVersion = '2.0';
+		(wider.capabilities['items.list']!.input as { properties: Record<string, unknown> }).properties.search = { type: 'string' };
+		(wider.capabilities['items.list']!.output as { properties: { items: { items: { properties: Record<string, unknown> } } } }).properties.items.items.properties.notes = {
+			type: 'string',
+		};
+		(wider.slots['item.actions']!.provides as { properties: Record<string, unknown> }).properties.labels = { type: 'array' };
+		const build = await linkBuild();
+		const check = staticCheck(await pageBuild(), typed, wider);
+		expect(check.start).toBe('reverify');
+		expect(check.changes).toEqual([{ kind: 'capability', symbol: 'items.list', change: 'changed', compatible: true }]);
+		expect(staticCheck(build, typed, wider).changes).toEqual([{ kind: 'slot', symbol: 'item.actions', change: 'changed', compatible: true }]);
+
+		const result = await upgradeBuild({
+			build: await pageBuild(),
+			spec,
+			specHash,
+			grant,
+			from: typed,
+			to: wider,
+			verify: (candidate, g) => verifyBuild({ build: candidate, spec, surface: wider, sandbox: fakeSandbox(), semantics, createCan, grant: g }),
+		});
+		expect(result.outcome).toBe('survived');
+		expect(result.path[0]!.note).toBe('capability items.list changed compatibly');
 	});
 
 	it('migrates a renamed capability', async () => {

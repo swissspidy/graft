@@ -27,6 +27,34 @@ Everything Graft needs to target WordPress 7.1+.
   `users.current:read`, each with the WordPress capabilities it maps to.
 - **Audiences:** the roles of a fresh install.
 
+## Sites with their own content, and agencies
+
+Sites built by an agency expose their own content, and the agency sets
+what the site's administrators may do
+([ADR 0008](../../docs/adr/0008-agency-sites.md)). Both are code (filters,
+typically in a must-use plugin), never wp-admin settings:
+
+- **`graft_content_model`**: post types customizations may use, with the
+  custom fields (registered meta keys) and taxonomies of each. The surface
+  carries the result as `model`. `posts.list` takes a `post_type`, a term
+  filter and `meta.<field>` ordering. Posts come with `meta` and `terms`.
+  Exposed fields and taxonomies add `posts.update_meta`,
+  `posts.set_terms` and `terms.list`. The row-action and editor-panel
+  slots take a `post_type` option. Default: posts (categories, tags) and
+  pages.
+- **`graft_policy`**: who maintains the site (`managed_by`, `contact`),
+  whether its people may write customizations (`authoring`), which slots
+  (`slots`) and permission scopes (`scopes`) they may use, and a directory
+  of customization bundles the maintainer ships (`managed`, written by
+  `graft bundle`). Those are installed, updated and archived with the
+  code, and locked in wp-admin.
+
+A site whose surface no shipped snapshot describes records its own from
+Tools → Customizations: the admin's browser assembles it from the host
+dump, and the plugin keeps it once it matches the site's fingerprint and
+the plugin's components. The same screen upgrades customizations after a
+content model change, verified in Playground in the browser.
+
 The surface hash covers the contract only (not `hostVersion`, `previous`
 or `migrations`), so WordPress versions that expose the same surface share
 a hash and need no rebuild.
@@ -136,6 +164,10 @@ pnpm build                          # bundle the client runtime into plugin/buil
 pnpm test:wp                        # smoke test abilities, store, lifecycle and gateway on WordPress 7.1 with PHP 7.4 and 8.4
 pnpm test:e2e                       # Playwright against a seeded Playground (editor, contributor, subscriber)
 pnpm verify:examples                # verify the example builds in a sandbox
+pnpm surface:agency [--check]       # the agency example site's surface (surface:generate --site <mu-plugin>)
+pnpm verify:agency                  # verify the agency example builds against it
+pnpm bundle:agency                  # write the agency's managed customization bundle
+pnpm test:e2e:agency                # Playwright on the agency example site (Riverside Arts Centre)
 pnpm test:canary                    # run every canary scenario against fixtures/canary
 pnpm graft validate --surface hosts/wordpress/plugin/surfaces/7.1.json examples/specs
 ```

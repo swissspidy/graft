@@ -17,6 +17,7 @@ declare module '@wordpress/components' {
 	export const Notice: ComponentType<{
 		status?: 'info' | 'success' | 'warning' | 'error';
 		isDismissible?: boolean;
+		spokenMessage?: string;
 		onRemove?: () => void;
 		children?: ReactNode;
 	}>;

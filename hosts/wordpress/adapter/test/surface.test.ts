@@ -56,6 +56,42 @@ describe('checked-in surfaces', () => {
 	});
 });
 
+describe('the agency example (examples/agency)', () => {
+	const agencyDir = join(examplesDir, '../agency');
+	const surface = JSON.parse(readFileSync(join(agencyDir, 'surface.json'), 'utf8')) as Surface;
+
+	it("is a valid surface of the Riverside site's content model", async () => {
+		const result = await validateSurface(surface);
+		expect(result.diagnostics).toEqual([]);
+		expect(result.hash).toBe(surface.hash);
+		const model = surface.model as { postTypes: Record<string, { fields: Record<string, unknown>; taxonomies: string[] }> };
+		expect(Object.keys(model.postTypes)).toEqual(['event', 'page', 'post']);
+		expect(Object.keys(model.postTypes.event!.fields)).toEqual(['capacity', 'event_date', 'sold_out', 'venue']);
+		expect(model.postTypes.event!.taxonomies).toEqual(['event_type']);
+		expect(surface.components).toEqual(components);
+	});
+
+	it('has builds valid for it and their specs', async () => {
+		for (const file of readdirSync(join(agencyDir, 'builds'))) {
+			const build = JSON.parse(readFileSync(join(agencyDir, 'builds', file), 'utf8'));
+			const source = readFileSync(join(agencyDir, 'specs', file.replace(/\.json$/, '.md')), 'utf8');
+			const spec = validateSpec(source, { surface }).spec!;
+			const result = await validateBuild(build, surface, { spec: { spec, hash: await hashSpec(source) } });
+			expect(result.diagnostics, file).toEqual([]);
+		}
+	});
+
+	it('ships managed bundles made from the current specs and builds (pnpm bundle:agency)', async () => {
+		for (const file of readdirSync(join(agencyDir, 'managed'))) {
+			const bundle = JSON.parse(readFileSync(join(agencyDir, 'managed', file), 'utf8'));
+			const id = file.replace(/\.json$/, '');
+			expect(bundle.spec.source, file).toBe(readFileSync(join(agencyDir, 'specs', `${id}.md`), 'utf8'));
+			expect(bundle.builds.map((b: { build: unknown }) => b.build), file).toEqual([JSON.parse(readFileSync(join(agencyDir, 'builds', `${id}.json`), 'utf8'))]);
+			expect(bundle.builds.every((b: { verification: { passed: boolean } }) => b.verification.passed), file).toBe(true);
+		}
+	});
+});
+
 describe('components', () => {
 	const ajv = createAjv();
 

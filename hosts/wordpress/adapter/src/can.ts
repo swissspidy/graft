@@ -9,6 +9,8 @@
 const objectChecks: Record<string, string> = {
 	'posts.status:write': 'publish',
 	'posts:write': 'edit',
+	'posts.meta:write': 'edit',
+	'posts.terms:write': 'edit',
 };
 
 export function createCan(usable: Record<string, boolean>) {

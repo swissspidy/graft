@@ -85,6 +85,9 @@ export async function verifyBuild(options: VerifyOptions): Promise<Verification>
 		}
 	}
 	try {
+		if (!unavailable) {
+			await options.sandbox.prepare?.(options.surface);
+		}
 		for (const [index, check] of build.checks.entries()) {
 			results.push(unavailable ? { criterion: check.criterion, check: index, passed: false, failures: [unavailable] } : await runCheck(options, check, index, functions));
 		}
@@ -200,7 +203,8 @@ async function runCheck(options: VerifyOptions, check: Check, index: number, fun
 			return [];
 		}
 		const instances: Instance[] = [];
-		for (const slot of await sandbox.slotInstances(viewer, build.mount.slot)) {
+		const { slot: slotId, ...mountOptions } = build.mount;
+		for (const slot of await sandbox.slotInstances(viewer, slotId, mountOptions)) {
 			instances.push(snap({ slot, data: await loadData(slot), widgets: {}, entered: {} }));
 		}
 		return instances;

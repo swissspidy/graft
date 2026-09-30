@@ -18,6 +18,9 @@ export interface ProtocolSandbox extends Sandbox {
 export function protocolSandbox(send: SandboxTransport): ProtocolSandbox {
 	const op = async <T>(body: Record<string, unknown>) => (await send(body)) as T;
 	return {
+		async prepare(surface) {
+			await op({ op: 'model', model: surface.model ?? null });
+		},
 		async reset() {
 			await op({ op: 'reset' });
 		},
@@ -35,8 +38,8 @@ export function protocolSandbox(send: SandboxTransport): ProtocolSandbox {
 			}
 			return data.result;
 		},
-		async slotInstances(user, slot) {
-			return (await op<{ instances: Array<Record<string, unknown>> }>({ op: 'slot', as: user, slot })).instances;
+		async slotInstances(user, slot, options = {}) {
+			return (await op<{ instances: Array<Record<string, unknown>> }>({ op: 'slot', as: user, slot, options })).instances;
 		},
 		async assert(kind, expected) {
 			return op<{ ok: boolean; actual: unknown }>({ op: 'assert', kind, expected });

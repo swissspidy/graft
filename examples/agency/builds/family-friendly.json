@@ -1,0 +1,353 @@
+{
+	"graft": 1,
+	"spec": {
+		"id": "family-friendly",
+		"hash": "sha256:b305adf4c5253246aa855bb8e355b0271cbc3895889a4bf573664dc52843e446"
+	},
+	"surface": {
+		"host": "wordpress",
+		"hostVersion": "7.1.2",
+		"hash": "sha256:05a8b3caa16f7a75fea1d891bcd0acf7519150b14ee305e56faa120a61f1ae2b"
+	},
+	"mount": {
+		"slot": "posts.list.row-actions",
+		"post_type": "event"
+	},
+	"data": {},
+	"tree": {
+		"type": "row-action",
+		"props": {
+			"id": "family-friendly",
+			"label": "Family friendly",
+			"visible": {
+				"$and": [
+					{
+						"$can": "posts.terms:write",
+						"on": {
+							"$slot": "post"
+						}
+					},
+					{
+						"$not": {
+							"$fn": "hasTerm",
+							"args": [
+								{
+									"$slot": "post.terms.event_type"
+								},
+								"family"
+							]
+						}
+					}
+				]
+			},
+			"onClick": {
+				"$call": "posts.set_terms",
+				"input": {
+					"id": {
+						"$slot": "post.id"
+					},
+					"taxonomy": "event_type",
+					"terms": [
+						"family"
+					],
+					"mode": "add"
+				},
+				"then": [
+					"reload:page"
+				],
+				"notice": "Marked as family friendly."
+			}
+		}
+	},
+	"code": {
+		"language": "javascript",
+		"source": "// Whether a list of terms has the one with this slug.\nfunction hasTerm(terms, slug) {\n\treturn Array.isArray(terms) && terms.some((term) => term && term.slug === slug);\n}\n",
+		"functions": [
+			"hasTerm"
+		]
+	},
+	"checks": [
+		{
+			"criterion": "offered",
+			"fixtures": {
+				"users": [
+					{
+						"as": "e",
+						"role": "editor"
+					}
+				],
+				"terms": {
+					"event_type": [
+						{
+							"name": "Family",
+							"slug": "family"
+						},
+						{
+							"name": "Music",
+							"slug": "music"
+						}
+					]
+				},
+				"posts": [
+					{
+						"title": "Jazz night",
+						"type": "event",
+						"status": "publish",
+						"terms": {
+							"event_type": [
+								"music"
+							]
+						}
+					}
+				]
+			},
+			"view_as": "e",
+			"expect": [
+				{
+					"action": "family-friendly",
+					"row": {
+						"title": "Jazz night"
+					},
+					"available": true
+				}
+			]
+		},
+		{
+			"criterion": "adds",
+			"fixtures": {
+				"users": [
+					{
+						"as": "e",
+						"role": "editor"
+					}
+				],
+				"terms": {
+					"event_type": [
+						{
+							"name": "Family",
+							"slug": "family"
+						},
+						{
+							"name": "Music",
+							"slug": "music"
+						}
+					]
+				},
+				"posts": [
+					{
+						"title": "Puppet show",
+						"type": "event",
+						"status": "publish",
+						"terms": {
+							"event_type": [
+								"music"
+							]
+						}
+					}
+				]
+			},
+			"view_as": "e",
+			"steps": [
+				{
+					"action": "family-friendly",
+					"row": {
+						"title": "Puppet show"
+					}
+				}
+			],
+			"expect": [
+				{
+					"post": {
+						"title": "Puppet show",
+						"terms": {
+							"event_type": [
+								"family",
+								"music"
+							]
+						}
+					}
+				}
+			]
+		},
+		{
+			"criterion": "not-twice",
+			"fixtures": {
+				"users": [
+					{
+						"as": "e",
+						"role": "editor"
+					}
+				],
+				"terms": {
+					"event_type": [
+						{
+							"name": "Family",
+							"slug": "family"
+						},
+						{
+							"name": "Music",
+							"slug": "music"
+						}
+					]
+				},
+				"posts": [
+					{
+						"title": "Puppet show",
+						"type": "event",
+						"status": "publish",
+						"terms": {
+							"event_type": [
+								"family",
+								"music"
+							]
+						}
+					},
+					{
+						"title": "Jazz night",
+						"type": "event",
+						"status": "publish",
+						"terms": {
+							"event_type": [
+								"music"
+							]
+						}
+					}
+				]
+			},
+			"view_as": "e",
+			"expect": [
+				{
+					"action": "family-friendly",
+					"row": {
+						"title": "Puppet show"
+					},
+					"available": false
+				},
+				{
+					"action": "family-friendly",
+					"row": {
+						"title": "Jazz night"
+					},
+					"available": true
+				}
+			]
+		},
+		{
+			"criterion": "events-only",
+			"fixtures": {
+				"users": [
+					{
+						"as": "e",
+						"role": "editor"
+					}
+				],
+				"posts": [
+					{
+						"title": "Season announcement",
+						"type": "post",
+						"status": "publish"
+					}
+				]
+			},
+			"view_as": "e",
+			"expect": [
+				{
+					"action": "family-friendly",
+					"row": {
+						"title": "Season announcement"
+					},
+					"available": false
+				}
+			]
+		},
+		{
+			"criterion": "editors-only",
+			"fixtures": {
+				"users": [
+					{
+						"as": "a",
+						"role": "author"
+					},
+					{
+						"as": "b",
+						"role": "author"
+					}
+				],
+				"terms": {
+					"event_type": [
+						{
+							"name": "Family",
+							"slug": "family"
+						},
+						{
+							"name": "Music",
+							"slug": "music"
+						}
+					]
+				},
+				"posts": [
+					{
+						"title": "Mine",
+						"type": "event",
+						"status": "publish",
+						"terms": {
+							"event_type": [
+								"music"
+							]
+						},
+						"author": "a"
+					},
+					{
+						"title": "Theirs",
+						"type": "event",
+						"status": "publish",
+						"terms": {
+							"event_type": [
+								"music"
+							]
+						},
+						"author": "b"
+					}
+				]
+			},
+			"view_as": "a",
+			"expect": [
+				{
+					"action": "family-friendly",
+					"row": {
+						"title": "Mine"
+					},
+					"available": true
+				},
+				{
+					"action": "family-friendly",
+					"row": {
+						"title": "Theirs"
+					},
+					"available": false
+				}
+			]
+		}
+	],
+	"refs": {
+		"slot": "posts.list.row-actions",
+		"components": {
+			"row-action": [
+				"id",
+				"label",
+				"onClick",
+				"visible"
+			]
+		},
+		"capabilities": [
+			"posts.set_terms"
+		],
+		"scopes": [
+			"posts.terms:write"
+		]
+	},
+	"provenance": {
+		"compiler": "handwritten",
+		"strategy": "handwritten"
+	}
+}

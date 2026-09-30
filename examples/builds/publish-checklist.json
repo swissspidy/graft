@@ -7,7 +7,7 @@
 	"surface": {
 		"host": "wordpress",
 		"hostVersion": "7.1.2",
-		"hash": "sha256:d8b175a5187c29e53e231197e32aa74e34711ee0a397df32fec0a55f27b15ba0"
+		"hash": "sha256:6f170822cb71accfa0c59633044953ce846b218fbcbd1f6406323c4f38e17cdc"
 	},
 	"mount": {
 		"slot": "post.editor.panel",

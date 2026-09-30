@@ -65,6 +65,12 @@ export interface Surface {
 	migrations?: Migration[];
 	/** Present when builds may carry pure functions (`code`, `$fn`), and the limits they run under. */
 	functions?: SurfaceFunctions;
+	/**
+	 * The host's content model the surface was generated from, in a
+	 * host-defined shape (WordPress: exposed post types, their fields and
+	 * taxonomies). Sandboxes use it to reproduce the site; it is hashed.
+	 */
+	model?: Record<string, unknown>;
 }
 
 export interface SurfaceFunctions {

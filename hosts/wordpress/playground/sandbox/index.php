@@ -6,12 +6,15 @@
  * Accepts POST JSON { op, ... } with the X-Graft-Sandbox header set to the
  * GRAFT_SANDBOX_TOKEN constant, and answers JSON. Operations:
  *
- * - reset: delete all posts and all users but the admin.
- * - seed { fixtures: { users: [{ as, role }], posts: [{ title, status, author?, type? }] } }
+ * - model { model }: the content model to reproduce (see model.php); null for WordPress as it is.
+ * - reset: delete all posts, terms and users but the admin.
+ * - seed { fixtures: { users: [{ as, role }], terms?: { taxonomy: [{ name, slug? }] },
+ *   posts: [{ title, status, author?, type?, excerpt?, meta?: { key: value }, terms?: { taxonomy: [slug] } }] } }
  * - scopes { as, scopes[] }: which scopes the user can use (WordPress caps).
  * - call { as, capability, input }: run the capability's ability as the user.
- * - slot { as, slot }: slot props for every place the slot renders.
- * - assert { kind, expected }: host assertions (kind "post").
+ * - slot { as, slot, options }: slot props for every place the slot renders.
+ * - assert { kind, expected }: host assertions (kind "post": title, and any of
+ *   excerpt, status, type, meta { key: value }, terms { taxonomy: [slug] }).
  * - patch { patch }: store a synthetic host change for canary.php.
  * - dump: the host half of the surface and its fingerprint.
  */
@@ -48,7 +51,33 @@ function alias_user( string $alias ): int {
 	return $user ? $user->ID : 0;
 }
 
+/**
+ * A term by slug, created (named after its slug) when missing.
+ *
+ * @param string $taxonomy Taxonomy.
+ * @param string $slug     Slug.
+ * @param string $name     Name for a new term.
+ * @return int Term id, or 0.
+ */
+function sandbox_term( string $taxonomy, string $slug, string $name = '' ): int {
+	$term = get_term_by( 'slug', $slug, $taxonomy );
+	if ( $term ) {
+		return (int) $term->term_id;
+	}
+	$created = wp_insert_term( '' !== $name ? $name : $slug, $taxonomy, array( 'slug' => $slug ) );
+	return is_wp_error( $created ) ? 0 : (int) $created['term_id'];
+}
+
 switch ( $request['op'] ?? '' ) {
+	case 'model':
+		$model = $request['model'] ?? null;
+		if ( is_array( $model ) ) {
+			update_option( 'graft_sandbox_model', $model, false );
+		} else {
+			delete_option( 'graft_sandbox_model' );
+		}
+		respond( array( 'ok' => true ) );
+
 	case 'reset':
 		global $wpdb;
 		foreach ( $wpdb->get_col( "SELECT ID FROM {$wpdb->posts}" ) as $id ) {
@@ -56,6 +85,18 @@ switch ( $request['op'] ?? '' ) {
 		}
 		foreach ( get_users( array( 'exclude' => array( 1 ), 'fields' => 'ID' ) ) as $id ) {
 			wp_delete_user( (int) $id );
+		}
+		$keep = (int) get_option( 'default_category' );
+		foreach ( get_terms(
+			array(
+				'taxonomy'   => array_keys( get_taxonomies( array( 'show_ui' => true ) ) ),
+				'hide_empty' => false,
+				'fields'     => 'all',
+			)
+		) as $term ) {
+			if ( (int) $term->term_id !== $keep ) {
+				wp_delete_term( (int) $term->term_id, $term->taxonomy );
+			}
 		}
 		wp_cache_flush();
 		respond( array( 'ok' => true ) );
@@ -77,6 +118,11 @@ switch ( $request['op'] ?? '' ) {
 			}
 			$users[ $user['as'] ] = array( $user['role'] );
 		}
+		foreach ( $fixtures['terms'] ?? array() as $taxonomy => $terms ) {
+			foreach ( $terms as $term ) {
+				sandbox_term( (string) $taxonomy, (string) ( $term['slug'] ?? sanitize_title( $term['name'] ) ), (string) $term['name'] );
+			}
+		}
 		foreach ( array_values( $fixtures['posts'] ?? array() ) as $i => $post ) {
 			$id = wp_insert_post(
 				array(
@@ -94,6 +140,18 @@ switch ( $request['op'] ?? '' ) {
 			);
 			if ( is_wp_error( $id ) ) {
 				respond( array( 'error' => $id->get_error_message() ), 400 );
+			}
+			foreach ( $post['meta'] ?? array() as $key => $value ) {
+				update_post_meta( $id, (string) $key, wp_slash( $value ) );
+			}
+			foreach ( $post['terms'] ?? array() as $taxonomy => $slugs ) {
+				$ids = array_map(
+					static function ( $slug ) use ( $taxonomy ): int {
+						return sandbox_term( (string) $taxonomy, (string) $slug );
+					},
+					(array) $slugs
+				);
+				wp_set_object_terms( $id, array_filter( $ids ), (string) $taxonomy );
 			}
 		}
 		respond( array( 'users' => (object) $users ) );
@@ -129,12 +187,13 @@ switch ( $request['op'] ?? '' ) {
 		if ( ! $slot ) {
 			respond( array( 'instances' => array() ) );
 		}
+		$post_type = (string) ( $request['options']['post_type'] ?? 'post' );
 		if ( 'filter:post_row_actions' === ( $slot['anchor'] ?? '' ) ) {
 			// The Posts screen's "All" view: every status it lists, private
 			// posts only where readable.
 			$query     = new WP_Query(
 				array(
-					'post_type'      => 'post',
+					'post_type'      => $post_type,
 					'post_status'    => array( 'publish', 'future', 'draft', 'pending', 'private' ),
 					'perm'           => 'readable',
 					'posts_per_page' => -1,
@@ -149,7 +208,7 @@ switch ( $request['op'] ?? '' ) {
 			// The editor of each saved post the viewer can edit.
 			$query     = new WP_Query(
 				array(
-					'post_type'      => 'post',
+					'post_type'      => $post_type,
 					'post_status'    => array( 'publish', 'future', 'draft', 'pending', 'private' ),
 					'perm'           => 'editable',
 					'posts_per_page' => -1,
@@ -195,7 +254,36 @@ switch ( $request['op'] ?? '' ) {
 				'status'  => $post->post_status,
 				'type'    => $post->post_type,
 			) : null;
-			$ok       = null !== $actual && array() === array_diff_assoc( array_map( 'strval', $expected ), array_map( 'strval', $actual ) );
+			$scalar   = array_diff_key( $expected, array_flip( array( 'meta', 'terms' ) ) );
+			$ok       = null !== $actual && array() === array_diff_assoc( array_map( 'strval', $scalar ), array_map( 'strval', $actual ) );
+			if ( $post && isset( $expected['meta'] ) ) {
+				$actual['meta'] = array();
+				foreach ( (array) $expected['meta'] as $key => $value ) {
+					$stored                 = metadata_exists( 'post', $post->ID, $key ) ? get_post_meta( $post->ID, $key, true ) : null;
+					$actual['meta'][ $key ] = $stored;
+					// Stored values are strings (false is ''); null expects no value.
+					if ( null === $value ) {
+						$match = null === $stored;
+					} elseif ( is_bool( $value ) ) {
+						$match = null !== $stored && (bool) $stored === $value;
+					} else {
+						$match = null !== $stored && (string) $value === (string) $stored;
+					}
+					$ok = $ok && $match;
+				}
+			}
+			if ( $post && isset( $expected['terms'] ) ) {
+				$actual['terms'] = array();
+				foreach ( (array) $expected['terms'] as $taxonomy => $slugs ) {
+					$terms                       = get_the_terms( $post, $taxonomy );
+					$actual['terms'][ $taxonomy ] = is_array( $terms ) ? wp_list_pluck( $terms, 'slug' ) : array();
+					$want                         = (array) $slugs;
+					sort( $want );
+					$have = $actual['terms'][ $taxonomy ];
+					sort( $have );
+					$ok = $ok && $want === $have;
+				}
+			}
 			respond( array( 'ok' => $ok, 'actual' => $actual ) );
 		}
 		respond( array( 'ok' => false, 'actual' => 'unknown assertion ' . ( $request['kind'] ?? '' ) ) );
