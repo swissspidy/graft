@@ -170,13 +170,23 @@ function enqueue_runtime(): void {
 			$with_code = $with_code || isset( $servable[ $spec_id ]['build']['code'] );
 		}
 	}
-	$config = array( 'specs' => (object) $specs );
+	$config  = array( 'specs' => (object) $specs );
+	$surface = current_surface();
 	if ( $editor ) {
+		// Reads may run while the editor has unsaved changes; everything
+		// else waits for a save (see editorGuard in the client).
+		$editor['reads']  = array_keys(
+			array_filter(
+				$surface['capabilities'] ?? array(),
+				static function ( $capability ): bool {
+					return 'read' === ( $capability['kind'] ?? '' );
+				}
+			)
+		);
 		$config['editor'] = $editor;
 	}
 	// Only screens with code learn where the functions worker is; the page
 	// starts it (and fetches QuickJS) on the first function call.
-	$surface = current_surface();
 	if ( $with_code && isset( $surface['functions']['limits'] ) ) {
 		$config['functions'] = array(
 			'worker' => plugins_url( 'build/functions-worker.js', __DIR__ ),

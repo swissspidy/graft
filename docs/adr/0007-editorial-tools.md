@@ -62,6 +62,8 @@ The editor keeps its own copy of the post, which raises two problems:
   lose them, and the next save would overwrite the action's change. The
   runtime therefore refuses calls from the panel while the editor has
   unsaved changes ("Save or discard your changes to the post first").
+  Reads are exempt: the plugin lists the surface's read capabilities in
+  the editor config, so data sources still load.
 
 A new, unsaved post gets no panel. Reloading `post-new.php` would open a
 different post than the one an action changed.
@@ -74,7 +76,9 @@ dependencies only on the editor screen.
 
 `posts.update_fields` (ability `graft/post-update-fields`) changes the
 title, the excerpt, or both, as plain text. The post's content, status
-and all other fields stay as they are. It needs a new scope,
+and all other fields stay as they are. A field sent back exactly as it
+is stored is left alone, so saving a new title does not strip markup
+from an excerpt nobody edited. It needs a new scope,
 `posts:write` ("Change the title and excerpt of posts you can edit",
 which requires `edit_posts`). The ability also checks `edit_post` on the
 post itself, and `$can: "posts:write"` uses the post's own `can.edit`.
@@ -100,7 +104,7 @@ an optional `excerpt`, and the `post` assertion compares it.
 - "Publish", which the code offers only when everything is ticked and
   saved, and which the build shows only to people who may publish.
 
-It is verified in Playground (12 checks), tested in the real block editor
+It is verified in Playground (13 checks), tested in the real block editor
 (e2e), and installed in the Playground demo.
 
 ## Consequences

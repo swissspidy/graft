@@ -328,6 +328,48 @@
 			]
 		},
 		{
+			"criterion": "save",
+			"fixtures": {
+				"users": [
+					{
+						"as": "e",
+						"role": "editor"
+					}
+				],
+				"posts": [
+					{
+						"title": "Road works",
+						"status": "draft",
+						"excerpt": "Detours on <a href=\"https://example.com/map\">Main Street</a> until May."
+					}
+				]
+			},
+			"view_as": "e",
+			"steps": [
+				{
+					"fill": "title",
+					"value": "Road works close Main Street until May",
+					"row": {
+						"title": "Road works"
+					}
+				},
+				{
+					"action": "save",
+					"row": {
+						"title": "Road works"
+					}
+				}
+			],
+			"expect": [
+				{
+					"post": {
+						"title": "Road works close Main Street until May",
+						"excerpt": "Detours on <a href=\"https://example.com/map\">Main Street</a> until May."
+					}
+				}
+			]
+		},
+		{
 			"criterion": "publish",
 			"fixtures": {
 				"users": [

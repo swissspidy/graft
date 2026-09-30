@@ -261,11 +261,14 @@ function can_update_post_fields( $input = null ) {
  * @return array<string, mixed>|WP_Error
  */
 function execute_post_update_fields( $input ) {
+	$post    = get_post( (int) $input['id'] );
 	$changes = array( 'ID' => (int) $input['id'] );
-	if ( isset( $input['title'] ) ) {
+	// A field sent back as it is stored stays untouched, so saving a new
+	// title does not strip markup from an excerpt nobody edited.
+	if ( isset( $input['title'] ) && ( ! $post || (string) $input['title'] !== $post->post_title ) ) {
 		$changes['post_title'] = sanitize_text_field( (string) $input['title'] );
 	}
-	if ( isset( $input['excerpt'] ) ) {
+	if ( isset( $input['excerpt'] ) && ( ! $post || (string) $input['excerpt'] !== $post->post_excerpt ) ) {
 		$changes['post_excerpt'] = sanitize_textarea_field( (string) $input['excerpt'] );
 	}
 	$result = wp_update_post( wp_slash( $changes ), true );

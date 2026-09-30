@@ -323,6 +323,11 @@ describe('widget inputs', () => {
 		expect(inVisible.diagnostics.map((d) => d.code)).toContain('build-input-not-allowed');
 	});
 
+	it('take steps that either use an action or fill an input, never both', async () => {
+		const mixed = await validateBuild(inputBuild([{ criterion: 'count', steps: [{ action: 'rename', fill: 'title' }], expect: [{ text: 'x' }] }]), withInputs);
+		expect(mixed.diagnostics.map((d) => d.code)).toContain('build-schema');
+	});
+
 	it('send what the viewer typed, and tell update as they type', async () => {
 		const calls: Array<[string, unknown]> = [];
 		const b = inputBuild([

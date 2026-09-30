@@ -281,6 +281,7 @@
                 "description": "Use an action: a button, a row action.",
                 "type": "object",
                 "required": ["action"],
+                "additionalProperties": false,
                 "properties": {
                   "action": { "type": "string" },
                   "row": { "type": "object" }
@@ -290,6 +291,7 @@
                 "description": "Type a value into a widget's input (a checkbox takes true or false).",
                 "type": "object",
                 "required": ["fill", "value"],
+                "additionalProperties": false,
                 "properties": {
                   "fill": { "type": "string" },
                   "value": { "type": ["string", "boolean"] },

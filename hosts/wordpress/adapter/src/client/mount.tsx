@@ -22,8 +22,11 @@ export interface RuntimeConfig {
 	>;
 	/** Present when a build on this screen has code: where the functions worker is, and its limits. */
 	functions?: { worker: string; wasm: string; limits: SurfaceFunctions['limits']; widgets?: SurfaceFunctions['widgets'] };
-	/** In the block editor: the panels to add to the sidebar, and the slot (the post being edited). */
-	editor?: { panels: Array<{ spec: string; title: string }>; slot: Record<string, unknown> };
+	/**
+	 * In the block editor: the panels to add to the sidebar, the slot (the
+	 * post being edited), and the capabilities that only read.
+	 */
+	editor?: { panels: Array<{ spec: string; title: string }>; slot: Record<string, unknown>; reads?: string[] };
 }
 
 /** The block editor's globals, present on its screen only (the runtime does not bundle them). */
@@ -40,10 +43,10 @@ declare global {
 	}
 }
 
-export function createGateway(spec: string, guard?: () => string | undefined): Gateway {
+export function createGateway(spec: string, guard?: (capability: string) => string | undefined): Gateway {
 	return {
 		call: (capability, input) => {
-			const refused = guard?.();
+			const refused = guard?.(capability);
 			return refused ? Promise.reject(new Error(refused)) : apiFetch({ path: '/graft/v1/call', method: 'POST', data: { spec, capability, input } });
 		},
 	};
@@ -52,10 +55,13 @@ export function createGateway(spec: string, guard?: () => string | undefined): G
 /**
  * In the editor, the post may have unsaved changes: a call that changes the
  * post would be overwritten by the next save, and the reload after it would
- * lose them. So calls wait until the editor has nothing to save.
+ * lose them. So calls wait until the editor has nothing to save, except
+ * those the surface lists as reads (data sources keep loading).
  */
-const editorGuard = (): string | undefined =>
-	window.wp?.data?.select('core/editor').isEditedPostDirty?.() ? 'Save or discard your changes to the post first.' : undefined;
+const editorGuard = (capability: string): string | undefined =>
+	!window.graftRuntime?.editor?.reads?.includes(capability) && window.wp?.data?.select('core/editor').isEditedPostDirty?.()
+		? 'Save or discard your changes to the post first.'
+		: undefined;
 
 function Mounted({ spec, config, slot, inEditor = false }: { spec: string; config: RuntimeConfig['specs'][string]; slot: Record<string, unknown>; inEditor?: boolean }) {
 	const [notices, setNotices] = useState<Array<Notice & { key: number }>>([]);
