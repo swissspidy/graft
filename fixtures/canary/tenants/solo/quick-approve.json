@@ -7,7 +7,7 @@
 	"surface": {
 		"host": "wordpress",
 		"hostVersion": "7.1.2",
-		"hash": "sha256:19604b84149c0450e91760edf227d37052c0e8d93934e34b98cf89b45e58ac06"
+		"hash": "sha256:ae834227acb80b481452162b3f476c836a71754be537aa4568b28d4b2df0a8b3"
 	},
 	"mount": {
 		"slot": "posts.list.row-actions"

@@ -2,8 +2,8 @@
 	"graft": 1,
 	"host": "wordpress",
 	"hostVersion": "7.1.2",
-	"hash": "sha256:19604b84149c0450e91760edf227d37052c0e8d93934e34b98cf89b45e58ac06",
-	"fingerprint": "sha256:a3f21f7dbfb53754d84349725beed385f16ce6a795406f3fe38bde078a261451",
+	"hash": "sha256:ae834227acb80b481452162b3f476c836a71754be537aa4568b28d4b2df0a8b3",
+	"fingerprint": "sha256:dae69d492f09778b9d048cda8b6f258a0b15e25ec55b60cacaadb3805110b152",
 	"slots": {
 		"admin.page": {
 			"kind": "owned",
@@ -1396,7 +1396,7 @@
 		},
 		"posts.set_terms": {
 			"kind": "write",
-			"description": "Replaces a post's terms in one taxonomy with existing terms, by slug. An empty list removes them all.",
+			"description": "Changes a post's terms in one taxonomy, by slug: replaces them (an empty list removes them all), adds to them, or removes some. Only existing terms.",
 			"input": {
 				"type": "object",
 				"properties": {
@@ -1419,6 +1419,15 @@
 						},
 						"maxItems": 50,
 						"uniqueItems": true
+					},
+					"mode": {
+						"type": "string",
+						"enum": [
+							"replace",
+							"add",
+							"remove"
+						],
+						"default": "replace"
 					}
 				},
 				"required": [

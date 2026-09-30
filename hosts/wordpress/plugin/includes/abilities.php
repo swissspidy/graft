@@ -318,7 +318,7 @@ function register_content_abilities( array $post_item ): void {
 		'graft/post-set-terms',
 		array(
 			'label'               => __( 'Set terms', 'graft' ),
-			'description'         => __( "Replaces a post's terms in one taxonomy with existing terms, by slug. An empty list removes them all.", 'graft' ),
+			'description'         => __( "Changes a post's terms in one taxonomy, by slug: replaces them (an empty list removes them all), adds to them, or removes some. Only existing terms.", 'graft' ),
 			'category'            => ABILITY_CATEGORY,
 			'input_schema'        => array(
 				'type'                 => 'object',
@@ -336,6 +336,11 @@ function register_content_abilities( array $post_item ): void {
 						),
 						'maxItems'    => 50,
 						'uniqueItems' => true,
+					),
+					'mode'     => array(
+						'type'    => 'string',
+						'enum'    => array( 'replace', 'add', 'remove' ),
+						'default' => 'replace',
 					),
 				),
 				'required'             => array( 'id', 'taxonomy', 'terms' ),
@@ -465,8 +470,8 @@ function can_set_post_terms( $input = null ) {
 }
 
 /**
- * Replaces the post's terms in one taxonomy. Only existing terms: creating
- * terms is a different permission.
+ * Replaces, adds to or removes from the post's terms in one taxonomy. Only
+ * existing terms: creating terms is a different permission.
  *
  * @param array<string, mixed> $input Ability input.
  * @return array<string, mixed>|WP_Error
@@ -481,7 +486,10 @@ function execute_post_set_terms( $input ) {
 		}
 		$ids[] = (int) $term->term_id;
 	}
-	$result = wp_set_object_terms( (int) $input['id'], $ids, $input['taxonomy'] );
+	$mode   = $input['mode'] ?? 'replace';
+	$result = 'remove' === $mode
+		? wp_remove_object_terms( (int) $input['id'], $ids, $input['taxonomy'] )
+		: wp_set_object_terms( (int) $input['id'], $ids, $input['taxonomy'], 'add' === $mode );
 	if ( is_wp_error( $result ) ) {
 		return $result;
 	}
