@@ -124,7 +124,8 @@ async function runCheck(options: VerifyOptions, check: Check, index: number, fun
 	const fn = functions
 		? (name: string, args: unknown[]): unknown => {
 				try {
-					return functions.call(name, args);
+					// Code sees the check's clock, like $daysSince.
+					return functions.call(name, args, now);
 				} catch (error) {
 					const failure = `Function "${name}" failed: ${describeError(error)}.`;
 					if (!failures.includes(failure)) {

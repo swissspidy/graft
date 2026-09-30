@@ -14,7 +14,8 @@
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.129.0",
-    "@graft/core": "workspace:*"
+    "@graft/core": "workspace:*",
+    "@graft/sandbox": "workspace:*"
   },
   "peerDependencies": {
     "emdash": "^1.0.1"

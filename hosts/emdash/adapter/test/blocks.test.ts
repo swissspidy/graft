@@ -1,7 +1,7 @@
 import { snapshotTree, validateBuild, type Build, type TreeNode } from '@graft/core';
 import { readFile } from 'node:fs/promises';
 import { describe, expect, it } from 'vitest';
-import { findAction, renderTree } from '../src/host/blocks.ts';
+import { findAction, readValue, renderTree, withWidgetStates, type Block } from '../src/host/blocks.ts';
 import { createCan } from '../src/host/can.ts';
 import { semantics } from '../src/host/semantics.ts';
 
@@ -128,10 +128,106 @@ describe('semantics', () => {
 	});
 });
 
+describe('widgets', () => {
+	// The build's code, as plain functions: the renderer only sees ctx.fn.
+	const code: Record<string, (...args: never[]) => unknown> = {
+		draw: (rows: Array<{ id: string; title: string }>, state: { only?: string }) => ({
+			type: 'stack',
+			children: [
+				{ type: 'actions', children: [{ type: 'button', props: { id: 'only-a', label: 'Only A', onClick: { $event: 'only', payload: { title: 'A' } } } }] },
+				{
+					type: 'table',
+					props: {
+						rows: rows.filter((row) => !state.only || row.title === state.only),
+						columns: [{ key: 'title', label: 'Title', primary: true }],
+						actions: [{ id: 'publish', label: 'Publish', onClick: { $use: 'publish' } }],
+					},
+				},
+				{ type: 'actions', children: [{ type: 'button', props: { id: 'forged', label: 'Forged', onClick: { $use: 'publish', row: 'x' } } }] },
+			],
+		}),
+		only: (_state: unknown, _event: string, payload: { title: string }) => ({ only: payload.title }),
+	};
+	const fn = (name: string, args: unknown[]) => (code[name] as (...a: unknown[]) => unknown)(...args);
+	const widget: TreeNode = {
+		type: 'stack',
+		children: [
+			{
+				type: 'widget',
+				props: {
+					render: 'draw',
+					update: 'only',
+					input: { $data: 'q.items' },
+					state: {},
+					actions: {
+						publish: {
+							call: { $call: 'content.publish', input: { id: { $field: 'id' } }, then: ['refresh:q'] },
+							visible: { $can: 'content.status:write' },
+						},
+					},
+				},
+			},
+		],
+	};
+	const items = [entry('a', 'A', true), entry('b', 'B', false)];
+	const limits = { components: ['stack', 'actions', 'button', 'table'], maxNodes: 50 };
+	const draw = (states: Record<string, unknown> = {}) =>
+		withWidgetStates(renderTree(widget, { ...ctx(items, { 'content.status:write': true }), fn }, 'spec', { limits, states }), 'spec');
+
+	it('draws the tree the code returns, with events and the declared actions it offers', () => {
+		const rendered = draw();
+		expect(rendered.widgets['0.0']).toEqual({ props: expect.objectContaining({ render: 'draw' }), state: {} });
+		const only = rendered.actions.find((a) => a.id === 'only-a')!;
+		expect(only).toMatchObject({ available: true, event: { widget: '0.0', name: 'only', payload: { title: 'A' } } });
+		// Declared actions resolve to the input's own rows, and only where visible holds.
+		const publish = rendered.actions.filter((a) => a.id === 'publish');
+		expect(publish.map((a) => [a.value, a.available, a.action?.input])).toEqual([
+			['a', true, { id: 'a' }],
+			['b', false, undefined],
+		]);
+		// A row the widget was not given is not offered, and is reported.
+		expect(rendered.actions.find((a) => a.id === 'forged')?.available).toBe(false);
+		expect(rendered.problems).toEqual(['A widget: The widget offers "publish" on a row that is not in its input.']);
+	});
+
+	it('carries the states in every button of the customization, and reads them back', () => {
+		const rendered = draw({ '0.0': { only: 'A' } });
+		const clicked = (rendered.blocks.flatMap((b) => (b.type === 'actions' ? (b.elements as Block[]) : [])) as Block[]).find((b) => b.label === 'Only A')!;
+		const { value, states } = readValue(clicked.value);
+		expect(states).toEqual({ '0.0': { only: 'A' } });
+		expect(findAction(rendered, String(clicked.action_id), value)?.event?.name).toBe('only');
+		// A table button keeps its row id next to the states.
+		const table = rendered.blocks.find((b) => b.type === 'table') as Block & { rows: Array<Record<string, Block>> };
+		const publish = Object.values(table.rows[0]!).find((cell) => typeof cell === 'object' && cell.type === 'button')!;
+		expect(readValue(publish.value)).toEqual({ value: 'a', states: { '0.0': { only: 'A' } } });
+		// Values without states are read as they are.
+		expect(readValue('a')).toEqual({ value: 'a', states: {} });
+		expect(readValue('w|not json')).toEqual({ value: 'w|not json', states: {} });
+	});
+
+	it('draws nothing where functions do not run, and sends no events outside a widget', () => {
+		const rendered = renderTree(widget, ctx(items, {}), 'spec', { limits, states: {} });
+		expect(rendered.blocks).toEqual([]);
+		expect(rendered.problems).toEqual(['A widget cannot be drawn here.']);
+		const loose = renderTree({ type: 'actions', children: [{ type: 'button', props: { id: 'x', label: 'X', onClick: { $event: 'x' } } }] }, ctx([], {}), 'spec');
+		expect(loose.blocks).toEqual([]);
+		expect(loose.actions[0]?.available).toBe(false);
+	});
+
+	it('reads in a snapshot as the verifier draws it', () => {
+		const snapshot = snapshotTree(widget, { ...ctx(items, { 'content.status:write': true }), fn }, semantics, { limits, state: () => ({ has: false }) });
+		expect(snapshot.actions.find((a) => a.id === 'only-a')).toMatchObject({ available: true, event: { widget: '/tree/children/0', name: 'only' } });
+		expect(snapshot.tables[0]!.rows.map((row) => [row.label, row.actions[0]!.available])).toEqual([
+			['A', true],
+			['B', false],
+		]);
+	});
+});
+
 describe('examples', () => {
 	it('are valid against the committed surface', async () => {
 		const surface = JSON.parse(await readFile(new URL('../surfaces/1.0.json', import.meta.url), 'utf8'));
-		for (const name of ['publish-queue', 'go-live', 'drafts-glance']) {
+		for (const name of ['publish-queue', 'go-live', 'drafts-glance', 'stale-drafts', 'status-board']) {
 			const build = JSON.parse(await readFile(new URL(`../../../../examples/emdash/builds/${name}.json`, import.meta.url), 'utf8')) as Build;
 			const result = await validateBuild(build, surface);
 			expect(result.diagnostics.filter((d) => d.severity === 'error')).toEqual([]);

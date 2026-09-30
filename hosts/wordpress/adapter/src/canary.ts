@@ -73,14 +73,14 @@ export const scenarios: Scenario[] = [
 			capabilities: { scopes: { 'posts.update_status': ['posts.status:write', 'posts.publish:write'] } },
 		},
 		migrations: [],
-		expect: { 'review-queue': 'needs_approval', 'quick-approve': 'needs_approval', 'editorial-inbox': 'needs_approval', 'headline-check': 'survived', 'pending-by-author': 'survived' },
+		expect: { 'review-queue': 'needs_approval', 'quick-approve': 'needs_approval', 'editorial-inbox': 'needs_approval', 'headline-check': 'survived', 'pending-by-author': 'needs_approval' },
 	},
 	{
 		name: 'remove-status-update',
 		description: 'posts.update_status is removed without replacement.',
 		patch: { capabilities: { remove: ['posts.update_status'] } },
 		migrations: [],
-		expect: { 'review-queue': 'failed', 'quick-approve': 'failed', 'editorial-inbox': 'failed', 'headline-check': 'survived', 'pending-by-author': 'survived' },
+		expect: { 'review-queue': 'failed', 'quick-approve': 'failed', 'editorial-inbox': 'failed', 'headline-check': 'survived', 'pending-by-author': 'failed' },
 	},
 	{
 		name: 'no-functions',

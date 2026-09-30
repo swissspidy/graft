@@ -176,6 +176,17 @@ export const components: Record<string, Component> = {
 				update: { description: 'The function that computes the next state from an event.', type: 'string' },
 				input: { description: 'What the widget draws from, e.g. {"$data": "queue.items"}.' },
 				state: { description: 'The initial state.' },
+				actions: {
+					description:
+						'Actions the widget may offer on rows of its input (an array of records with an id): {"approve": {"call": {"$call": ..., "input": {"id": {"$field": "id"}}}, "visible": {"$can": ...}}}. A drawn button uses one with {"$use": "approve", "row": <row id>}; inside a table row, {"$use": "approve"} applies to that row.',
+					type: 'object',
+					additionalProperties: {
+						type: 'object',
+						properties: { call: action, visible: condition },
+						required: ['call'],
+						additionalProperties: false,
+					},
+				},
 			},
 			required: ['render'],
 			additionalProperties: false,

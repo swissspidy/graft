@@ -1,6 +1,6 @@
-import { mkdir, writeFile } from 'node:fs/promises';
+import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import { fileURLToPath } from 'node:url';
-import { build } from 'esbuild';
+import { build, type Plugin } from 'esbuild';
 import { emdashVersion } from '../src/index.ts';
 
 /**
@@ -8,11 +8,41 @@ import { emdashVersion } from '../src/index.ts';
  * module for the EmDash plugin sandbox: dist/sandbox-entry.mjs. Sandboxed
  * plugins cannot import packages at runtime, and Ajv is left out (the
  * sandbox forbids generated code; the plugin uses the cfworker engine).
+ * Build functions run on QuickJS compiled to asm.js (@graft/sandbox/asmjs).
  */
 
 const root = fileURLToPath(new URL('..', import.meta.url));
 const site = fileURLToPath(new URL('../../site/', import.meta.url));
 const stub = fileURLToPath(new URL('./ajv-stub.ts', import.meta.url));
+
+/**
+ * The asm.js QuickJS build probes where it runs, to know how to read its
+ * files: workerd looks like Node (nodejs_compat sets process.versions.node)
+ * and like a Web Worker (it has importScripts), and neither way works
+ * there. It needs no files (everything is inline), so the bundle turns the
+ * probes off and points the Node-only import at an external module that is
+ * never loaded.
+ */
+const quickjsInWorkerd: Plugin = {
+	name: 'quickjs-in-workerd',
+	setup(build) {
+		build.onLoad({ filter: /quickjs-asmjs-mjs-release-sync[\\/]dist[\\/]index\.mjs$/ }, async ({ path }) => {
+			let source = await readFile(path, 'utf8');
+			const replacements: Array<[string, string]> = [
+				['typeof process=="object"&&typeof process.versions=="object"&&typeof process.versions.node=="string"', 'false'],
+				['typeof importScripts=="function"', 'false'],
+				['await import("module")', 'await import("node:module")'],
+			];
+			for (const [from, to] of replacements) {
+				if (!source.includes(from)) {
+					throw new Error(`${path} changed: update the quickjs-in-workerd plugin (no ${from}).`);
+				}
+				source = source.replace(from, to);
+			}
+			return { contents: source, loader: 'js' };
+		});
+	},
+};
 
 await mkdir(`${root}dist`, { recursive: true });
 const result = await build({
@@ -29,6 +59,7 @@ const result = await build({
 	external: ['emdash', 'node:*'],
 	define: { __GRAFT_EMDASH_VERSION__: JSON.stringify(emdashVersion(site)) },
 	legalComments: 'none',
+	plugins: [quickjsInWorkerd],
 	metafile: true,
 	logLevel: 'warning',
 });

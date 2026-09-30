@@ -181,4 +181,31 @@ export const components: Record<string, Component> = {
 		props: { type: 'object', properties: buttonProps, required: ['id', 'label', 'onClick'], additionalProperties: false },
 		children: 'none',
 	},
+	widget: {
+		description:
+			'An interactive widget drawn by the build\'s code, on the server: render(input, state) returns a tree of components, and update(state, event, payload, input) the next state when a button sends {"$event": name, "payload": ...}.',
+		props: {
+			type: 'object',
+			properties: {
+				render: { description: 'The function that draws the widget.', type: 'string' },
+				update: { description: 'The function that computes the next state from an event.', type: 'string' },
+				input: { description: 'What the widget draws from, e.g. {"$data": "entries"}.' },
+				state: { description: 'The initial state.' },
+				actions: {
+					description:
+						'Actions the widget may offer on rows of its input (an array of records with an id): {"publish": {"call": {"$call": ..., "input": {"id": {"$field": "id"}}}, "visible": {"$can": ...}}}. A drawn button uses one with {"$use": "publish", "row": <row id>}; inside a table row, {"$use": "publish"} applies to that row.',
+					type: 'object',
+					additionalProperties: {
+						type: 'object',
+						properties: { call: action, visible: condition },
+						required: ['call'],
+						additionalProperties: false,
+					},
+				},
+			},
+			required: ['render'],
+			additionalProperties: false,
+		},
+		children: 'none',
+	},
 };

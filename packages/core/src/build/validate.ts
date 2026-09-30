@@ -9,7 +9,7 @@ import { hashSurface } from '../surface/hash.ts';
 import type { JsonSchema, Surface } from '../surface/types.ts';
 import { isDynamic, isCall, isCan, isDataRef, isFn, isSlotRef, walkTree, walkValue } from './expressions.ts';
 import { extractRefs } from './refs.ts';
-import { isWidgetEvent, WIDGET } from './widgets.ts';
+import { isWidgetEvent, isWidgetUse, WIDGET } from './widgets.ts';
 import type { Build, Refs, TreeNode, Value } from './types.ts';
 
 const validateShape = lazyValidator<Build>(buildSchema);
@@ -278,7 +278,7 @@ function underBindingAlternative(error: ErrorObject, bindingPaths: string[]): bo
 
 function replaceBindings(value: unknown, path: string, found: string[]): unknown {
 	// Widget events stand where actions go; only code can produce them.
-	if (isDynamic(value) || isWidgetEvent(value)) {
+	if (isDynamic(value) || isWidgetEvent(value) || isWidgetUse(value)) {
 		found.push(path);
 		return null;
 	}

@@ -1,6 +1,7 @@
 import { readdir, readFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { runCanary, validateSpec, verifyBuild, type Build, type CanaryOptions, type CanaryReport, type CorpusEntry, type Migration, type Surface, type UpgradeOutcome } from '@graft/core';
+import { loadFunctions } from '@graft/sandbox';
 import { createCan } from '../host/can.ts';
 import type { HostPatch } from '../host/patch.ts';
 import { semantics } from '../host/semantics.ts';
@@ -25,28 +26,28 @@ export const scenarios: Scenario[] = [
 		description: 'Nothing the customizations use changes.',
 		patch: {},
 		migrations: [],
-		expect: { 'publish-queue': 'survived', 'go-live': 'survived', 'drafts-glance': 'survived' },
+		expect: { 'publish-queue': 'survived', 'go-live': 'survived', 'drafts-glance': 'survived', 'status-board': 'survived' },
 	},
 	{
 		name: 'rename-list-capability',
 		description: 'content.list is renamed to content.query, with a declared migration.',
 		patch: { capabilities: { rename: { 'content.list': 'content.query' } } },
 		migrations: [{ op: 'rename', kind: 'capability', from: 'content.list', to: 'content.query' }],
-		expect: { 'publish-queue': 'migrated', 'go-live': 'survived', 'drafts-glance': 'migrated' },
+		expect: { 'publish-queue': 'migrated', 'go-live': 'survived', 'drafts-glance': 'migrated', 'status-board': 'migrated' },
 	},
 	{
 		name: 'move-editor-panel',
 		description: 'The editor panel slot is deprecated in favor of content.editor.sidebar.',
 		patch: { slots: { alias: { 'content.editor.sidebar': 'content.editor.panel' }, deprecate: { 'content.editor.panel': 'content.editor.sidebar' } } },
 		migrations: [],
-		expect: { 'publish-queue': 'survived', 'go-live': 'reanchored', 'drafts-glance': 'survived' },
+		expect: { 'publish-queue': 'survived', 'go-live': 'reanchored', 'drafts-glance': 'survived', 'status-board': 'survived' },
 	},
 	{
 		name: 'change-list-input',
 		description: 'content.list takes "statuses" (a list) instead of "status"; no migration describes it.',
 		patch: { capabilities: { statuses: true } },
 		migrations: [],
-		expect: { 'publish-queue': 'regenerated', 'go-live': 'survived', 'drafts-glance': 'regenerated' },
+		expect: { 'publish-queue': 'regenerated', 'go-live': 'survived', 'drafts-glance': 'regenerated', 'status-board': 'regenerated' },
 	},
 	{
 		name: 'widen-publish-scope',
@@ -61,14 +62,14 @@ export const scenarios: Scenario[] = [
 			},
 		},
 		migrations: [],
-		expect: { 'publish-queue': 'needs_approval', 'go-live': 'needs_approval', 'drafts-glance': 'survived' },
+		expect: { 'publish-queue': 'needs_approval', 'go-live': 'needs_approval', 'drafts-glance': 'survived', 'status-board': 'needs_approval' },
 	},
 	{
 		name: 'remove-publish',
 		description: 'content.publish is removed without replacement.',
 		patch: { capabilities: { remove: ['content.publish'] } },
 		migrations: [],
-		expect: { 'publish-queue': 'failed', 'go-live': 'failed', 'drafts-glance': 'survived' },
+		expect: { 'publish-queue': 'failed', 'go-live': 'failed', 'drafts-glance': 'survived', 'status-board': 'failed' },
 	},
 ];
 
@@ -129,7 +130,7 @@ export async function runEmDashCanary(options: EmDashCanaryOptions): Promise<{ r
 			corpus: options.corpus,
 			from,
 			to,
-			verify: (build, spec, grant) => verifyBuild({ build, spec, surface: to, sandbox, semantics, createCan, grant }),
+			verify: (build, spec, grant) => verifyBuild({ build, spec, surface: to, sandbox, semantics, createCan, grant, loadFunctions }),
 			...(options.regenerate ? { regenerate: options.regenerate } : {}),
 			...(options.chooseSlot ? { chooseSlot: options.chooseSlot } : {}),
 			...(options.onEntry ? { onEntry: options.onEntry } : {}),

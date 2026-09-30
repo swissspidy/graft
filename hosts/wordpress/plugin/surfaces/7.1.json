@@ -2,7 +2,7 @@
 	"graft": 1,
 	"host": "wordpress",
 	"hostVersion": "7.1.2",
-	"hash": "sha256:c00f62a89f32ae9f1e0c5275974aa8fdecc248c790d51a256139edb95ae21e98",
+	"hash": "sha256:e8c711a5d8cd686c2e069ceafc1dc8a95bf48116688c01c0eca1cc002f2d9bb1",
 	"fingerprint": "sha256:aac93a247c479496ea0abe8ea8b948c5af6bed66a04e8ae3f1ff729ee262cce8",
 	"slots": {
 		"admin.page": {
@@ -657,6 +657,64 @@
 					},
 					"state": {
 						"description": "The initial state."
+					},
+					"actions": {
+						"description": "Actions the widget may offer on rows of its input (an array of records with an id): {\"approve\": {\"call\": {\"$call\": ..., \"input\": {\"id\": {\"$field\": \"id\"}}}, \"visible\": {\"$can\": ...}}}. A drawn button uses one with {\"$use\": \"approve\", \"row\": <row id>}; inside a table row, {\"$use\": \"approve\"} applies to that row.",
+						"type": "object",
+						"additionalProperties": {
+							"type": "object",
+							"properties": {
+								"call": {
+									"description": "A capability call: { $call, input, then }.",
+									"type": "object",
+									"required": [
+										"$call"
+									]
+								},
+								"visible": {
+									"description": "true, false, a permission check { $can, on }, or logic over them: $eq, $and, $or, $not.",
+									"anyOf": [
+										{
+											"type": "boolean"
+										},
+										{
+											"type": "object",
+											"required": [
+												"$can"
+											]
+										},
+										{
+											"type": "object",
+											"required": [
+												"$eq"
+											]
+										},
+										{
+											"type": "object",
+											"required": [
+												"$and"
+											]
+										},
+										{
+											"type": "object",
+											"required": [
+												"$or"
+											]
+										},
+										{
+											"type": "object",
+											"required": [
+												"$not"
+											]
+										}
+									]
+								}
+							},
+							"required": [
+								"call"
+							],
+							"additionalProperties": false
+						}
 					}
 				},
 				"required": [

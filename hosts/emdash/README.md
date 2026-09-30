@@ -41,6 +41,12 @@ Customizations appear under **Plugins → Customizations** as tabs, in a
 **Customizations** widget on the dashboard, and in a **Customizations**
 panel in the entry editor.
 
+Builds with code ([ADR 0005](../../docs/adr/0005-sandboxed-functions.md))
+run it on the server, in QuickJS: compiled to WebAssembly in the native
+plugin, to asm.js in the plugin sandbox, which compiles no WebAssembly.
+Interactive widgets ([ADR 0006](../../docs/adr/0006-interactive-widgets.md))
+are drawn there too, as Block Kit; their state travels in the buttons.
+
 ### Writing customizations in the admin
 
 Administrators write specs in the **Manage** tab. Set an Anthropic API key

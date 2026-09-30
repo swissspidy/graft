@@ -3,6 +3,7 @@ import {
 	describeChange,
 	extractRefs,
 	hashSurface,
+	resolveWidgetUse,
 	sanitizeWidgetTree,
 	staticCheck,
 	validateBuild,
@@ -71,7 +72,7 @@ const surface: Surface = {
 			},
 		},
 		widget: {
-			props: { type: 'object', properties: { render: { type: 'string' }, update: { type: 'string' }, input: {}, state: {} }, required: ['render'], additionalProperties: false },
+			props: { type: 'object', properties: { render: { type: 'string' }, update: { type: 'string' }, input: {}, state: {}, actions: { type: 'object' } }, required: ['render'], additionalProperties: false },
 		},
 	},
 	capabilities: { 'items.close': { kind: 'write', input: { type: 'object' }, output: {}, scopes: ['items:write'] } },
@@ -201,6 +202,52 @@ describe('widgets in builds', () => {
 		const b = build([{ criterion: 'count', view_as: 'v', steps: [{ action: 'add' }], expect: [{ text: 'State: null' }] }], { render: 'draw', update: 'step', state: 5 });
 		const result = await verifyBuild({ build: b, spec, surface, sandbox, semantics, createCan: () => () => true, loadFunctions: clearing });
 		expect(result.results.flatMap((r) => r.failures)).toEqual([]);
+	});
+
+	it('run declared actions on rows of their input, and only those', async () => {
+		const calls: Array<[string, unknown]> = [];
+		const withRows: Sandbox = {
+			...sandbox,
+			async call(_user, capability, input) {
+				calls.push([capability, input]);
+				return capability === 'items.list' ? { items: [{ id: 1, title: 'One' }, { id: 2, title: 'Two' }] } : {};
+			},
+		};
+		const drawing = async () => ({
+			call() {
+				return {
+					type: 'stack',
+					children: [
+						{ type: 'button', props: { id: 'close-two', label: 'Close', onClick: { $use: 'close', row: 2 } } },
+						{ type: 'button', props: { id: 'close-made-up', label: 'Close', onClick: { $use: 'close', row: 99 } } },
+					],
+				};
+			},
+		});
+		const surfaceWithList: Surface = {
+			...surface,
+			capabilities: { ...surface.capabilities, 'items.list': { kind: 'read', input: { type: 'object' }, output: {}, scopes: ['items:write'] } },
+		};
+		surfaceWithList.hash = await hashSurface(surfaceWithList);
+		const b = build(
+			[{ criterion: 'count', view_as: 'v', steps: [{ action: 'close-two' }], expect: [{ action: 'close-made-up', available: false }] }],
+			{ render: 'draw', input: { $data: 'items.items' }, actions: { close: { call: { $call: 'items.close', input: { id: { $field: 'id' } } } } } },
+		);
+		b.data = { items: { call: 'items.list', input: {} } };
+		b.surface.hash = surfaceWithList.hash;
+		b.refs = extractRefs(b, surfaceWithList);
+		const result = await verifyBuild({ build: b, spec, surface: surfaceWithList, sandbox: withRows, semantics, createCan: () => () => true, loadFunctions: drawing });
+		expect(calls.filter(([c]) => c === 'items.close')).toEqual([['items.close', { id: 2 }]]);
+		expect(result.results[0]!.failures).toEqual(['The widget at /tree: The widget offers "close" on a row that is not in its input.']);
+	});
+
+	it('offer a declared action only where its visible condition holds', () => {
+		const actions = { close: { call: { $call: 'items.close', input: { id: { $field: 'id' } } }, visible: { $can: 'items:write' } } };
+		const input = [{ id: 1 }, { id: 2 }];
+		const ctx = (allowed: number) => ({ data: {}, slot: {}, can: (_scope: string, on: unknown) => (on as { id: number }).id === allowed });
+		expect(resolveWidgetUse({ $use: 'close', row: 1 }, actions, input, ctx(1))).toMatchObject({ available: true, row: { id: 1 }, action: { capability: 'items.close', input: { id: 1 } } });
+		expect(resolveWidgetUse({ $use: 'close', row: 2 }, actions, input, ctx(1)).available).toBe(false);
+		expect(resolveWidgetUse({ $use: 'close', row: { id: 2, title: 'forged' } }, actions, input, ctx(2)).row).toEqual({ id: 2 });
 	});
 
 	it('need regenerating when the host stops running widgets', () => {

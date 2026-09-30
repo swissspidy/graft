@@ -18,7 +18,24 @@ export { extractRefs } from './build/refs.ts';
 export { validateBuild, validateWidgetTree, type BuildValidation, type ValidateBuildOptions } from './build/validate.ts';
 export { nextSpecState, specEvents, specLifecycle, type SpecEvent, type SpecState } from './lifecycle/spec.ts';
 export { removeRow } from './build/rows.ts';
-export { initialState, isWidgetEvent, renderArgs, sanitizeWidgetTree, updateArgs, WIDGET, widgetProps, type WidgetEvent, type WidgetLimits, type WidgetProps } from './build/widgets.ts';
+export {
+	initialState,
+	isWidgetEvent,
+	isWidgetUse,
+	renderArgs,
+	resolveWidgetUse,
+	sanitizeWidgetTree,
+	updateArgs,
+	WIDGET,
+	widgetProps,
+	widgetRow,
+	type ResolvedUse,
+	type WidgetAction,
+	type WidgetEvent,
+	type WidgetLimits,
+	type WidgetProps,
+	type WidgetUse,
+} from './build/widgets.ts';
 export { SandboxCallError, type Sandbox } from './verifier/sandbox.ts';
 export {
 	allActions,

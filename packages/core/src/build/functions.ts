@@ -6,7 +6,8 @@ import { canonicalJson } from '../surface/hash.ts';
  * `call` throws FunctionError when a call fails or breaks a limit.
  */
 export interface FunctionRunner {
-	call(name: string, args: unknown[]): unknown;
+	/** `now` is the time Date reports inside the call; the host's current time when omitted. */
+	call(name: string, args: unknown[], now?: number): unknown;
 	dispose?(): void;
 }
 
@@ -29,6 +30,8 @@ export const functionKey = (name: string, args: unknown[]): string => `${name}:$
 export interface FunctionCall {
 	name: string;
 	args: unknown[];
+	/** The time Date reports inside the call. */
+	now?: number;
 }
 
 export type FunctionResult = { ok: true; value: unknown } | { ok: false; kind: FunctionErrorKind; message: string };

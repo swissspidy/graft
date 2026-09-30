@@ -16,5 +16,6 @@ The site has no other entries. Entries are created oldest first, in list order, 
 - Per-entry permission: {"$can": "content.status:write"} inside a table row, or with "on": {"$slot": "entry"} in the editor panel, uses the entry's own can flags.
 - The content.editor.panel slot renders once per saved entry with {"entry": {...same fields as content.list items}}; checks match its actions with "row": {"title": ...}.
 - The server re-renders from fresh data after every action: use "then": ["refresh:<source>"] (or "reload:page" in the editor panel), not "remove-row".
-- Every action (button, table action) needs an "id" matching the action ids the checks use.`,
+- Every action (button, table action) needs an "id" matching the action ids the checks use.
+- Functions and widgets run on the server. A widget's render function returns EmDash components, as in the build's tree: tables take "columns" (not "fields") and rows as plain data; buttons go inside "actions" and take "style" (primary, secondary, danger). A widget is a child of the root "stack".`,
 };

@@ -7,7 +7,7 @@ import { HostError, type Viewer } from './host.ts';
 import { routePermissions, type RouteName } from './manifest.ts';
 import { ModelSetupError, modelSettings, pluginModel } from './model.ts';
 import { handleSandbox } from './sandbox.ts';
-import { serveAdmin, servePanel, type Interaction } from './serve.ts';
+import { serveAdmin, servePanel, type Interaction, type LoadFunctions } from './serve.ts';
 import { createStore, StoreError } from './store.ts';
 
 /**
@@ -48,6 +48,8 @@ export interface RouteOptions {
 	sandbox?: boolean;
 	/** Offers writing customizations in the admin (needs an API key in the settings). */
 	authoring?: boolean;
+	/** Runs builds' functions and widgets: @graft/sandbox, in the build the runtime can run. */
+	loadFunctions?: LoadFunctions;
 }
 
 const surfaces = new Map<string, Promise<Surface>>();
@@ -121,6 +123,7 @@ export function graftRoutes(options: RouteOptions = {}): Partial<Record<RouteNam
 					store: storeFor(ctx),
 					surface: await currentSurface(version),
 					...(options.authoring ? { authoring: authoringFor(ctx) } : {}),
+					...(options.loadFunctions ? { loadFunctions: options.loadFunctions } : {}),
 				},
 				(request.input ?? {}) as Interaction,
 				where,
@@ -131,7 +134,11 @@ export function graftRoutes(options: RouteOptions = {}): Partial<Record<RouteNam
 			if (!entry) {
 				throw new GraftRouteError('BAD_REQUEST', 'The panel needs an entry.');
 			}
-			return servePanel({ ctx, viewer: viewerOf(request), store: storeFor(ctx), surface: await currentSurface(version) }, (request.input ?? {}) as Interaction, entry);
+			return servePanel(
+				{ ctx, viewer: viewerOf(request), store: storeFor(ctx), surface: await currentSurface(version), ...(options.loadFunctions ? { loadFunctions: options.loadFunctions } : {}) },
+				(request.input ?? {}) as Interaction,
+				entry,
+			);
 		}),
 		surface: route('surface', async () => currentSurface(version)),
 		specs: route('specs', async (_request, ctx) => ({ specs: await storeFor(ctx).list() })),

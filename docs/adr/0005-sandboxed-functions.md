@@ -56,8 +56,8 @@ plus the list of functions it exposes. Props call a function with
   shown (a `$fn` as an `$if` condition), never what is read or written.
 - **Only on hosts that run it.** A surface declares `functions` with its
   runtime and limits. Code and `$fn` are refused on surfaces without it,
-  and the plugin never serves such a build there. WordPress declares
-  functions; EmDash does not (yet).
+  and the plugin never serves such a build there. WordPress and EmDash
+  both declare functions.
 
 ### Where it runs: QuickJS compiled to WebAssembly, in a Web Worker
 
@@ -176,14 +176,25 @@ time; a model writing JavaScript per build isn't that.
 
 - **The example.** `examples/specs/headline-check.md` is verified in
   Playground and served in wp-admin.
-- **Determinism.** Code can still call `Date.now()` and `Math.random()`,
-  and nothing forbids it. The prompt says functions are pure. A build that
-  depends on either will verify inconsistently, which the canary would
-  show. Freezing both is possible if it becomes a problem.
-- **EmDash.** EmDash renders on the server, in the plugin or in EmDash's
-  own workerd sandbox. Running QuickJS there is possible (it is plain
-  Wasm), but loading a wasm file in the sandboxed plugin format needs
-  work. Until then, EmDash surfaces do not declare functions.
+- **Determinism.** Inside the sandbox, `Date` and `Date.now()` report the
+  time the host passes with each call. The page passes its current time;
+  the verifier passes the check's clock, so `clock.advanceDays` applies to
+  code as it does to `$daysSince`. `Math.random()` is a PRNG reseeded on
+  every call, so a function gives the same result for the same arguments
+  at the same time. The replacement `Date` is also what
+  `Date.prototype.constructor` returns, so reaching for the original
+  through the prototype finds the frozen one.
+- **EmDash.** EmDash renders on the server, so functions run in the
+  plugin, per render, under the same limits (with a longer deadline, 100
+  ms). The native plugin uses the WebAssembly build. EmDash's plugin
+  sandbox (workerd, and Worker Loader on Cloudflare) compiles no
+  WebAssembly at run time, so the standard-format plugin uses
+  QuickJS compiled to asm.js (`@graft/sandbox/asmjs`,
+  `@jitl/quickjs-asmjs-mjs-release-sync`): the same engine and limits,
+  as plain JavaScript, about 1 MB more in the bundle. A sandbox is kept
+  per build's code while the process lives. The verifier runs the
+  WebAssembly build; both are the same QuickJS release, so a verified
+  build behaves the same in either plugin format.
 - **Step 3: interactive widgets.** Components drawn by code, with events,
   are the next step and need a render bridge. `@arrow-js/sandbox` shows
   one shape for it: templates rendered by trusted host code from a

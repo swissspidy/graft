@@ -59,6 +59,9 @@ const child = spawn(
 		`--port=${port}`,
 		`--wp=${wp}`,
 		`--php=${DEFAULT_PHP}`,
+		// The CLI drops to cpus-1 workers on small runners (3 on CI) and warns that fewer than
+		// 6 can deadlock on file locks; the dashboard's parallel requests hung a login there.
+		'--workers=6',
 		`--mount=${paths.plugin}:/wordpress/wp-content/plugins/graft`,
 		`--mount=${paths.playground}:/graft-playground`,
 		`--mount=${dir}:/graft-fixtures`,

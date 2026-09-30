@@ -5,7 +5,7 @@ import { validateSpec, type Build, type Spec, type Surface } from '@graft/core';
 /** The EmDash examples (examples/emdash) with the current surface. */
 
 export const ROOT = fileURLToPath(new URL('../../../../../', import.meta.url));
-export const EXAMPLES = ['publish-queue', 'go-live', 'drafts-glance', 'stale-drafts'] as const;
+export const EXAMPLES = ['publish-queue', 'go-live', 'drafts-glance', 'stale-drafts', 'status-board'] as const;
 
 export interface Example {
 	name: string;

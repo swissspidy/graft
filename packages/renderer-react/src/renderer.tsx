@@ -7,6 +7,7 @@ import {
 	isWidgetEvent,
 	removeRow,
 	renderArgs,
+	resolveWidgetUse,
 	sanitizeWidgetTree,
 	updateArgs,
 	WIDGET,
@@ -280,19 +281,32 @@ function Widget({ node }: { node: TreeNode }) {
 		}
 	});
 
-	const inner = useMemo<RuntimeValue | undefined>(
-		() =>
-			runtime ? {
-				...runtime,
-				// Inside a widget, only its own events do anything.
-				invoke: async (value: unknown) => {
-					if (isWidgetEvent(value)) {
-						setPending((events) => [...events, value]);
-					}
+	const inner = useMemo<RuntimeValue | undefined>(() => {
+		if (!runtime) {
+			return undefined;
+		}
+		const actions = ((node.props ?? {}) as Record<string, Value>).actions;
+		return {
+			...runtime,
+			ctx: {
+				...runtime.ctx,
+				// A use of a declared action becomes the action for that row of the input, or null.
+				use: (use) => {
+					const resolved = resolveWidgetUse(use, actions, props?.input, runtime.ctx);
+					return resolved.available && resolved.action ? resolved.action : null;
 				},
-			} : undefined,
-		[runtime],
-	);
+			},
+			// Inside a widget, only its own events and its resolved actions do anything; any
+			// $call the code drew was made null by the sanitizer.
+			invoke: async (value: unknown) => {
+				if (isWidgetEvent(value)) {
+					setPending((events) => [...events, value]);
+				} else if (isAction(value)) {
+					await runtime.invoke(value);
+				}
+			},
+		};
+	}, [runtime, node, props?.input]);
 	const tree = useMemo(() => (drawn !== undefined && drawn !== null && runtime?.widgets ? sanitizeWidgetTree(drawn, runtime.widgets).tree : undefined), [drawn, runtime?.widgets]);
 
 	if (!tree || !inner) {
