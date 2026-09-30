@@ -64,6 +64,8 @@ foreach ( $posts as list( $title, $status, $author, $days ) ) {
 
 wp_set_current_user( 1 );
 $examples = json_decode( (string) file_get_contents( '/wordpress/graft-demo/demo.json' ), true );
+// The builds decoded as objects, so they are stored exactly as written (empty objects stay objects).
+$raw_examples = json_decode( (string) file_get_contents( '/wordpress/graft-demo/demo.json' ) );
 foreach ( $examples as $spec_id => $example ) {
 	$version = Graft\create_version(
 		array(
@@ -72,7 +74,7 @@ foreach ( $examples as $spec_id => $example ) {
 			'title'    => $example['title'],
 		)
 	);
-	Graft\attach_build( $spec_id, $version['version'], $example['build'], $example['verification'] ?? null );
+	Graft\attach_build( $spec_id, $version['version'], $raw_examples->{ $spec_id }->build, $example['verification'] ?? null );
 	if ( 'waiting-posts' !== $spec_id ) {
 		Graft\approve_version( $spec_id, $version['version'] );
 	}

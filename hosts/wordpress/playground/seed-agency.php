@@ -78,6 +78,8 @@ Graft\sync_managed( true );
 // The centre's own customization, verified by e2e/agency-server.ts and
 // waiting for an administrator.
 $examples = json_decode( (string) file_get_contents( '/graft-fixtures/examples.json' ), true );
+// The builds decoded as objects, so they are stored exactly as written (empty objects stay objects).
+$raw_examples = json_decode( (string) file_get_contents( '/graft-fixtures/examples.json' ) );
 $example  = $examples['family-friendly'];
 $version  = Graft\create_version(
 	array(
@@ -86,7 +88,7 @@ $version  = Graft\create_version(
 		'title'    => $example['title'],
 	)
 );
-Graft\attach_build( 'family-friendly', $version['version'], $example['build'], $example['verification'] ?? null );
+Graft\attach_build( 'family-friendly', $version['version'], $raw_examples->{'family-friendly'}->build, $example['verification'] ?? null );
 
 list( $app_password ) = WP_Application_Passwords::create_new_application_password( 1, array( 'name' => 'graft-e2e' ) );
 file_put_contents( '/graft-fixtures/app-password.txt', $app_password );

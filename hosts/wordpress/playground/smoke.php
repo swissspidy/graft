@@ -428,6 +428,31 @@ check(
 wp_set_current_user( $contributor3 );
 check( 'only administrators get the sandbox package', 403 === rest( 'GET', '/graft/v1/sandbox-package' )['status'] );
 
+// Builds are stored exactly as sent: an empty object stays an object.
+wp_set_current_user( $admin );
+$faithful                 = json_decode( (string) wp_json_encode( $qa['build'] ) );
+$faithful->data           = new stdClass();
+$faithful->provenance->id = 'faithful';
+$request                  = new WP_REST_Request( 'POST', '/graft/v1/specs/quick-approve/versions/1/builds' );
+$request->set_header( 'Content-Type', 'application/json' );
+$request->set_body(
+	(string) wp_json_encode(
+		array(
+			'build'        => $faithful,
+			'verification' => array( 'passed' => true ),
+		)
+	)
+);
+$sent   = rest_do_request( $request );
+$listed = rest_do_request( new WP_REST_Request( 'GET', '/graft/v1/specs' ) )->get_data();
+$qa_out = null;
+foreach ( $listed as $spec ) {
+	if ( 'quick-approve' === $spec['spec_id'] ) {
+		$qa_out = $spec['versions'][ count( $spec['versions'] ) - 1 ]['builds']->{ $faithful->surface->hash }->build ?? null;
+	}
+}
+check( 'builds are returned exactly as sent, empty objects included', 200 === $sent->get_status() && is_object( $qa_out ) && is_object( $qa_out->data ) && 'faithful' === ( $qa_out->provenance->id ?? null ), array( $sent->get_status(), $qa_out->data ?? null ) );
+
 // ---------------------------------------------------------------------------
 // Content model, site surfaces and policy (ADR 0008).
 // ---------------------------------------------------------------------------

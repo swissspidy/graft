@@ -219,8 +219,12 @@ function managed_files(): array {
 function managed_bundles(): array {
 	$bundles = array();
 	foreach ( array_keys( managed_files() ) as $file ) {
-		$bundle = json_decode( (string) file_get_contents( $file ), true ); // phpcs:ignore WordPress.WP.AlternativeFunctions.file_get_contents_file_get_contents
+		$json   = (string) file_get_contents( $file ); // phpcs:ignore WordPress.WP.AlternativeFunctions.file_get_contents_file_get_contents
+		$bundle = json_decode( $json, true );
 		if ( is_array( $bundle ) && 1 === ( $bundle['graft'] ?? null ) && 'customization' === ( $bundle['kind'] ?? null ) ) {
+			// The builds decoded as objects too, so they are stored exactly as shipped (see stored_builds()).
+			$raw                          = json_decode( $json );
+			$bundle['raw_builds']         = is_object( $raw ) && is_array( $raw->builds ?? null ) ? $raw->builds : array();
 			$bundles[ basename( $file ) ] = $bundle;
 		}
 	}
@@ -329,7 +333,7 @@ function install_managed( array $bundle ) {
 	$spec = get_spec_post( $spec_id );
 	set_json_meta( $spec->ID, '_graft_managed', array( 'by' => maintainer() ) );
 
-	foreach ( $bundle['builds'] as $entry ) {
+	foreach ( $bundle['builds'] as $i => $entry ) {
 		if ( ! is_array( $entry['build'] ?? null ) || empty( $entry['verification']['passed'] ) || ! surface_snapshot( (string) ( $entry['build']['surface']['hash'] ?? '' ) ) ) {
 			continue;
 		}
@@ -337,7 +341,8 @@ function install_managed( array $bundle ) {
 		if ( isset( version_record( $current )['builds'][ $entry['build']['surface']['hash'] ] ) ) {
 			continue;
 		}
-		$attached = attach_build( $spec_id, $record['version'], $entry['build'], $entry['verification'] + array( 'runner' => 'managed' ) );
+		$raw      = $bundle['raw_builds'][ $i ]->build ?? $entry['build'];
+		$attached = attach_build( $spec_id, $record['version'], $raw, $entry['verification'] + array( 'runner' => 'managed' ) );
 		if ( is_wp_error( $attached ) ) {
 			return $attached;
 		}

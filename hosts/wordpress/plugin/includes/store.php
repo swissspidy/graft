@@ -77,6 +77,21 @@ function get_json_meta( int $post_id, string $key ) {
 }
 
 /**
+ * The builds of a version as stored, with JSON objects kept as objects
+ * (empty ones included), for output: decoding into PHP arrays would turn
+ * an empty object such as `"data": {}` into `[]`, and the build would no
+ * longer validate.
+ *
+ * @param int $post_id Version post id.
+ * @return object Surface hash => { build, verification, attached }.
+ */
+function stored_builds( int $post_id ): object {
+	$value  = get_post_meta( $post_id, '_graft_builds', true );
+	$builds = is_string( $value ) && '' !== $value ? json_decode( $value ) : null;
+	return is_object( $builds ) ? $builds : new \stdClass();
+}
+
+/**
  * Writes a JSON meta value.
  *
  * @param int    $post_id Post id.
@@ -465,11 +480,17 @@ function grant_covers( ?array $grant, array $scopes ): bool {
  *
  * @param string               $spec_id      Spec id.
  * @param int                  $version      Version number.
- * @param array<string, mixed> $build        Build.
- * @param array<string, mixed> $verification { passed: bool, results?: array, runner?: string }.
+ * @param array<string, mixed>|object $build Build. Pass the decoded JSON object (json_decode() without
+ *                                            $assoc) to store it exactly as sent, empty objects included.
+ * @param array<string, mixed>        $verification { passed: bool, results?: array, runner?: string }.
  * @return array<string, mixed>|WP_Error Updated record.
  */
-function attach_build( string $spec_id, int $version, array $build, ?array $verification ) {
+function attach_build( string $spec_id, int $version, $build, ?array $verification ) {
+	$stored = $build;
+	$build  = is_array( $build ) ? $build : json_decode( (string) wp_json_encode( $build ), true );
+	if ( ! is_array( $build ) ) {
+		return new WP_Error( 'graft_invalid_build', __( 'Missing build.', 'graft' ), array( 'status' => 400 ) );
+	}
 	$post = get_version_post( $spec_id, $version );
 	if ( ! $post ) {
 		return new WP_Error( 'graft_not_found', __( 'Spec version not found.', 'graft' ), array( 'status' => 404 ) );
@@ -512,9 +533,10 @@ function attach_build( string $spec_id, int $version, array $build, ?array $veri
 		return new WP_Error( 'graft_unverified', __( 'Only verified builds can be attached to an active customization.', 'graft' ), array( 'status' => 400 ) );
 	}
 
-	$builds                  = $record['builds'];
-	$builds[ $surface_hash ] = array(
-		'build'        => $build,
+	// Stored as sent: the builds already there are read back as objects too.
+	$builds                    = stored_builds( $post->ID );
+	$builds->{ $surface_hash } = array(
+		'build'        => $stored,
 		'verification' => $verification,
 		'attached'     => gmdate( 'c' ),
 	);
@@ -601,9 +623,10 @@ function apply_event( string $spec_id, int $version, string $event ) {
 /**
  * All specs with their versions.
  *
+ * @param bool $output For a response: builds exactly as stored (see stored_builds()).
  * @return array<int, array<string, mixed>>
  */
-function list_specs(): array {
+function list_specs( bool $output = false ): array {
 	$specs = get_posts(
 		array(
 			'post_type'        => SPEC_POST_TYPE,
@@ -615,7 +638,7 @@ function list_specs(): array {
 		)
 	);
 	return array_map(
-		static function ( WP_Post $spec ): array {
+		static function ( WP_Post $spec ) use ( $output ): array {
 			return array(
 				'spec_id'        => $spec->post_name,
 				'title'          => $spec->post_title,
@@ -623,7 +646,16 @@ function list_specs(): array {
 				'owner'          => (int) $spec->post_author,
 				'active_version' => (int) get_post_meta( $spec->ID, '_graft_active_version', true ) ?: null,
 				'managed_by'     => managed_by( $spec->post_name ),
-				'versions'       => array_map( __NAMESPACE__ . '\version_record', get_version_posts( $spec ) ),
+				'versions'       => array_map(
+					static function ( WP_Post $version ) use ( $output ): array {
+						$record = version_record( $version );
+						if ( $output ) {
+							$record['builds'] = stored_builds( $version->ID );
+						}
+						return $record;
+					},
+					get_version_posts( $spec )
+				),
 			);
 		},
 		$specs

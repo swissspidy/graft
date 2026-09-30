@@ -54,6 +54,8 @@ wp_insert_post(
 
 wp_set_current_user( 1 );
 $examples = json_decode( (string) file_get_contents( '/graft-fixtures/examples.json' ), true );
+// The builds decoded as objects, so they are stored exactly as written (empty objects stay objects).
+$raw_examples = json_decode( (string) file_get_contents( '/graft-fixtures/examples.json' ) );
 foreach ( $examples as $spec_id => $example ) {
 	$version = Graft\create_version(
 		array(
@@ -62,7 +64,7 @@ foreach ( $examples as $spec_id => $example ) {
 			'title'    => $example['title'],
 		)
 	);
-	Graft\attach_build( $spec_id, $version['version'], $example['build'], $example['verification'] ?? null );
+	Graft\attach_build( $spec_id, $version['version'], $raw_examples->{ $spec_id }->build, $example['verification'] ?? null );
 	// waiting-posts is left for the admin to approve in the e2e tests.
 	if ( 'waiting-posts' !== $spec_id ) {
 		Graft\approve_version( $spec_id, $version['version'] );

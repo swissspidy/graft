@@ -39,7 +39,7 @@ function register_routes(): void {
 			array(
 				'methods'             => WP_REST_Server::READABLE,
 				'callback'            => static function (): WP_REST_Response {
-					return new WP_REST_Response( list_specs() );
+					return new WP_REST_Response( list_specs( true ) );
 				},
 				'permission_callback' => $manage,
 			),
@@ -162,8 +162,10 @@ function register_routes(): void {
 		array(
 			'methods'             => WP_REST_Server::CREATABLE,
 			'callback'            => static function ( WP_REST_Request $request ) {
-				$build = $request['build'];
-				if ( ! is_array( $build ) ) {
+				// The build as sent, so empty objects stay objects (see stored_builds()).
+				$body  = json_decode( $request->get_body() );
+				$build = is_object( $body ) && isset( $body->build ) && is_object( $body->build ) ? $body->build : $request['build'];
+				if ( ! is_array( $build ) && ! is_object( $build ) ) {
 					return new WP_Error( 'graft_invalid_build', __( 'Missing build.', 'graft' ), array( 'status' => 400 ) );
 				}
 				$verification = is_array( $request['verification'] ) ? $request['verification'] : null;
