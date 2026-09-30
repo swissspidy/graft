@@ -2,7 +2,7 @@
 	"graft": 1,
 	"host": "wordpress",
 	"hostVersion": "7.1.2",
-	"hash": "sha256:1bc6d2a59a6b817b340fdd0104d36964905866c724d92ad379f1d04458d61e27",
+	"hash": "sha256:05a8b3caa16f7a75fea1d891bcd0acf7519150b14ee305e56faa120a61f1ae2b",
 	"fingerprint": "sha256:1def839aa33ce770b2885752e931fd4528460ec0a37906964807f3ed8b6d8433",
 	"slots": {
 		"admin.page": {
@@ -1314,7 +1314,7 @@
 						"default": 1
 					},
 					"orderby": {
-						"description": "meta.<key> orders by a custom field; posts without a value come first in ascending order.",
+						"description": "meta.<key> orders by a custom field; posts without a value come last.",
 						"type": "string",
 						"enum": [
 							"date",

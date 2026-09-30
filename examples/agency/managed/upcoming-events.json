@@ -34,7 +34,7 @@
 				"surface": {
 					"host": "wordpress",
 					"hostVersion": "7.1.2",
-					"hash": "sha256:1bc6d2a59a6b817b340fdd0104d36964905866c724d92ad379f1d04458d61e27"
+					"hash": "sha256:05a8b3caa16f7a75fea1d891bcd0acf7519150b14ee305e56faa120a61f1ae2b"
 				},
 				"mount": {
 					"slot": "dashboard.widget",
@@ -419,7 +419,7 @@
 				"surface": {
 					"host": "wordpress",
 					"hostVersion": "7.1.2",
-					"hash": "sha256:1bc6d2a59a6b817b340fdd0104d36964905866c724d92ad379f1d04458d61e27"
+					"hash": "sha256:05a8b3caa16f7a75fea1d891bcd0acf7519150b14ee305e56faa120a61f1ae2b"
 				},
 				"results": [
 					{
@@ -448,7 +448,7 @@
 					}
 				],
 				"unchecked": [],
-				"verifiedAt": "2026-09-30T18:21:14.627Z"
+				"verifiedAt": "2026-09-30T18:36:25.986Z"
 			}
 		}
 	]
