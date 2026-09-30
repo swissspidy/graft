@@ -193,7 +193,7 @@ time; a model writing JavaScript per build isn't that.
   `@jitl/quickjs-asmjs-mjs-release-sync`): the same engine and limits,
   as plain JavaScript, about 1 MB more in the (minified) bundle. The
   plugin keeps a sandbox per build's code, at most 16, freeing the least
-  recently used. A cold start costs about 140 ms of CPU in Node 22,
+  recently used. A cold start costs about 150 ms of CPU in Node 24,
   more than the 50 ms Cloudflare allows a sandboxed invocation (ADR
   0004); workerd on Node does not enforce that limit. The verifier runs the
   WebAssembly build; both are the same QuickJS release, so a verified

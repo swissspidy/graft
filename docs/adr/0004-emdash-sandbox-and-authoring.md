@@ -130,10 +130,10 @@ compile.
 - **CPU limit.** On Cloudflare, sandboxed invocations get 50 ms of CPU
   (EmDash's default `cpuMs`). workerd on Node does not enforce it, so CI
   cannot catch an overrun. Validating a large build on cfworker has not
-  been measured. Build functions have been, in Node 22 (ADR 0005): a
-  cold start costs about 140 ms of CPU before the first result (about 40
+  been measured. Build functions have been, in Node 24 (ADR 0005): a
+  cold start costs about 150 ms of CPU before the first result (about 40
   ms to load the asm.js module, 40 ms to start QuickJS, and 30 ms for its
-  first evaluation), and each further build's sandbox about 20 ms. So on
+  first evaluation), and each further build's sandbox about 25 ms. So on
   Cloudflare, the first render of a build with code after an isolate
   starts would likely exceed the limit. Customizations without code do
   not load QuickJS.
