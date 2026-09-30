@@ -59,6 +59,10 @@ const result = await build({
 	external: ['emdash', 'node:*'],
 	define: { __GRAFT_EMDASH_VERSION__: JSON.stringify(emdashVersion(site)) },
 	legalComments: 'none',
+	// Minified: the asm.js QuickJS build ships minified and triples in size
+	// when re-printed. Names stay, for readable errors.
+	minify: true,
+	keepNames: true,
 	plugins: [quickjsInWorkerd],
 	metafile: true,
 	logLevel: 'warning',

@@ -191,8 +191,11 @@ time; a model writing JavaScript per build isn't that.
   WebAssembly at run time, so the standard-format plugin uses
   QuickJS compiled to asm.js (`@graft/sandbox/asmjs`,
   `@jitl/quickjs-asmjs-mjs-release-sync`): the same engine and limits,
-  as plain JavaScript, about 1 MB more in the bundle. A sandbox is kept
-  per build's code while the process lives. The verifier runs the
+  as plain JavaScript, about 1 MB more in the (minified) bundle. The
+  plugin keeps a sandbox per build's code, at most 16, freeing the least
+  recently used. A cold start costs about 140 ms of CPU in Node 22,
+  more than the 50 ms Cloudflare allows a sandboxed invocation (ADR
+  0004); workerd on Node does not enforce that limit. The verifier runs the
   WebAssembly build; both are the same QuickJS release, so a verified
   build behaves the same in either plugin format.
 - **Step 3: interactive widgets.** Components drawn by code, with events,
