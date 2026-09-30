@@ -241,6 +241,11 @@ function managed_bundles(): array {
  * @return array<string, string> What happened, by bundle file.
  */
 function sync_managed( bool $force = false ): array {
+	// A site that has never had managed customizations has nothing to sync:
+	// no queries and no writes on its admin and REST requests.
+	if ( ! $force && null === policy()['managed'] && false === get_option( 'graft_managed_digest' ) ) {
+		return array();
+	}
 	$digest = md5( (string) wp_json_encode( array( managed_files(), policy()['managed_by'], current_surface()['hash'] ?? null ) ) );
 	if ( ! $force && get_option( 'graft_managed_digest' ) === $digest ) {
 		return array();
