@@ -142,7 +142,7 @@ verifies it from a terminal instead.
 
 ## Try it
 
-Requires Node 22+ and pnpm. Playground is fetched on demand (network access
+Requires Node 24+ (the current LTS) and pnpm. Playground is fetched on demand (network access
 needed the first time).
 
 ```sh

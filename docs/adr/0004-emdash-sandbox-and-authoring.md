@@ -127,14 +127,22 @@ compile.
   registry and run on Cloudflare. That is untested on Cloudflare itself;
   CI runs the Node sandbox (workerd). Publishing needs the publisher's
   atproto DID in `emdash-plugin.jsonc`.
-- **Unmeasured CPU limit.** On Cloudflare, sandboxed invocations get 50
-  ms of CPU. Validating a large build on cfworker may exceed that. It has
-  not been measured.
+- **CPU limit.** On Cloudflare, sandboxed invocations get 50 ms of CPU
+  (EmDash's default `cpuMs`). workerd on Node does not enforce it, so CI
+  cannot catch an overrun. Validating a large build on cfworker has not
+  been measured. Build functions have been, in Node 24 (ADR 0005): a
+  cold start costs about 150 ms of CPU before the first result (about 40
+  ms to load the asm.js module, 40 ms to start QuickJS, and 30 ms for its
+  first evaluation), and each further build's sandbox about 25 ms. So on
+  Cloudflare, the first render of a build with code after an isolate
+  starts would likely exceed the limit. Customizations without code do
+  not load QuickJS.
 - **Manual steps.** Admins click **Continue building** once per model
   call, a handful of times. A background runner (EmDash's cron ticks on a
   timer) could take over when the host allows long invocations.
-- **Bundle size.** The sandboxed bundle is about 900 KB, most of it the
-  SDK.
+- **Bundle size.** The sandboxed bundle is minified: about 1.4 MB (480 KB
+  gzipped), of which about 1 MB is QuickJS as asm.js (ADR 0005) and
+  about 190 KB the Anthropic SDK.
 - **Verification still leaves the site.** A verification service, or
   signed verification (ADR 0002's future work), would let a site verify
   without an operator's terminal.

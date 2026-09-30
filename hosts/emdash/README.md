@@ -47,6 +47,13 @@ plugin, to asm.js in the plugin sandbox, which compiles no WebAssembly.
 Interactive widgets ([ADR 0006](../../docs/adr/0006-interactive-widgets.md))
 are drawn there too, as Block Kit; their state travels in the buttons.
 
+On Cloudflare, sandboxed plugins get 50 ms of CPU per request (not
+enforced by workerd on Node, which the tests use). Starting QuickJS takes
+more than that, so a customization with code will likely fail its first
+render there after a cold start. This is untested on Cloudflare
+([ADR 0004](../../docs/adr/0004-emdash-sandbox-and-authoring.md)). The
+native plugin, and the sandbox on Node, have no such limit.
+
 ### Writing customizations in the admin
 
 Administrators write specs in the **Manage** tab. Set an Anthropic API key
