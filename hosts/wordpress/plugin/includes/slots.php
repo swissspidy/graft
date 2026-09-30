@@ -81,8 +81,19 @@ function mount_dashboard_widgets(): void {
 }
 
 /**
- * Slot posts.list.row-actions: a row action on the Posts screen, given the
- * row's post.
+ * The post type a spec's slot is for (the slot's post_type option).
+ *
+ * @param array<string, mixed> $entry Servable spec.
+ * @return string
+ */
+function mount_post_type( array $entry ): string {
+	return (string) ( $entry['build']['mount']['post_type'] ?? 'post' );
+}
+
+/**
+ * Slot posts.list.row-actions: a row action on the list screen of the
+ * spec's post type, given the row's post. Hooked to post_row_actions and,
+ * for hierarchical types such as pages, page_row_actions.
  *
  * @param array<string, string> $actions Row actions.
  * @param WP_Post               $post    Row post.
@@ -90,11 +101,13 @@ function mount_dashboard_widgets(): void {
  */
 function mount_row_actions( array $actions, WP_Post $post ): array {
 	$screen = function_exists( 'get_current_screen' ) ? get_current_screen() : null;
-	if ( ! $screen || 'edit-post' !== $screen->id ) {
+	if ( ! $screen || 'edit-' . $post->post_type !== $screen->id ) {
 		return $actions;
 	}
-	foreach ( array_keys( specs_in_slot( 'posts.list.row-actions' ) ) as $spec_id ) {
-		$actions[ 'graft-' . $spec_id ] = mount_point( $spec_id, post_slot_props( $post ), 'span' );
+	foreach ( specs_in_slot( 'posts.list.row-actions' ) as $spec_id => $entry ) {
+		if ( mount_post_type( $entry ) === $post->post_type ) {
+			$actions[ 'graft-' . $spec_id ] = mount_point( $spec_id, post_slot_props( $post ), 'span' );
+		}
 	}
 	return $actions;
 }
@@ -113,6 +126,8 @@ function post_slot_props( WP_Post $post ): array {
 			'title'  => get_the_title( $post ),
 			'status' => $post->post_status,
 			'type'   => $post->post_type,
+			'meta'   => (object) post_meta_values( $post ),
+			'terms'  => (object) post_term_values( $post ),
 			'can'    => array(
 				'edit'    => current_user_can( 'edit_post', $post->ID ),
 				'publish' => current_user_can( 'publish_post', $post->ID ),
@@ -137,6 +152,8 @@ function editor_slot_props( WP_Post $post ): array {
 			'excerpt' => $post->post_excerpt,
 			'status'  => $post->post_status,
 			'type'    => $post->post_type,
+			'meta'    => (object) post_meta_values( $post ),
+			'terms'   => (object) post_term_values( $post ),
 			'can'     => array(
 				'edit'    => current_user_can( 'edit_post', $post->ID ),
 				'publish' => current_user_can( 'publish_post', $post->ID ),
@@ -153,7 +170,7 @@ function editor_slot_props( WP_Post $post ): array {
 function mount_editor_panels(): void {
 	$screen = function_exists( 'get_current_screen' ) ? get_current_screen() : null;
 	$post   = get_post();
-	if ( ! $screen || 'post' !== $screen->base || ! $screen->is_block_editor() || ! $post || 'post' !== $post->post_type ) {
+	if ( ! $screen || 'post' !== $screen->base || ! $screen->is_block_editor() || ! $post || ! is_exposed_post_type( $post->post_type ) ) {
 		return;
 	}
 	// A new post is not saved yet: an action would change another post than the one reloaded.
@@ -162,6 +179,9 @@ function mount_editor_panels(): void {
 	}
 	$panels = array();
 	foreach ( specs_in_slot( 'post.editor.panel' ) as $spec_id => $entry ) {
+		if ( mount_post_type( $entry ) !== $post->post_type ) {
+			continue;
+		}
 		rendered_specs( $spec_id );
 		$panels[] = array(
 			'spec'  => $spec_id,

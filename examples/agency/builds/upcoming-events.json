@@ -1,0 +1,367 @@
+{
+	"graft": 1,
+	"spec": {
+		"id": "upcoming-events",
+		"hash": "sha256:c8323508e979adb469d1ce701c1204c55995305f6222118f2cbacd7fe9375135"
+	},
+	"surface": {
+		"host": "wordpress",
+		"hostVersion": "7.1.2",
+		"hash": "sha256:4969d2f2dc3f2f71626a2322262864f32c0880eea5915f19c3c3fab73b18a8d9"
+	},
+	"mount": {
+		"slot": "dashboard.widget",
+		"title": "Upcoming events"
+	},
+	"data": {
+		"events": {
+			"call": "posts.list",
+			"input": {
+				"post_type": "event",
+				"status": [
+					"publish",
+					"future"
+				],
+				"per_page": 20,
+				"orderby": "meta.event_date",
+				"order": "asc"
+			}
+		}
+	},
+	"tree": {
+		"type": "table",
+		"props": {
+			"rows": {
+				"$data": "events.items"
+			},
+			"fields": [
+				{
+					"id": "title",
+					"label": "Event",
+					"primary": true
+				},
+				{
+					"id": "meta.event_date",
+					"label": "Date",
+					"type": "date"
+				},
+				{
+					"id": "meta.venue",
+					"label": "Venue",
+					"value": {
+						"$if": [
+							{
+								"$eq": [
+									{
+										"$field": "meta.venue"
+									},
+									null
+								]
+							},
+							"Venue missing",
+							{
+								"$field": "meta.venue"
+							}
+						]
+					},
+					"tone": {
+						"$if": [
+							{
+								"$eq": [
+									{
+										"$field": "meta.venue"
+									},
+									null
+								]
+							},
+							"error",
+							null
+						]
+					}
+				},
+				{
+					"id": "meta.capacity",
+					"label": "Seats",
+					"type": "integer"
+				}
+			],
+			"actions": [
+				{
+					"id": "sold-out",
+					"label": "Mark sold out",
+					"visible": {
+						"$and": [
+							{
+								"$can": "posts.meta:write",
+								"on": {
+									"$field": "id"
+								}
+							},
+							{
+								"$not": {
+									"$eq": [
+										{
+											"$field": "meta.sold_out"
+										},
+										true
+									]
+								}
+							}
+						]
+					},
+					"onClick": {
+						"$call": "posts.update_meta",
+						"input": {
+							"id": {
+								"$field": "id"
+							},
+							"meta": {
+								"sold_out": true
+							}
+						},
+						"then": [
+							"refresh:events"
+						],
+						"notice": "Marked sold out."
+					}
+				}
+			],
+			"empty": "No upcoming events"
+		}
+	},
+	"checks": [
+		{
+			"criterion": "events-soonest-first",
+			"fixtures": {
+				"users": [
+					{
+						"as": "e",
+						"role": "editor"
+					}
+				],
+				"posts": [
+					{
+						"title": "Jazz night",
+						"type": "event",
+						"status": "publish",
+						"meta": {
+							"event_date": "2026-11-20",
+							"venue": "Main hall"
+						}
+					},
+					{
+						"title": "Poetry slam",
+						"type": "event",
+						"status": "publish",
+						"meta": {
+							"event_date": "2026-10-05",
+							"venue": "Studio"
+						}
+					},
+					{
+						"title": "Season announcement",
+						"status": "publish"
+					},
+					{
+						"title": "About us",
+						"type": "page",
+						"status": "publish"
+					}
+				]
+			},
+			"view_as": "e",
+			"expect": [
+				{
+					"rows": [
+						"Poetry slam",
+						"Jazz night"
+					]
+				}
+			]
+		},
+		{
+			"criterion": "details",
+			"fixtures": {
+				"users": [
+					{
+						"as": "e",
+						"role": "editor"
+					}
+				],
+				"posts": [
+					{
+						"title": "Jazz night",
+						"type": "event",
+						"status": "publish",
+						"meta": {
+							"event_date": "2026-11-20",
+							"venue": "Main hall",
+							"capacity": 240
+						}
+					}
+				]
+			},
+			"view_as": "e",
+			"expect": [
+				{
+					"columns": [
+						"Event",
+						"Date",
+						"Venue",
+						"Seats"
+					]
+				},
+				{
+					"cell": {
+						"row": {
+							"title": "Jazz night"
+						},
+						"column": "Venue",
+						"text": "Main hall"
+					}
+				},
+				{
+					"cell": {
+						"row": {
+							"title": "Jazz night"
+						},
+						"column": "Seats",
+						"text": "240"
+					}
+				}
+			]
+		},
+		{
+			"criterion": "missing-venue",
+			"fixtures": {
+				"users": [
+					{
+						"as": "e",
+						"role": "editor"
+					}
+				],
+				"posts": [
+					{
+						"title": "Open rehearsal",
+						"type": "event",
+						"status": "publish",
+						"meta": {
+							"event_date": "2026-10-12"
+						}
+					},
+					{
+						"title": "Jazz night",
+						"type": "event",
+						"status": "publish",
+						"meta": {
+							"event_date": "2026-11-20",
+							"venue": "Main hall"
+						}
+					}
+				]
+			},
+			"view_as": "e",
+			"expect": [
+				{
+					"cell": {
+						"row": {
+							"title": "Open rehearsal"
+						},
+						"column": "Venue",
+						"text": "Venue missing",
+						"tone": "error"
+					}
+				}
+			]
+		},
+		{
+			"criterion": "sold-out",
+			"fixtures": {
+				"users": [
+					{
+						"as": "e",
+						"role": "editor"
+					}
+				],
+				"posts": [
+					{
+						"title": "Jazz night",
+						"type": "event",
+						"status": "publish",
+						"meta": {
+							"event_date": "2026-11-20",
+							"venue": "Main hall",
+							"capacity": 240
+						}
+					},
+					{
+						"title": "Poetry slam",
+						"type": "event",
+						"status": "publish",
+						"meta": {
+							"event_date": "2026-10-05",
+							"venue": "Studio",
+							"capacity": 60
+						}
+					}
+				]
+			},
+			"view_as": "e",
+			"steps": [
+				{
+					"action": "sold-out",
+					"row": {
+						"title": "Jazz night"
+					}
+				}
+			],
+			"expect": [
+				{
+					"post": {
+						"title": "Jazz night",
+						"meta": {
+							"sold_out": true
+						}
+					}
+				},
+				{
+					"action": "sold-out",
+					"row": {
+						"title": "Jazz night"
+					},
+					"available": false
+				},
+				{
+					"action": "sold-out",
+					"row": {
+						"title": "Poetry slam"
+					},
+					"available": true
+				}
+			]
+		}
+	],
+	"refs": {
+		"slot": "dashboard.widget",
+		"components": {
+			"table": [
+				"actions",
+				"empty",
+				"fields",
+				"rows"
+			]
+		},
+		"capabilities": [
+			"posts.list",
+			"posts.update_meta"
+		],
+		"scopes": [
+			"posts.meta:write",
+			"posts:read"
+		]
+	},
+	"provenance": {
+		"compiler": "handwritten",
+		"strategy": "handwritten"
+	}
+}

@@ -1,6 +1,7 @@
 import apiFetch from '@wordpress/api-fetch';
 import sandboxIndex from '../../../playground/sandbox/index.php';
 import sandboxCanary from '../../../playground/sandbox/canary.php';
+import sandboxModel from '../../../playground/sandbox/model.php';
 import { protocolSandbox, type ProtocolSandbox } from '../sandbox-protocol.ts';
 
 /**
@@ -63,7 +64,8 @@ async function start(wp: string): Promise<ProtocolSandbox> {
 				{ step: 'mkdir', path: '/wordpress/graft-sandbox' },
 				{ step: 'writeFile', path: '/wordpress/graft-sandbox/index.php', data: sandboxIndex },
 				{ step: 'writeFile', path: '/wordpress/graft-sandbox/canary.php', data: sandboxCanary },
-				{ step: 'writeFile', path: '/wordpress/wp-content/mu-plugins/graft-canary.php', data: "<?php require '/wordpress/graft-sandbox/canary.php';" },
+				{ step: 'writeFile', path: '/wordpress/graft-sandbox/model.php', data: sandboxModel },
+				{ step: 'writeFile', path: '/wordpress/wp-content/mu-plugins/graft-canary.php', data: "<?php require '/wordpress/graft-sandbox/canary.php'; require '/wordpress/graft-sandbox/model.php';" },
 			],
 		},
 	});

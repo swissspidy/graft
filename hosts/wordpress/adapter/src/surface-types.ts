@@ -9,5 +9,24 @@ export interface HostDump {
 	capabilities: Record<string, Surface['capabilities'][string]> | [];
 	scopes: Record<string, Surface['scopes'][string]> | [];
 	audiences: string[];
+	/** The exposed content model (see includes/content-model.php). */
+	model?: WordPressModel;
 	fingerprint: string;
+}
+
+/** The content model a WordPress surface was generated from. */
+export interface WordPressModel {
+	postTypes: Record<
+		string,
+		{
+			label: string;
+			hierarchical: boolean;
+			capabilityType: string;
+			editor: boolean;
+			/** Meta key to JSON Schema. */
+			fields: Record<string, Record<string, unknown>> | [];
+			taxonomies: string[];
+		}
+	>;
+	taxonomies: Record<string, { label: string; hierarchical: boolean }> | [];
 }
