@@ -13,7 +13,7 @@
   },
   "dependencies": {
     "@astrojs/node": "^11.1.5",
-    "@astrojs/react": "^6.0.5",
+    "@astrojs/react": "^7.0.0",
     "@emdash-cms/sandbox-workerd": "0.9.1",
     "@graft/emdash": "workspace:*",
     "astro": "^7.3.2",
