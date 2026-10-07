@@ -30,8 +30,10 @@ excerpt there, watch the checklist follow as you type, save, and publish.
 The demo is rebuilt from `main` on every push
 (`pnpm demo:build`, `pnpm test:demo`).
 
-The example customizations in the demo are hand-written builds; see
-[Compile](#how-it-works) for how Claude writes them from a spec.
+The example customizations in the demo are hand-written builds, so the
+tests run without a model. [Compiling with Claude](docs/compiling-with-claude.md)
+shows a real run: Claude compiles all seven example specs into builds that
+pass their checks, and regenerates five customizations after a host change.
 
 ## A customization
 
