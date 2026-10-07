@@ -360,7 +360,9 @@ test('the publish checklist sits in the block editor: it follows typing, saves, 
 	const panel = page.locator('.graft-editor-panel');
 	const toggle = page.getByRole('button', { name: 'Publish checklist' });
 	await toggle.waitFor({ timeout: 60_000 });
-	if ((await toggle.getAttribute('aria-expanded')) === 'false') {
+	// Not toggle.getAttribute('aria-expanded'): it does not run the handler, and the guide can
+	// open after the toggle shows, hiding it from getByRole, so it waits out its timeout.
+	if (!(await panel.isVisible())) {
 		await toggle.click();
 	}
 
