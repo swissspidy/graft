@@ -2,7 +2,6 @@ import { execFile } from 'node:child_process';
 import { existsSync, readFileSync } from 'node:fs';
 import { promisify } from 'node:util';
 import { expect, test, type Page } from '@playwright/test';
-import { openPublishChecklist } from '../adapter/src/editor-panel.ts';
 
 /**
  * Milestone 3: the plugin serves hand-written builds of the example specs
@@ -355,10 +354,16 @@ test('the publish checklist sits in the block editor: it follows typing, saves, 
 	await login(page, 'editor');
 	// The editor greets first-time users with a guide.
 	const guide = page.getByRole('dialog', { name: /welcome/i });
-	await page.addLocatorHandler(guide, () => guide.getByRole('button', { name: /close/i }).click());
+	// Escape, not a click: the guide has two buttons named Close (the corner X and its own).
+	await page.addLocatorHandler(guide, () => page.keyboard.press('Escape'));
 	await page.goto('/wp-admin/edit.php');
 	await page.locator('#the-list').getByRole('link', { name: 'Draft B', exact: true }).first().click();
-	const panel = await openPublishChecklist(page);
+	const panel = page.locator('.graft-editor-panel');
+	const toggle = page.getByRole('button', { name: 'Publish checklist' });
+	await toggle.waitFor({ timeout: 60_000 });
+	if ((await toggle.getAttribute('aria-expanded')) === 'false') {
+		await toggle.click();
+	}
 
 	// Drawn by the build's code in the sandbox, from the post as saved.
 	await expect(panel.getByLabel('Headline')).toHaveValue('Draft B', { timeout: 30_000 });
