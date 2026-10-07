@@ -90,16 +90,17 @@ try {
 	await page.screenshot({ path: 'test-results/demo-review-queue.png' });
 	await check('the publish checklist shows in the block editor', async () => {
 		const guide = page.getByRole('dialog', { name: /welcome/i });
-		// Escape, not a click: the guide has two buttons named Close (the corner X and its own).
-		await page.addLocatorHandler(guide, () => page.keyboard.press('Escape'));
+		await page.addLocatorHandler(guide, () => guide.getByRole('button', { name: /close/i }).click());
 		await page.goto(`http://127.0.0.1:${site}/wp-admin/edit.php`);
 		await page.locator('#the-list').getByRole('link', { name: 'Year in review (outline)', exact: true }).first().click();
 		const toggle = page.getByRole('button', { name: 'Publish checklist' });
 		await toggle.waitFor({ timeout: 60_000 });
-		if ((await toggle.getAttribute('aria-expanded')) === 'false') {
+		const panel = page.locator('.graft-editor-panel');
+		// Not toggle.getAttribute('aria-expanded'): it does not run the handler, and the guide can
+		// open after the toggle shows, hiding it from getByRole, so it waits out its timeout.
+		if (!(await panel.isVisible())) {
 			await toggle.click();
 		}
-		const panel = page.locator('.graft-editor-panel');
 		await panel.getByText('✗ Excerpt of at least 50 characters (0 now)').waitFor({ timeout: 30_000 });
 		await panel.getByLabel('Excerpt').fill('Twelve months of council votes, storms and a new school, in one look back.');
 		await panel.getByText('✓ Excerpt of at least 50 characters').waitFor();

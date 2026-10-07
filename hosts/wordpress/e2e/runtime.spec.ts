@@ -354,14 +354,15 @@ test('the publish checklist sits in the block editor: it follows typing, saves, 
 	await login(page, 'editor');
 	// The editor greets first-time users with a guide.
 	const guide = page.getByRole('dialog', { name: /welcome/i });
-	// Escape, not a click: the guide has two buttons named Close (the corner X and its own).
-	await page.addLocatorHandler(guide, () => page.keyboard.press('Escape'));
+	await page.addLocatorHandler(guide, () => guide.getByRole('button', { name: /close/i }).click());
 	await page.goto('/wp-admin/edit.php');
 	await page.locator('#the-list').getByRole('link', { name: 'Draft B', exact: true }).first().click();
 	const panel = page.locator('.graft-editor-panel');
 	const toggle = page.getByRole('button', { name: 'Publish checklist' });
 	await toggle.waitFor({ timeout: 60_000 });
-	if ((await toggle.getAttribute('aria-expanded')) === 'false') {
+	// Not toggle.getAttribute('aria-expanded'): it does not run the handler, and the guide can
+	// open after the toggle shows, hiding it from getByRole, so it waits out its timeout.
+	if (!(await panel.isVisible())) {
 		await toggle.click();
 	}
 
