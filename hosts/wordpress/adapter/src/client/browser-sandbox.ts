@@ -31,6 +31,28 @@ function base64ToBytes(base64: string): Uint8Array {
 	return bytes;
 }
 
+/**
+ * Imports Playground's client, retrying when playground.wordpress.net does
+ * not answer: a CDN hiccup otherwise fails the whole check. Retries add a
+ * query so the browser fetches the module again instead of reusing the
+ * failed import.
+ */
+async function loadPlaygroundClient(): Promise<PlaygroundModule> {
+	const delays = [1_000, 3_000, 9_000];
+	for (let attempt = 0; ; attempt++) {
+		try {
+			const url = `${PLAYGROUND}/client/index.js${attempt ? `?retry=${attempt}` : ''}`;
+			return (await import(/* @vite-ignore */ url)) as PlaygroundModule;
+		} catch (error) {
+			const delay = delays[attempt];
+			if (delay === undefined) {
+				throw error;
+			}
+			await new Promise((resolve) => setTimeout(resolve, delay));
+		}
+	}
+}
+
 let starting: Promise<ProtocolSandbox> | undefined;
 
 /** Starts (once per page) and returns the browser sandbox. */
@@ -52,7 +74,7 @@ async function start(wp: string): Promise<ProtocolSandbox> {
 	iframe.setAttribute('aria-hidden', 'true');
 	document.body.append(iframe);
 
-	const { startPlaygroundWeb } = (await import(/* @vite-ignore */ `${PLAYGROUND}/client/index.js`)) as PlaygroundModule;
+	const { startPlaygroundWeb } = await loadPlaygroundClient();
 	const client = await startPlaygroundWeb({
 		iframe,
 		remoteUrl: `${PLAYGROUND}/remote.html`,

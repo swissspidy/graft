@@ -8,6 +8,12 @@ updates:
     cooldown:
       default-days: 7
     groups:
+      # react and react-dom must be the exact same version (EmDash refuses to
+      # start otherwise, and react-dom crashes on a different react), so they
+      # and their types always move together, majors included. Listed first:
+      # a dependency joins the first group it matches.
+      react:
+        patterns: [react, react-dom, '@types/react', '@types/react-dom']
       # Minor and patch updates in one PR; majors stay separate.
       npm-minor-and-patch:
         update-types: [minor, patch]
