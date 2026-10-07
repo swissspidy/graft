@@ -12,28 +12,6 @@ when the host changes, **migrates, re-anchors or regenerates** the build and
 verifies it again. The spec is the contract, the criteria are the guarantee,
 and the platform can change underneath.
 
-The design is in [ADR 0001](docs/adr/0001-architecture.md), with later
-decisions (authoring in wp-admin, operating live sites, hardening) in
-[ADR 0002](docs/adr/0002-authoring-and-operations.md). There are two hosts:
-WordPress 7.1+ (wp-admin), and [EmDash](hosts/emdash/README.md)
-([ADR 0003](docs/adr/0003-emdash-host.md)), in-process or in EmDash's plugin
-sandbox, with customizations written in either admin
-([ADR 0004](docs/adr/0004-emdash-sandbox-and-authoring.md)). Where the
-declarative language runs out, a build may carry pure functions that run
-in QuickJS compiled to WebAssembly, with no access to the page
-([ADR 0005](docs/adr/0005-sandboxed-functions.md); on EmDash, on the
-server, and as asm.js in its plugin sandbox).
-The same functions can draw interactive widgets that keep state as the
-viewer clicks, still with the host's own components
-([ADR 0006](docs/adr/0006-interactive-widgets.md)). On WordPress, widgets
-also take input (text fields, checkboxes, dropdowns), and can sit in the
-block editor next to the post being edited
-([ADR 0007](docs/adr/0007-editorial-tools.md)). Sites an agency builds can
-expose their own post types, custom fields and taxonomies to
-customizations. The agency can also limit what the client's administrators
-may allow, and ship customizations it manages itself
-([ADR 0008](docs/adr/0008-agency-sites.md)).
-
 ## Try it
 
 [![Try in WordPress Playground](https://img.shields.io/badge/Try%20in%20WordPress%20Playground-3F57E1?style=for-the-badge&logo=WordPress&logoColor=ffffff)](https://playground.wordpress.net/?blueprint-url=https://swissspidy.github.io/graft/blueprint.json)
@@ -52,8 +30,8 @@ excerpt there, watch the checklist follow as you type, save, and publish.
 The demo is rebuilt from `main` on every push
 (`pnpm demo:build`, `pnpm test:demo`).
 
-Status: a working prototype. All six MVP milestones of the ADR are built, and
-each is tested against real WordPress in [Playground](https://wordpress.org/playground/).
+The example customizations in the demo are hand-written builds; see
+[Compile](#how-it-works) for how Claude writes them from a spec.
 
 ## A customization
 
@@ -152,7 +130,7 @@ unverified draft, and
 `graft site verify --site <url> --user <admin> --password <application password>`
 verifies it from a terminal instead.
 
-## Try it
+## Run it locally
 
 Requires Node 24+ (the current LTS) and pnpm. Playground is fetched on demand (network access
 needed the first time).
@@ -229,6 +207,33 @@ pnpm graft site verify --site <url> --token <token>
 CI runs all of them, plus a weekly canary against WordPress nightly. As of
 7.2-alpha the surface is unchanged (same hash as 7.1) and every
 customization re-passes its checks there.
+
+## Design and status
+
+Graft is a working prototype. All six MVP milestones of
+[ADR 0001](docs/adr/0001-architecture.md) are built, and each is tested
+against real WordPress in [Playground](https://wordpress.org/playground/).
+Later decisions each have their own record:
+
+| ADR | What |
+| --- | --- |
+| [0001](docs/adr/0001-architecture.md) | Specs, surfaces, builds, verification, compilation and the upgrade ladder |
+| [0002](docs/adr/0002-authoring-and-operations.md) | Authoring in wp-admin, operating live sites, hardening |
+| [0003](docs/adr/0003-emdash-host.md) | [EmDash](hosts/emdash/README.md) as a second host |
+| [0004](docs/adr/0004-emdash-sandbox-and-authoring.md) | Graft in EmDash's plugin sandbox, and authoring in the EmDash admin |
+| [0005](docs/adr/0005-sandboxed-functions.md) | Pure functions in QuickJS/WebAssembly where the declarative language runs out |
+| [0006](docs/adr/0006-interactive-widgets.md) | Interactive widgets that keep state, drawn with the host's components |
+| [0007](docs/adr/0007-editorial-tools.md) | Widgets that take input, and a panel in the block editor |
+| [0008](docs/adr/0008-agency-sites.md) | Sites an agency builds: their own content model, policy and managed customizations |
+
+Known limits:
+
+- WordPress 7.1 or later.
+- A site verifies its own builds. Signed verification records from a
+  verifier outside the site are
+  [future work](docs/adr/0002-authoring-and-operations.md#future-work).
+- Each tenant gets its own copy of a spec. Specs that extend a shared
+  template and follow its upgrades are not built yet.
 
 ## Layout
 
