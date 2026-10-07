@@ -4,6 +4,7 @@ import { mkdtemp, readFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { extname, join } from 'node:path';
 import { chromium } from '@playwright/test';
+import { openPublishChecklist } from './editor-panel.ts';
 import { DEFAULT_PHP, PLAYGROUND_CLI } from './playground.ts';
 
 /**
@@ -93,12 +94,7 @@ try {
 		await page.addLocatorHandler(guide, () => guide.getByRole('button', { name: /close/i }).click());
 		await page.goto(`http://127.0.0.1:${site}/wp-admin/edit.php`);
 		await page.locator('#the-list').getByRole('link', { name: 'Year in review (outline)', exact: true }).first().click();
-		const toggle = page.getByRole('button', { name: 'Publish checklist' });
-		await toggle.waitFor({ timeout: 60_000 });
-		if ((await toggle.getAttribute('aria-expanded')) === 'false') {
-			await toggle.click();
-		}
-		const panel = page.locator('.graft-editor-panel');
+		const panel = await openPublishChecklist(page);
 		await panel.getByText('✗ Excerpt of at least 50 characters (0 now)').waitFor({ timeout: 30_000 });
 		await panel.getByLabel('Excerpt').fill('Twelve months of council votes, storms and a new school, in one look back.');
 		await panel.getByText('✓ Excerpt of at least 50 characters').waitFor();
