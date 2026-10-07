@@ -153,6 +153,15 @@ function checkProblems(checks: Check[], criteria: string[]): string[] {
 	checks.forEach((check, i) => {
 		if (!validateCheck(check)) {
 			problems.push(`Check ${i + 1} (${check.criterion}) is malformed: ${(validateCheck.errors ?? []).map((e) => describeSchemaError(e, '', 'the check')).join(' ')}.`);
+			return;
+		}
+		// Caught here, a viewer missing from the fixtures costs a checks attempt instead of every tree attempt.
+		const users = (check.fixtures as { users?: unknown } | undefined)?.users;
+		if (check.view_as !== undefined && Array.isArray(users)) {
+			const aliases = users.map((user) => (user as { as?: unknown } | null)?.as);
+			if (!aliases.includes(check.view_as)) {
+				problems.push(`Check ${i + 1} (${check.criterion}) views as "${check.view_as}", who is not in its fixtures' users; add that user or view as one of them.`);
+			}
 		}
 	});
 	for (const id of criteria) {

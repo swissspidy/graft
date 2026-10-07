@@ -114,10 +114,24 @@ export function snapshotTree(tree: TreeNode, ctx: EvalContext, semantics: Compon
 			snapshot.tables.push(table);
 			for (const row of table.rows) {
 				emit.text(row.label);
+				for (const cell of Object.values(row.cells ?? {})) {
+					if (cell.text !== row.label) {
+						emit.text(cell.text);
+					}
+				}
+				for (const action of row.actions) {
+					if (action.available) {
+						emit.text(action.label);
+					}
+				}
 			}
 		},
 		action: (action) => {
 			snapshot.actions.push(action);
+			// An action the viewer can use shows its label (a button, a row action).
+			if (action.available) {
+				emit.text(action.label);
+			}
 		},
 	};
 
