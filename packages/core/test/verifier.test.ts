@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { extractRefs, validateSpec, verifyBuild, type Build } from '../src/index.ts';
+import { extractRefs, FixtureError, validateSpec, verifyBuild, type Build } from '../src/index.ts';
 import { createCan, fakeSandbox, fixtures, pageBuild, semantics, spec, specSource, surface } from './fixtures/acme.ts';
 
 describe('verifyBuild', () => {
@@ -39,6 +39,30 @@ describe('verifyBuild', () => {
 			['Step 1: no available "close" action for title "Nope".'],
 		]);
 		expect(result.unchecked).toEqual(['open-only', 'empty']);
+	});
+
+	it('fails a check whose fixtures the host cannot create, and runs the others', async () => {
+		const build = await pageBuild();
+		const sandbox = fakeSandbox();
+		const seed = sandbox.seed.bind(sandbox);
+		let seeded = 0;
+		sandbox.seed = async (f) => {
+			if (seeded++ === 0) {
+				throw new FixtureError('Unknown collection "pages".');
+			}
+			return seed(f);
+		};
+		const result = await verifyBuild({ build, spec, surface, sandbox, semantics, createCan });
+		expect(result.results[0]!.failures).toEqual(['The check\'s fixtures cannot be created: Unknown collection "pages".']);
+		expect(result.results.slice(1).every((r) => r.passed)).toBe(true);
+	});
+
+	it('lets other sandbox errors through', async () => {
+		const sandbox = fakeSandbox();
+		sandbox.seed = async () => {
+			throw new Error('sandbox: 500');
+		};
+		await expect(verifyBuild({ build: await pageBuild(), spec, surface, sandbox, semantics, createCan })).rejects.toThrow('sandbox: 500');
 	});
 
 	it('renders nothing for users outside the audience', async () => {

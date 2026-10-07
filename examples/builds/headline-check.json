@@ -2,7 +2,7 @@
 	"graft": 1,
 	"spec": {
 		"id": "headline-check",
-		"hash": "sha256:397b2fd73445a45a0425415fe53173a98c9fd458b8dcbc7bf30b33186f498673"
+		"hash": "sha256:604b8d6f30db7168ae1bb1f45ff46e89a60850c8ed1e7e747865cc83d840e1d5"
 	},
 	"surface": {
 		"host": "wordpress",

@@ -7,7 +7,7 @@ import type { Build, BuildCode, Check } from '../build/types.ts';
 import type { Spec } from '../spec/types.ts';
 import { canonicalJson } from '../surface/hash.ts';
 import type { Surface } from '../surface/types.ts';
-import { SandboxCallError, type Sandbox } from './sandbox.ts';
+import { FixtureError, SandboxCallError, type Sandbox } from './sandbox.ts';
 import { allActions, snapshotTree, type ComponentSemantics, type Snapshot, type SnapshotAction, type SnapshotInput } from './snapshot.ts';
 
 export interface VerifyOptions {
@@ -112,7 +112,16 @@ async function runCheck(options: VerifyOptions, check: Check, index: number, fun
 	const result = (): CheckResult => ({ criterion: check.criterion, check: index, passed: failures.length === 0, failures });
 
 	await sandbox.reset();
-	const { users } = await sandbox.seed(check.fixtures ?? {});
+	let users: Record<string, string[]>;
+	try {
+		({ users } = await sandbox.seed(check.fixtures ?? {}));
+	} catch (error) {
+		if (!(error instanceof FixtureError)) {
+			throw error;
+		}
+		failures.push(`The check's fixtures cannot be created: ${error.message}`);
+		return result();
+	}
 	const viewer = check.view_as ?? Object.keys(users)[0];
 	if (!viewer || !users[viewer]) {
 		failures.push(`The check views as "${viewer ?? '(nobody)'}", who is not in its fixtures.`);

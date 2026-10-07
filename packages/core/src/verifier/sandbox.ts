@@ -14,7 +14,10 @@ export interface Sandbox {
 	prepare?(surface: Surface): Promise<void>;
 	/** Removes everything a previous check created. */
 	reset(): Promise<void>;
-	/** Seeds fixtures (host-specific shape); returns the roles of each user alias. */
+	/**
+	 * Seeds fixtures (host-specific shape); returns the roles of each user
+	 * alias. Rejects with a FixtureError when the host cannot create them.
+	 */
 	seed(fixtures: Record<string, unknown>): Promise<{ users: Record<string, string[]> }>;
 	/** Which of the scopes the user can use with the host's own permissions. */
 	scopes(user: string, scopes: string[]): Promise<Record<string, boolean>>;
@@ -41,5 +44,17 @@ export class SandboxCallError extends Error {
 	) {
 		super(message);
 		this.name = 'SandboxCallError';
+	}
+}
+
+/**
+ * A check's fixtures that the host cannot create (an unknown role or
+ * collection, say). The check fails with the reason, so the compiler can
+ * send it back to the model, instead of aborting verification.
+ */
+export class FixtureError extends Error {
+	constructor(message: string) {
+		super(message);
+		this.name = 'FixtureError';
 	}
 }

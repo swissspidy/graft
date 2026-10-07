@@ -1,4 +1,4 @@
-import { SandboxCallError, verifyBuild, type Build, type Sandbox, type Spec, type Surface, type Verification } from '@graft/core';
+import { FixtureError, SandboxCallError, verifyBuild, type Build, type Sandbox, type Spec, type Surface, type Verification } from '@graft/core';
 import { loadFunctions } from '@graft/sandbox';
 import { createCan } from '../host/can.ts';
 import type { HostPatch } from '../host/patch.ts';
@@ -28,7 +28,11 @@ export async function startSandbox(options: Omit<StartOptions, 'sandbox'> = {}):
 			await op({ op: 'reset' });
 		},
 		async seed(fixtures) {
-			return op<{ users: Record<string, string[]> }>({ op: 'seed', fixtures });
+			const data = await op<{ users?: Record<string, string[]>; error?: string }>({ op: 'seed', fixtures });
+			if (data.error !== undefined || !data.users) {
+				throw new FixtureError(data.error ?? 'The sandbox did not seed the fixtures.');
+			}
+			return { users: data.users };
 		},
 		async scopes(user, scopes) {
 			return (await op<{ scopes: Record<string, boolean> }>({ op: 'scopes', as: user, scopes })).scopes;
