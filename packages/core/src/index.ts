@@ -41,7 +41,7 @@ export {
 	type WidgetProps,
 	type WidgetUse,
 } from './build/widgets.ts';
-export { SandboxCallError, type Sandbox } from './verifier/sandbox.ts';
+export { FixtureError, SandboxCallError, type Sandbox } from './verifier/sandbox.ts';
 export {
 	allActions,
 	snapshotTree,

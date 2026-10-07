@@ -22,7 +22,7 @@ headline of each post waiting for review, before they open it.
 - Headlines in capitals are "All caps" {#all-caps}
 - Headlines of fewer than three words are "Too short" {#too-short}
 - Every problem is listed, marked as a warning {#warning}
-- Other headlines "Look good", marked as fine {#good}
+- Other headlines "Looks good", marked as fine {#good}
 
 ## Out of scope
 

@@ -83,7 +83,7 @@ export async function handleSandbox(input: unknown, ctx: PluginContext, surface:
 			for (const user of fixtures.users ?? []) {
 				const level = roles[user.role as RoleName];
 				if (level === undefined) {
-					throw new Error(`Unknown role "${user.role}". Roles: ${Object.keys(roles).join(', ')}.`);
+					return { error: `Unknown role "${user.role}". Roles: ${Object.keys(roles).join(', ')}.` };
 				}
 				users[user.as] = { id: `sandbox-${user.as}`, role: level };
 				out[user.as] = [user.role];
@@ -93,8 +93,15 @@ export async function handleSandbox(input: unknown, ctx: PluginContext, surface:
 			// Oldest first, as listed; distinct update times keep ordering stable.
 			for (const entry of fixtures.entries ?? []) {
 				const collection = entry.collection ?? 'posts';
+				let item;
+				try {
+					item = await content.create(collection, { title: entry.title });
+				} catch (error) {
+					// Usually a collection the site does not have; the test site only has posts.
+					await ctx.kv.set(COLLECTIONS, [...used]);
+					return { error: `Entry "${entry.title}" cannot be created in "${collection}": ${error instanceof Error ? error.message : String(error)}` };
+				}
 				used.add(collection);
-				const item = await content.create(collection, { title: entry.title });
 				const status = entry.status ?? 'published';
 				if (status === 'published' || status === 'scheduled') {
 					const versioned = await content.getVersioned(collection, item.id);
