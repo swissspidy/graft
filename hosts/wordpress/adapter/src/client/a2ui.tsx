@@ -18,6 +18,7 @@ import {
 	type ComponentCatalog,
 	type FunctionRegistry,
 	type JsonValue,
+	type ResolveScope,
 } from 'a2ui-wp';
 import type { UiRootProps } from '@graft/renderer-react';
 import type { Field } from '../cells.ts';
@@ -32,7 +33,7 @@ import { components } from './components.tsx';
  * and an action event becomes the capability call it is bound to.
  */
 
-const surfaceId = 'graft';
+export const surfaceId = 'graft';
 
 /** The viewer's permission check, for tables to refine per row. */
 const CanContext = createContext<UiRootProps['can']>(() => false);
@@ -138,6 +139,23 @@ const withVisible = (catalog: ComponentCatalog): ComponentCatalog =>
 
 const catalog = withVisible(createCatalog({ ...wordPressCatalog, Button, Table }));
 
+const isPlainObject = (value: unknown): value is Record<string, unknown> => typeof value === 'object' && value !== null && !Array.isArray(value);
+
+/**
+ * Resolves a value as the verifier (@a2ui/web_core) does: bindings and calls
+ * anywhere in plain objects and lists, e.g. `{"form": {"title": {"path": "/slot/post/title"}}}`.
+ * a2ui-wp passes a literal object through untouched.
+ */
+function resolveDeep(value: unknown, scope: ResolveScope): unknown {
+	if (Array.isArray(value)) {
+		return value.map((item) => resolveDeep(item, scope));
+	}
+	if (isPlainObject(value) && !('path' in value) && !('call' in value)) {
+		return Object.fromEntries(Object.entries(value).map(([key, inner]) => [key, resolveDeep(inner, scope)]));
+	}
+	return resolveDynamicValue(value, scope);
+}
+
 /** Values of an A2UI `initial` or `computed` section, written into the model in order. */
 function seed(processor: A2UIProcessor, values: Record<string, unknown> | undefined) {
 	const surface = processor.getSurface(surfaceId);
@@ -146,8 +164,40 @@ function seed(processor: A2UIProcessor, values: Record<string, unknown> | undefi
 	}
 	for (const [key, value] of Object.entries(values ?? {})) {
 		// A copy: what the viewer enters must not write into the build's own values.
-		surface.dataModel.set(`/${key}`, structuredClone(resolveDynamicValue(value, processor.createScope(surface, '/')) ?? null) as JsonValue);
+		surface.dataModel.set(`/${key}`, structuredClone(resolveDeep(value, processor.createScope(surface, '/')) ?? null) as JsonValue);
 	}
+}
+
+/**
+ * The A2UI processor for one mounted build: its components, the slot, then
+ * `initial`; `computed` follows every change of the model. `set`, the
+ * catalog's local action, writes the model.
+ */
+export function createProcessor(build: A2UIBuild, slot: Record<string, unknown>, can: UiRootProps['can']): A2UIProcessor {
+	const version = build.ui.protocol.replace(/^a2ui\//, '');
+	const set = (pointer: string, value: unknown) => processor.getSurface(surfaceId)?.dataModel.set(pointer, (value ?? null) as JsonValue);
+	const processor: A2UIProcessor = new A2UIProcessor({ supportedCatalogIds: [build.ui.catalogId], locale: 'en-US', functions: functionsFor(can, set) });
+	processor.processMessages([
+		{ version, createSurface: { surfaceId, catalogId: build.ui.catalogId } },
+		{ version, updateComponents: { surfaceId, components: build.ui.components as never } },
+		{ version, updateDataModel: { surfaceId, path: '/slot', value: slot as JsonValue } },
+	]);
+	seed(processor, build.ui.initial);
+	let computing = false;
+	const recompute = () => {
+		if (computing || !build.ui.computed) {
+			return;
+		}
+		computing = true;
+		try {
+			seed(processor, build.ui.computed);
+		} finally {
+			computing = false;
+		}
+	};
+	processor.getSurface(surfaceId)?.dataModel.subscribe(recompute);
+	recompute();
+	return processor;
 }
 
 /** Draws an A2UI build for GraftRoot (its `ui`). */
@@ -155,33 +205,8 @@ export function A2UIRoot({ build: raw, data, slot, can, invoke }: UiRootProps) {
 	const build = raw as unknown as A2UIBuild;
 	const version = build.ui.protocol.replace(/^a2ui\//, '');
 
-	// One processor per mounted build: its components, the slot, then `initial`; `computed` follows the model.
-	const processor = useMemo(() => {
-		const set = (pointer: string, value: unknown) => processor.getSurface(surfaceId)?.dataModel.set(pointer, (value ?? null) as JsonValue);
-		const processor: A2UIProcessor = new A2UIProcessor({ supportedCatalogIds: [build.ui.catalogId], locale: 'en-US', functions: functionsFor(can, set) });
-		processor.processMessages([
-			{ version, createSurface: { surfaceId, catalogId: build.ui.catalogId } },
-			{ version, updateComponents: { surfaceId, components: build.ui.components as never } },
-			{ version, updateDataModel: { surfaceId, path: '/slot', value: slot as JsonValue } },
-		]);
-		seed(processor, build.ui.initial);
-		let computing = false;
-		const recompute = () => {
-			if (computing || !build.ui.computed) {
-				return;
-			}
-			computing = true;
-			try {
-				seed(processor, build.ui.computed);
-			} finally {
-				computing = false;
-			}
-		};
-		processor.getSurface(surfaceId)?.dataModel.subscribe(recompute);
-		recompute();
-		return processor;
-		// The build, slot and viewer are fixed for the lifetime of a root.
-	}, []);
+	// The build, slot and viewer are fixed for the lifetime of a root.
+	const processor = useMemo(() => createProcessor(build, slot, can), []);
 
 	// Data sources into the model, as they load and change.
 	useEffect(() => {

@@ -9,6 +9,8 @@ export default defineConfig({
 		alias: {
 			'@wordpress/api-fetch': wordpressStub,
 			'@wordpress/components': wordpressStub,
+			// The client bundles a2ui-wp from its copy (see scripts/build-client.ts).
+			'a2ui-wp': fileURLToPath(new URL('packages/a2ui-wp/src/index.ts', import.meta.url)),
 		},
 	},
 	test: {
