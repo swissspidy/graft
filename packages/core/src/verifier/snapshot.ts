@@ -137,12 +137,16 @@ export function snapshotTree(tree: TreeNode, ctx: EvalContext, semantics: Compon
 
 	const problem = (text: string) => (snapshot.problems ??= []).push(text);
 
-	const visit = (node: TreeNode, path: string, out: SnapshotEmitter, at: EvalContext = ctx): void => {
+	/** `inputs`: in a widget, the input types it may draw; each shows its label where it stands. */
+	const visit = (node: TreeNode, path: string, out: SnapshotEmitter, at: EvalContext = ctx, inputs?: Set<string>): void => {
 		const raw = (node.props ?? {}) as Record<string, Value>;
 		const props = evaluate(raw, at) as Record<string, unknown>;
 		if (node.type === WIDGET) {
 			drawWidget(raw, props, path);
 			return;
+		}
+		if (inputs?.has(node.type) && typeof props.label === 'string') {
+			out.text(props.label);
 		}
 		const describe = semantics[node.type];
 		const result = describe?.({
@@ -160,7 +164,7 @@ export function snapshotTree(tree: TreeNode, ctx: EvalContext, semantics: Compon
 				out.text(node.children);
 			}
 		} else {
-			node.children?.forEach((child, i) => visit(child, `${path}/children/${i}`, out, at));
+			node.children?.forEach((child, i) => visit(child, `${path}/children/${i}`, out, at, inputs));
 		}
 	};
 
@@ -191,8 +195,6 @@ export function snapshotTree(tree: TreeNode, ctx: EvalContext, semantics: Compon
 		const values = inputValues(drawnWidget.inputs, widgets.entered?.(path) ?? {});
 		for (const input of Object.values(drawnWidget.inputs)) {
 			(snapshot.inputs ??= []).push({ widget: path, id: input.id, ...(input.label !== undefined ? { label: input.label } : {}), value: values[input.id] });
-			// An input shows its label.
-			emit.text(input.label ?? '');
 		}
 		// Buttons in a widget: events update it; uses of its declared actions resolve, while
 		// drawing, to the action for one of its rows (or null when it is not offered).
@@ -220,7 +222,7 @@ export function snapshotTree(tree: TreeNode, ctx: EvalContext, semantics: Compon
 			}
 			return resolved.available && resolved.action ? resolved.action : null;
 		};
-		visit(sub, `${path}/widget`, inWidget, { ...ctx, use });
+		visit(sub, `${path}/widget`, inWidget, { ...ctx, use }, new Set(widgets.limits.inputs ?? []));
 	};
 
 	visit(tree, '/tree', emit);
