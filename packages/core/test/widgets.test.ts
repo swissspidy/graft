@@ -352,6 +352,12 @@ describe('widget inputs', () => {
 		]);
 	});
 
+	it('show their labels, as text checks see them', async () => {
+		const b = inputBuild([{ criterion: 'count', view_as: 'v', expect: [{ text: 'Title' }, { text: 'Rename' }] }]);
+		const result = await verifyBuild({ build: b, spec, surface: withInputs, sandbox, semantics, createCan: () => () => true, loadFunctions: drawing() });
+		expect(result.results.flatMap((r) => r.failures)).toEqual([]);
+	});
+
 	it('fail a check that types into an input that is not there', async () => {
 		const b = inputBuild([{ criterion: 'count', view_as: 'v', steps: [{ fill: 'nope', value: 'x' }], expect: [{ text: 'x' }] }]);
 		const result = await verifyBuild({ build: b, spec, surface: withInputs, sandbox, semantics, createCan: () => () => true, loadFunctions: drawing() });

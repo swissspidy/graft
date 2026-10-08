@@ -21,7 +21,7 @@ const CHECK_VOCABULARY = `A check proves one acceptance criterion. It seeds its 
   {"rows": ["label", ...]}: the labels (primary field) of the listed rows, in any order; [] for none.
   {"columns": ["Label", ...]}: every column label, in order (the whole list, not just the ones a criterion names; use "cell" to check one column).
   rows and columns read the first table shown, so a tree (or widget) the checks list rows in shows that table first and draws choices such as filters as buttons, not as another table.
-  {"text": "..."}: this text is shown somewhere.
+  {"text": "..."}: this text is shown somewhere: in text, a table cell, an input's label, or the label of a button or action the viewer can use (not of one that is hidden or disabled). It cannot say where: to check a value in a table use "cell" (which row and column), and to check a button use "action".
   {"action": "<action id>", "row": {...}, "available": true|false}: whether the action is available (for that row). Only a table row's actions have a row; a button outside a table has none, so give each such button its own action id (e.g. "author-alice") and leave "row" out.
   {"cell": {"row": {...}, "column": "Label", "text": "...", "tone": "..."}}: what a table cell shows for that row (text: contained; tone: the mark, when the column has one).
   {"input": "<input id>", "value": <value>, "row": {...}}: what a widget's input shows.

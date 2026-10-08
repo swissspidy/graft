@@ -191,6 +191,8 @@ export function snapshotTree(tree: TreeNode, ctx: EvalContext, semantics: Compon
 		const values = inputValues(drawnWidget.inputs, widgets.entered?.(path) ?? {});
 		for (const input of Object.values(drawnWidget.inputs)) {
 			(snapshot.inputs ??= []).push({ widget: path, id: input.id, ...(input.label !== undefined ? { label: input.label } : {}), value: values[input.id] });
+			// An input shows its label.
+			emit.text(input.label ?? '');
 		}
 		// Buttons in a widget: events update it; uses of its declared actions resolve, while
 		// drawing, to the action for one of its rows (or null when it is not offered).
