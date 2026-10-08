@@ -195,6 +195,8 @@ pnpm graft site verify --site <url> --token <token>
 | `pnpm test:compile` | The compile pipeline with a scripted model against WordPress, including a build whose code loops |
 | `pnpm test:canary` | Eight synthetic host changes, each forcing one rung, against a five-tenant corpus (one with code and a widget) |
 | `pnpm test:e2e` | Playwright in wp-admin: serving, gateway and its audit log, build functions and their lazy loading, an interactive widget, the publish checklist in the block editor, approval, authoring, `graft site` |
+| `pnpm test:e2e:a2ui` | Playwright on the e2e site with the example specs built as A2UI surfaces: Dashboard widgets, local state, row actions, the review queue, approval and the block editor panel, with no code |
+| `pnpm test:canary:a2ui` | The same synthetic host changes against the example specs built as A2UI |
 | `pnpm test:e2e:agency` | Playwright on a client site an agency built: custom post types, fields and terms, the agency's policy and managed customization, and upgrading after the agency changes the content model |
 | `pnpm verify:emdash` | The EmDash example builds' checks in a throwaway EmDash |
 | `pnpm test:compile:emdash` | The compile pipeline with a scripted model against EmDash |
@@ -203,6 +205,7 @@ pnpm graft site verify --site <url> --token <token>
 | `pnpm test:emdash:sandboxed` | The same, with Graft in EmDash's plugin sandbox (workerd) |
 | `pnpm test:author:emdash` | Writing a customization in the EmDash admin, with a stubbed Claude API, in both formats |
 | `pnpm test:cfworker` | The unit tests again on the schema engine used where code generation is forbidden |
+| `pnpm test:emdash:a2ui` | The EmDash examples built as A2UI: installed, approved and served as Block Kit, natively and sandboxed |
 | `pnpm test:emdash` | EmDash plugin smoke test: install, approve, serve per role, forged and refused actions, a widget's events and actions |
 | `pnpm test:e2e:emdash` | Playwright in the EmDash admin: the page, the widget and the editor panel |
 
@@ -227,6 +230,7 @@ Later decisions each have their own record:
 | [0006](docs/adr/0006-interactive-widgets.md) | Interactive widgets that keep state, drawn with the host's components |
 | [0007](docs/adr/0007-editorial-tools.md) | Widgets that take input, and a panel in the block editor |
 | [0008](docs/adr/0008-agency-sites.md) | Sites an agency builds: their own content model, policy and managed customizations |
+| [0009](docs/adr/0009-a2ui.md) | A2UI surfaces as a build's UI, next to trees (proposed) |
 
 Known limits:
 
