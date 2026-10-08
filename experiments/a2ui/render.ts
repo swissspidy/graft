@@ -27,27 +27,27 @@ async function login(user: string) {
 }
 
 const table = (p: Page) => p.locator('#graft-a2ui table');
-const rowTitles = (p: Page) => table(p).locator('tbody tr td:first-child strong').allTextContents();
+const rowTitles = (p: Page) => table(p).locator('[data-graft-row] [data-graft-field="title"]').allTextContents();
 
 try {
 	await login('editor');
 	await page.goto(`${site}/wp-admin/edit.php?page=graft-review-queue`);
-	await page.locator('.graft-page table tbody tr').first().waitFor({ timeout: 30_000 });
+	await page.locator('.graft-page table [data-graft-row]').first().waitFor({ timeout: 30_000 });
 	await page.screenshot({ path: 'test-results/a2ui-tree-version.png' });
 
 	await page.goto(`${site}/wp-admin/edit.php?page=graft-a2ui`);
-	await table(page).locator('tbody tr').first().waitFor({ timeout: 30_000 });
+	await table(page).locator('[data-graft-row]').first().waitFor({ timeout: 30_000 });
 	await page.screenshot({ path: 'test-results/a2ui-editor.png' });
 	check('heading and text from A2UI Text components', (await page.locator('#graft-a2ui').textContent())?.includes('Posts waiting for review, oldest first.') === true);
-	const columns = await table(page).locator('thead th').allTextContents();
+	const columns = await table(page).locator('thead th:not(:has(.screen-reader-text))').allTextContents();
 	check('columns', columns.join('|') === 'Title|Author|Submitted', columns.join(', '));
 	const before = await rowTitles(page);
 	check('pending posts listed', before.includes('Draft A') && before.includes('Draft E'), before.join(', '));
 	check('editors get Approve', (await table(page).locator('[data-graft-action="approve"]').count()) === before.length);
 
-	await table(page).locator('tbody tr', { hasText: 'Draft A' }).locator('[data-graft-action="approve"]').click();
+	await table(page).locator('[data-graft-row]', { hasText: 'Draft A' }).locator('[data-graft-action="approve"]').click();
 	await page.locator('.components-notice', { hasText: 'Post published.' }).waitFor({ timeout: 30_000 });
-	await table(page).locator('tbody tr', { hasText: 'Draft A' }).waitFor({ state: 'detached', timeout: 30_000 });
+	await table(page).locator('[data-graft-row]', { hasText: 'Draft A' }).waitFor({ state: 'detached', timeout: 30_000 });
 	await page.screenshot({ path: 'test-results/a2ui-after-approve.png' });
 	check('Approve removes the row and shows the notice', !(await rowTitles(page)).includes('Draft A'));
 	const status = await page.evaluate(async () => {
@@ -58,7 +58,7 @@ try {
 
 	await login('contributor');
 	await page.goto(`${site}/wp-admin/edit.php?page=graft-a2ui`);
-	await table(page).locator('tbody tr').first().waitFor({ timeout: 30_000 });
+	await table(page).locator('[data-graft-row]').first().waitFor({ timeout: 30_000 });
 	await page.screenshot({ path: 'test-results/a2ui-contributor.png' });
 	const theirs = await rowTitles(page);
 	check('contributors see their pending posts', theirs.includes('Draft E'), theirs.join(', '));

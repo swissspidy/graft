@@ -1,13 +1,14 @@
 import { useState } from 'react';
 import { createRoot } from 'react-dom/client';
 import apiFetch from '@wordpress/api-fetch';
-import { Button, Notice, Spinner } from '@wordpress/components';
+import { Notice } from '@wordpress/components';
 import {
 	A2UIProcessor,
 	A2UIRenderer,
 	createCatalog,
 	joinPointer,
 	resolveBoolean,
+	resolveDynamicValue,
 	useProcessor,
 	useScopePath,
 	useSurface,
@@ -17,7 +18,8 @@ import {
 } from '../../../swissspidy/a2ui-wp/src/index.ts';
 import { removeRow } from '../../packages/core/src/build/rows.ts';
 import { createCan } from '../../hosts/wordpress/adapter/src/can.ts';
-import { cell, readPath, type Field } from '../../hosts/wordpress/adapter/src/cells.ts';
+import type { Field } from '../../hosts/wordpress/adapter/src/cells.ts';
+import { components } from '../../hosts/wordpress/adapter/src/client/components.tsx';
 import { withContext } from './events.ts';
 import type { A2UIBuild } from './snapshot.ts';
 
@@ -66,59 +68,57 @@ interface RowAction {
 	action: { event: { name: string; context?: Record<string, unknown> } };
 }
 
-/** The Graft Table, a catalog component A2UI's basic catalog does not have. */
+const GraftTable = components.table!;
+const isRowAction = (value: unknown): value is RowAction => typeof value === 'object' && value !== null && 'action' in value && 'label' in value;
+
+/**
+ * The Table A2UI's basic catalog lacks: Graft's own WordPress table, so both
+ * UI formats draw rows, cells and actions identically. Graft's table asks
+ * for each row's actions and cells through `evaluate`; here that resolves
+ * the A2UI definitions in the row's scope, and a button dispatches the
+ * row's A2UI action event.
+ */
 function Table({ id, props }: A2UIComponentProps<{ rows?: { path: string }; fields?: Field[]; rowActions?: RowAction[]; empty?: string }>) {
 	const processor = useProcessor();
 	const surface = useSurface();
 	const scopePath = useScopePath();
 	const rowsPath = props.rows?.path ? joinPointer(scopePath, props.rows.path) : undefined;
 	const rows = rowsPath ? surface.dataModel.get(rowsPath) : undefined;
-	const fields = props.fields ?? [];
-	const primary = fields.find((field) => field.primary) ?? fields[0];
-	if (!Array.isArray(rows)) {
-		return <Spinner />;
-	}
-	if (rows.length === 0) {
-		return <p>{props.empty ?? 'No items.'}</p>;
-	}
+	const list = Array.isArray(rows) ? rows : undefined;
+
+	const evaluate = (value: unknown, row?: unknown): unknown => {
+		if (row === undefined || !list) {
+			return value;
+		}
+		const path = joinPointer(rowsPath, String(list.indexOf(row)));
+		// `can` for this row: the host check refines per post.
+		const scope = { ...processor.createScope(surface, path), functions: { ...processor.functions, can: (args: Record<string, unknown>) => can(String(args.scope), row) } };
+		if (isRowAction(value)) {
+			return {
+				id: value.id,
+				label: value.label,
+				primary: value.variant === 'primary',
+				visible: value.visible === undefined || resolveBoolean(value.visible, scope),
+				onClick: { action: value.action, path },
+			};
+		}
+		return resolveDynamicValue(value, scope);
+	};
+	const invoke = async (onClick: unknown) => {
+		const { action, path } = onClick as { action: RowAction['action']; path: string };
+		processor.dispatchAction(surface.id, id, action, path);
+	};
+
 	return (
-		<table className="wp-list-table widefat fixed striped">
-			<thead>
-				<tr>
-					{fields.map((field) => (
-						<th key={field.id} scope="col">
-							{field.label}
-						</th>
-					))}
-				</tr>
-			</thead>
-			<tbody>
-				{rows.map((row, i) => {
-					const rowPath = joinPointer(rowsPath, String(i));
-					// `can` for this row: the host check refines per post.
-					const scope = { ...processor.createScope(surface, rowPath), functions: { ...processor.functions, can: (args: Record<string, unknown>) => can(String(args.scope), row) } };
-					const actions = (props.rowActions ?? []).filter((action) => action.visible === undefined || resolveBoolean(action.visible, scope));
-					return (
-						<tr key={String(readPath(row, 'id') ?? i)}>
-							{fields.map((field) => (
-								<td key={field.id}>
-									{field === primary ? <strong>{cell(field, row, () => undefined, 'en-US').text}</strong> : cell(field, row, () => undefined, 'en-US').text}
-									{field === primary && actions.length > 0 && (
-										<div>
-											{actions.map((action) => (
-												<Button key={action.id} variant={action.variant === 'primary' ? 'primary' : 'secondary'} size="compact" data-graft-action={action.id} onClick={() => processor.dispatchAction(surface.id, id, action.action, rowPath)}>
-													{action.label}
-												</Button>
-											))}
-										</div>
-									)}
-								</td>
-							))}
-						</tr>
-					);
-				})}
-			</tbody>
-		</table>
+		<GraftTable
+			node={{ type: 'table' }}
+			props={{ rows: list, fields: props.fields, empty: props.empty }}
+			raw={{ fields: (props.fields ?? []) as never, actions: (props.rowActions ?? []) as never }}
+			evaluate={evaluate as never}
+			invoke={invoke}
+		>
+			{null}
+		</GraftTable>
 	);
 }
 

@@ -53,9 +53,10 @@ a2ui-wp's renderer and catalog plus the Graft Table, against the e2e site.
 - Approve publishes the post through `/graft/v1/call` (WordPress confirms
   the status), removes the row and shows "Post published."
 - Contributors see their pending posts without Approve.
-- No page errors. Next to the tree-rendered Review queue it is near
-  identical (the PoC Table puts Approve under the title instead of in its
-  own column).
+- No page errors. It matches the tree-rendered Review queue: the A2UI
+  Table is a thin adapter around Graft's own WordPress table, so rows,
+  cells and actions are drawn by the same component in both formats. Only
+  the gap under the heading differs (A2UI `Column` against Graft `stack`).
 
 ## What it took
 
@@ -64,7 +65,8 @@ a2ui-wp's renderer and catalog plus the Graft Table, against the e2e site.
   not a tree. Nothing else in core changed.
 - [`snapshot.ts`](snapshot.ts): reads an A2UI surface into Graft's semantic
   snapshot with a2ui-wp's resolver (about 120 lines with the Table).
-- [`client.tsx`](client.tsx): the runtime glue and the Table for the browser.
+- [`client.tsx`](client.tsx): the runtime glue, and the Table: Graft's WordPress
+  table, given the A2UI row actions and dispatching their events.
 - The A2UI page is served as the approved review-queue customization, so the
   gateway authorizes calls against that build's capabilities and grant (the
   same ones).
