@@ -12,8 +12,13 @@ import { asUser, contentApi, login, pluginRoute, startEmDash } from './server.ts
  * through the gateway; the status board switches lists with a local `set`,
  * its state riding in the buttons' values. Exit code 1 if any check fails.
  *
- *   tsx a2ui-smoke.ts
+ *   tsx a2ui-smoke.ts [--format native|sandboxed]
+ *
+ * With --format sandboxed the site runs Graft in EmDash's plugin sandbox
+ * (build it first: pnpm build:emdash).
  */
+
+const format = process.argv.includes('--format') ? (process.argv[process.argv.indexOf('--format') + 1] as 'native' | 'sandboxed') : 'native';
 
 type Block = Record<string, unknown> & { type: string };
 
@@ -44,7 +49,7 @@ async function main(): Promise<number> {
 			return { name, source, build, spec: validateSpec(source, { surface }).spec!, surface };
 		}),
 	);
-	const [sandbox, server] = await Promise.all([startSandbox(), startEmDash({ format: 'native', testLogin: true })]);
+	const [sandbox, server] = await Promise.all([startSandbox(), startEmDash({ format, testLogin: true })]);
 	const content = contentApi(server);
 	try {
 		const verifications = await verifyInEmDash(examples, { sandbox });
@@ -114,7 +119,7 @@ async function main(): Promise<number> {
 		}
 	}
 	const failed = checks.filter((c) => !c.ok).length;
-	console.log(failed ? `\n${failed} check(s) failed` : `\nAll ${checks.length} checks passed`);
+	console.log(failed ? `\n${failed} check(s) failed (${format})` : `\nAll ${checks.length} checks passed (${format})`);
 	return failed ? 1 : 0;
 }
 

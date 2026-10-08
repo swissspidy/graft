@@ -219,9 +219,7 @@ export function validateA2UI(value: Build, surface: Surface, host: A2UIHost, spe
 			error('build-unknown-capability', `${path}/call`, `Unknown capability "${binding.call}".`);
 			continue;
 		}
-		if (spec && !capability.scopes.every((scope) => spec.manifest.permissions.includes(scope))) {
-			error('build-scope-not-requested', `${path}/call`, `"${binding.call}" needs ${capability.scopes.join(', ')}, which the spec does not request.`);
-		}
+		// Scopes the spec does not request: core checks refs, which include these calls (a warning when upgrading).
 		for (const problem of inputProblems(surface, binding.call, binding.input ?? {})) {
 			error('build-invalid-value', `${path}/input`, `Input for "${binding.call}": ${problem}.`);
 		}

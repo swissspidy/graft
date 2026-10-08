@@ -111,6 +111,15 @@ describe('A2UI builds', () => {
 		);
 	});
 
+	it('need approval, not rejection, when an upgrade makes their calls need more scopes', async () => {
+		const build = await a2uiBuild();
+		const narrow = { ...spec, manifest: { ...spec.manifest, permissions: ['items:read'] } };
+		const upgrade = await validateBuild(build, surface, { spec: { spec: narrow, hash: build.spec.hash }, upgrade: true });
+		expect(upgrade.diagnostics.filter((d) => d.code === 'build-scope-not-requested').map((d) => d.severity)).toEqual(['warning']);
+		const fresh = await validateBuild(build, surface, { spec: { spec: narrow, hash: build.spec.hash } });
+		expect(fresh.diagnostics.filter((d) => d.code === 'build-scope-not-requested').map((d) => d.severity)).toEqual(['error']);
+	});
+
 	it('are either a tree or a UI with events, never both', async () => {
 		const both = { ...(await a2uiBuild()), tree: (await pageBuild()).tree };
 		expect((await validateBuild(both, surface)).diagnostics.map((d) => d.code)).toContain('build-schema');

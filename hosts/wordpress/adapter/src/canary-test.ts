@@ -79,7 +79,9 @@ async function scriptedRegenerate({ previous, surface }: { previous: Build; surf
 const sandbox = await startSandbox();
 let mismatches = 0;
 try {
-	for (const scenario of scenarios) {
+	// --scenario <name> runs one.
+	const only = process.argv.includes('--scenario') ? process.argv[process.argv.indexOf('--scenario') + 1] : undefined;
+	for (const scenario of scenarios.filter((s) => !only || s.name === only)) {
 		const { report } = await runWordPressCanary({ corpus, from, scenario, sandbox, regenerate: scriptedRegenerate });
 		console.log(`\n## ${scenario.name}: ${scenario.description}\n`);
 		console.log(formatCanaryReport(report));

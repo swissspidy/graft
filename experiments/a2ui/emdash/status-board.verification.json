@@ -1,5 +1,5 @@
 {
-	"passed": false,
+	"passed": true,
 	"spec": {
 		"id": "status-board",
 		"hash": "sha256:be0c7a3ea99ebdb2922afe82fd56276c46a031d4031222f5f4fb5b90feac6830"
@@ -37,18 +37,14 @@
 		{
 			"criterion": "unpublish",
 			"check": 4,
-			"passed": false,
-			"failures": [
-				"Expected the text \"Nothing published\" to be shown."
-			]
+			"passed": true,
+			"failures": []
 		},
 		{
 			"criterion": "contributors",
 			"check": 5,
-			"passed": false,
-			"failures": [
-				"Expected rows \"Draft A\", \"Draft B\", found \"Post C\"."
-			]
+			"passed": true,
+			"failures": []
 		},
 		{
 			"criterion": "contributors",
@@ -58,5 +54,5 @@
 		}
 	],
 	"unchecked": [],
-	"verifiedAt": "2026-10-08T13:01:52.891Z"
+	"verifiedAt": "2026-10-08T13:03:09.938Z"
 }
