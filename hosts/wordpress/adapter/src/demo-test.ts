@@ -68,6 +68,16 @@ try {
 		} catch (error) {
 			failures.push(what);
 			console.log(`✖ ${what}: ${(error as Error).message.split('\n')[0]}`);
+			// What the page showed, for the CI artifact: a screenshot, and any open dialogs with their buttons.
+			await page.screenshot({ path: `test-results/demo-failure-${failures.length}.png` }).catch(() => {});
+			const dialogs = await page
+				.evaluate(() =>
+					[...document.querySelectorAll('[role="dialog"]')].map(
+						(d) => `${d.getAttribute('aria-label') ?? d.textContent?.trim().slice(0, 60)} [${[...d.querySelectorAll('button')].map((b) => b.getAttribute('aria-label') ?? b.textContent?.trim()).join(', ')}]`,
+					),
+				)
+				.catch(() => []);
+			console.log(`  at ${page.url()}${dialogs.length ? `, dialogs: ${dialogs.join('; ')}` : ''}`);
 		}
 	};
 	const widget = (id: string) => page.locator(`#graft-${id}`);
