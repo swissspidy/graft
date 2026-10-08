@@ -8,6 +8,7 @@ import type { Spec } from '../spec/types.ts';
 import { canonicalJson } from '../surface/hash.ts';
 import type { Surface } from '../surface/types.ts';
 import { FixtureError, SandboxCallError, type Sandbox } from './sandbox.ts';
+import { requireUiFormat } from '../build/format.ts';
 import { allActions, snapshotTree, type ComponentSemantics, type Snapshot, type SnapshotAction, type SnapshotInput } from './snapshot.ts';
 
 export interface VerifyOptions {
@@ -24,8 +25,8 @@ export interface VerifyOptions {
 	/** The grant to simulate. Default: the permissions the spec requests. */
 	grant?: string[];
 	/**
-	 * Reads the build's UI into a snapshot instead of walking `build.tree`,
-	 * for a build whose UI is in another format (e.g. an A2UI surface).
+	 * Reads the build's UI into a snapshot instead of walking `build.tree`
+	 * (or, for a build without a tree, asking its registered UI format).
 	 * `entered` is what the viewer typed so far: input group, then input id,
 	 * as the snapshot's `inputs` name them.
 	 */
@@ -188,9 +189,12 @@ async function runCheck(options: VerifyOptions, check: Check, index: number, fun
 
 	const widgetLimits = options.surface.functions?.widgets;
 	const snap = (instance: Omit<Instance, 'snapshot'>): Instance => {
+		const ctx = { data: instance.data, slot: instance.slot, can, now, fn };
 		const snapshot = options.snapshot
-			? options.snapshot(build, { data: instance.data, slot: instance.slot, can, now, fn }, instance.entered)
-			: snapshotTree(
+			? options.snapshot(build, ctx, instance.entered)
+			: !build.tree
+				? requireUiFormat(build).snapshot(build, ctx, instance.entered)
+				: snapshotTree(
 				build.tree,
 				{ data: instance.data, slot: instance.slot, can, now, fn },
 				semantics,
@@ -255,7 +259,7 @@ async function runCheck(options: VerifyOptions, check: Check, index: number, fun
 			return result();
 		}
 		const { instance, action } = found;
-		if (action.event && options.snapshot && !instance.snapshot.widgets?.[action.event.widget]) {
+		if (action.event && (options.snapshot || !build.tree) && !instance.snapshot.widgets?.[action.event.widget]) {
 			// A local action in a custom snapshot's UI: what it sets is kept with what the viewer
 			// entered (latest last), and the snapshot draws it.
 			const { widget, name, payload } = action.event;

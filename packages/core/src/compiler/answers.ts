@@ -13,6 +13,9 @@ export function modelAnswers(build: Build, dataInput?: Record<string, unknown>) 
 			node.children.forEach((child) => visit(child, id));
 		}
 	};
+	if (!build.tree) {
+		throw new Error('modelAnswers takes a tree build.');
+	}
 	visit(build.tree, null);
 	return {
 		checks: {

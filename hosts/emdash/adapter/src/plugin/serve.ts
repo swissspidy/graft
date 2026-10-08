@@ -165,8 +165,11 @@ async function renderInstance(ctx: PluginContext, viewer: Viewer, instance: Inst
 				}
 			}
 		: undefined;
-	const widgets = surface.functions?.widgets ? { limits: surface.functions.widgets, states, validate: (tree: Build['tree']) => validateWidgetTree(tree, surface) } : undefined;
-	const rendered = withWidgetStates(renderTree(served.build.tree, { data, slot, can, now, ...(fn ? { fn } : {}) }, served.record.id, widgets), served.record.id);
+	const widgets = surface.functions?.widgets ? { limits: surface.functions.widgets, states, validate: (tree: NonNullable<Build['tree']>) => validateWidgetTree(tree, surface) } : undefined;
+	if (!served.build.tree) {
+		failures.push('This customization is not a tree, and EmDash only draws trees so far.');
+	}
+	const rendered = withWidgetStates(renderTree(served.build.tree ?? { type: 'stack' }, { data, slot, can, now, ...(fn ? { fn } : {}) }, served.record.id, widgets), served.record.id);
 	if (errors.length > 0) {
 		rendered.blocks.unshift({ type: 'banner', variant: 'error', title: 'Some data could not be loaded', description: errors.join(' ') });
 	}

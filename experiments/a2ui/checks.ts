@@ -23,6 +23,8 @@ import { compileA2UI } from './compiler.ts';
  *
  *   ANTHROPIC_API_KEY=... npx tsx experiments/a2ui/checks.ts pending-by-author publish-checklist stale-drafts
  *
+ * With --reuse-checks, the checks written by an earlier run stay as they are.
+ *
  * Output goes to experiments/a2ui/compiled/fresh/.
  */
 
@@ -74,12 +76,16 @@ const out = new URL('experiments/a2ui/compiled/fresh/', root);
 await mkdir(out, { recursive: true });
 const summary: string[] = [];
 try {
-	for (const id of process.argv.slice(2)) {
+	// --reuse-checks: keep the fresh checks written before (frozen), and compile against them again.
+	const reuse = process.argv.includes('--reuse-checks');
+	for (const id of process.argv.slice(2).filter((arg) => !arg.startsWith('--'))) {
 		console.log(`${id}:`);
 		const { spec } = validateSpec(await read(`examples/specs/${id}.md`), { surface });
 		const example = JSON.parse(await read(`examples/builds/${id}.json`)) as Build;
-		const { checks, log } = await writeChecks(spec!);
-		await writeFile(new URL(`${id}.checks.json`, out), JSON.stringify({ checks, log }, null, '\t') + '\n');
+		const { checks, log } = reuse ? (JSON.parse(await readFile(new URL(`${id}.checks.json`, out), 'utf8')) as { checks?: Check[]; log: unknown[] }) : await writeChecks(spec!);
+		if (!reuse) {
+			await writeFile(new URL(`${id}.checks.json`, out), JSON.stringify({ checks, log }, null, '\t') + '\n');
+		}
 		if (!checks) {
 			summary.push(`✘ ${id}: no checks`);
 			continue;

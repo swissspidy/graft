@@ -1,0 +1,129 @@
+import { describe, expect, it } from 'vitest';
+import { applyMigrations, extractRefs, registerUiFormat, validateBuild, verifyBuild, type Build } from '@graft/core';
+import { createCan, fakeSandbox, fixtures, pageBuild, semantics, spec, surface } from '../../core/test/fixtures/acme.ts';
+import { createA2UIFormat, type A2UIBuild } from '../src/index.ts';
+
+registerUiFormat(createA2UIFormat({ catalogId: 'graft:acme' }));
+
+/** The acme page build with its tree as an A2UI surface. */
+async function a2uiBuild(change?: (build: A2UIBuild) => void): Promise<Build> {
+	const { tree: _tree, ...envelope } = await pageBuild();
+	const build = {
+		...envelope,
+		ui: {
+			protocol: 'a2ui/v0.9',
+			catalogId: 'graft:acme',
+			components: [
+				{ id: 'root', component: 'Column', children: ['title', 'list'] },
+				{ id: 'title', component: 'Text', text: 'Open items', variant: 'h1' },
+				{
+					id: 'list',
+					component: 'Table',
+					rows: { path: '/open/items' },
+					fields: [{ id: 'title', label: 'Title', primary: true }],
+					rowActions: [
+						{ id: 'close', label: 'Close', visible: { call: 'can', args: { scope: 'items:write' } }, action: { event: { name: 'close', context: { id: { path: 'id' } } } } },
+					],
+					empty: 'All done',
+				},
+			],
+		},
+		events: { close: { call: 'items.close', input: { id: { $context: 'id' } }, then: ['remove-row:open'] } },
+	} as unknown as A2UIBuild;
+	change?.(build);
+	const result = build as unknown as Build;
+	result.refs = extractRefs(result, surface);
+	return result;
+}
+
+const components = (build: Build) => (build as unknown as A2UIBuild).ui.components as Array<Record<string, unknown>>;
+
+describe('A2UI builds', () => {
+	it('validate, with refs from their event bindings and catalog', async () => {
+		const build = await a2uiBuild();
+		const validation = await validateBuild(build, surface);
+		expect(validation.diagnostics.filter((d) => d.severity === 'error')).toEqual([]);
+		expect(build.refs).toEqual({
+			slot: 'page',
+			components: {},
+			capabilities: ['items.close', 'items.list'],
+			scopes: ['items:read', 'items:write'],
+			catalog: { Column: ['children'], Table: ['empty', 'fields', 'rowActions', 'rows'], Text: ['text', 'variant'] },
+		});
+	});
+
+	it('pass the frozen checks the tree build passes, and fail the one a mistake breaks', async () => {
+		const good = await verifyBuild({ build: await a2uiBuild(), spec, surface, sandbox: fakeSandbox(), semantics, createCan });
+		expect(good.results.filter((r) => !r.passed)).toEqual([]);
+
+		const everyone = await a2uiBuild((b) => {
+			delete ((b.ui.components[2]!.rowActions as Array<Record<string, unknown>>)[0]!).visible;
+		});
+		const broken = await verifyBuild({ build: everyone, spec, surface, sandbox: fakeSandbox(), semantics, createCan });
+		expect(broken.results.filter((r) => !r.passed).map((r) => [r.criterion, r.failures])).toEqual([
+			['clerks', ['Expected "close" not to be available for title "Open A", but it is.']],
+		]);
+	});
+
+	it('keep local state: set actions and computed lists', async () => {
+		const build = await a2uiBuild((b) => {
+			b.data.open = { call: 'items.list', input: {} };
+			b.ui.initial = { form: { status: 'open' } };
+			b.ui.computed = { shown: { call: 'filter', args: { items: { path: '/open/items' }, by: 'status', equals: { path: '/form/status' } } } };
+			(b.ui.components[0]!.children as string[]).push('done');
+			b.ui.components.push({ id: 'done', component: 'Button', child: 'done-label', action: { functionCall: { call: 'set', args: { target: '/form/status', value: 'done' } } } });
+			b.ui.components.push({ id: 'done-label', component: 'Text', text: 'Show done' });
+			b.ui.components[2]!.rows = { path: '/shown' };
+		});
+		build.checks = [
+			{ criterion: 'open-only', fixtures, view_as: 'm', expect: [{ rows: ['Open A'] }, { text: 'Show done' }] },
+			{ criterion: 'open-only', fixtures, view_as: 'm', steps: [{ action: 'done' }], expect: [{ rows: ['Done B'] }] },
+		];
+		expect((await validateBuild(build, surface)).diagnostics.filter((d) => d.severity === 'error')).toEqual([]);
+		const result = await verifyBuild({ build, spec, surface, sandbox: fakeSandbox(), semantics, createCan });
+		expect(result.results.flatMap((r) => r.failures)).toEqual([]);
+	});
+
+	it('are refused for unknown components and functions, wrong props and arguments, and unbound events', async () => {
+		const build = await a2uiBuild((b) => {
+			b.ui.components.push({ id: 'x', component: 'Marquee' });
+			(b.ui.components[0]!.children as string[]).push('x');
+			b.ui.components[1]!.text = { call: 'shout', args: {} };
+			b.ui.components[1]!.variant = 'huge';
+			const action = (b.ui.components[2]!.rowActions as Array<Record<string, unknown>>)[0]!;
+			action.visible = { call: 'can', args: { scope: 7 } };
+			action.action = { event: { name: 'finish', context: { id: { path: 'item.id' } } } };
+		});
+		const codes = (await validateBuild(build, surface)).diagnostics.map((d) => `${d.code} ${d.path}`);
+		expect(codes).toEqual(
+			expect.arrayContaining([
+				'a2ui-unknown-component /ui/components/3/component',
+				'a2ui-unknown-function /ui/components/1/text',
+				'a2ui-props /ui/components/1/variant',
+				'a2ui-function-args /ui/components/2/rowActions/0/visible/args/scope',
+				'a2ui-dotted-pointer /ui/components/2/rowActions/0/action/event/context/id',
+				'a2ui-unbound-event /events',
+				'a2ui-unused-event /events/close',
+			]),
+		);
+	});
+
+	it('are either a tree or a UI with events, never both', async () => {
+		const both = { ...(await a2uiBuild()), tree: (await pageBuild()).tree };
+		expect((await validateBuild(both, surface)).diagnostics.map((d) => d.code)).toContain('build-schema');
+	});
+
+	it('migrate: capability renames reach event bindings, scope renames reach can calls', async () => {
+		const build = await a2uiBuild();
+		const migrated = applyMigrations(build, [
+			{ op: 'rename', kind: 'capability', from: 'items.close', to: 'items.finish' },
+			{ op: 'rename', kind: 'capability', from: 'items.list', to: 'items.query' },
+			{ op: 'rename', kind: 'scope', from: 'items:write', to: 'items:manage' },
+		]) as unknown as A2UIBuild;
+		expect(migrated.events.close!.call).toBe('items.finish');
+		expect(migrated.data.open!.call).toBe('items.query');
+		expect((components(migrated as unknown as Build)[2]!.rowActions as Array<{ visible: unknown }>)[0]!.visible).toEqual({ call: 'can', args: { scope: 'items:manage' } });
+		// Removing what the build uses cannot be migrated.
+		expect(applyMigrations(build, [{ op: 'remove', kind: 'capability', symbol: 'items.close' }])).toBeUndefined();
+	});
+});

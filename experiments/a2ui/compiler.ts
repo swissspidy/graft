@@ -1,7 +1,7 @@
 import { describeSpec, describeSurface, usableCapabilities, type Check, type ModelClient, type Spec, type Surface, type Verification } from '../../packages/core/src/index.ts';
 import { compileSchema } from '../../packages/core/src/schema.ts';
 import { describeSchemaError, schemaErrorPath } from '../../packages/core/src/schema-errors.ts';
-import { isDataBinding, isFunctionCall, type ComponentDefinition } from '../../packages/a2ui/src/core/index.ts';
+import { isDataBinding, isFunctionCall, type ComponentDefinition } from '../../packages/a2ui-wp/src/core/index.ts';
 import { CATALOG_GUIDE, CATALOG_ID, COMPONENTS, graftFunctions, PROTOCOL } from './catalog.ts';
 import type { A2UIBuild, EventBinding } from './snapshot.ts';
 

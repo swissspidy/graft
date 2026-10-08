@@ -10,7 +10,7 @@ import {
 	type ComponentDefinition,
 	type JsonValue,
 	type ResolveScope,
-} from '../../packages/a2ui/src/core/index.ts';
+} from '../../packages/a2ui-wp/src/core/index.ts';
 import { cell, type Field } from '../../hosts/wordpress/adapter/src/cells.ts';
 import { graftFunctions } from './catalog.ts';
 import { withContext } from './events.ts';

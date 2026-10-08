@@ -1,4 +1,5 @@
 export { hasErrors, type Diagnostic, type Severity } from './diagnostics.ts';
+export { isTreeBuild, registerUiFormat, requireUiFormat, uiFormatOf, type UiCompiler, type UiFormat } from './build/format.ts';
 export { ajvEngine, createAjv } from './ajv.ts';
 export { compileSchema, setSchemaEngine, type SchemaEngine, type SchemaError, type Validator } from './schema.ts';
 export { parseSpec, type ParsedSpec } from './spec/parse.ts';
@@ -11,7 +12,7 @@ export { validateSurface, type SurfaceValidation } from './surface/validate.ts';
 export { canonicalJson, hashSurface, sha256 } from './surface/hash.ts';
 export type { Capability, Component, JsonSchema, Migration, Scope, Slot, Surface, SurfaceFunctions } from './surface/types.ts';
 export { hashSpec, normalizeSpecSource } from './spec/hash.ts';
-export type { AndExpr, Binding, Build, CheckStep, InputRef, BuildCode, CallExpr, CanExpr, Check, DataRef, DataSource, EqExpr, Expression, FieldRef, FnExpr, Logic, NotExpr, OrExpr, Refs, SlotRef, TreeNode, Value } from './build/types.ts';
+export type { AndExpr, Binding, Build, BuildUi, EventBinding, CheckStep, InputRef, BuildCode, CallExpr, CanExpr, Check, DataRef, DataSource, EqExpr, Expression, FieldRef, FnExpr, Logic, NotExpr, OrExpr, Refs, SlotRef, TreeNode, Value } from './build/types.ts';
 export { getPath, isAnd, isBinding, isInputRef, isCall, isCan, isDataRef, isEq, isExpression, isFieldRef, isFn, isNot, isOr, isSlotRef, walkTree, walkValue } from './build/expressions.ts';
 export { evaluate, inert, isAction, type Action, type EvalContext } from './build/evaluate.ts';
 export { FunctionError, functionKey, type AsyncFunctionRunner, type FunctionCall, type FunctionErrorKind, type FunctionResult, type FunctionRunner } from './build/functions.ts';

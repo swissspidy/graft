@@ -1,3 +1,4 @@
+import type { UiFormat } from '../build/format.ts';
 import type { Build, Check } from '../build/types.ts';
 import type { Diagnostic } from '../diagnostics.ts';
 import type { Spec } from '../spec/types.ts';
@@ -35,6 +36,8 @@ export interface HostGuide {
 	assertions: string;
 	/** Anything else the compiler should know about building for this host. */
 	notes?: string;
+	/** The same for building in another UI format, by format name (e.g. "A2UI"). */
+	formats?: Record<string, string>;
 }
 
 export interface CompileOptions {
@@ -53,6 +56,8 @@ export interface CompileOptions {
 	checks?: Check[];
 	/** The build being replaced, as a reference for layout and wording (regeneration). */
 	previous?: Build;
+	/** Build the UI in this format instead of as a tree. */
+	format?: UiFormat;
 	/** Attempts per phase. Default 3. */
 	maxAttempts?: number;
 	compilerVersion?: string;

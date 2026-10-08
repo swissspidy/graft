@@ -386,14 +386,14 @@
 					"items": {
 						"path": "/pending/items"
 					},
-					"by": "author/name"
+					"by": "author/id"
 				}
 			},
 			"shown": {
 				"call": "if",
 				"args": {
 					"condition": {
-						"call": "equals",
+						"call": "notEquals",
 						"args": {
 							"a": {
 								"path": "/form/author"
@@ -402,19 +402,19 @@
 						}
 					},
 					"then": {
-						"path": "/pending/items"
-					},
-					"else": {
 						"call": "filter",
 						"args": {
 							"items": {
 								"path": "/pending/items"
 							},
-							"by": "author/name",
+							"by": "author/id",
 							"equals": {
 								"path": "/form/author"
 							}
 						}
+					},
+					"else": {
+						"path": "/pending/items"
 					}
 				}
 			}
@@ -425,7 +425,7 @@
 				"component": "Column",
 				"children": [
 					"filters",
-					"pending_table"
+					"pending-table"
 				]
 			},
 			{
@@ -433,13 +433,13 @@
 				"component": "Row",
 				"children": [
 					"everyone",
-					"author_list"
+					"author-list"
 				]
 			},
 			{
 				"id": "everyone",
 				"component": "Button",
-				"child": "everyone_label",
+				"child": "everyone-label",
 				"variant": "default",
 				"action": {
 					"functionCall": {
@@ -452,22 +452,22 @@
 				}
 			},
 			{
-				"id": "everyone_label",
+				"id": "everyone-label",
 				"component": "Text",
 				"text": "Everyone"
 			},
 			{
-				"id": "author_list",
+				"id": "author-list",
 				"component": "Row",
 				"children": {
-					"componentId": "author_btn",
+					"componentId": "author-btn",
 					"path": "/authors"
 				}
 			},
 			{
-				"id": "author_btn",
+				"id": "author-btn",
 				"component": "Button",
-				"child": "author_btn_label",
+				"child": "author-btn-label",
 				"variant": "default",
 				"actionId": {
 					"call": "formatString",
@@ -481,21 +481,21 @@
 						"args": {
 							"target": "/form/author",
 							"value": {
-								"path": "author/name"
+								"path": "author/id"
 							}
 						}
 					}
 				}
 			},
 			{
-				"id": "author_btn_label",
+				"id": "author-btn-label",
 				"component": "Text",
 				"text": {
 					"path": "author/name"
 				}
 			},
 			{
-				"id": "pending_table",
+				"id": "pending-table",
 				"component": "Table",
 				"rows": {
 					"path": "/shown"

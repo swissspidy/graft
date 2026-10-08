@@ -633,7 +633,7 @@
 			}
 		},
 		"computed": {
-			"headlineLen": {
+			"titleLen": {
 				"call": "count",
 				"args": {
 					"value": {
@@ -649,7 +649,7 @@
 					}
 				}
 			},
-			"headlineOk": {
+			"titleOk": {
 				"call": "length",
 				"args": {
 					"value": {
@@ -682,31 +682,6 @@
 						"path": "/form/excerpt"
 					},
 					"min": 50
-				}
-			},
-			"allOk": {
-				"call": "and",
-				"args": {
-					"values": [
-						{
-							"path": "/headlineOk"
-						},
-						{
-							"path": "/notCaps"
-						},
-						{
-							"path": "/excerptOk"
-						},
-						{
-							"call": "equals",
-							"args": {
-								"a": {
-									"path": "/form/facts"
-								},
-								"b": true
-							}
-						}
-					]
 				}
 			},
 			"saved": {
@@ -746,13 +721,12 @@
 				"children": [
 					"headline",
 					"excerpt",
-					"divider1",
-					"row_hl",
-					"row_caps",
-					"row_ex",
+					"checklistTitle",
+					"chkTitleLen",
+					"chkCaps",
+					"chkExcerpt",
+					"chkFacts",
 					"facts",
-					"divider2",
-					"unsaved_note",
 					"actions"
 				]
 			},
@@ -775,151 +749,78 @@
 				"variant": "longText"
 			},
 			{
-				"id": "divider1",
-				"component": "Divider"
-			},
-			{
-				"id": "row_hl",
-				"component": "Row",
-				"children": [
-					"icon_hl",
-					"label_hl",
-					"count_hl"
-				]
-			},
-			{
-				"id": "icon_hl",
+				"id": "checklistTitle",
 				"component": "Text",
+				"text": "Checklist",
+				"variant": "h3"
+			},
+			{
+				"id": "chkTitleLen",
+				"component": "Text",
+				"variant": "body",
 				"text": {
 					"call": "if",
 					"args": {
 						"condition": {
-							"path": "/headlineOk"
+							"path": "/titleOk"
 						},
-						"then": "✓",
-						"else": "✗"
-					}
-				},
-				"variant": "body"
-			},
-			{
-				"id": "label_hl",
-				"component": "Text",
-				"text": {
-					"call": "if",
-					"args": {
-						"condition": {
-							"path": "/headlineOk"
-						},
-						"then": "Headline is 20 to 70 characters",
-						"else": "Headline should be 20 to 70 characters; now:"
-					}
-				},
-				"variant": "body"
-			},
-			{
-				"id": "count_hl",
-				"component": "Text",
-				"text": {
-					"call": "formatString",
-					"args": {
-						"value": "${/headlineLen}"
-					}
-				},
-				"variant": "caption",
-				"visible": {
-					"call": "not",
-					"args": {
-						"value": {
-							"path": "/headlineOk"
+						"then": "✓ Headline is 20 to 70 characters",
+						"else": {
+							"call": "formatString",
+							"args": {
+								"value": "✗ Headline is 20 to 70 characters (now ${/titleLen})"
+							}
 						}
 					}
 				}
 			},
 			{
-				"id": "row_caps",
-				"component": "Row",
-				"children": [
-					"icon_caps",
-					"label_caps"
-				]
-			},
-			{
-				"id": "icon_caps",
+				"id": "chkCaps",
 				"component": "Text",
+				"variant": "body",
 				"text": {
 					"call": "if",
 					"args": {
 						"condition": {
 							"path": "/notCaps"
 						},
-						"then": "✓",
-						"else": "✗"
+						"then": "✓ Headline is not in capitals",
+						"else": "✗ Headline is not in capitals"
 					}
-				},
-				"variant": "body"
+				}
 			},
 			{
-				"id": "label_caps",
+				"id": "chkExcerpt",
 				"component": "Text",
-				"text": "Headline is not in capitals",
-				"variant": "body"
-			},
-			{
-				"id": "row_ex",
-				"component": "Row",
-				"children": [
-					"icon_ex",
-					"label_ex",
-					"count_ex"
-				]
-			},
-			{
-				"id": "icon_ex",
-				"component": "Text",
+				"variant": "body",
 				"text": {
 					"call": "if",
 					"args": {
 						"condition": {
 							"path": "/excerptOk"
 						},
-						"then": "✓",
-						"else": "✗"
-					}
-				},
-				"variant": "body"
-			},
-			{
-				"id": "label_ex",
-				"component": "Text",
-				"text": {
-					"call": "if",
-					"args": {
-						"condition": {
-							"path": "/excerptOk"
-						},
-						"then": "Excerpt has at least 50 characters",
-						"else": "Excerpt needs at least 50 characters; now:"
-					}
-				},
-				"variant": "body"
-			},
-			{
-				"id": "count_ex",
-				"component": "Text",
-				"text": {
-					"call": "formatString",
-					"args": {
-						"value": "${/excerptLen}"
-					}
-				},
-				"variant": "caption",
-				"visible": {
-					"call": "not",
-					"args": {
-						"value": {
-							"path": "/excerptOk"
+						"then": "✓ Excerpt of at least 50 characters",
+						"else": {
+							"call": "formatString",
+							"args": {
+								"value": "✗ Excerpt of at least 50 characters (now ${/excerptLen})"
+							}
 						}
+					}
+				}
+			},
+			{
+				"id": "chkFacts",
+				"component": "Text",
+				"variant": "body",
+				"text": {
+					"call": "if",
+					"args": {
+						"condition": {
+							"path": "/form/facts"
+						},
+						"then": "✓ Facts and names checked",
+						"else": "✗ Facts and names checked"
 					}
 				}
 			},
@@ -932,24 +833,6 @@
 				}
 			},
 			{
-				"id": "divider2",
-				"component": "Divider"
-			},
-			{
-				"id": "unsaved_note",
-				"component": "Text",
-				"text": "You have unsaved changes.",
-				"variant": "caption",
-				"visible": {
-					"call": "not",
-					"args": {
-						"value": {
-							"path": "/saved"
-						}
-					}
-				}
-			},
-			{
 				"id": "actions",
 				"component": "Row",
 				"children": [
@@ -958,15 +841,37 @@
 				]
 			},
 			{
-				"id": "save_label",
+				"id": "saveLabel",
 				"component": "Text",
 				"text": "Save"
 			},
 			{
 				"id": "save",
 				"component": "Button",
-				"child": "save_label",
+				"child": "saveLabel",
 				"variant": "default",
+				"visible": {
+					"call": "can",
+					"args": {
+						"scope": "posts:write",
+						"on": {
+							"path": "/slot/post"
+						}
+					}
+				},
+				"checks": [
+					{
+						"condition": {
+							"call": "required",
+							"args": {
+								"value": {
+									"path": "/form/headline"
+								}
+							}
+						},
+						"message": "The headline cannot be empty"
+					}
+				],
 				"action": {
 					"event": {
 						"name": "save",
@@ -982,55 +887,17 @@
 							}
 						}
 					}
-				},
-				"checks": [
-					{
-						"condition": {
-							"call": "length",
-							"args": {
-								"value": {
-									"path": "/form/headline"
-								},
-								"min": 1,
-								"max": 200
-							}
-						},
-						"message": "The headline must be 1 to 200 characters."
-					},
-					{
-						"condition": {
-							"call": "length",
-							"args": {
-								"value": {
-									"path": "/form/excerpt"
-								},
-								"max": 1000
-							}
-						},
-						"message": "The excerpt must be at most 1000 characters."
-					},
-					{
-						"condition": {
-							"call": "not",
-							"args": {
-								"value": {
-									"path": "/saved"
-								}
-							}
-						},
-						"message": "Nothing to save."
-					}
-				]
+				}
 			},
 			{
-				"id": "publish_label",
+				"id": "publishLabel",
 				"component": "Text",
 				"text": "Publish"
 			},
 			{
 				"id": "publish",
 				"component": "Button",
-				"child": "publish_label",
+				"child": "publishLabel",
 				"variant": "primary",
 				"visible": {
 					"call": "and",
@@ -1047,19 +914,42 @@
 							},
 							{
 								"path": "/slot/post/can/publish"
-							},
-							{
-								"call": "notEquals",
-								"args": {
-									"a": {
-										"path": "/slot/post/status"
-									},
-									"b": "publish"
-								}
 							}
 						]
 					}
 				},
+				"checks": [
+					{
+						"condition": {
+							"path": "/titleOk"
+						},
+						"message": "The headline must be 20 to 70 characters"
+					},
+					{
+						"condition": {
+							"path": "/notCaps"
+						},
+						"message": "The headline must not be in capitals"
+					},
+					{
+						"condition": {
+							"path": "/excerptOk"
+						},
+						"message": "The excerpt must be at least 50 characters"
+					},
+					{
+						"condition": {
+							"path": "/form/facts"
+						},
+						"message": "Check facts and names first"
+					},
+					{
+						"condition": {
+							"path": "/saved"
+						},
+						"message": "Save your changes first"
+					}
+				],
 				"action": {
 					"event": {
 						"name": "publish",
@@ -1069,21 +959,7 @@
 							}
 						}
 					}
-				},
-				"checks": [
-					{
-						"condition": {
-							"path": "/allOk"
-						},
-						"message": "Tick every item on the checklist first."
-					},
-					{
-						"condition": {
-							"path": "/saved"
-						},
-						"message": "Save your changes first."
-					}
-				]
+				}
 			}
 		]
 	},
@@ -1104,7 +980,7 @@
 			"then": [
 				"reload:page"
 			],
-			"notice": "Headline and excerpt saved."
+			"notice": "Headline and excerpt saved"
 		},
 		"publish": {
 			"call": "posts.update_status",
@@ -1117,7 +993,7 @@
 			"then": [
 				"reload:page"
 			],
-			"notice": "Post published."
+			"notice": "Post published"
 		}
 	},
 	"refs": {
@@ -1131,18 +1007,16 @@
 				"value",
 				"variant"
 			],
-			"Divider": [],
-			"Row": [
-				"children"
-			],
 			"Text": [
 				"text",
-				"variant",
-				"visible"
+				"variant"
 			],
 			"CheckBox": [
 				"label",
 				"value"
+			],
+			"Row": [
+				"children"
 			],
 			"Button": [
 				"action",

@@ -25,7 +25,8 @@ function fits(slot: Slot, before: Slot | undefined, build: Build, needed: string
 	if (before && slot.kind !== before.kind) {
 		return false;
 	}
-	if (slot.accepts && !slot.accepts.includes(build.tree.type)) {
+	// Only a tree's root is a host component; other formats draw from their catalog.
+	if (build.tree && slot.accepts && !slot.accepts.includes(build.tree.type)) {
 		return false;
 	}
 	const provides = typeof slot.provides === 'object' ? ((slot.provides.properties as Record<string, unknown> | undefined) ?? {}) : {};

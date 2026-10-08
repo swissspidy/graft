@@ -21,9 +21,9 @@
 				"status": [
 					"draft"
 				],
-				"per_page": 100,
 				"orderby": "modified",
-				"order": "asc"
+				"order": "asc",
+				"per_page": 100
 			}
 		}
 	},
@@ -278,62 +278,9 @@
 	"ui": {
 		"protocol": "a2ui/v0.9.1",
 		"catalogId": "graft:wordpress",
-		"computed": {
-			"oldest": {
-				"call": "slice",
-				"args": {
-					"items": {
-						"path": "/drafts/items"
-					},
-					"start": 0,
-					"end": 1
-				}
-			}
-		},
 		"components": [
 			{
 				"id": "root",
-				"component": "Column",
-				"children": [
-					"oldestList",
-					"table"
-				]
-			},
-			{
-				"id": "oldestList",
-				"component": "Column",
-				"children": {
-					"componentId": "oldestRow",
-					"path": "/oldest"
-				}
-			},
-			{
-				"id": "oldestRow",
-				"component": "Row",
-				"children": [
-					"oldestLabel",
-					"oldestDays"
-				]
-			},
-			{
-				"id": "oldestLabel",
-				"component": "Text",
-				"text": "Oldest draft, days since last update:",
-				"variant": "caption"
-			},
-			{
-				"id": "oldestDays",
-				"component": "Text",
-				"text": {
-					"call": "formatString",
-					"args": {
-						"value": "${daysSince(value: ${modified})}"
-					}
-				},
-				"variant": "body"
-			},
-			{
-				"id": "table",
 				"component": "Table",
 				"rows": {
 					"path": "/drafts/items"
@@ -341,7 +288,7 @@
 				"fields": [
 					{
 						"id": "title",
-						"label": "Draft",
+						"label": "Title",
 						"type": "string",
 						"primary": true
 					},
@@ -351,13 +298,15 @@
 						"type": "string"
 					},
 					{
-						"id": "modified",
+						"id": "days",
 						"label": "Last updated",
-						"type": "string",
+						"type": "integer",
 						"value": {
-							"call": "formatString",
+							"call": "daysSince",
 							"args": {
-								"value": "${daysSince(value: ${modified})}"
+								"value": {
+									"path": "modified"
+								}
 							}
 						},
 						"tone": {
@@ -411,16 +360,6 @@
 	"refs": {
 		"slot": "dashboard.widget",
 		"catalog": {
-			"Column": [
-				"children"
-			],
-			"Row": [
-				"children"
-			],
-			"Text": [
-				"text",
-				"variant"
-			],
 			"Table": [
 				"empty",
 				"fields",

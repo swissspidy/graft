@@ -1,4 +1,4 @@
-# @graft/a2ui
+# @graft/a2ui-wp
 
 An [A2UI](https://a2ui.org/) v0.9 client: the framework-agnostic protocol
 core (`./core`: messages, data model, bindings, expressions, functions) and a

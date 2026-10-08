@@ -77,6 +77,22 @@ export interface GraftRootProps {
 	functions?: () => AsyncFunctionRunner;
 	/** What interactive widgets may draw with; without it, widgets draw nothing. */
 	widgets?: WidgetLimits;
+	/** Draws a build without a tree (another UI format); without it, such a build draws nothing. */
+	ui?: ComponentType<UiRootProps>;
+}
+
+/**
+ * What a renderer for another UI format gets: the loaded data sources, and
+ * `invoke` for the actions its events resolve to, so `then`, notices and
+ * reloads work exactly as for a tree.
+ */
+export interface UiRootProps {
+	build: Build;
+	/** Data sources by name, as they load and change. */
+	data: Record<string, unknown>;
+	slot: Record<string, unknown>;
+	can: EvalContext['can'];
+	invoke(action: Action): Promise<void>;
 }
 
 interface RuntimeValue {
@@ -98,7 +114,7 @@ const Runtime = createContext<RuntimeValue | null>(null);
  * build was validated against the surface, so this only happens if the
  * registry and the surface disagree.
  */
-export function GraftRoot({ build, components, gateway, slot = {}, can, onNotice, onReload, functions, widgets }: GraftRootProps) {
+export function GraftRoot({ build, components, gateway, slot = {}, can, onNotice, onReload, functions, widgets, ui: Ui }: GraftRootProps) {
 	const [data, setData] = useState<Record<string, unknown>>({});
 	const { fn, flush } = useFunctions(build.code ? functions : undefined);
 	const mounted = useRef(true);
@@ -170,6 +186,9 @@ export function GraftRoot({ build, components, gateway, slot = {}, can, onNotice
 		[data, slot, can, fn, invoke, components, flush, widgets],
 	);
 
+	if (!build.tree) {
+		return Ui ? <Ui build={build} data={data} slot={slot} can={can} invoke={invoke} /> : null;
+	}
 	return (
 		<Runtime.Provider value={runtime}>
 			<Node node={build.tree} />

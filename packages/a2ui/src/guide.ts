@@ -1,87 +1,10 @@
-import { createBasicFunctions, type FunctionRegistry } from '../../packages/a2ui-wp/src/core/index.ts';
-
 /**
- * The `graft:wordpress` A2UI catalog: the parts of A2UI's basic catalog a
- * Graft build may use, a Table, and what Graft needs on top. The basic
- * catalog cannot hide a component or branch on a value, so this catalog
- * adds `visible` to every component and an `if` function; `can` is the
- * host's permission check, `count` a length to show.
+ * The Graft A2UI catalog in words, for the compiler's prompt (checks phase
+ * and UI phase): how values, the data model, functions, components and
+ * events work. Kept next to the catalog so the two change together.
  */
 
-export const CATALOG_ID = 'graft:wordpress';
-export const PROTOCOL = 'a2ui/v0.9.1';
-
-/** Component types the snapshot and the client draw. */
-export const COMPONENTS = ['Column', 'Row', 'Card', 'Divider', 'Text', 'Button', 'TextField', 'CheckBox', 'Table'] as const;
-
-/** Values every function gets besides its arguments. */
-export interface GraftFunctionContext {
-	can(scope: string, on: unknown): boolean;
-	now: Date;
-	/** The record in scope (a table row), which `can` refines on by default. */
-	row?: unknown;
-	/** Writes the data model, for the local `set` action. Without it, `set` does nothing. */
-	set?(pointer: string, value: unknown): void;
-}
-
-const DAY = 86_400_000;
-
-/** Reads a relative JSON Pointer ("author/name") from a value. */
-export function readPointer(value: unknown, pointer: string): unknown {
-	if (pointer === '' || pointer === '/') {
-		return value;
-	}
-	return pointer
-		.replace(/^\//, '')
-		.split('/')
-		.map((key) => key.replace(/~1/g, '/').replace(/~0/g, '~'))
-		.reduce<unknown>((inner, key) => (inner && typeof inner === 'object' ? (inner as Record<string, unknown>)[key] : undefined), value);
-}
-
-const list = (value: unknown): unknown[] => (Array.isArray(value) ? value : []);
-const text = (value: unknown): string => (value === null || value === undefined ? '' : typeof value === 'object' ? JSON.stringify(value) : String(value));
-
-export function graftFunctions({ can, now, row, set }: GraftFunctionContext): FunctionRegistry {
-	return {
-		...createBasicFunctions({ locale: 'en-US' }),
-		can: ({ scope, on }) => can(String(scope), on ?? row),
-		if: (args) => (args.condition ? args.then : args.else),
-		count: ({ value }) => (typeof value === 'string' || Array.isArray(value) ? value.length : 0),
-		daysSince: ({ value }) => {
-			const time = typeof value === 'string' || typeof value === 'number' ? new Date(value).getTime() : NaN;
-			return Number.isNaN(time) ? null : Math.floor((now.getTime() - time) / DAY);
-		},
-		// Lists.
-		filter: ({ items, by, equals }) => list(items).filter((item) => readPointer(item, String(by ?? '')) === equals),
-		map: ({ items, by }) => list(items).map((item) => readPointer(item, String(by ?? '')) ?? null),
-		distinct: ({ items, by }) => {
-			const seen = new Set<string>();
-			return list(items).filter((item) => {
-				const key = JSON.stringify(readPointer(item, String(by ?? '')) ?? null);
-				return seen.has(key) ? false : (seen.add(key), true);
-			});
-		},
-		sort: ({ items, by, descending }) =>
-			[...list(items)].sort((a, b) => {
-				const x = readPointer(a, String(by ?? ''));
-				const y = readPointer(b, String(by ?? ''));
-				const order = typeof x === 'number' && typeof y === 'number' ? x - y : text(x).localeCompare(text(y));
-				return descending ? -order : order;
-			}),
-		slice: ({ items, start, end }) => list(items).slice(Number(start ?? 0), end === undefined || end === null ? undefined : Number(end)),
-		// Strings.
-		join: ({ values, separator }) => list(values).map(text).filter(Boolean).join(separator === undefined ? ', ' : text(separator)),
-		lower: ({ value }) => text(value).toLowerCase(),
-		upper: ({ value }) => text(value).toUpperCase(),
-		replace: ({ value, pattern, with: replacement }) => text(value).replace(new RegExp(text(pattern), 'g'), text(replacement)),
-		// The local action: writes a value into the data model.
-		set: ({ target, value }) => {
-			set?.(String(target), value);
-		},
-	};
-}
-
-/** The catalog as the compiler describes it to the model. */
+/** The catalog as the compiler describes it to the model; hosts add their components and notes. */
 export const CATALOG_GUIDE = `The UI is an A2UI v0.9 surface: a flat list of components, each with a unique "id" and a "component" type. The component with id "root" is drawn first; containers name their children by id.
 
 Values (anywhere a property is dynamic):

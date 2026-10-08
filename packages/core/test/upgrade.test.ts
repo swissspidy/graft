@@ -139,7 +139,7 @@ describe('applyMigrations', () => {
 			{ op: 'rename', kind: 'component', from: 'list', to: 'grid' },
 			{ op: 'rename-prop', component: 'grid', from: 'empty', to: 'emptyText' },
 		])!;
-		const grid = (migrated.tree.children as Build['tree'][])[1]!;
+		const grid = (migrated.tree!.children as Build['tree'][])[1]!;
 		expect(grid.type).toBe('grid');
 		expect(grid.props!.emptyText).toBe('All done');
 		expect(JSON.stringify(grid.props)).toContain('"$call":"items.archive"');
