@@ -255,6 +255,15 @@ async function runCheck(options: VerifyOptions, check: Check, index: number, fun
 			return result();
 		}
 		const { instance, action } = found;
+		if (action.event && options.snapshot && !instance.snapshot.widgets?.[action.event.widget]) {
+			// A local action in a custom snapshot's UI: what it sets is kept with what the viewer
+			// entered (latest last), and the snapshot draws it.
+			const { widget, name, payload } = action.event;
+			const { [name]: _previous, ...group } = instance.entered[widget] ?? {};
+			const entered = { ...instance.entered, [widget]: { ...group, [name]: payload } };
+			view = view.map((item) => (item === instance ? snap({ slot: item.slot, data: item.data, widgets: item.widgets, entered }) : item));
+			continue;
+		}
 		if (action.event) {
 			// A widget's button: its update function computes the widget's next state.
 			const drawn = instance.snapshot.widgets?.[action.event.widget];

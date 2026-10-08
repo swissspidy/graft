@@ -1,4 +1,4 @@
-import type { Migration } from '../../packages/core/src/index.ts';
+import type { Migration, Surface } from '../../packages/core/src/index.ts';
 import type { A2UIBuild } from './snapshot.ts';
 
 /**
@@ -69,8 +69,51 @@ function applyOne(build: A2UIBuild, migration: Migration): A2UIBuild | undefined
 			const rename = (scope: string) => (scope === from ? to : scope);
 			return {
 				...build,
-				ui: { ...build.ui, components: mapCan(build.ui.components, rename) as A2UIBuild['ui']['components'], ...(build.ui.initial ? { initial: mapCan(build.ui.initial, rename) as Record<string, unknown> } : {}) },
+				ui: { ...build.ui, components: mapCan(build.ui.components, rename) as A2UIBuild['ui']['components'], ...(build.ui.initial ? { initial: mapCan(build.ui.initial, rename) as Record<string, unknown> } : {}), ...(build.ui.computed ? { computed: mapCan(build.ui.computed, rename) as Record<string, unknown> } : {}) },
 			};
 		}
 	}
+}
+
+/** The slot props an A2UI build reads: the first key of every /slot/... pointer. */
+export function slotPropsUsedA2UI(build: A2UIBuild): string[] {
+	const used = new Set<string>();
+	const walk = (value: unknown): void => {
+		if (Array.isArray(value)) {
+			value.forEach(walk);
+		} else if (value && typeof value === 'object') {
+			const object = value as Record<string, unknown>;
+			if (typeof object.path === 'string' && object.path.startsWith('/slot/')) {
+				used.add(object.path.split('/')[2]!);
+			}
+			if (typeof object.$slot === 'string') {
+				used.add(object.$slot.split('.')[0]!);
+			}
+			Object.values(object).forEach(walk);
+		}
+	};
+	walk([build.ui, build.data, build.events]);
+	return [...used].sort();
+}
+
+/**
+ * The re-anchor rung for an A2UI build, as core's `reanchor` does for trees:
+ * the slot's declared successor, or the one other slot of the same kind
+ * that provides every slot prop the surface reads. A slot's `accepts`
+ * (Graft component types for the root) does not apply to A2UI surfaces.
+ */
+export function reanchorA2UI(build: A2UIBuild, from: Surface, to: Surface): A2UIBuild | undefined {
+	const current = build.mount.slot;
+	const successor = to.slots[current]?.successor;
+	let target: string | undefined = successor && to.slots[successor] ? successor : undefined;
+	if (!target) {
+		const kind = from.slots[current]?.kind;
+		const needed = slotPropsUsedA2UI(build);
+		const candidates = Object.entries(to.slots).filter(([id, slot]) => {
+			const provides = (typeof slot.provides === 'object' ? (slot.provides.properties as Record<string, unknown> | undefined) : undefined) ?? {};
+			return id !== current && !slot.deprecated && slot.kind === kind && needed.every((prop) => prop in provides);
+		});
+		target = candidates.length === 1 ? candidates[0]![0] : undefined;
+	}
+	return target ? { ...structuredClone(build), mount: { ...build.mount, slot: target } } : undefined;
 }

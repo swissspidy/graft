@@ -1,0 +1,407 @@
+{
+	"checks": [
+		{
+			"criterion": "authors",
+			"expect": [
+				{
+					"rows": [
+						"Alice Pending",
+						"Bob Pending"
+					]
+				},
+				{
+					"action": "author-alice",
+					"available": true
+				},
+				{
+					"action": "author-bob",
+					"available": true
+				},
+				{
+					"action": "author-carol",
+					"available": false
+				}
+			],
+			"fixtures": {
+				"users": [
+					{
+						"as": "ed",
+						"role": "editor"
+					},
+					{
+						"as": "alice",
+						"role": "author"
+					},
+					{
+						"as": "bob",
+						"role": "author"
+					},
+					{
+						"as": "carol",
+						"role": "author"
+					}
+				],
+				"posts": [
+					{
+						"title": "Alice Pending",
+						"status": "pending",
+						"author": "alice"
+					},
+					{
+						"title": "Bob Pending",
+						"status": "pending",
+						"author": "bob"
+					},
+					{
+						"title": "Carol Draft",
+						"status": "draft",
+						"author": "carol"
+					},
+					{
+						"title": "Alice Published",
+						"status": "publish",
+						"author": "alice"
+					},
+					{
+						"title": "Admin Private",
+						"status": "private"
+					},
+					{
+						"title": "Carol Scheduled",
+						"status": "future",
+						"author": "carol"
+					}
+				]
+			},
+			"view_as": "ed"
+		},
+		{
+			"criterion": "filter",
+			"expect": [
+				{
+					"rows": [
+						"Alice Pending One",
+						"Alice Pending Two"
+					]
+				}
+			],
+			"fixtures": {
+				"users": [
+					{
+						"as": "ed",
+						"role": "editor"
+					},
+					{
+						"as": "alice",
+						"role": "author"
+					},
+					{
+						"as": "bob",
+						"role": "author"
+					}
+				],
+				"posts": [
+					{
+						"title": "Alice Pending One",
+						"status": "pending",
+						"author": "alice"
+					},
+					{
+						"title": "Bob Pending",
+						"status": "pending",
+						"author": "bob"
+					},
+					{
+						"title": "Alice Pending Two",
+						"status": "pending",
+						"author": "alice"
+					},
+					{
+						"title": "Alice Draft",
+						"status": "draft",
+						"author": "alice"
+					},
+					{
+						"title": "Alice Published",
+						"status": "publish",
+						"author": "alice"
+					}
+				]
+			},
+			"view_as": "ed",
+			"steps": [
+				{
+					"action": "author-alice"
+				}
+			]
+		},
+		{
+			"criterion": "filter",
+			"expect": [
+				{
+					"rows": [
+						"Bob Pending"
+					]
+				}
+			],
+			"fixtures": {
+				"users": [
+					{
+						"as": "ed",
+						"role": "editor"
+					},
+					{
+						"as": "alice",
+						"role": "author"
+					},
+					{
+						"as": "bob",
+						"role": "author"
+					}
+				],
+				"posts": [
+					{
+						"title": "Alice Pending One",
+						"status": "pending",
+						"author": "alice"
+					},
+					{
+						"title": "Bob Pending",
+						"status": "pending",
+						"author": "bob"
+					},
+					{
+						"title": "Alice Pending Two",
+						"status": "pending",
+						"author": "alice"
+					},
+					{
+						"title": "Bob Draft",
+						"status": "draft",
+						"author": "bob"
+					}
+				]
+			},
+			"view_as": "ed",
+			"steps": [
+				{
+					"action": "author-alice"
+				},
+				{
+					"action": "author-bob"
+				}
+			]
+		},
+		{
+			"criterion": "everyone",
+			"expect": [
+				{
+					"text": "Everyone"
+				},
+				{
+					"rows": [
+						"Alice Pending",
+						"Bob Pending"
+					]
+				}
+			],
+			"fixtures": {
+				"users": [
+					{
+						"as": "ed",
+						"role": "editor"
+					},
+					{
+						"as": "alice",
+						"role": "author"
+					},
+					{
+						"as": "bob",
+						"role": "author"
+					}
+				],
+				"posts": [
+					{
+						"title": "Alice Pending",
+						"status": "pending",
+						"author": "alice"
+					},
+					{
+						"title": "Bob Pending",
+						"status": "pending",
+						"author": "bob"
+					},
+					{
+						"title": "Bob Draft",
+						"status": "draft",
+						"author": "bob"
+					},
+					{
+						"title": "Alice Published",
+						"status": "publish",
+						"author": "alice"
+					}
+				]
+			},
+			"view_as": "ed",
+			"steps": [
+				{
+					"action": "author-alice"
+				},
+				{
+					"action": "everyone"
+				}
+			]
+		},
+		{
+			"criterion": "approve",
+			"expect": [
+				{
+					"post": {
+						"title": "Bob Pending",
+						"status": "publish"
+					}
+				},
+				{
+					"post": {
+						"title": "Alice Pending",
+						"status": "pending"
+					}
+				},
+				{
+					"rows": [
+						"Alice Pending"
+					]
+				}
+			],
+			"fixtures": {
+				"users": [
+					{
+						"as": "ed",
+						"role": "editor"
+					},
+					{
+						"as": "alice",
+						"role": "author"
+					},
+					{
+						"as": "bob",
+						"role": "author"
+					}
+				],
+				"posts": [
+					{
+						"title": "Alice Pending",
+						"status": "pending",
+						"author": "alice"
+					},
+					{
+						"title": "Bob Pending",
+						"status": "pending",
+						"author": "bob"
+					}
+				]
+			},
+			"view_as": "ed",
+			"steps": [
+				{
+					"action": "approve",
+					"row": {
+						"title": "Bob Pending"
+					}
+				}
+			]
+		},
+		{
+			"criterion": "approve",
+			"expect": [
+				{
+					"action": "approve",
+					"row": {
+						"title": "Alice Pending"
+					},
+					"available": true
+				}
+			],
+			"fixtures": {
+				"users": [
+					{
+						"as": "ed",
+						"role": "editor"
+					},
+					{
+						"as": "alice",
+						"role": "author"
+					}
+				],
+				"posts": [
+					{
+						"title": "Alice Pending",
+						"status": "pending",
+						"author": "alice"
+					}
+				]
+			},
+			"view_as": "ed"
+		}
+	],
+	"log": [
+		{
+			"attempt": 1,
+			"problems": [],
+			"output": {
+				"unverifiable": [],
+				"checks": [
+					{
+						"criterion": "authors",
+						"fixtures_json": "{\"users\":[{\"as\":\"ed\",\"role\":\"editor\"},{\"as\":\"alice\",\"role\":\"author\"},{\"as\":\"bob\",\"role\":\"author\"},{\"as\":\"carol\",\"role\":\"author\"}],\"posts\":[{\"title\":\"Alice Pending\",\"status\":\"pending\",\"author\":\"alice\"},{\"title\":\"Bob Pending\",\"status\":\"pending\",\"author\":\"bob\"},{\"title\":\"Carol Draft\",\"status\":\"draft\",\"author\":\"carol\"},{\"title\":\"Alice Published\",\"status\":\"publish\",\"author\":\"alice\"},{\"title\":\"Admin Private\",\"status\":\"private\"},{\"title\":\"Carol Scheduled\",\"status\":\"future\",\"author\":\"carol\"}]}",
+						"view_as": "ed",
+						"advance_days": 0,
+						"steps_json": "[]",
+						"expect_json": "[{\"rows\":[\"Alice Pending\",\"Bob Pending\"]},{\"action\":\"author-alice\",\"available\":true},{\"action\":\"author-bob\",\"available\":true},{\"action\":\"author-carol\",\"available\":false}]"
+					},
+					{
+						"criterion": "filter",
+						"fixtures_json": "{\"users\":[{\"as\":\"ed\",\"role\":\"editor\"},{\"as\":\"alice\",\"role\":\"author\"},{\"as\":\"bob\",\"role\":\"author\"}],\"posts\":[{\"title\":\"Alice Pending One\",\"status\":\"pending\",\"author\":\"alice\"},{\"title\":\"Bob Pending\",\"status\":\"pending\",\"author\":\"bob\"},{\"title\":\"Alice Pending Two\",\"status\":\"pending\",\"author\":\"alice\"},{\"title\":\"Alice Draft\",\"status\":\"draft\",\"author\":\"alice\"},{\"title\":\"Alice Published\",\"status\":\"publish\",\"author\":\"alice\"}]}",
+						"view_as": "ed",
+						"advance_days": 0,
+						"steps_json": "[{\"action\":\"author-alice\"}]",
+						"expect_json": "[{\"rows\":[\"Alice Pending One\",\"Alice Pending Two\"]}]"
+					},
+					{
+						"criterion": "filter",
+						"fixtures_json": "{\"users\":[{\"as\":\"ed\",\"role\":\"editor\"},{\"as\":\"alice\",\"role\":\"author\"},{\"as\":\"bob\",\"role\":\"author\"}],\"posts\":[{\"title\":\"Alice Pending One\",\"status\":\"pending\",\"author\":\"alice\"},{\"title\":\"Bob Pending\",\"status\":\"pending\",\"author\":\"bob\"},{\"title\":\"Alice Pending Two\",\"status\":\"pending\",\"author\":\"alice\"},{\"title\":\"Bob Draft\",\"status\":\"draft\",\"author\":\"bob\"}]}",
+						"view_as": "ed",
+						"advance_days": 0,
+						"steps_json": "[{\"action\":\"author-alice\"},{\"action\":\"author-bob\"}]",
+						"expect_json": "[{\"rows\":[\"Bob Pending\"]}]"
+					},
+					{
+						"criterion": "everyone",
+						"fixtures_json": "{\"users\":[{\"as\":\"ed\",\"role\":\"editor\"},{\"as\":\"alice\",\"role\":\"author\"},{\"as\":\"bob\",\"role\":\"author\"}],\"posts\":[{\"title\":\"Alice Pending\",\"status\":\"pending\",\"author\":\"alice\"},{\"title\":\"Bob Pending\",\"status\":\"pending\",\"author\":\"bob\"},{\"title\":\"Bob Draft\",\"status\":\"draft\",\"author\":\"bob\"},{\"title\":\"Alice Published\",\"status\":\"publish\",\"author\":\"alice\"}]}",
+						"view_as": "ed",
+						"advance_days": 0,
+						"steps_json": "[{\"action\":\"author-alice\"},{\"action\":\"everyone\"}]",
+						"expect_json": "[{\"text\":\"Everyone\"},{\"rows\":[\"Alice Pending\",\"Bob Pending\"]}]"
+					},
+					{
+						"criterion": "approve",
+						"fixtures_json": "{\"users\":[{\"as\":\"ed\",\"role\":\"editor\"},{\"as\":\"alice\",\"role\":\"author\"},{\"as\":\"bob\",\"role\":\"author\"}],\"posts\":[{\"title\":\"Alice Pending\",\"status\":\"pending\",\"author\":\"alice\"},{\"title\":\"Bob Pending\",\"status\":\"pending\",\"author\":\"bob\"}]}",
+						"view_as": "ed",
+						"advance_days": 0,
+						"steps_json": "[{\"action\":\"approve\",\"row\":{\"title\":\"Bob Pending\"}}]",
+						"expect_json": "[{\"post\":{\"title\":\"Bob Pending\",\"status\":\"publish\"}},{\"post\":{\"title\":\"Alice Pending\",\"status\":\"pending\"}},{\"rows\":[\"Alice Pending\"]}]"
+					},
+					{
+						"criterion": "approve",
+						"fixtures_json": "{\"users\":[{\"as\":\"ed\",\"role\":\"editor\"},{\"as\":\"alice\",\"role\":\"author\"}],\"posts\":[{\"title\":\"Alice Pending\",\"status\":\"pending\",\"author\":\"alice\"}]}",
+						"view_as": "ed",
+						"advance_days": 0,
+						"steps_json": "[]",
+						"expect_json": "[{\"action\":\"approve\",\"row\":{\"title\":\"Alice Pending\"},\"available\":true}]"
+					}
+				]
+			}
+		}
+	]
+}

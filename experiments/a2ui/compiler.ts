@@ -1,4 +1,6 @@
 import { describeSpec, describeSurface, usableCapabilities, type Check, type ModelClient, type Spec, type Surface, type Verification } from '../../packages/core/src/index.ts';
+import { compileSchema } from '../../packages/core/src/schema.ts';
+import { describeSchemaError, schemaErrorPath } from '../../packages/core/src/schema-errors.ts';
 import { isDataBinding, isFunctionCall, type ComponentDefinition } from '../../packages/a2ui/src/core/index.ts';
 import { CATALOG_GUIDE, CATALOG_ID, COMPONENTS, graftFunctions, PROTOCOL } from './catalog.ts';
 import type { A2UIBuild, EventBinding } from './snapshot.ts';
@@ -19,7 +21,7 @@ export function a2uiOutputSchema(spec: Spec, surface: Surface): Record<string, u
 	return {
 		type: 'object',
 		additionalProperties: false,
-		required: ['components', 'initial_json', 'data', 'events'],
+		required: ['components', 'initial_json', 'computed_json', 'data', 'events'],
 		properties: {
 			components: {
 				type: 'array',
@@ -36,6 +38,7 @@ export function a2uiOutputSchema(spec: Spec, surface: Surface): Record<string, u
 				},
 			},
 			initial_json: { type: 'string', description: 'JSON object: data model values set when the surface is drawn; "{}" for none.' },
+			computed_json: { type: 'string', description: 'JSON object: data model values recomputed whenever the model changes; "{}" for none.' },
 			data: {
 				type: 'array',
 				description: 'Named data sources, loaded into the data model at /<name>.',
@@ -79,6 +82,8 @@ const WORDPRESS_NOTES = `WordPress specifics:
 - posts.list returns {items: [{id, title, status, type, author: {id, name}, date, modified, edit_url, meta, terms, can: {edit, publish}}], total, pages}. Bind table rows to /<source>/items.
 - Per-post permission: {"call": "can", "args": {"scope": "posts.status:write"}} in a table row uses that row's post; for the slot's post pass "on": {"path": "/slot/post"}.
 - The post.editor.panel slot renders in the block editor's sidebar for each saved post the viewer can edit, with /slot/post = {id, title, excerpt, status, type, meta, terms, can} (title and excerpt as saved). Events that change the post should end with "then": ["reload:page"], which reloads the editor (and with it the saved values and the form). Checks match its actions and inputs with "row": {"title": ...}, which refers to that post.
+- The posts.list.row-actions slot renders once per post on the posts list screen, with /slot/post = {id, title, status, type, meta, terms, can}; its root is the one Button for that post (its id is the action id). WordPress draws that list, so its events end with "then": ["reload:page"].
+- The dashboard.widget slot is a Dashboard box with no slot data: draw from data sources.
 - posts.update_fields changes a post's title and/or excerpt (scope posts:write). posts.update_status changes its status (scope posts.status:write).`;
 
 export function a2uiSystem(spec: Spec, surface: Surface): string {
@@ -144,6 +149,10 @@ export function assembleA2UI(output: unknown): { value?: Parts; problems: string
 	if (initial !== undefined && !isObject(initial)) {
 		problems.push('initial_json must be an object.');
 	}
+	const computed = parse(output.computed_json ?? '{}', 'computed_json', problems);
+	if (computed !== undefined && !isObject(computed)) {
+		problems.push('computed_json must be an object.');
+	}
 	const data: A2UIBuild['data'] = {};
 	for (const item of output.data as Array<{ name: string; call: string; input_json: string }>) {
 		if (!/^[a-z][a-zA-Z0-9_-]*$/.test(item.name) || item.name === 'slot' || item.name === 'form') {
@@ -163,11 +172,50 @@ export function assembleA2UI(output: unknown): { value?: Parts; problems: string
 	if (problems.length > 0) {
 		return { problems };
 	}
-	return { value: { ui: { protocol: PROTOCOL, catalogId: CATALOG_ID, ...(isObject(initial) && Object.keys(initial).length ? { initial } : {}), components }, data, events }, problems };
+	return { value: { ui: { protocol: PROTOCOL, catalogId: CATALOG_ID, ...(isObject(initial) && Object.keys(initial).length ? { initial } : {}), ...(isObject(computed) && Object.keys(computed).length ? { computed } : {}), components }, data, events }, problems };
 }
 
-/** Static checks before verification: structure, references, functions, event bindings. */
-export function validateA2UI(build: Parts): string[] {
+/**
+ * Problems with a capability input: checked against the capability's input
+ * schema, with placeholders filled in at run time ({"$context": ...} in
+ * events, {"$slot": ...} in data sources) exempt.
+ */
+export function inputProblems(surface: Surface, capability: string, input: unknown, what: string): string[] {
+	const schema = surface.capabilities[capability]?.input;
+	if (!schema) {
+		return [];
+	}
+	const placeholders: string[] = [];
+	const fill = (value: unknown, path: string): unknown => {
+		if (isObject(value) && Object.keys(value).length === 1 && (typeof value.$context === 'string' || typeof value.$slot === 'string')) {
+			placeholders.push(path);
+			return null;
+		}
+		if (Array.isArray(value)) {
+			return value.map((item, i) => fill(item, `${path}/${i}`));
+		}
+		return isObject(value) ? Object.fromEntries(Object.entries(value).map(([key, item]) => [key, fill(item, `${path}/${key}`)])) : value;
+	};
+	const validate = compileSchema(schema as object);
+	if (validate(fill(input ?? {}, ''))) {
+		return [];
+	}
+	return (validate.errors ?? [])
+		.filter((error) => {
+			const at = schemaErrorPath(error);
+			const exempt = placeholders.some((p) => at === p || at.startsWith(`${p}/`));
+			return !exempt && !((error.keyword === 'anyOf' || error.keyword === 'oneOf') && placeholders.includes(error.instancePath));
+		})
+		.map((error) => `${what}: ${describeSchemaError(error, '', 'the input')}`);
+}
+
+/** Pointers written with "." where JSON Pointers use "/" (e.g. "can.publish"). */
+function dottedPointer(path: string): boolean {
+	return path.split('/').some((segment) => /^[A-Za-z_]\w*(\.[A-Za-z_]\w*)+$/.test(segment));
+}
+
+/** Static checks before verification: structure, references, functions, event bindings, capability inputs. */
+export function validateA2UI(build: Parts, surface?: Surface): string[] {
 	const problems: string[] = [];
 	const ids = new Map<string, ComponentDefinition>();
 	for (const component of build.ui.components) {
@@ -225,6 +273,12 @@ export function validateA2UI(build: Parts): string[] {
 			if (isFunctionCall(value) && !known.has(value.call)) {
 				problems.push(`${where} calls an unknown function "${value.call}".`);
 			}
+			if (isDataBinding(value) && dottedPointer(value.path)) {
+				problems.push(`${where} binds "${value.path}": JSON Pointers separate keys with "/", e.g. "${value.path.replace(/\./g, '/')}".`);
+			}
+			if (isObject(value.functionCall) && (value.functionCall.call !== 'set' || !isObject(value.functionCall.args) || typeof value.functionCall.args.target !== 'string' || !value.functionCall.args.target.startsWith('/'))) {
+				problems.push(`${where}: a local action must be {"functionCall": {"call": "set", "args": {"target": "/<pointer>", "value": ...}}}.`);
+			}
 			if (isObject(value.event) && typeof value.event.name === 'string') {
 				events.add(value.event.name);
 			}
@@ -233,11 +287,33 @@ export function validateA2UI(build: Parts): string[] {
 	};
 	for (const component of build.ui.components) {
 		scan(component, `"${component.id}"`);
+		if (component.component === 'Table') {
+			for (const field of (component.fields as Array<{ id?: unknown }> | undefined) ?? []) {
+				if (typeof field.id === 'string' && field.id.includes('.') && !field.id.includes('/')) {
+					problems.push(`"${component.id}": field "${field.id}" should be a JSON Pointer into the row, e.g. "${field.id.replace(/\./g, '/')}".`);
+				}
+			}
+		}
 		if ((component.component === 'TextField' || component.component === 'CheckBox') && !(isDataBinding(component.value) && component.value.path.startsWith('/'))) {
 			problems.push(`The input "${component.id}" must bind "value" to an absolute path, e.g. {"path": "/form/${component.id}"}.`);
 		}
 	}
 	scan(build.ui.initial ?? {}, '"initial"');
+	scan(build.ui.computed ?? {}, '"computed"');
+	const keys = [...Object.keys(build.ui.initial ?? {}), ...Object.keys(build.ui.computed ?? {})];
+	for (const key of keys) {
+		if (key === 'slot' || build.data[key] || keys.indexOf(key) !== keys.lastIndexOf(key)) {
+			problems.push(`The data model key "${key}" is used twice (data sources, "slot", "initial" and "computed" share the top level).`);
+		}
+	}
+	if (surface) {
+		for (const [name, source] of Object.entries(build.data)) {
+			problems.push(...inputProblems(surface, source.call, source.input ?? {}, `Data source "${name}" (${source.call})`));
+		}
+		for (const [name, binding] of Object.entries(build.events)) {
+			problems.push(...inputProblems(surface, binding.call, binding.input ?? {}, `Event "${name}" (${binding.call})`));
+		}
+	}
 	for (const name of events) {
 		if (!build.events[name]) {
 			problems.push(`The event "${name}" is not bound in "events".`);
@@ -305,7 +381,7 @@ export async function compileA2UI(options: CompileA2UIOptions): Promise<{ ok: bo
 		const response = await model.generate({ purpose: 'tree', system, prompt: a2uiPrompt(spec, checks, feedback, options.previous), schema });
 		const seconds = Math.round((Date.now() - started) / 1000);
 		const assembled = assembleA2UI(response.output);
-		const problems = assembled.value ? validateA2UI(assembled.value) : assembled.problems;
+		const problems = assembled.value ? validateA2UI(assembled.value, surface) : assembled.problems;
 		let verification: Verification | undefined;
 		if (assembled.value && problems.length === 0) {
 			build = {

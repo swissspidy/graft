@@ -1,0 +1,28 @@
+[
+	{
+		"attempt": 1,
+		"seconds": 10,
+		"model": "claude-opus-5-5",
+		"problems": [],
+		"results": "✔pending-only#1 ✔at-most-five#2 ✔empty#3",
+		"output": {
+			"components": [
+				{
+					"id": "root",
+					"component": "Table",
+					"props_json": "{\"rows\":{\"path\":\"/pending/items\"},\"fields\":[{\"id\":\"title\",\"label\":\"Title\",\"type\":\"string\",\"primary\":true},{\"id\":\"author/name\",\"label\":\"Author\",\"type\":\"string\"}],\"empty\":\"Nothing is waiting\"}"
+				}
+			],
+			"initial_json": "{}",
+			"computed_json": "{}",
+			"data": [
+				{
+					"name": "pending",
+					"call": "posts.list",
+					"input_json": "{\"post_type\":\"post\",\"status\":[\"pending\"],\"per_page\":5,\"orderby\":\"date\",\"order\":\"desc\"}"
+				}
+			],
+			"events": []
+		}
+	}
+]

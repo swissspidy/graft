@@ -60,3 +60,41 @@ add_action(
 		wp_add_inline_script( 'graft-a2ui', sprintf( 'window.graftA2UI = %s;', wp_json_encode( $config ) ), 'before' );
 	}
 );
+
+/*
+ * Dashboard → one "<title> (A2UI)" widget per compiled dashboard.widget
+ * build, each served as its approved customization.
+ */
+add_action(
+	'wp_dashboard_setup',
+	static function () {
+		$servable = \Graft\servable_specs();
+		$configs  = array();
+		foreach ( glob( __DIR__ . '/compiled/*.a2ui.json' ) as $file ) {
+			$spec  = basename( $file, '.a2ui.json' );
+			$build = json_decode( (string) file_get_contents( $file ), true );
+			if ( ! isset( $servable[ $spec ] ) || 'dashboard.widget' !== ( $build['mount']['slot'] ?? '' ) ) {
+				continue;
+			}
+			$element = 'graft-a2ui-' . $spec;
+			wp_add_dashboard_widget(
+				$element . '-widget',
+				( $build['mount']['title'] ?? $spec ) . ' (A2UI)',
+				static function () use ( $element ) {
+					printf( '<div id="%s"></div>', esc_attr( $element ) );
+				}
+			);
+			$configs[] = array(
+				'spec'    => $spec,
+				'build'   => $build,
+				'scopes'  => (object) \Graft\usable_scopes( $servable[ $spec ]['record'] ),
+				'element' => $element,
+			);
+		}
+		if ( $configs ) {
+			wp_enqueue_script( 'graft-a2ui', content_url( 'graft-a2ui/build/client.js' ), array( 'react', 'react-dom', 'react-jsx-runtime', 'wp-components', 'wp-api-fetch', 'wp-element', 'wp-i18n' ), (string) filemtime( __DIR__ . '/build/client.js' ), true );
+			wp_add_inline_script( 'graft-a2ui', sprintf( 'window.graftA2UI = %s;', wp_json_encode( $configs ) ), 'before' );
+			wp_enqueue_style( 'wp-components' );
+		}
+	}
+);

@@ -11,7 +11,7 @@ import {
 	type JsonValue,
 	type ResolveScope,
 } from '../../packages/a2ui/src/core/index.ts';
-import { cell, readPath, type Field } from '../../hosts/wordpress/adapter/src/cells.ts';
+import { cell, type Field } from '../../hosts/wordpress/adapter/src/cells.ts';
 import { graftFunctions } from './catalog.ts';
 import { withContext } from './events.ts';
 
@@ -30,6 +30,8 @@ export interface A2UIBuild extends Omit<Build, 'tree'> {
 		catalogId: string;
 		/** Data model values set when the surface is drawn, as A2UI values (e.g. a form seeded from the slot). */
 		initial?: Record<string, unknown>;
+		/** Data model values recomputed whenever the model changes (e.g. a filtered list), as A2UI values. */
+		computed?: Record<string, unknown>;
 		components: ComponentDefinition[];
 	};
 	events: Record<string, EventBinding>;
@@ -44,6 +46,10 @@ export interface EventBinding {
 
 interface EventAction {
 	event: { name: string; context?: Record<string, unknown> };
+}
+
+interface LocalAction {
+	functionCall: { call: string; args?: Record<string, unknown> };
 }
 
 interface RowAction {
@@ -64,6 +70,21 @@ export function initialDataModel(build: A2UIBuild, data: Record<string, unknown>
 		model.set(`/${key}`, resolveInitial(value, at) as JsonValue);
 	}
 	return model;
+}
+
+/** Writes `computed` into the model, each key seeing the ones before it. */
+export function computeDataModel(build: A2UIBuild, model: DataModel, at: ResolveScope): void {
+	for (const [key, value] of Object.entries(build.ui.computed ?? {})) {
+		model.set(`/${key}`, resolveInitial(value, at) as JsonValue);
+	}
+}
+
+/**
+ * A Table field as Graft's cells read it: `id` is a JSON Pointer into the
+ * row ("author/name"), so its value is that binding unless it computes one.
+ */
+export function tableField<T extends { id: string; value?: unknown }>(field: T): T {
+	return field.value === undefined ? { ...field, value: { path: field.id } } : field;
 }
 
 // `initial` nests plain objects around A2UI values.
@@ -101,9 +122,9 @@ export function snapshotA2UI(build: A2UIBuild, ctx: EvalContext, entered: Record
 		problem(`"initial" could not be resolved: ${(error as Error).message}`);
 		dataModel = new DataModel({ ...ctx.data, slot: ctx.slot ?? null } as JsonValue);
 	}
-	// What the viewer entered goes where each input is bound.
+	// What the viewer entered goes where each input is bound; local `set` actions name the pointer.
 	for (const [id, value] of Object.entries(entered[INPUT_GROUP] ?? {})) {
-		const binding = components.get(id)?.value;
+		const binding = id.startsWith('/') ? { path: id } : components.get(id)?.value;
 		if (isDataBinding(binding) && binding.path.startsWith('/')) {
 			dataModel.set(binding.path, value as JsonValue);
 		} else {
@@ -111,6 +132,11 @@ export function snapshotA2UI(build: A2UIBuild, ctx: EvalContext, entered: Record
 		}
 	}
 	const scope = (scopePath?: string, row?: unknown) => scopeOf(dataModel, scopePath, row);
+	try {
+		computeDataModel(build, dataModel, scope());
+	} catch (error) {
+		problem(`"computed" could not be resolved: ${(error as Error).message}`);
+	}
 	const safely = <T>(what: string, fallback: T, run: () => T): T => {
 		try {
 			return run();
@@ -182,8 +208,21 @@ export function snapshotA2UI(build: A2UIBuild, ctx: EvalContext, entered: Record
 				// Not drawn as text: its label is in the action.
 				const checks = (props.checks as Array<{ condition: unknown }> | undefined) ?? [];
 				const passes = checks.every((check, i) => safely(`Check ${i + 1} of "${id}"`, false, () => resolveBoolean(check.condition, at)));
+				const actionId = props.actionId === undefined ? id : safely(`"actionId" of "${id}"`, id, () => resolveString(props.actionId, at));
+				const base = { id: actionId, label: label(props.child, at), ...(row !== undefined ? { row } : {}) };
+				const local = (props.action as LocalAction | undefined)?.functionCall;
+				if (local) {
+					// A local action: `set` writes the model, recorded like what the viewer enters.
+					const args = Object.fromEntries(Object.entries(local.args ?? {}).map(([key, value]) => [key, safely(`The action of "${id}"`, null, () => resolveDynamicValue(value, at))]));
+					const target = local.call === 'set' && typeof args.target === 'string' && args.target.startsWith('/') ? args.target : undefined;
+					if (!target) {
+						problem(`The action of "${id}" must be {"functionCall": {"call": "set", "args": {"target": "/<pointer>", "value": ...}}} or an event.`);
+					}
+					emit.action({ ...base, available: passes && target !== undefined, ...(target ? { event: { widget: INPUT_GROUP, name: target, payload: args.value ?? null } } : {}) });
+					return;
+				}
 				const action = event(props.action as EventAction | undefined, at, row);
-				emit.action({ id, label: label(props.child, at), available: passes && action !== undefined, ...(action ? { action } : {}), ...(row !== undefined ? { row } : {}) });
+				emit.action({ ...base, available: passes && action !== undefined, ...(action ? { action } : {}) });
 				return;
 			}
 			case 'TextField':
@@ -199,7 +238,7 @@ export function snapshotA2UI(build: A2UIBuild, ctx: EvalContext, entered: Record
 				const rowsPath = binding?.path ? joinPointer(scopePath, binding.path) : undefined;
 				const rows = rowsPath ? dataModel.get(rowsPath) : undefined;
 				const records = Array.isArray(rows) ? rows : [];
-				const fields = (props.fields as Field[] | undefined) ?? [];
+				const fields = ((props.fields as Field[] | undefined) ?? []).map(tableField);
 				const primary = fields.find((field) => field.primary) ?? fields[0];
 				const rowActions = (props.rowActions as RowAction[] | undefined) ?? [];
 				emit.table({
@@ -212,7 +251,7 @@ export function snapshotA2UI(build: A2UIBuild, ctx: EvalContext, entered: Record
 							return { id: rowAction.id, label: rowAction.label, available: visible && action !== undefined, ...(action ? { action } : {}), row: record };
 						});
 						return {
-							label: primary ? String(readPath(record, primary.id) ?? '') : '',
+							label: primary ? String(safely(`Field "${primary.label}"`, null, () => resolveDynamicValue(primary.value, rowScope)) ?? '') : '',
 							record,
 							actions,
 							cells: Object.fromEntries(fields.map((field) => [field.label, cell(field, record, (value) => safely(`Field "${field.label}"`, null, () => resolveDynamicValue(value, rowScope)), 'en-US')])),

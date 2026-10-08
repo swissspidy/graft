@@ -1,4 +1,4 @@
-import { readFile } from 'node:fs/promises';
+import { readdir, readFile } from 'node:fs/promises';
 import { hashSpec, validateSpec, verifyBuild, type Build, type Spec, type Surface, type Verification } from '../../packages/core/src/index.ts';
 import { createCan } from '../../hosts/wordpress/adapter/src/can.ts';
 import { startSandbox } from '../../hosts/wordpress/adapter/src/sandbox.ts';
@@ -53,6 +53,13 @@ try {
 	report('A2UI surface (experiments/a2ui/review-queue.a2ui.json)', await verify(a2ui, 'a2ui'));
 	report('A2UI, broken: Approve shown to everyone', await verify(showsApproveToEveryone, 'a2ui'));
 	report('A2UI, broken: Approve sets status to draft', await verify(approvesToDraft, 'a2ui'));
+	// Every compiled build, against its own spec's frozen checks.
+	for (const file of (await readdir(new URL('experiments/a2ui/compiled/', root))).filter((f) => f.endsWith('.a2ui.json')).sort()) {
+		const id = file.replace(/\.a2ui\.json$/, '');
+		const compiled = JSON.parse(await read(`experiments/a2ui/compiled/${file}`)) as A2UIBuild;
+		const own = validateSpec(await read(`examples/specs/${id}.md`), { surface }).spec as Spec;
+		report(`Compiled: ${id}`, await verifyBuild({ build: compiled as unknown as Build, spec: own, surface, sandbox, semantics, createCan, snapshot: (b, ctx, entered) => snapshotA2UI(b as unknown as A2UIBuild, ctx, entered) }));
+	}
 } finally {
 	await sandbox.close();
 }

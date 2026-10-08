@@ -50,6 +50,14 @@ try {
 	check('Publish disabled while unsaved', await panel.getByRole('button', { name: 'Publish' }).isDisabled());
 	await page.screenshot({ path: 'test-results/a2ui-checklist-typed.png' });
 
+	// While the editor has unsaved changes of its own, nothing is written.
+	type EditorData = { data: { dispatch(store: string): { editPost(edits: object): void }; select(store: string): { isEditedPostDirty(): boolean } } };
+	await page.evaluate(() => (window.wp as unknown as EditorData).data.dispatch('core/editor').editPost({ title: 'Draft B, edited in the editor' }));
+	await panel.getByRole('button', { name: 'Save' }).click();
+	check('refuses while the editor has unsaved changes', await panel.getByText('Save or discard your changes to the post first.').waitFor({ timeout: 10_000 }).then(() => true, () => false));
+	await page.evaluate(() => (window.wp as unknown as EditorData).data.dispatch('core/editor').editPost({ title: 'Draft B' }));
+	await page.waitForFunction(() => !(window.wp as unknown as EditorData).data.select('core/editor').isEditedPostDirty());
+
 	const saved = page.waitForEvent('load', { timeout: 60_000 });
 	await panel.getByRole('button', { name: 'Save' }).click();
 	await saved;
