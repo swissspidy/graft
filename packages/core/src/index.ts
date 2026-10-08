@@ -45,6 +45,7 @@ export { FixtureError, SandboxCallError, type Sandbox } from './verifier/sandbox
 export {
 	allActions,
 	snapshotTree,
+	createSnapshotEmitter,
 	type ComponentSemantics,
 	type SemanticsArgs,
 	type Snapshot,

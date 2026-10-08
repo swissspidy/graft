@@ -23,6 +23,11 @@ export interface VerifyOptions {
 	createCan(usable: Record<string, boolean>): EvalContext['can'];
 	/** The grant to simulate. Default: the permissions the spec requests. */
 	grant?: string[];
+	/**
+	 * Reads the build's UI into a snapshot instead of walking `build.tree`,
+	 * for a build whose UI is in another format (e.g. an A2UI surface).
+	 */
+	snapshot?(build: Build, ctx: EvalContext): Snapshot;
 	/** Starts the host's sandbox for a build with code. Required to verify such builds. */
 	loadFunctions?(code: BuildCode, limits: NonNullable<Surface['functions']>['limits']): Promise<FunctionRunner>;
 }
@@ -181,19 +186,21 @@ async function runCheck(options: VerifyOptions, check: Check, index: number, fun
 
 	const widgetLimits = options.surface.functions?.widgets;
 	const snap = (instance: Omit<Instance, 'snapshot'>): Instance => {
-		const snapshot = snapshotTree(
-			build.tree,
-			{ data: instance.data, slot: instance.slot, can, now, fn },
-			semantics,
-			widgetLimits
-				? {
-						limits: widgetLimits,
-						state: (path) => (Object.hasOwn(instance.widgets, path) ? { has: true, value: instance.widgets[path] } : { has: false }),
-						validate: (tree) => validateWidgetTree(tree, options.surface),
-						entered: (path) => instance.entered[path] ?? {},
-					}
-				: undefined,
-		);
+		const snapshot = options.snapshot
+			? options.snapshot(build, { data: instance.data, slot: instance.slot, can, now, fn })
+			: snapshotTree(
+				build.tree,
+				{ data: instance.data, slot: instance.slot, can, now, fn },
+				semantics,
+				widgetLimits
+					? {
+							limits: widgetLimits,
+							state: (path) => (Object.hasOwn(instance.widgets, path) ? { has: true, value: instance.widgets[path] } : { has: false }),
+							validate: (tree) => validateWidgetTree(tree, options.surface),
+							entered: (path) => instance.entered[path] ?? {},
+						}
+					: undefined,
+			);
 		for (const problem of snapshot.problems ?? []) {
 			if (!failures.includes(problem)) {
 				failures.push(problem);

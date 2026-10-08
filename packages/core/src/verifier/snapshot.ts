@@ -99,10 +99,10 @@ export interface SemanticsArgs {
 export type ComponentSemantics = Record<string, (args: SemanticsArgs) => void | false>;
 
 /**
- * Interprets a tree into a snapshot. Components without semantics
- * contribute their text children, if any.
+ * A snapshot and the emitter that fills it. Components reading into a
+ * snapshot go through the emitter, so every UI format reads the same way.
  */
-export function snapshotTree(tree: TreeNode, ctx: EvalContext, semantics: ComponentSemantics, widgets?: SnapshotWidgets): Snapshot {
+export function createSnapshotEmitter(): { snapshot: Snapshot; emit: SnapshotEmitter } {
 	const snapshot: Snapshot = { texts: [], tables: [], actions: [] };
 	const emit: SnapshotEmitter = {
 		text: (text) => {
@@ -120,6 +120,15 @@ export function snapshotTree(tree: TreeNode, ctx: EvalContext, semantics: Compon
 			snapshot.actions.push(action);
 		},
 	};
+	return { snapshot, emit };
+}
+
+/**
+ * Interprets a tree into a snapshot. Components without semantics
+ * contribute their text children, if any.
+ */
+export function snapshotTree(tree: TreeNode, ctx: EvalContext, semantics: ComponentSemantics, widgets?: SnapshotWidgets): Snapshot {
+	const { snapshot, emit } = createSnapshotEmitter();
 
 	const problem = (text: string) => (snapshot.problems ??= []).push(text);
 
