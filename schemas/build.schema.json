@@ -2,10 +2,14 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://graft.dev/schemas/build/1.json",
   "title": "Graft build",
-  "description": "A disposable build of one spec version against one surface: a declarative UI tree, its data sources, frozen checks, computed refs and provenance. A pure function of (spec hash, surface hash, compiler version).",
+  "description": "A disposable build of one spec version against one surface: its UI (a declarative tree, or a surface in another UI format with its event bindings), its data sources, frozen checks, computed refs and provenance. A pure function of (spec hash, surface hash, compiler version).",
   "type": "object",
-  "required": ["graft", "spec", "surface", "mount", "tree", "data", "checks", "refs", "provenance"],
+  "required": ["graft", "spec", "surface", "mount", "data", "checks", "refs", "provenance"],
   "additionalProperties": false,
+  "oneOf": [
+    { "description": "A Graft tree.", "required": ["tree"], "properties": { "tree": true, "ui": false, "events": false } },
+    { "description": "Another UI format (e.g. A2UI), validated by the tool that supports it.", "required": ["ui", "events"], "properties": { "tree": false, "ui": true, "events": true } }
+  ],
   "properties": {
     "graft": { "const": 1 },
     "spec": {
@@ -33,6 +37,30 @@
       "properties": { "slot": { "type": "string" } }
     },
     "tree": { "$ref": "#/$defs/node" },
+    "ui": {
+      "description": "The UI in another format than a tree: the protocol and catalog it draws from, and the format's own content (A2UI: components, initial and computed data model values). A registered UI format validates the rest.",
+      "type": "object",
+      "required": ["protocol", "catalogId"],
+      "properties": {
+        "protocol": { "type": "string" },
+        "catalogId": { "type": "string" }
+      }
+    },
+    "events": {
+      "description": "For a ui: what each action event does, a capability call like a tree's $call. {\"$context\": \"<key>\"} in the input stands for a value of the event's context.",
+      "type": "object",
+      "additionalProperties": {
+        "type": "object",
+        "required": ["call"],
+        "additionalProperties": false,
+        "properties": {
+          "call": { "type": "string" },
+          "input": true,
+          "then": { "type": "array", "items": { "type": "string" } },
+          "notice": { "type": "string" }
+        }
+      }
+    },
     "data": {
       "description": "Named data sources, each a capability call with fixed or bound input.",
       "type": "object",
@@ -51,7 +79,7 @@
       "items": { "$ref": "#/$defs/check" }
     },
     "refs": {
-      "description": "Every surface symbol the build uses. Computed from the tree, data and checks, never trusted from the model.",
+      "description": "Every surface symbol the build uses. Computed from the UI, data and checks, never trusted from the model.",
       "type": "object",
       "required": ["slot", "components", "capabilities", "scopes"],
       "additionalProperties": false,
@@ -63,7 +91,12 @@
           "additionalProperties": { "type": "array", "items": { "type": "string" } }
         },
         "capabilities": { "type": "array", "items": { "type": "string" }, "uniqueItems": true },
-        "scopes": { "type": "array", "items": { "type": "string" }, "uniqueItems": true }
+        "scopes": { "type": "array", "items": { "type": "string" }, "uniqueItems": true },
+        "catalog": {
+          "type": "object",
+          "description": "A build in another UI format: component type to the properties it uses, in that format's catalog.",
+          "additionalProperties": { "type": "array", "items": { "type": "string" } }
+        }
       }
     },
     "code": {

@@ -1,0 +1,28 @@
+[
+	{
+		"attempt": 1,
+		"seconds": 9,
+		"model": "claude-opus-5-5",
+		"problems": [],
+		"results": "✔drafts-only#1 ✔days#2 ✔age-tone#3 ✔age-tone#4 ✔age-tone#5",
+		"output": {
+			"components": [
+				{
+					"id": "root",
+					"component": "Table",
+					"props_json": "{\"rows\":{\"path\":\"/drafts/items\"},\"fields\":[{\"id\":\"title\",\"label\":\"Title\",\"type\":\"string\",\"primary\":true},{\"id\":\"author/name\",\"label\":\"Author\",\"type\":\"string\"},{\"id\":\"days\",\"label\":\"Days since update\",\"type\":\"integer\",\"value\":{\"call\":\"daysSince\",\"args\":{\"value\":{\"path\":\"modified\"}}},\"tone\":{\"call\":\"if\",\"args\":{\"condition\":{\"call\":\"greaterThan\",\"args\":{\"a\":{\"call\":\"daysSince\",\"args\":{\"value\":{\"path\":\"modified\"}}},\"b\":29}},\"then\":\"error\",\"else\":{\"call\":\"if\",\"args\":{\"condition\":{\"call\":\"greaterThan\",\"args\":{\"a\":{\"call\":\"daysSince\",\"args\":{\"value\":{\"path\":\"modified\"}}},\"b\":6}},\"then\":\"warning\",\"else\":\"success\"}}}}}],\"empty\":\"No drafts.\"}"
+				}
+			],
+			"initial_json": "{}",
+			"computed_json": "{}",
+			"data": [
+				{
+					"name": "drafts",
+					"call": "posts.list",
+					"input_json": "{\"post_type\":\"post\",\"status\":[\"draft\"],\"orderby\":\"modified\",\"order\":\"asc\",\"per_page\":50}"
+				}
+			],
+			"events": []
+		}
+	}
+]

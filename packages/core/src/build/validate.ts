@@ -9,6 +9,7 @@ import { hashSurface } from '../surface/hash.ts';
 import type { JsonSchema, Surface } from '../surface/types.ts';
 import { isDynamic, isCall, isCan, isDataRef, isFn, isInputRef, isSlotRef, walkTree, walkValue } from './expressions.ts';
 import { extractRefs } from './refs.ts';
+import { isTreeBuild, uiFormatOf } from './format.ts';
 import { isWidgetEvent, isWidgetUse, WIDGET } from './widgets.ts';
 import type { Build, Refs, TreeNode, Value } from './types.ts';
 
@@ -69,14 +70,28 @@ export async function validateBuild(value: unknown, surface: Surface, options: V
 	const slot = surface.slots[build.mount.slot];
 	if (!slot) {
 		error('build-unknown-slot', '/mount/slot', `Unknown slot "${build.mount.slot}".`);
-	} else if (slot.accepts && !slot.accepts.includes(build.tree.type)) {
+	} else if (build.tree && slot.accepts && !slot.accepts.includes(build.tree.type)) {
 		error('build-root-not-accepted', '/tree/type', `Slot "${build.mount.slot}" only accepts ${slot.accepts.join(', ')} at the root, not "${build.tree.type}".`);
 	}
 	const slotProps = slot && typeof slot.provides === 'object' ? Object.keys((slot.provides.properties as object | undefined) ?? {}) : [];
 
+	// The UI: a tree (below), or another format that validates itself.
+	const tree = isTreeBuild(build);
+	const format = tree ? undefined : uiFormatOf(build);
+	if (!tree && !format) {
+		error('build-unknown-format', '/', 'The build has no tree, and its UI is in a format this tool does not support.');
+		return { ok: false, diagnostics };
+	}
+	if (format) {
+		diagnostics.push(...format.validate(build, surface, options.spec?.spec));
+		if (build.code) {
+			error('build-code-not-allowed', '/code', `Only tree builds carry code; a ${format.name} build computes with its catalog's functions.`);
+		}
+	}
+
 	// Code: pure functions, only where the host can run them.
 	const functions = new Set(build.code?.functions ?? []);
-	if (build.code) {
+	if (build.code && tree) {
 		checkCode(build, surface, error);
 	}
 	const noFunctionsIn = (root: Value | undefined, base: string, what: string) =>
@@ -130,37 +145,39 @@ export async function validateBuild(value: unknown, surface: Surface, options: V
 		});
 
 	// Tree.
-	walkTree(build.tree, '/tree', (node, path) => {
-		const component = surface.components[node.type];
-		if (!component) {
-			error('build-unknown-component', `${path}/type`, `Unknown component "${node.type}".`);
-			return;
-		}
-		const children = component.children ?? 'none';
-		if (node.children !== undefined) {
-			if (children === 'none') {
-				error('build-children', `${path}/children`, `"${node.type}" takes no children.`);
-			} else if (children === 'text' && typeof node.children !== 'string') {
-				error('build-children', `${path}/children`, `"${node.type}" takes text, not nodes.`);
+	if (build.tree) {
+		walkTree(build.tree, '/tree', (node, path) => {
+			const component = surface.components[node.type];
+			if (!component) {
+				error('build-unknown-component', `${path}/type`, `Unknown component "${node.type}".`);
+				return;
 			}
-		}
-		checkAgainstSchema(component.props, node.props ?? {}, `${path}/props`, `Props of "${node.type}"`, diagnostics);
-		if (node.type === WIDGET) {
-			widgetPaths.push(path);
-		}
-		checkExpressions(node.props as Value | undefined, `${path}/props`);
-		if (node.type === WIDGET) {
-			if (!surface.functions?.widgets) {
-				error('build-widgets-unsupported', `${path}/type`, `${surface.host} does not run interactive widgets.`);
-			}
-			for (const prop of ['render', 'update'] as const) {
-				const name = node.props?.[prop];
-				if (name !== undefined && (typeof name !== 'string' || !functions.has(name))) {
-					error('build-unknown-function', `${path}/props/${prop}`, `The widget's ${prop} must name one of the build's functions (${[...functions].join(', ') || 'none'}).`);
+			const children = component.children ?? 'none';
+			if (node.children !== undefined) {
+				if (children === 'none') {
+					error('build-children', `${path}/children`, `"${node.type}" takes no children.`);
+				} else if (children === 'text' && typeof node.children !== 'string') {
+					error('build-children', `${path}/children`, `"${node.type}" takes text, not nodes.`);
 				}
 			}
-		}
-	});
+			checkAgainstSchema(component.props, node.props ?? {}, `${path}/props`, `Props of "${node.type}"`, diagnostics);
+			if (node.type === WIDGET) {
+				widgetPaths.push(path);
+			}
+			checkExpressions(node.props as Value | undefined, `${path}/props`);
+			if (node.type === WIDGET) {
+				if (!surface.functions?.widgets) {
+					error('build-widgets-unsupported', `${path}/type`, `${surface.host} does not run interactive widgets.`);
+				}
+				for (const prop of ['render', 'update'] as const) {
+					const name = node.props?.[prop];
+					if (name !== undefined && (typeof name !== 'string' || !functions.has(name))) {
+						error('build-unknown-function', `${path}/props/${prop}`, `The widget's ${prop} must name one of the build's functions (${[...functions].join(', ') || 'none'}).`);
+					}
+				}
+			}
+		});
+	}
 
 	// Data sources.
 	for (const [name, source] of Object.entries(build.data)) {

@@ -103,7 +103,7 @@ export async function upgradeBuild(options: UpgradeOptions): Promise<UpgradeResu
 		}
 
 		candidate = rebase(candidate, target, rung, replaces);
-		const key = canonicalJson({ tree: candidate.tree, data: candidate.data, mount: candidate.mount });
+		const key = canonicalJson({ tree: candidate.tree ?? null, ui: candidate.ui ?? null, events: candidate.events ?? null, data: candidate.data, mount: candidate.mount });
 		if (tried.has(key)) {
 			path.push({ state: rung, note: 'same candidate as before' });
 			continue;

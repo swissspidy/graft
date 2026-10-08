@@ -1,0 +1,94 @@
+[
+	{
+		"attempt": 1,
+		"seconds": 9,
+		"model": "claude-opus-5-5",
+		"problems": [
+			"Check 3 for \"approve\": Step 1: no available \"approve\" action for title \"Draft A\"."
+		],
+		"results": "✔pending-only#1 ✔columns#2 ✘approve#3 ✔contributors-no-approve#4 ✔empty-state#5",
+		"output": {
+			"components": [
+				{
+					"id": "root",
+					"component": "Column",
+					"props_json": "{\"children\":[\"heading\",\"queue_table\"]}"
+				},
+				{
+					"id": "heading",
+					"component": "Text",
+					"props_json": "{\"text\":\"Review queue\",\"variant\":\"h1\"}"
+				},
+				{
+					"id": "queue_table",
+					"component": "Table",
+					"props_json": "{\"rows\":{\"path\":\"/queue/items\"},\"fields\":[{\"id\":\"title\",\"label\":\"Title\",\"type\":\"string\",\"primary\":true},{\"id\":\"author.name\",\"label\":\"Author\",\"type\":\"user\"},{\"id\":\"date\",\"label\":\"Submitted\",\"type\":\"datetime\"}],\"rowActions\":[{\"id\":\"approve\",\"label\":\"Approve\",\"variant\":\"primary\",\"visible\":{\"call\":\"and\",\"args\":{\"values\":[{\"call\":\"can\",\"args\":{\"scope\":\"posts.status:write\"}},{\"path\":\"can.publish\"}]}},\"action\":{\"event\":{\"name\":\"approve\",\"context\":{\"id\":{\"path\":\"id\"}}}}}],\"empty\":\"Nothing to review\"}"
+				}
+			],
+			"initial_json": "{}",
+			"data": [
+				{
+					"name": "queue",
+					"call": "posts.list",
+					"input_json": "{\"post_type\":\"post\",\"status\":[\"pending\"],\"per_page\":100,\"orderby\":\"date\",\"order\":\"asc\"}"
+				}
+			],
+			"events": [
+				{
+					"name": "approve",
+					"call": "posts.update_status",
+					"input_json": "{\"id\":{\"$context\":\"id\"},\"status\":\"publish\"}",
+					"then": [
+						"remove-row:queue"
+					],
+					"notice": "Post approved and published."
+				}
+			]
+		}
+	},
+	{
+		"attempt": 2,
+		"seconds": 11,
+		"model": "claude-opus-5-5",
+		"problems": [],
+		"results": "✔pending-only#1 ✔columns#2 ✔approve#3 ✔contributors-no-approve#4 ✔empty-state#5",
+		"output": {
+			"components": [
+				{
+					"id": "root",
+					"component": "Column",
+					"props_json": "{\"children\":[\"heading\",\"queue_table\"]}"
+				},
+				{
+					"id": "heading",
+					"component": "Text",
+					"props_json": "{\"text\":\"Review queue\",\"variant\":\"h1\"}"
+				},
+				{
+					"id": "queue_table",
+					"component": "Table",
+					"props_json": "{\"rows\":{\"path\":\"/queue/items\"},\"fields\":[{\"id\":\"title\",\"label\":\"Title\",\"type\":\"string\",\"primary\":true},{\"id\":\"author.name\",\"label\":\"Author\",\"type\":\"user\"},{\"id\":\"date\",\"label\":\"Submitted\",\"type\":\"datetime\"}],\"rowActions\":[{\"id\":\"approve\",\"label\":\"Approve\",\"variant\":\"primary\",\"visible\":{\"call\":\"can\",\"args\":{\"scope\":\"posts.status:write\"}},\"action\":{\"event\":{\"name\":\"approve\",\"context\":{\"id\":{\"path\":\"id\"}}}}}],\"empty\":\"Nothing to review\"}"
+				}
+			],
+			"initial_json": "{}",
+			"data": [
+				{
+					"name": "queue",
+					"call": "posts.list",
+					"input_json": "{\"post_type\":\"post\",\"status\":[\"pending\"],\"per_page\":100}"
+				}
+			],
+			"events": [
+				{
+					"name": "approve",
+					"call": "posts.update_status",
+					"input_json": "{\"id\":{\"$context\":\"id\"},\"status\":\"publish\"}",
+					"then": [
+						"remove-row:queue"
+					],
+					"notice": "Post approved and published."
+				}
+			]
+		}
+	}
+]

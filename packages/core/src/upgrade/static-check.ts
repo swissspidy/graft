@@ -1,3 +1,4 @@
+import { requireUiFormat } from '../build/format.ts';
 import { isSlotRef, walkTree, walkValue } from '../build/expressions.ts';
 import type { Build } from '../build/types.ts';
 import { canonicalJson } from '../surface/hash.ts';
@@ -240,7 +241,11 @@ export function slotPropsUsed(build: Build): string[] {
 			used.add(value.$slot.split('.')[0] ?? '');
 		}
 	};
-	walkTree(build.tree, '', (node) => walkValue(node.props as never, '', visit));
+	if (build.tree) {
+		walkTree(build.tree, '', (node) => walkValue(node.props as never, '', visit));
+	} else {
+		requireUiFormat(build).slotPropsUsed(build).forEach((prop) => used.add(prop));
+	}
 	for (const source of Object.values(build.data)) {
 		walkValue(source.input, '', visit);
 	}

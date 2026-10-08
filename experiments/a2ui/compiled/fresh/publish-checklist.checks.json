@@ -1,0 +1,745 @@
+{
+	"checks": [
+		{
+			"criterion": "prefilled",
+			"expect": [
+				{
+					"input": "headline",
+					"value": "City council approves new bike lanes downtown"
+				},
+				{
+					"input": "excerpt",
+					"value": "The council voted to add twelve kilometres of protected bike lanes across the city centre."
+				}
+			],
+			"fixtures": {
+				"users": [
+					{
+						"as": "ed",
+						"role": "editor"
+					}
+				],
+				"posts": [
+					{
+						"title": "City council approves new bike lanes downtown",
+						"status": "draft",
+						"author": "ed",
+						"excerpt": "The council voted to add twelve kilometres of protected bike lanes across the city centre."
+					}
+				]
+			},
+			"view_as": "ed"
+		},
+		{
+			"criterion": "prefilled",
+			"expect": [
+				{
+					"input": "headline",
+					"value": "Way too short"
+				},
+				{
+					"input": "excerpt",
+					"value": ""
+				}
+			],
+			"fixtures": {
+				"users": [
+					{
+						"as": "au",
+						"role": "author"
+					}
+				],
+				"posts": [
+					{
+						"title": "Way too short",
+						"status": "draft",
+						"author": "au"
+					}
+				]
+			},
+			"view_as": "au"
+		},
+		{
+			"criterion": "checklist",
+			"expect": [
+				{
+					"text": "13"
+				},
+				{
+					"text": "17"
+				},
+				{
+					"action": "publish",
+					"available": false
+				}
+			],
+			"fixtures": {
+				"users": [
+					{
+						"as": "ed",
+						"role": "editor"
+					}
+				],
+				"posts": [
+					{
+						"title": "Way too short",
+						"status": "draft",
+						"author": "ed",
+						"excerpt": "Needs more words."
+					}
+				]
+			},
+			"view_as": "ed",
+			"steps": [
+				{
+					"fill": "facts",
+					"value": true
+				}
+			]
+		},
+		{
+			"criterion": "checklist",
+			"expect": [
+				{
+					"action": "publish",
+					"available": false
+				}
+			],
+			"fixtures": {
+				"users": [
+					{
+						"as": "ed",
+						"role": "editor"
+					}
+				],
+				"posts": [
+					{
+						"title": "CITY COUNCIL APPROVES NEW BIKE LANES DOWNTOWN",
+						"status": "draft",
+						"author": "ed",
+						"excerpt": "The council voted to add twelve kilometres of protected bike lanes across the city centre."
+					}
+				]
+			},
+			"view_as": "ed",
+			"steps": [
+				{
+					"fill": "facts",
+					"value": true
+				}
+			]
+		},
+		{
+			"criterion": "checklist",
+			"expect": [
+				{
+					"action": "publish",
+					"available": false
+				}
+			],
+			"fixtures": {
+				"users": [
+					{
+						"as": "ed",
+						"role": "editor"
+					}
+				],
+				"posts": [
+					{
+						"title": "This headline is far too long to fit in search results and will be cut off",
+						"status": "draft",
+						"author": "ed",
+						"excerpt": "The council voted to add twelve kilometres of protected bike lanes across the city centre."
+					}
+				]
+			},
+			"view_as": "ed",
+			"steps": [
+				{
+					"fill": "facts",
+					"value": true
+				}
+			]
+		},
+		{
+			"criterion": "checklist",
+			"expect": [
+				{
+					"text": "17"
+				},
+				{
+					"action": "publish",
+					"available": false
+				}
+			],
+			"fixtures": {
+				"users": [
+					{
+						"as": "ed",
+						"role": "editor"
+					}
+				],
+				"posts": [
+					{
+						"title": "City council approves new bike lanes downtown",
+						"status": "draft",
+						"author": "ed",
+						"excerpt": "Needs more words."
+					}
+				]
+			},
+			"view_as": "ed",
+			"steps": [
+				{
+					"fill": "facts",
+					"value": true
+				}
+			]
+		},
+		{
+			"criterion": "facts",
+			"expect": [
+				{
+					"input": "facts",
+					"value": false
+				},
+				{
+					"text": "Facts and names checked"
+				},
+				{
+					"action": "publish",
+					"available": false
+				}
+			],
+			"fixtures": {
+				"users": [
+					{
+						"as": "ed",
+						"role": "editor"
+					}
+				],
+				"posts": [
+					{
+						"title": "City council approves new bike lanes downtown",
+						"status": "draft",
+						"author": "ed",
+						"excerpt": "The council voted to add twelve kilometres of protected bike lanes across the city centre."
+					}
+				]
+			},
+			"view_as": "ed"
+		},
+		{
+			"criterion": "facts",
+			"expect": [
+				{
+					"input": "facts",
+					"value": true
+				},
+				{
+					"action": "publish",
+					"available": true
+				}
+			],
+			"fixtures": {
+				"users": [
+					{
+						"as": "ed",
+						"role": "editor"
+					}
+				],
+				"posts": [
+					{
+						"title": "City council approves new bike lanes downtown",
+						"status": "draft",
+						"author": "ed",
+						"excerpt": "The council voted to add twelve kilometres of protected bike lanes across the city centre."
+					}
+				]
+			},
+			"view_as": "ed",
+			"steps": [
+				{
+					"fill": "facts",
+					"value": true
+				}
+			]
+		},
+		{
+			"criterion": "live",
+			"expect": [
+				{
+					"text": "13"
+				},
+				{
+					"text": "17"
+				},
+				{
+					"post": {
+						"title": "City council approves new bike lanes downtown",
+						"excerpt": "The council voted to add twelve kilometres of protected bike lanes across the city centre."
+					}
+				}
+			],
+			"fixtures": {
+				"users": [
+					{
+						"as": "ed",
+						"role": "editor"
+					}
+				],
+				"posts": [
+					{
+						"title": "City council approves new bike lanes downtown",
+						"status": "draft",
+						"author": "ed",
+						"excerpt": "The council voted to add twelve kilometres of protected bike lanes across the city centre."
+					}
+				]
+			},
+			"view_as": "ed",
+			"steps": [
+				{
+					"fill": "headline",
+					"value": "Way too short"
+				},
+				{
+					"fill": "excerpt",
+					"value": "Needs more words."
+				}
+			]
+		},
+		{
+			"criterion": "save",
+			"expect": [
+				{
+					"post": {
+						"title": "City council approves new bike lanes downtown",
+						"excerpt": "The council voted to add twelve kilometres of protected bike lanes across the city centre.",
+						"status": "draft"
+					}
+				},
+				{
+					"input": "headline",
+					"value": "City council approves new bike lanes downtown"
+				}
+			],
+			"fixtures": {
+				"users": [
+					{
+						"as": "ed",
+						"role": "editor"
+					}
+				],
+				"posts": [
+					{
+						"title": "Way too short",
+						"status": "draft",
+						"author": "ed",
+						"excerpt": "Needs more words."
+					}
+				]
+			},
+			"view_as": "ed",
+			"steps": [
+				{
+					"fill": "headline",
+					"value": "City council approves new bike lanes downtown"
+				},
+				{
+					"fill": "excerpt",
+					"value": "The council voted to add twelve kilometres of protected bike lanes across the city centre."
+				},
+				{
+					"action": "save"
+				}
+			]
+		},
+		{
+			"criterion": "publish",
+			"expect": [
+				{
+					"post": {
+						"title": "City council approves new bike lanes downtown",
+						"status": "publish"
+					}
+				}
+			],
+			"fixtures": {
+				"users": [
+					{
+						"as": "ed",
+						"role": "editor"
+					}
+				],
+				"posts": [
+					{
+						"title": "City council approves new bike lanes downtown",
+						"status": "draft",
+						"author": "ed",
+						"excerpt": "The council voted to add twelve kilometres of protected bike lanes across the city centre."
+					}
+				]
+			},
+			"view_as": "ed",
+			"steps": [
+				{
+					"fill": "facts",
+					"value": true
+				},
+				{
+					"action": "publish"
+				}
+			]
+		},
+		{
+			"criterion": "publish",
+			"expect": [
+				{
+					"action": "publish",
+					"available": false
+				},
+				{
+					"post": {
+						"title": "City council approves new bike lanes downtown",
+						"status": "draft"
+					}
+				}
+			],
+			"fixtures": {
+				"users": [
+					{
+						"as": "ed",
+						"role": "editor"
+					}
+				],
+				"posts": [
+					{
+						"title": "City council approves new bike lanes downtown",
+						"status": "draft",
+						"author": "ed",
+						"excerpt": "The council voted to add twelve kilometres of protected bike lanes across the city centre."
+					}
+				]
+			},
+			"view_as": "ed",
+			"steps": [
+				{
+					"fill": "headline",
+					"value": "City council approves new bike lanes on Main Street"
+				},
+				{
+					"fill": "facts",
+					"value": true
+				}
+			]
+		},
+		{
+			"criterion": "publish",
+			"expect": [
+				{
+					"action": "publish",
+					"available": true
+				}
+			],
+			"fixtures": {
+				"users": [
+					{
+						"as": "ed",
+						"role": "editor"
+					}
+				],
+				"posts": [
+					{
+						"title": "Way too short",
+						"status": "draft",
+						"author": "ed",
+						"excerpt": "Needs more words."
+					}
+				]
+			},
+			"view_as": "ed",
+			"steps": [
+				{
+					"fill": "headline",
+					"value": "City council approves new bike lanes downtown"
+				},
+				{
+					"fill": "excerpt",
+					"value": "The council voted to add twelve kilometres of protected bike lanes across the city centre."
+				},
+				{
+					"action": "save"
+				},
+				{
+					"fill": "facts",
+					"value": true
+				}
+			]
+		},
+		{
+			"criterion": "publish",
+			"expect": [
+				{
+					"post": {
+						"title": "City council approves new bike lanes downtown",
+						"status": "publish"
+					}
+				}
+			],
+			"fixtures": {
+				"users": [
+					{
+						"as": "au",
+						"role": "author"
+					}
+				],
+				"posts": [
+					{
+						"title": "City council approves new bike lanes downtown",
+						"status": "draft",
+						"author": "au",
+						"excerpt": "The council voted to add twelve kilometres of protected bike lanes across the city centre."
+					}
+				]
+			},
+			"view_as": "au",
+			"steps": [
+				{
+					"fill": "facts",
+					"value": true
+				},
+				{
+					"action": "publish"
+				}
+			]
+		},
+		{
+			"criterion": "contributors",
+			"expect": [
+				{
+					"post": {
+						"title": "City council approves new bike lanes downtown",
+						"excerpt": "The council voted to add twelve kilometres of protected bike lanes across the city centre.",
+						"status": "draft"
+					}
+				},
+				{
+					"action": "publish",
+					"available": false
+				}
+			],
+			"fixtures": {
+				"users": [
+					{
+						"as": "co",
+						"role": "contributor"
+					}
+				],
+				"posts": [
+					{
+						"title": "Way too short",
+						"status": "draft",
+						"author": "co",
+						"excerpt": "Needs more words."
+					}
+				]
+			},
+			"view_as": "co",
+			"steps": [
+				{
+					"fill": "headline",
+					"value": "City council approves new bike lanes downtown"
+				},
+				{
+					"fill": "excerpt",
+					"value": "The council voted to add twelve kilometres of protected bike lanes across the city centre."
+				},
+				{
+					"action": "save"
+				},
+				{
+					"fill": "facts",
+					"value": true
+				}
+			]
+		},
+		{
+			"criterion": "contributors",
+			"expect": [
+				{
+					"action": "publish",
+					"available": false
+				},
+				{
+					"post": {
+						"title": "City council approves new bike lanes downtown",
+						"status": "pending"
+					}
+				}
+			],
+			"fixtures": {
+				"users": [
+					{
+						"as": "co",
+						"role": "contributor"
+					}
+				],
+				"posts": [
+					{
+						"title": "City council approves new bike lanes downtown",
+						"status": "pending",
+						"author": "co",
+						"excerpt": "The council voted to add twelve kilometres of protected bike lanes across the city centre."
+					}
+				]
+			},
+			"view_as": "co",
+			"steps": [
+				{
+					"fill": "facts",
+					"value": true
+				}
+			]
+		}
+	],
+	"log": [
+		{
+			"attempt": 1,
+			"problems": [],
+			"output": {
+				"unverifiable": [],
+				"checks": [
+					{
+						"criterion": "prefilled",
+						"fixtures_json": "{\"users\":[{\"as\":\"ed\",\"role\":\"editor\"}],\"posts\":[{\"title\":\"City council approves new bike lanes downtown\",\"status\":\"draft\",\"author\":\"ed\",\"excerpt\":\"The council voted to add twelve kilometres of protected bike lanes across the city centre.\"}]}",
+						"view_as": "ed",
+						"advance_days": 0,
+						"steps_json": "[]",
+						"expect_json": "[{\"input\":\"headline\",\"value\":\"City council approves new bike lanes downtown\"},{\"input\":\"excerpt\",\"value\":\"The council voted to add twelve kilometres of protected bike lanes across the city centre.\"}]"
+					},
+					{
+						"criterion": "prefilled",
+						"fixtures_json": "{\"users\":[{\"as\":\"au\",\"role\":\"author\"}],\"posts\":[{\"title\":\"Way too short\",\"status\":\"draft\",\"author\":\"au\"}]}",
+						"view_as": "au",
+						"advance_days": 0,
+						"steps_json": "[]",
+						"expect_json": "[{\"input\":\"headline\",\"value\":\"Way too short\"},{\"input\":\"excerpt\",\"value\":\"\"}]"
+					},
+					{
+						"criterion": "checklist",
+						"fixtures_json": "{\"users\":[{\"as\":\"ed\",\"role\":\"editor\"}],\"posts\":[{\"title\":\"Way too short\",\"status\":\"draft\",\"author\":\"ed\",\"excerpt\":\"Needs more words.\"}]}",
+						"view_as": "ed",
+						"advance_days": 0,
+						"steps_json": "[{\"fill\":\"facts\",\"value\":true}]",
+						"expect_json": "[{\"text\":\"13\"},{\"text\":\"17\"},{\"action\":\"publish\",\"available\":false}]"
+					},
+					{
+						"criterion": "checklist",
+						"fixtures_json": "{\"users\":[{\"as\":\"ed\",\"role\":\"editor\"}],\"posts\":[{\"title\":\"CITY COUNCIL APPROVES NEW BIKE LANES DOWNTOWN\",\"status\":\"draft\",\"author\":\"ed\",\"excerpt\":\"The council voted to add twelve kilometres of protected bike lanes across the city centre.\"}]}",
+						"view_as": "ed",
+						"advance_days": 0,
+						"steps_json": "[{\"fill\":\"facts\",\"value\":true}]",
+						"expect_json": "[{\"action\":\"publish\",\"available\":false}]"
+					},
+					{
+						"criterion": "checklist",
+						"fixtures_json": "{\"users\":[{\"as\":\"ed\",\"role\":\"editor\"}],\"posts\":[{\"title\":\"This headline is far too long to fit in search results and will be cut off\",\"status\":\"draft\",\"author\":\"ed\",\"excerpt\":\"The council voted to add twelve kilometres of protected bike lanes across the city centre.\"}]}",
+						"view_as": "ed",
+						"advance_days": 0,
+						"steps_json": "[{\"fill\":\"facts\",\"value\":true}]",
+						"expect_json": "[{\"action\":\"publish\",\"available\":false}]"
+					},
+					{
+						"criterion": "checklist",
+						"fixtures_json": "{\"users\":[{\"as\":\"ed\",\"role\":\"editor\"}],\"posts\":[{\"title\":\"City council approves new bike lanes downtown\",\"status\":\"draft\",\"author\":\"ed\",\"excerpt\":\"Needs more words.\"}]}",
+						"view_as": "ed",
+						"advance_days": 0,
+						"steps_json": "[{\"fill\":\"facts\",\"value\":true}]",
+						"expect_json": "[{\"text\":\"17\"},{\"action\":\"publish\",\"available\":false}]"
+					},
+					{
+						"criterion": "facts",
+						"fixtures_json": "{\"users\":[{\"as\":\"ed\",\"role\":\"editor\"}],\"posts\":[{\"title\":\"City council approves new bike lanes downtown\",\"status\":\"draft\",\"author\":\"ed\",\"excerpt\":\"The council voted to add twelve kilometres of protected bike lanes across the city centre.\"}]}",
+						"view_as": "ed",
+						"advance_days": 0,
+						"steps_json": "[]",
+						"expect_json": "[{\"input\":\"facts\",\"value\":false},{\"text\":\"Facts and names checked\"},{\"action\":\"publish\",\"available\":false}]"
+					},
+					{
+						"criterion": "facts",
+						"fixtures_json": "{\"users\":[{\"as\":\"ed\",\"role\":\"editor\"}],\"posts\":[{\"title\":\"City council approves new bike lanes downtown\",\"status\":\"draft\",\"author\":\"ed\",\"excerpt\":\"The council voted to add twelve kilometres of protected bike lanes across the city centre.\"}]}",
+						"view_as": "ed",
+						"advance_days": 0,
+						"steps_json": "[{\"fill\":\"facts\",\"value\":true}]",
+						"expect_json": "[{\"input\":\"facts\",\"value\":true},{\"action\":\"publish\",\"available\":true}]"
+					},
+					{
+						"criterion": "live",
+						"fixtures_json": "{\"users\":[{\"as\":\"ed\",\"role\":\"editor\"}],\"posts\":[{\"title\":\"City council approves new bike lanes downtown\",\"status\":\"draft\",\"author\":\"ed\",\"excerpt\":\"The council voted to add twelve kilometres of protected bike lanes across the city centre.\"}]}",
+						"view_as": "ed",
+						"advance_days": 0,
+						"steps_json": "[{\"fill\":\"headline\",\"value\":\"Way too short\"},{\"fill\":\"excerpt\",\"value\":\"Needs more words.\"}]",
+						"expect_json": "[{\"text\":\"13\"},{\"text\":\"17\"},{\"post\":{\"title\":\"City council approves new bike lanes downtown\",\"excerpt\":\"The council voted to add twelve kilometres of protected bike lanes across the city centre.\"}}]"
+					},
+					{
+						"criterion": "save",
+						"fixtures_json": "{\"users\":[{\"as\":\"ed\",\"role\":\"editor\"}],\"posts\":[{\"title\":\"Way too short\",\"status\":\"draft\",\"author\":\"ed\",\"excerpt\":\"Needs more words.\"}]}",
+						"view_as": "ed",
+						"advance_days": 0,
+						"steps_json": "[{\"fill\":\"headline\",\"value\":\"City council approves new bike lanes downtown\"},{\"fill\":\"excerpt\",\"value\":\"The council voted to add twelve kilometres of protected bike lanes across the city centre.\"},{\"action\":\"save\"}]",
+						"expect_json": "[{\"post\":{\"title\":\"City council approves new bike lanes downtown\",\"excerpt\":\"The council voted to add twelve kilometres of protected bike lanes across the city centre.\",\"status\":\"draft\"}},{\"input\":\"headline\",\"value\":\"City council approves new bike lanes downtown\"}]"
+					},
+					{
+						"criterion": "publish",
+						"fixtures_json": "{\"users\":[{\"as\":\"ed\",\"role\":\"editor\"}],\"posts\":[{\"title\":\"City council approves new bike lanes downtown\",\"status\":\"draft\",\"author\":\"ed\",\"excerpt\":\"The council voted to add twelve kilometres of protected bike lanes across the city centre.\"}]}",
+						"view_as": "ed",
+						"advance_days": 0,
+						"steps_json": "[{\"fill\":\"facts\",\"value\":true},{\"action\":\"publish\"}]",
+						"expect_json": "[{\"post\":{\"title\":\"City council approves new bike lanes downtown\",\"status\":\"publish\"}}]"
+					},
+					{
+						"criterion": "publish",
+						"fixtures_json": "{\"users\":[{\"as\":\"ed\",\"role\":\"editor\"}],\"posts\":[{\"title\":\"City council approves new bike lanes downtown\",\"status\":\"draft\",\"author\":\"ed\",\"excerpt\":\"The council voted to add twelve kilometres of protected bike lanes across the city centre.\"}]}",
+						"view_as": "ed",
+						"advance_days": 0,
+						"steps_json": "[{\"fill\":\"headline\",\"value\":\"City council approves new bike lanes on Main Street\"},{\"fill\":\"facts\",\"value\":true}]",
+						"expect_json": "[{\"action\":\"publish\",\"available\":false},{\"post\":{\"title\":\"City council approves new bike lanes downtown\",\"status\":\"draft\"}}]"
+					},
+					{
+						"criterion": "publish",
+						"fixtures_json": "{\"users\":[{\"as\":\"ed\",\"role\":\"editor\"}],\"posts\":[{\"title\":\"Way too short\",\"status\":\"draft\",\"author\":\"ed\",\"excerpt\":\"Needs more words.\"}]}",
+						"view_as": "ed",
+						"advance_days": 0,
+						"steps_json": "[{\"fill\":\"headline\",\"value\":\"City council approves new bike lanes downtown\"},{\"fill\":\"excerpt\",\"value\":\"The council voted to add twelve kilometres of protected bike lanes across the city centre.\"},{\"action\":\"save\"},{\"fill\":\"facts\",\"value\":true}]",
+						"expect_json": "[{\"action\":\"publish\",\"available\":true}]"
+					},
+					{
+						"criterion": "publish",
+						"fixtures_json": "{\"users\":[{\"as\":\"au\",\"role\":\"author\"}],\"posts\":[{\"title\":\"City council approves new bike lanes downtown\",\"status\":\"draft\",\"author\":\"au\",\"excerpt\":\"The council voted to add twelve kilometres of protected bike lanes across the city centre.\"}]}",
+						"view_as": "au",
+						"advance_days": 0,
+						"steps_json": "[{\"fill\":\"facts\",\"value\":true},{\"action\":\"publish\"}]",
+						"expect_json": "[{\"post\":{\"title\":\"City council approves new bike lanes downtown\",\"status\":\"publish\"}}]"
+					},
+					{
+						"criterion": "contributors",
+						"fixtures_json": "{\"users\":[{\"as\":\"co\",\"role\":\"contributor\"}],\"posts\":[{\"title\":\"Way too short\",\"status\":\"draft\",\"author\":\"co\",\"excerpt\":\"Needs more words.\"}]}",
+						"view_as": "co",
+						"advance_days": 0,
+						"steps_json": "[{\"fill\":\"headline\",\"value\":\"City council approves new bike lanes downtown\"},{\"fill\":\"excerpt\",\"value\":\"The council voted to add twelve kilometres of protected bike lanes across the city centre.\"},{\"action\":\"save\"},{\"fill\":\"facts\",\"value\":true}]",
+						"expect_json": "[{\"post\":{\"title\":\"City council approves new bike lanes downtown\",\"excerpt\":\"The council voted to add twelve kilometres of protected bike lanes across the city centre.\",\"status\":\"draft\"}},{\"action\":\"publish\",\"available\":false}]"
+					},
+					{
+						"criterion": "contributors",
+						"fixtures_json": "{\"users\":[{\"as\":\"co\",\"role\":\"contributor\"}],\"posts\":[{\"title\":\"City council approves new bike lanes downtown\",\"status\":\"pending\",\"author\":\"co\",\"excerpt\":\"The council voted to add twelve kilometres of protected bike lanes across the city centre.\"}]}",
+						"view_as": "co",
+						"advance_days": 0,
+						"steps_json": "[{\"fill\":\"facts\",\"value\":true}]",
+						"expect_json": "[{\"action\":\"publish\",\"available\":false},{\"post\":{\"title\":\"City council approves new bike lanes downtown\",\"status\":\"pending\"}}]"
+					}
+				]
+			}
+		}
+	]
+}

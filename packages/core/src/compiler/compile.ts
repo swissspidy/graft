@@ -2,6 +2,7 @@ import buildSchema from '../../../../schemas/build.schema.json' with { type: 'js
 import '../ajv.ts';
 import { describeSchemaError } from '../schema-errors.ts';
 import { lazyValidator, type Validator } from '../schema.ts';
+import { uiFormatOf } from '../build/format.ts';
 import { extractRefs } from '../build/refs.ts';
 import type { Build, Check } from '../build/types.ts';
 import { validateBuild } from '../build/validate.ts';
@@ -37,7 +38,9 @@ export async function compileSpec(options: CompileOptions): Promise<CompileResul
 	// Phase 1: checks.
 	let checks = options.checks;
 	if (!checks) {
-		const system = checksSystem(spec, surface, host);
+		const base = checksSystem(spec, surface, host);
+		const format = options.format ?? (options.previous ? uiFormatOf(options.previous) : undefined);
+		const system = format?.compiler?.checksSystem?.(base, spec, surface) ?? base;
 		const schema = checksOutputSchema(spec);
 		let feedback: string[] = [];
 		for (let attempt = 1; attempt <= maxAttempts && !checks; attempt++) {
@@ -68,17 +71,23 @@ export async function compileSpec(options: CompileOptions): Promise<CompileResul
 		}
 	}
 
-	// Phase 2: tree and data against the frozen checks.
-	const system = treeSystem(spec, surface, host);
-	const schema = treeOutputSchema(spec, surface);
+	// Phase 2: the UI (a tree, or the format's) and data against the frozen checks.
+	// Regenerating a build in another format keeps its format.
+	const format = options.format ?? (options.previous ? uiFormatOf(options.previous) : undefined);
+	const ui = format?.compiler;
+	if (format && !ui) {
+		throw new Error(`The ${format.name} format has no compiler.`);
+	}
+	const system = ui ? ui.system(spec, surface, host.formats?.[format!.name]) : treeSystem(spec, surface, host);
+	const schema = ui ? ui.schema(spec, surface) : treeOutputSchema(spec, surface);
 	const surfaceHash = surface.hash ?? '';
 	let feedback: string[] = [];
 	let candidate: Build | undefined;
 	for (let attempt = 1; attempt <= maxAttempts; attempt++) {
 		options.onEvent?.({ type: 'request', purpose: 'tree', attempt });
-		const prompt = treePrompt(spec, checks, options.previous, feedback);
+		const prompt = ui ? ui.prompt(spec, checks, options.previous, feedback) : treePrompt(spec, checks, options.previous, feedback);
 		const response = await model.generate({ purpose: 'tree', system, prompt, schema });
-		const assembled = assembleTree(response.output);
+		const assembled = ui ? ui.assemble(response.output, surface) : assembleTree(response.output);
 		if (!assembled.value) {
 			attempts.push({ phase: 'tree', problems: assembled.problems, diagnostics: [] });
 			options.onEvent?.({ type: 'rejected', purpose: 'tree', attempt, problems: assembled.problems });
@@ -100,11 +109,10 @@ export async function compileSpec(options: CompileOptions): Promise<CompileResul
 			spec: { id: spec.manifest.id, hash: options.specHash },
 			surface: { host: surface.host, hostVersion: surface.hostVersion, hash: surfaceHash },
 			mount: spec.manifest.mount,
-			tree: assembled.value.tree,
-			data: assembled.value.data,
+			data: {},
+			...assembled.value,
 			checks,
 			refs: { slot: spec.manifest.mount.slot, components: {}, capabilities: [], scopes: [] },
-			...(assembled.value.code ? { code: assembled.value.code } : {}),
 			provenance,
 		};
 		candidate.refs = extractRefs(candidate, surface);

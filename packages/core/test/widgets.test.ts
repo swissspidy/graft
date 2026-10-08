@@ -6,12 +6,14 @@ import {
 	hashSurface,
 	resolveWidgetUse,
 	sanitizeWidgetTree,
+	snapshotTree,
 	staticCheck,
 	validateBuild,
 	validateSpec,
 	verifyBuild,
 	type Build,
 	type ComponentSemantics,
+	type EvalContext,
 	type Sandbox,
 	type Surface,
 } from '../src/index.ts';
@@ -350,6 +352,20 @@ describe('widget inputs', () => {
 			['items.rename', { id: 1, title: 'One' }],
 			['items.rename', { id: 1, title: 'Uno' }],
 		]);
+	});
+
+	it('show their labels, as text checks see them', async () => {
+		const b = inputBuild([{ criterion: 'count', view_as: 'v', expect: [{ text: 'Title' }, { text: 'Rename' }] }]);
+		const result = await verifyBuild({ build: b, spec, surface: withInputs, sandbox, semantics, createCan: () => () => true, loadFunctions: drawing() });
+		expect(result.results.flatMap((r) => r.failures)).toEqual([]);
+	});
+
+	it('show their labels where they stand, among the widget text', () => {
+		const drawn = { type: 'stack', children: [{ type: 'text', children: 'Before' }, { type: 'field', props: { id: 'title', label: 'Title' } }, { type: 'text', children: 'After' }] };
+		const ctx = { data: {}, slot: {}, can: () => true, fn: () => drawn } as unknown as EvalContext;
+		const widgets = { limits: { components: ['stack', 'text', 'field'], inputs: ['field'], maxNodes: 10 }, state: () => ({ has: false }) };
+		const snapshot = snapshotTree({ type: 'widget', props: { render: 'draw' } }, ctx, semantics, widgets);
+		expect(snapshot.texts).toEqual(['Before', 'Title', 'After']);
 	});
 
 	it('fail a check that types into an input that is not there', async () => {

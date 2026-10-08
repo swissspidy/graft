@@ -111,6 +111,32 @@ export interface Refs {
 	components: Record<string, string[]>;
 	capabilities: string[];
 	scopes: string[];
+	/**
+	 * A build in another UI format: component type to the sorted properties
+	 * it uses, in that format's catalog (`ui.catalogId`). Host components
+	 * (`components`) are then empty.
+	 */
+	catalog?: Record<string, string[]>;
+}
+
+/** What an action event of a non-tree UI does: a capability call, as a tree's `$call`. */
+export interface EventBinding {
+	call: string;
+	/** The call's input; `{"$context": "<key>"}` stands for a value of the event's context. */
+	input?: unknown;
+	then?: string[];
+	notice?: string;
+}
+
+/**
+ * A UI in another format than Graft's tree (A2UI): the protocol, the
+ * catalog it draws from, and the format's own content. A registered
+ * `UiFormat` reads it.
+ */
+export interface BuildUi {
+	protocol: string;
+	catalogId: string;
+	[key: string]: unknown;
 }
 
 export interface BuildCode {
@@ -126,7 +152,11 @@ export interface Build {
 	spec: { id: string; hash: string };
 	surface: { host: string; hostVersion?: string; hash: string };
 	mount: { slot: string; [option: string]: unknown };
-	tree: TreeNode;
+	/** The UI as a Graft tree; absent when the UI is in another format (`ui`). */
+	tree?: TreeNode;
+	/** The UI in another format, e.g. an A2UI surface, with `events` binding its actions to capabilities. */
+	ui?: BuildUi;
+	events?: Record<string, EventBinding>;
 	data: Record<string, DataSource>;
 	checks: Check[];
 	refs: Refs;

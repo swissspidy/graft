@@ -1,0 +1,46 @@
+{
+	"passed": true,
+	"spec": {
+		"id": "publish-queue",
+		"hash": "sha256:8bd2c50b0a07388e5276f99b5e1c367cd84067b58b8e46f6a8f8d896a2c947ef"
+	},
+	"surface": {
+		"host": "emdash",
+		"hostVersion": "1.0.1",
+		"hash": "sha256:b9329970caab68a82f9e7fe44db516aa9d4dfddfe028473af619f480e85a35a0"
+	},
+	"results": [
+		{
+			"criterion": "drafts-only",
+			"check": 0,
+			"passed": true,
+			"failures": []
+		},
+		{
+			"criterion": "columns",
+			"check": 1,
+			"passed": true,
+			"failures": []
+		},
+		{
+			"criterion": "publish",
+			"check": 2,
+			"passed": true,
+			"failures": []
+		},
+		{
+			"criterion": "contributors-no-publish",
+			"check": 3,
+			"passed": true,
+			"failures": []
+		},
+		{
+			"criterion": "empty-state",
+			"check": 4,
+			"passed": true,
+			"failures": []
+		}
+	],
+	"unchecked": [],
+	"verifiedAt": "2026-10-08T12:52:46.363Z"
+}

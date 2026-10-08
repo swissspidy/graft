@@ -2,7 +2,7 @@ import { createElement, useCallback, useState, type ComponentType, type ReactNod
 import { createRoot } from 'react-dom/client';
 import apiFetch from '@wordpress/api-fetch';
 import { Notice as WPNotice } from '@wordpress/components';
-import { GraftRoot, type Gateway, type Notice } from '@graft/renderer-react';
+import { GraftRoot, type Gateway, type Notice, type UiRootProps } from '@graft/renderer-react';
 import type { AsyncFunctionRunner, Build, SurfaceFunctions } from '@graft/core/runtime';
 import { startFunctions } from '@graft/sandbox/client';
 import { createCan } from '../can.ts';
@@ -39,6 +39,8 @@ interface EditorGlobals {
 declare global {
 	interface Window {
 		graftRuntime?: RuntimeConfig;
+		/** Renderers for builds in other UI formats (build/a2ui.js adds A2UI). */
+		graftUi?: { A2UI?: ComponentType<UiRootProps> };
 		wp?: EditorGlobals;
 	}
 }
@@ -108,6 +110,8 @@ function Mounted({ spec, config, slot, inEditor = false }: { spec: string; confi
 				onNotice={onNotice}
 				onReload={() => window.location.reload()}
 				functions={functions}
+				// A build in another format is drawn by its renderer, loaded only on screens that serve one.
+				{...(window.graftUi?.A2UI ? { ui: window.graftUi.A2UI as never } : {})}
 				{...(window.graftRuntime?.functions?.widgets ? { widgets: window.graftRuntime.functions.widgets } : {})}
 			/>
 		</>

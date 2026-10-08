@@ -8,6 +8,7 @@ import type { Spec } from '../spec/types.ts';
 import { canonicalJson } from '../surface/hash.ts';
 import type { Surface } from '../surface/types.ts';
 import { FixtureError, SandboxCallError, type Sandbox } from './sandbox.ts';
+import { requireUiFormat } from '../build/format.ts';
 import { allActions, snapshotTree, type ComponentSemantics, type Snapshot, type SnapshotAction, type SnapshotInput } from './snapshot.ts';
 
 export interface VerifyOptions {
@@ -23,6 +24,13 @@ export interface VerifyOptions {
 	createCan(usable: Record<string, boolean>): EvalContext['can'];
 	/** The grant to simulate. Default: the permissions the spec requests. */
 	grant?: string[];
+	/**
+	 * Reads the build's UI into a snapshot instead of walking `build.tree`
+	 * (or, for a build without a tree, asking its registered UI format).
+	 * `entered` is what the viewer typed so far: input group, then input id,
+	 * as the snapshot's `inputs` name them.
+	 */
+	snapshot?(build: Build, ctx: EvalContext, entered: Record<string, Record<string, unknown>>): Snapshot;
 	/** Starts the host's sandbox for a build with code. Required to verify such builds. */
 	loadFunctions?(code: BuildCode, limits: NonNullable<Surface['functions']>['limits']): Promise<FunctionRunner>;
 }
@@ -181,19 +189,24 @@ async function runCheck(options: VerifyOptions, check: Check, index: number, fun
 
 	const widgetLimits = options.surface.functions?.widgets;
 	const snap = (instance: Omit<Instance, 'snapshot'>): Instance => {
-		const snapshot = snapshotTree(
-			build.tree,
-			{ data: instance.data, slot: instance.slot, can, now, fn },
-			semantics,
-			widgetLimits
-				? {
-						limits: widgetLimits,
-						state: (path) => (Object.hasOwn(instance.widgets, path) ? { has: true, value: instance.widgets[path] } : { has: false }),
-						validate: (tree) => validateWidgetTree(tree, options.surface),
-						entered: (path) => instance.entered[path] ?? {},
-					}
-				: undefined,
-		);
+		const ctx = { data: instance.data, slot: instance.slot, can, now, fn };
+		const snapshot = options.snapshot
+			? options.snapshot(build, ctx, instance.entered)
+			: !build.tree
+				? requireUiFormat(build).snapshot(build, ctx, instance.entered)
+				: snapshotTree(
+				build.tree,
+				{ data: instance.data, slot: instance.slot, can, now, fn },
+				semantics,
+				widgetLimits
+					? {
+							limits: widgetLimits,
+							state: (path) => (Object.hasOwn(instance.widgets, path) ? { has: true, value: instance.widgets[path] } : { has: false }),
+							validate: (tree) => validateWidgetTree(tree, options.surface),
+							entered: (path) => instance.entered[path] ?? {},
+						}
+					: undefined,
+			);
 		for (const problem of snapshot.problems ?? []) {
 			if (!failures.includes(problem)) {
 				failures.push(problem);
@@ -246,6 +259,15 @@ async function runCheck(options: VerifyOptions, check: Check, index: number, fun
 			return result();
 		}
 		const { instance, action } = found;
+		if (action.event && (options.snapshot || !build.tree) && !instance.snapshot.widgets?.[action.event.widget]) {
+			// A local action in a custom snapshot's UI: what it sets is kept with what the viewer
+			// entered (latest last), and the snapshot draws it.
+			const { widget, name, payload } = action.event;
+			const { [name]: _previous, ...group } = instance.entered[widget] ?? {};
+			const entered = { ...instance.entered, [widget]: { ...group, [name]: payload } };
+			view = view.map((item) => (item === instance ? snap({ slot: item.slot, data: item.data, widgets: item.widgets, entered }) : item));
+			continue;
+		}
 		if (action.event) {
 			// A widget's button: its update function computes the widget's next state.
 			const drawn = instance.snapshot.widgets?.[action.event.widget];

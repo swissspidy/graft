@@ -1,0 +1,1043 @@
+{
+	"graft": 1,
+	"spec": {
+		"id": "publish-checklist",
+		"hash": "sha256:ebd759b1f139f0217a8c24767cdc631ee61feb2382b08b26b336f0a52e4f2bad"
+	},
+	"surface": {
+		"host": "wordpress",
+		"hostVersion": "7.1.2",
+		"hash": "sha256:6f170822cb71accfa0c59633044953ce846b218fbcbd1f6406323c4f38e17cdc"
+	},
+	"mount": {
+		"slot": "post.editor.panel",
+		"title": "Publish checklist"
+	},
+	"data": {},
+	"checks": [
+		{
+			"criterion": "prefilled",
+			"expect": [
+				{
+					"input": "headline",
+					"value": "City council approves new bike lanes downtown"
+				},
+				{
+					"input": "excerpt",
+					"value": "The council voted to add twelve kilometres of protected bike lanes across the city centre."
+				}
+			],
+			"fixtures": {
+				"users": [
+					{
+						"as": "ed",
+						"role": "editor"
+					}
+				],
+				"posts": [
+					{
+						"title": "City council approves new bike lanes downtown",
+						"status": "draft",
+						"author": "ed",
+						"excerpt": "The council voted to add twelve kilometres of protected bike lanes across the city centre."
+					}
+				]
+			},
+			"view_as": "ed"
+		},
+		{
+			"criterion": "prefilled",
+			"expect": [
+				{
+					"input": "headline",
+					"value": "Way too short"
+				},
+				{
+					"input": "excerpt",
+					"value": ""
+				}
+			],
+			"fixtures": {
+				"users": [
+					{
+						"as": "au",
+						"role": "author"
+					}
+				],
+				"posts": [
+					{
+						"title": "Way too short",
+						"status": "draft",
+						"author": "au"
+					}
+				]
+			},
+			"view_as": "au"
+		},
+		{
+			"criterion": "checklist",
+			"expect": [
+				{
+					"text": "13"
+				},
+				{
+					"text": "17"
+				},
+				{
+					"action": "publish",
+					"available": false
+				}
+			],
+			"fixtures": {
+				"users": [
+					{
+						"as": "ed",
+						"role": "editor"
+					}
+				],
+				"posts": [
+					{
+						"title": "Way too short",
+						"status": "draft",
+						"author": "ed",
+						"excerpt": "Needs more words."
+					}
+				]
+			},
+			"view_as": "ed",
+			"steps": [
+				{
+					"fill": "facts",
+					"value": true
+				}
+			]
+		},
+		{
+			"criterion": "checklist",
+			"expect": [
+				{
+					"action": "publish",
+					"available": false
+				}
+			],
+			"fixtures": {
+				"users": [
+					{
+						"as": "ed",
+						"role": "editor"
+					}
+				],
+				"posts": [
+					{
+						"title": "CITY COUNCIL APPROVES NEW BIKE LANES DOWNTOWN",
+						"status": "draft",
+						"author": "ed",
+						"excerpt": "The council voted to add twelve kilometres of protected bike lanes across the city centre."
+					}
+				]
+			},
+			"view_as": "ed",
+			"steps": [
+				{
+					"fill": "facts",
+					"value": true
+				}
+			]
+		},
+		{
+			"criterion": "checklist",
+			"expect": [
+				{
+					"action": "publish",
+					"available": false
+				}
+			],
+			"fixtures": {
+				"users": [
+					{
+						"as": "ed",
+						"role": "editor"
+					}
+				],
+				"posts": [
+					{
+						"title": "This headline is far too long to fit in search results and will be cut off",
+						"status": "draft",
+						"author": "ed",
+						"excerpt": "The council voted to add twelve kilometres of protected bike lanes across the city centre."
+					}
+				]
+			},
+			"view_as": "ed",
+			"steps": [
+				{
+					"fill": "facts",
+					"value": true
+				}
+			]
+		},
+		{
+			"criterion": "checklist",
+			"expect": [
+				{
+					"text": "17"
+				},
+				{
+					"action": "publish",
+					"available": false
+				}
+			],
+			"fixtures": {
+				"users": [
+					{
+						"as": "ed",
+						"role": "editor"
+					}
+				],
+				"posts": [
+					{
+						"title": "City council approves new bike lanes downtown",
+						"status": "draft",
+						"author": "ed",
+						"excerpt": "Needs more words."
+					}
+				]
+			},
+			"view_as": "ed",
+			"steps": [
+				{
+					"fill": "facts",
+					"value": true
+				}
+			]
+		},
+		{
+			"criterion": "facts",
+			"expect": [
+				{
+					"input": "facts",
+					"value": false
+				},
+				{
+					"text": "Facts and names checked"
+				},
+				{
+					"action": "publish",
+					"available": false
+				}
+			],
+			"fixtures": {
+				"users": [
+					{
+						"as": "ed",
+						"role": "editor"
+					}
+				],
+				"posts": [
+					{
+						"title": "City council approves new bike lanes downtown",
+						"status": "draft",
+						"author": "ed",
+						"excerpt": "The council voted to add twelve kilometres of protected bike lanes across the city centre."
+					}
+				]
+			},
+			"view_as": "ed"
+		},
+		{
+			"criterion": "facts",
+			"expect": [
+				{
+					"input": "facts",
+					"value": true
+				},
+				{
+					"action": "publish",
+					"available": true
+				}
+			],
+			"fixtures": {
+				"users": [
+					{
+						"as": "ed",
+						"role": "editor"
+					}
+				],
+				"posts": [
+					{
+						"title": "City council approves new bike lanes downtown",
+						"status": "draft",
+						"author": "ed",
+						"excerpt": "The council voted to add twelve kilometres of protected bike lanes across the city centre."
+					}
+				]
+			},
+			"view_as": "ed",
+			"steps": [
+				{
+					"fill": "facts",
+					"value": true
+				}
+			]
+		},
+		{
+			"criterion": "live",
+			"expect": [
+				{
+					"text": "13"
+				},
+				{
+					"text": "17"
+				},
+				{
+					"post": {
+						"title": "City council approves new bike lanes downtown",
+						"excerpt": "The council voted to add twelve kilometres of protected bike lanes across the city centre."
+					}
+				}
+			],
+			"fixtures": {
+				"users": [
+					{
+						"as": "ed",
+						"role": "editor"
+					}
+				],
+				"posts": [
+					{
+						"title": "City council approves new bike lanes downtown",
+						"status": "draft",
+						"author": "ed",
+						"excerpt": "The council voted to add twelve kilometres of protected bike lanes across the city centre."
+					}
+				]
+			},
+			"view_as": "ed",
+			"steps": [
+				{
+					"fill": "headline",
+					"value": "Way too short"
+				},
+				{
+					"fill": "excerpt",
+					"value": "Needs more words."
+				}
+			]
+		},
+		{
+			"criterion": "save",
+			"expect": [
+				{
+					"post": {
+						"title": "City council approves new bike lanes downtown",
+						"excerpt": "The council voted to add twelve kilometres of protected bike lanes across the city centre.",
+						"status": "draft"
+					}
+				},
+				{
+					"input": "headline",
+					"value": "City council approves new bike lanes downtown"
+				}
+			],
+			"fixtures": {
+				"users": [
+					{
+						"as": "ed",
+						"role": "editor"
+					}
+				],
+				"posts": [
+					{
+						"title": "Way too short",
+						"status": "draft",
+						"author": "ed",
+						"excerpt": "Needs more words."
+					}
+				]
+			},
+			"view_as": "ed",
+			"steps": [
+				{
+					"fill": "headline",
+					"value": "City council approves new bike lanes downtown"
+				},
+				{
+					"fill": "excerpt",
+					"value": "The council voted to add twelve kilometres of protected bike lanes across the city centre."
+				},
+				{
+					"action": "save"
+				}
+			]
+		},
+		{
+			"criterion": "publish",
+			"expect": [
+				{
+					"post": {
+						"title": "City council approves new bike lanes downtown",
+						"status": "publish"
+					}
+				}
+			],
+			"fixtures": {
+				"users": [
+					{
+						"as": "ed",
+						"role": "editor"
+					}
+				],
+				"posts": [
+					{
+						"title": "City council approves new bike lanes downtown",
+						"status": "draft",
+						"author": "ed",
+						"excerpt": "The council voted to add twelve kilometres of protected bike lanes across the city centre."
+					}
+				]
+			},
+			"view_as": "ed",
+			"steps": [
+				{
+					"fill": "facts",
+					"value": true
+				},
+				{
+					"action": "publish"
+				}
+			]
+		},
+		{
+			"criterion": "publish",
+			"expect": [
+				{
+					"action": "publish",
+					"available": false
+				},
+				{
+					"post": {
+						"title": "City council approves new bike lanes downtown",
+						"status": "draft"
+					}
+				}
+			],
+			"fixtures": {
+				"users": [
+					{
+						"as": "ed",
+						"role": "editor"
+					}
+				],
+				"posts": [
+					{
+						"title": "City council approves new bike lanes downtown",
+						"status": "draft",
+						"author": "ed",
+						"excerpt": "The council voted to add twelve kilometres of protected bike lanes across the city centre."
+					}
+				]
+			},
+			"view_as": "ed",
+			"steps": [
+				{
+					"fill": "headline",
+					"value": "City council approves new bike lanes on Main Street"
+				},
+				{
+					"fill": "facts",
+					"value": true
+				}
+			]
+		},
+		{
+			"criterion": "publish",
+			"expect": [
+				{
+					"action": "publish",
+					"available": true
+				}
+			],
+			"fixtures": {
+				"users": [
+					{
+						"as": "ed",
+						"role": "editor"
+					}
+				],
+				"posts": [
+					{
+						"title": "Way too short",
+						"status": "draft",
+						"author": "ed",
+						"excerpt": "Needs more words."
+					}
+				]
+			},
+			"view_as": "ed",
+			"steps": [
+				{
+					"fill": "headline",
+					"value": "City council approves new bike lanes downtown"
+				},
+				{
+					"fill": "excerpt",
+					"value": "The council voted to add twelve kilometres of protected bike lanes across the city centre."
+				},
+				{
+					"action": "save"
+				},
+				{
+					"fill": "facts",
+					"value": true
+				}
+			]
+		},
+		{
+			"criterion": "publish",
+			"expect": [
+				{
+					"post": {
+						"title": "City council approves new bike lanes downtown",
+						"status": "publish"
+					}
+				}
+			],
+			"fixtures": {
+				"users": [
+					{
+						"as": "au",
+						"role": "author"
+					}
+				],
+				"posts": [
+					{
+						"title": "City council approves new bike lanes downtown",
+						"status": "draft",
+						"author": "au",
+						"excerpt": "The council voted to add twelve kilometres of protected bike lanes across the city centre."
+					}
+				]
+			},
+			"view_as": "au",
+			"steps": [
+				{
+					"fill": "facts",
+					"value": true
+				},
+				{
+					"action": "publish"
+				}
+			]
+		},
+		{
+			"criterion": "contributors",
+			"expect": [
+				{
+					"post": {
+						"title": "City council approves new bike lanes downtown",
+						"excerpt": "The council voted to add twelve kilometres of protected bike lanes across the city centre.",
+						"status": "draft"
+					}
+				},
+				{
+					"action": "publish",
+					"available": false
+				}
+			],
+			"fixtures": {
+				"users": [
+					{
+						"as": "co",
+						"role": "contributor"
+					}
+				],
+				"posts": [
+					{
+						"title": "Way too short",
+						"status": "draft",
+						"author": "co",
+						"excerpt": "Needs more words."
+					}
+				]
+			},
+			"view_as": "co",
+			"steps": [
+				{
+					"fill": "headline",
+					"value": "City council approves new bike lanes downtown"
+				},
+				{
+					"fill": "excerpt",
+					"value": "The council voted to add twelve kilometres of protected bike lanes across the city centre."
+				},
+				{
+					"action": "save"
+				},
+				{
+					"fill": "facts",
+					"value": true
+				}
+			]
+		},
+		{
+			"criterion": "contributors",
+			"expect": [
+				{
+					"action": "publish",
+					"available": false
+				},
+				{
+					"post": {
+						"title": "City council approves new bike lanes downtown",
+						"status": "pending"
+					}
+				}
+			],
+			"fixtures": {
+				"users": [
+					{
+						"as": "co",
+						"role": "contributor"
+					}
+				],
+				"posts": [
+					{
+						"title": "City council approves new bike lanes downtown",
+						"status": "pending",
+						"author": "co",
+						"excerpt": "The council voted to add twelve kilometres of protected bike lanes across the city centre."
+					}
+				]
+			},
+			"view_as": "co",
+			"steps": [
+				{
+					"fill": "facts",
+					"value": true
+				}
+			]
+		}
+	],
+	"ui": {
+		"protocol": "a2ui/v0.9.1",
+		"catalogId": "graft:wordpress",
+		"initial": {
+			"form": {
+				"headline": {
+					"path": "/slot/post/title"
+				},
+				"excerpt": {
+					"path": "/slot/post/excerpt"
+				},
+				"facts": false
+			}
+		},
+		"computed": {
+			"titleLen": {
+				"call": "count",
+				"args": {
+					"value": {
+						"path": "/form/headline"
+					}
+				}
+			},
+			"excerptLen": {
+				"call": "count",
+				"args": {
+					"value": {
+						"path": "/form/excerpt"
+					}
+				}
+			},
+			"titleOk": {
+				"call": "length",
+				"args": {
+					"value": {
+						"path": "/form/headline"
+					},
+					"min": 20,
+					"max": 70
+				}
+			},
+			"notCaps": {
+				"call": "notEquals",
+				"args": {
+					"a": {
+						"path": "/form/headline"
+					},
+					"b": {
+						"call": "upper",
+						"args": {
+							"value": {
+								"path": "/form/headline"
+							}
+						}
+					}
+				}
+			},
+			"excerptOk": {
+				"call": "length",
+				"args": {
+					"value": {
+						"path": "/form/excerpt"
+					},
+					"min": 50
+				}
+			},
+			"saved": {
+				"call": "and",
+				"args": {
+					"values": [
+						{
+							"call": "equals",
+							"args": {
+								"a": {
+									"path": "/form/headline"
+								},
+								"b": {
+									"path": "/slot/post/title"
+								}
+							}
+						},
+						{
+							"call": "equals",
+							"args": {
+								"a": {
+									"path": "/form/excerpt"
+								},
+								"b": {
+									"path": "/slot/post/excerpt"
+								}
+							}
+						}
+					]
+				}
+			}
+		},
+		"components": [
+			{
+				"id": "root",
+				"component": "Column",
+				"children": [
+					"headline",
+					"excerpt",
+					"checklistTitle",
+					"chkTitleLen",
+					"chkCaps",
+					"chkExcerpt",
+					"chkFacts",
+					"facts",
+					"actions"
+				]
+			},
+			{
+				"id": "headline",
+				"component": "TextField",
+				"label": "Headline",
+				"value": {
+					"path": "/form/headline"
+				},
+				"variant": "shortText"
+			},
+			{
+				"id": "excerpt",
+				"component": "TextField",
+				"label": "Excerpt",
+				"value": {
+					"path": "/form/excerpt"
+				},
+				"variant": "longText"
+			},
+			{
+				"id": "checklistTitle",
+				"component": "Text",
+				"text": "Checklist",
+				"variant": "h3"
+			},
+			{
+				"id": "chkTitleLen",
+				"component": "Text",
+				"variant": "body",
+				"text": {
+					"call": "if",
+					"args": {
+						"condition": {
+							"path": "/titleOk"
+						},
+						"then": "✓ Headline is 20 to 70 characters",
+						"else": {
+							"call": "formatString",
+							"args": {
+								"value": "✗ Headline is 20 to 70 characters (now ${/titleLen})"
+							}
+						}
+					}
+				}
+			},
+			{
+				"id": "chkCaps",
+				"component": "Text",
+				"variant": "body",
+				"text": {
+					"call": "if",
+					"args": {
+						"condition": {
+							"path": "/notCaps"
+						},
+						"then": "✓ Headline is not in capitals",
+						"else": "✗ Headline is not in capitals"
+					}
+				}
+			},
+			{
+				"id": "chkExcerpt",
+				"component": "Text",
+				"variant": "body",
+				"text": {
+					"call": "if",
+					"args": {
+						"condition": {
+							"path": "/excerptOk"
+						},
+						"then": "✓ Excerpt of at least 50 characters",
+						"else": {
+							"call": "formatString",
+							"args": {
+								"value": "✗ Excerpt of at least 50 characters (now ${/excerptLen})"
+							}
+						}
+					}
+				}
+			},
+			{
+				"id": "chkFacts",
+				"component": "Text",
+				"variant": "body",
+				"text": {
+					"call": "if",
+					"args": {
+						"condition": {
+							"path": "/form/facts"
+						},
+						"then": "✓ Facts and names checked",
+						"else": "✗ Facts and names checked"
+					}
+				}
+			},
+			{
+				"id": "facts",
+				"component": "CheckBox",
+				"label": "Facts and names checked",
+				"value": {
+					"path": "/form/facts"
+				}
+			},
+			{
+				"id": "actions",
+				"component": "Row",
+				"children": [
+					"save",
+					"publish"
+				]
+			},
+			{
+				"id": "saveLabel",
+				"component": "Text",
+				"text": "Save"
+			},
+			{
+				"id": "save",
+				"component": "Button",
+				"child": "saveLabel",
+				"variant": "default",
+				"visible": {
+					"call": "can",
+					"args": {
+						"scope": "posts:write",
+						"on": {
+							"path": "/slot/post"
+						}
+					}
+				},
+				"checks": [
+					{
+						"condition": {
+							"call": "required",
+							"args": {
+								"value": {
+									"path": "/form/headline"
+								}
+							}
+						},
+						"message": "The headline cannot be empty"
+					}
+				],
+				"action": {
+					"event": {
+						"name": "save",
+						"context": {
+							"id": {
+								"path": "/slot/post/id"
+							},
+							"title": {
+								"path": "/form/headline"
+							},
+							"excerpt": {
+								"path": "/form/excerpt"
+							}
+						}
+					}
+				}
+			},
+			{
+				"id": "publishLabel",
+				"component": "Text",
+				"text": "Publish"
+			},
+			{
+				"id": "publish",
+				"component": "Button",
+				"child": "publishLabel",
+				"variant": "primary",
+				"visible": {
+					"call": "and",
+					"args": {
+						"values": [
+							{
+								"call": "can",
+								"args": {
+									"scope": "posts.status:write",
+									"on": {
+										"path": "/slot/post"
+									}
+								}
+							},
+							{
+								"path": "/slot/post/can/publish"
+							}
+						]
+					}
+				},
+				"checks": [
+					{
+						"condition": {
+							"path": "/titleOk"
+						},
+						"message": "The headline must be 20 to 70 characters"
+					},
+					{
+						"condition": {
+							"path": "/notCaps"
+						},
+						"message": "The headline must not be in capitals"
+					},
+					{
+						"condition": {
+							"path": "/excerptOk"
+						},
+						"message": "The excerpt must be at least 50 characters"
+					},
+					{
+						"condition": {
+							"path": "/form/facts"
+						},
+						"message": "Check facts and names first"
+					},
+					{
+						"condition": {
+							"path": "/saved"
+						},
+						"message": "Save your changes first"
+					}
+				],
+				"action": {
+					"event": {
+						"name": "publish",
+						"context": {
+							"id": {
+								"path": "/slot/post/id"
+							}
+						}
+					}
+				}
+			}
+		]
+	},
+	"events": {
+		"save": {
+			"call": "posts.update_fields",
+			"input": {
+				"id": {
+					"$context": "id"
+				},
+				"title": {
+					"$context": "title"
+				},
+				"excerpt": {
+					"$context": "excerpt"
+				}
+			},
+			"then": [
+				"reload:page"
+			],
+			"notice": "Headline and excerpt saved"
+		},
+		"publish": {
+			"call": "posts.update_status",
+			"input": {
+				"id": {
+					"$context": "id"
+				},
+				"status": "publish"
+			},
+			"then": [
+				"reload:page"
+			],
+			"notice": "Post published"
+		}
+	},
+	"refs": {
+		"slot": "post.editor.panel",
+		"catalog": {
+			"Column": [
+				"children"
+			],
+			"TextField": [
+				"label",
+				"value",
+				"variant"
+			],
+			"Text": [
+				"text",
+				"variant"
+			],
+			"CheckBox": [
+				"label",
+				"value"
+			],
+			"Row": [
+				"children"
+			],
+			"Button": [
+				"action",
+				"checks",
+				"child",
+				"variant",
+				"visible"
+			]
+		},
+		"capabilities": [
+			"posts.update_fields",
+			"posts.update_status"
+		],
+		"scopes": [
+			"posts.status:write",
+			"posts:write"
+		]
+	},
+	"provenance": {
+		"compiler": "a2ui-poc",
+		"model": "claude-opus-5-5",
+		"strategy": "compiled"
+	}
+}

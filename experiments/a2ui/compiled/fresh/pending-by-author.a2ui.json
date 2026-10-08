@@ -1,0 +1,602 @@
+{
+	"graft": 1,
+	"spec": {
+		"id": "pending-by-author",
+		"hash": "sha256:2c34b9b1a1feb3c866537a5194856d22741cb1ac88428d05e1226dccf1298fe0"
+	},
+	"surface": {
+		"host": "wordpress",
+		"hostVersion": "7.1.2",
+		"hash": "sha256:6f170822cb71accfa0c59633044953ce846b218fbcbd1f6406323c4f38e17cdc"
+	},
+	"mount": {
+		"slot": "dashboard.widget",
+		"title": "Pending by author"
+	},
+	"data": {
+		"pending": {
+			"call": "posts.list",
+			"input": {
+				"post_type": "post",
+				"status": [
+					"pending"
+				],
+				"per_page": 100
+			}
+		}
+	},
+	"checks": [
+		{
+			"criterion": "authors",
+			"expect": [
+				{
+					"rows": [
+						"Alice Pending",
+						"Bob Pending"
+					]
+				},
+				{
+					"action": "author-alice",
+					"available": true
+				},
+				{
+					"action": "author-bob",
+					"available": true
+				},
+				{
+					"action": "author-carol",
+					"available": false
+				}
+			],
+			"fixtures": {
+				"users": [
+					{
+						"as": "ed",
+						"role": "editor"
+					},
+					{
+						"as": "alice",
+						"role": "author"
+					},
+					{
+						"as": "bob",
+						"role": "author"
+					},
+					{
+						"as": "carol",
+						"role": "author"
+					}
+				],
+				"posts": [
+					{
+						"title": "Alice Pending",
+						"status": "pending",
+						"author": "alice"
+					},
+					{
+						"title": "Bob Pending",
+						"status": "pending",
+						"author": "bob"
+					},
+					{
+						"title": "Carol Draft",
+						"status": "draft",
+						"author": "carol"
+					},
+					{
+						"title": "Alice Published",
+						"status": "publish",
+						"author": "alice"
+					},
+					{
+						"title": "Admin Private",
+						"status": "private"
+					},
+					{
+						"title": "Carol Scheduled",
+						"status": "future",
+						"author": "carol"
+					}
+				]
+			},
+			"view_as": "ed"
+		},
+		{
+			"criterion": "filter",
+			"expect": [
+				{
+					"rows": [
+						"Alice Pending One",
+						"Alice Pending Two"
+					]
+				}
+			],
+			"fixtures": {
+				"users": [
+					{
+						"as": "ed",
+						"role": "editor"
+					},
+					{
+						"as": "alice",
+						"role": "author"
+					},
+					{
+						"as": "bob",
+						"role": "author"
+					}
+				],
+				"posts": [
+					{
+						"title": "Alice Pending One",
+						"status": "pending",
+						"author": "alice"
+					},
+					{
+						"title": "Bob Pending",
+						"status": "pending",
+						"author": "bob"
+					},
+					{
+						"title": "Alice Pending Two",
+						"status": "pending",
+						"author": "alice"
+					},
+					{
+						"title": "Alice Draft",
+						"status": "draft",
+						"author": "alice"
+					},
+					{
+						"title": "Alice Published",
+						"status": "publish",
+						"author": "alice"
+					}
+				]
+			},
+			"view_as": "ed",
+			"steps": [
+				{
+					"action": "author-alice"
+				}
+			]
+		},
+		{
+			"criterion": "filter",
+			"expect": [
+				{
+					"rows": [
+						"Bob Pending"
+					]
+				}
+			],
+			"fixtures": {
+				"users": [
+					{
+						"as": "ed",
+						"role": "editor"
+					},
+					{
+						"as": "alice",
+						"role": "author"
+					},
+					{
+						"as": "bob",
+						"role": "author"
+					}
+				],
+				"posts": [
+					{
+						"title": "Alice Pending One",
+						"status": "pending",
+						"author": "alice"
+					},
+					{
+						"title": "Bob Pending",
+						"status": "pending",
+						"author": "bob"
+					},
+					{
+						"title": "Alice Pending Two",
+						"status": "pending",
+						"author": "alice"
+					},
+					{
+						"title": "Bob Draft",
+						"status": "draft",
+						"author": "bob"
+					}
+				]
+			},
+			"view_as": "ed",
+			"steps": [
+				{
+					"action": "author-alice"
+				},
+				{
+					"action": "author-bob"
+				}
+			]
+		},
+		{
+			"criterion": "everyone",
+			"expect": [
+				{
+					"text": "Everyone"
+				},
+				{
+					"rows": [
+						"Alice Pending",
+						"Bob Pending"
+					]
+				}
+			],
+			"fixtures": {
+				"users": [
+					{
+						"as": "ed",
+						"role": "editor"
+					},
+					{
+						"as": "alice",
+						"role": "author"
+					},
+					{
+						"as": "bob",
+						"role": "author"
+					}
+				],
+				"posts": [
+					{
+						"title": "Alice Pending",
+						"status": "pending",
+						"author": "alice"
+					},
+					{
+						"title": "Bob Pending",
+						"status": "pending",
+						"author": "bob"
+					},
+					{
+						"title": "Bob Draft",
+						"status": "draft",
+						"author": "bob"
+					},
+					{
+						"title": "Alice Published",
+						"status": "publish",
+						"author": "alice"
+					}
+				]
+			},
+			"view_as": "ed",
+			"steps": [
+				{
+					"action": "author-alice"
+				},
+				{
+					"action": "everyone"
+				}
+			]
+		},
+		{
+			"criterion": "approve",
+			"expect": [
+				{
+					"post": {
+						"title": "Bob Pending",
+						"status": "publish"
+					}
+				},
+				{
+					"post": {
+						"title": "Alice Pending",
+						"status": "pending"
+					}
+				},
+				{
+					"rows": [
+						"Alice Pending"
+					]
+				}
+			],
+			"fixtures": {
+				"users": [
+					{
+						"as": "ed",
+						"role": "editor"
+					},
+					{
+						"as": "alice",
+						"role": "author"
+					},
+					{
+						"as": "bob",
+						"role": "author"
+					}
+				],
+				"posts": [
+					{
+						"title": "Alice Pending",
+						"status": "pending",
+						"author": "alice"
+					},
+					{
+						"title": "Bob Pending",
+						"status": "pending",
+						"author": "bob"
+					}
+				]
+			},
+			"view_as": "ed",
+			"steps": [
+				{
+					"action": "approve",
+					"row": {
+						"title": "Bob Pending"
+					}
+				}
+			]
+		},
+		{
+			"criterion": "approve",
+			"expect": [
+				{
+					"action": "approve",
+					"row": {
+						"title": "Alice Pending"
+					},
+					"available": true
+				}
+			],
+			"fixtures": {
+				"users": [
+					{
+						"as": "ed",
+						"role": "editor"
+					},
+					{
+						"as": "alice",
+						"role": "author"
+					}
+				],
+				"posts": [
+					{
+						"title": "Alice Pending",
+						"status": "pending",
+						"author": "alice"
+					}
+				]
+			},
+			"view_as": "ed"
+		}
+	],
+	"ui": {
+		"protocol": "a2ui/v0.9.1",
+		"catalogId": "graft:wordpress",
+		"initial": {
+			"form": {
+				"author": ""
+			}
+		},
+		"computed": {
+			"authors": {
+				"call": "distinct",
+				"args": {
+					"items": {
+						"path": "/pending/items"
+					},
+					"by": "author/id"
+				}
+			},
+			"shown": {
+				"call": "if",
+				"args": {
+					"condition": {
+						"call": "notEquals",
+						"args": {
+							"a": {
+								"path": "/form/author"
+							},
+							"b": ""
+						}
+					},
+					"then": {
+						"call": "filter",
+						"args": {
+							"items": {
+								"path": "/pending/items"
+							},
+							"by": "author/id",
+							"equals": {
+								"path": "/form/author"
+							}
+						}
+					},
+					"else": {
+						"path": "/pending/items"
+					}
+				}
+			}
+		},
+		"components": [
+			{
+				"id": "root",
+				"component": "Column",
+				"children": [
+					"filters",
+					"pending-table"
+				]
+			},
+			{
+				"id": "filters",
+				"component": "Row",
+				"children": [
+					"everyone",
+					"author-list"
+				]
+			},
+			{
+				"id": "everyone",
+				"component": "Button",
+				"child": "everyone-label",
+				"variant": "default",
+				"action": {
+					"functionCall": {
+						"call": "set",
+						"args": {
+							"target": "/form/author",
+							"value": ""
+						}
+					}
+				}
+			},
+			{
+				"id": "everyone-label",
+				"component": "Text",
+				"text": "Everyone"
+			},
+			{
+				"id": "author-list",
+				"component": "Row",
+				"children": {
+					"componentId": "author-btn",
+					"path": "/authors"
+				}
+			},
+			{
+				"id": "author-btn",
+				"component": "Button",
+				"child": "author-btn-label",
+				"variant": "default",
+				"actionId": {
+					"call": "formatString",
+					"args": {
+						"value": "author-${lower(value: ${author/name})}"
+					}
+				},
+				"action": {
+					"functionCall": {
+						"call": "set",
+						"args": {
+							"target": "/form/author",
+							"value": {
+								"path": "author/id"
+							}
+						}
+					}
+				}
+			},
+			{
+				"id": "author-btn-label",
+				"component": "Text",
+				"text": {
+					"path": "author/name"
+				}
+			},
+			{
+				"id": "pending-table",
+				"component": "Table",
+				"rows": {
+					"path": "/shown"
+				},
+				"fields": [
+					{
+						"id": "title",
+						"label": "Title",
+						"type": "string",
+						"primary": true
+					},
+					{
+						"id": "author/name",
+						"label": "Author",
+						"type": "string"
+					},
+					{
+						"id": "date",
+						"label": "Date",
+						"type": "datetime"
+					}
+				],
+				"rowActions": [
+					{
+						"id": "approve",
+						"label": "Approve",
+						"variant": "primary",
+						"visible": {
+							"call": "can",
+							"args": {
+								"scope": "posts.status:write"
+							}
+						},
+						"action": {
+							"event": {
+								"name": "approve",
+								"context": {
+									"id": {
+										"path": "id"
+									}
+								}
+							}
+						}
+					}
+				],
+				"empty": "No pending posts."
+			}
+		]
+	},
+	"events": {
+		"approve": {
+			"call": "posts.update_status",
+			"input": {
+				"id": {
+					"$context": "id"
+				},
+				"status": "publish"
+			},
+			"then": [
+				"refresh:pending"
+			],
+			"notice": "Post approved and published."
+		}
+	},
+	"refs": {
+		"slot": "dashboard.widget",
+		"catalog": {
+			"Column": [
+				"children"
+			],
+			"Row": [
+				"children"
+			],
+			"Button": [
+				"action",
+				"actionId",
+				"child",
+				"variant"
+			],
+			"Text": [
+				"text"
+			],
+			"Table": [
+				"empty",
+				"fields",
+				"rowActions",
+				"rows"
+			]
+		},
+		"capabilities": [
+			"posts.list",
+			"posts.update_status"
+		],
+		"scopes": [
+			"posts.status:write",
+			"posts:read"
+		]
+	},
+	"provenance": {
+		"compiler": "a2ui-poc",
+		"model": "claude-opus-5-5",
+		"strategy": "compiled"
+	}
+}

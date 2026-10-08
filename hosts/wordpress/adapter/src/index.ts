@@ -9,3 +9,4 @@ export { verifyInWordPress, type VerifyTarget } from './verify.ts';
 export { hostGuide } from './guide.ts';
 export { loadCorpus, runWordPressCanary, scenarios, scenarioSurface, type Scenario, type WordPressCanaryOptions } from './canary.ts';
 export { describers } from './describe.ts';
+export { a2uiNotes, wordpressA2UI, wordpressA2UIFormat } from './a2ui.ts';

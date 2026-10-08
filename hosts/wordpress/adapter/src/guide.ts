@@ -1,7 +1,9 @@
 import type { HostGuide } from '@graft/core';
+import { a2uiNotes } from './a2ui.ts';
 
 /** What the compiler needs to know about WordPress beyond the surface. */
 export const hostGuide: HostGuide = {
+	formats: { A2UI: a2uiNotes },
 	fixtures: `A JSON object:
 {"users": [{"as": "<alias>", "role": "administrator|editor|author|contributor|subscriber", "name": "<display name, optional; default the alias with its first letter capitalized>"}],
  "posts": [{"title": "<unique title>", "status": "publish|future|draft|pending|private", "author": "<user alias, optional; default the site admin>", "excerpt": "<optional>",

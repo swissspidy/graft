@@ -22,7 +22,7 @@ describe('WordPress semantics', () => {
 	it('read the review queue the way the table renders it', () => {
 		const build = load('review-queue');
 		const snapshot = snapshotTree(
-			build.tree,
+			build.tree!,
 			{
 				data: { queue: { items: [post(1, 'Draft A', true), post(2, 'Draft B', false)], total: 2, pages: 1 } },
 				slot: {},
@@ -41,12 +41,12 @@ describe('WordPress semantics', () => {
 	});
 
 	it('show the empty text when there are no rows', () => {
-		const snapshot = snapshotTree(load('review-queue').tree, { data: { queue: { items: [] } }, slot: {}, can: () => true }, semantics);
+		const snapshot = snapshotTree(load('review-queue').tree!, { data: { queue: { items: [] } }, slot: {}, can: () => true }, semantics);
 		expect(snapshot.texts).toContain('Nothing to review');
 	});
 
 	it('make the quick approve row action depend on status and permission', () => {
-		const tree = load('quick-approve').tree;
+		const tree = load('quick-approve').tree!;
 		const can = createCan({ 'posts.status:write': true });
 		const available = (p: Record<string, unknown>) =>
 			allActions(snapshotTree(tree, { data: {}, slot: { post: p }, can }, semantics)).map((a) => a.available);

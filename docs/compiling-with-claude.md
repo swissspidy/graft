@@ -141,8 +141,8 @@ were checks that no tree could satisfy. Since checks are frozen, retrying
 the tree could never fix them:
 
 - `{"text": ...}` promised "shown somewhere", but the verifier only saw row
-  titles. It missed other cells (a post's author) and the labels of buttons
-  and row actions.
+  titles. It missed other cells (a post's author), the labels of buttons
+  and row actions, and the labels of inputs.
 - The guide never said that pages show users by display name, so checks
   expected aliases such as "alice".
 - The prompt didn't say that `rows` reads the first table and `columns` is

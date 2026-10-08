@@ -1,0 +1,473 @@
+{
+	"graft": 1,
+	"spec": {
+		"id": "headline-check",
+		"hash": "sha256:604b8d6f30db7168ae1bb1f45ff46e89a60850c8ed1e7e747865cc83d840e1d5"
+	},
+	"surface": {
+		"host": "wordpress",
+		"hostVersion": "7.1.2",
+		"hash": "sha256:6f170822cb71accfa0c59633044953ce846b218fbcbd1f6406323c4f38e17cdc"
+	},
+	"mount": {
+		"slot": "dashboard.widget",
+		"title": "Headline check"
+	},
+	"data": {
+		"pending": {
+			"call": "posts.list",
+			"input": {
+				"post_type": "post",
+				"status": [
+					"pending"
+				],
+				"per_page": 100
+			}
+		}
+	},
+	"checks": [
+		{
+			"criterion": "pending-only",
+			"fixtures": {
+				"users": [
+					{
+						"as": "e",
+						"role": "editor"
+					}
+				],
+				"posts": [
+					{
+						"title": "Waiting for review",
+						"status": "pending"
+					},
+					{
+						"title": "Still a draft",
+						"status": "draft"
+					},
+					{
+						"title": "Already out there",
+						"status": "publish"
+					}
+				]
+			},
+			"view_as": "e",
+			"expect": [
+				{
+					"rows": [
+						"Waiting for review"
+					]
+				},
+				{
+					"columns": [
+						"Title",
+						"Headline"
+					]
+				}
+			]
+		},
+		{
+			"criterion": "too-long",
+			"fixtures": {
+				"users": [
+					{
+						"as": "e",
+						"role": "editor"
+					}
+				],
+				"posts": [
+					{
+						"title": "A headline that goes on and on well past the point where search results cut it",
+						"status": "pending"
+					}
+				]
+			},
+			"view_as": "e",
+			"expect": [
+				{
+					"cell": {
+						"row": {
+							"title": "A headline that goes on and on well past the point where search results cut it"
+						},
+						"column": "Headline",
+						"text": "Too long"
+					}
+				}
+			]
+		},
+		{
+			"criterion": "all-caps",
+			"fixtures": {
+				"users": [
+					{
+						"as": "e",
+						"role": "editor"
+					}
+				],
+				"posts": [
+					{
+						"title": "CITY HALL VOTES TONIGHT",
+						"status": "pending"
+					}
+				]
+			},
+			"view_as": "e",
+			"expect": [
+				{
+					"cell": {
+						"row": {
+							"title": "CITY HALL VOTES TONIGHT"
+						},
+						"column": "Headline",
+						"text": "All caps"
+					}
+				}
+			]
+		},
+		{
+			"criterion": "too-short",
+			"fixtures": {
+				"users": [
+					{
+						"as": "e",
+						"role": "editor"
+					}
+				],
+				"posts": [
+					{
+						"title": "Budget vote",
+						"status": "pending"
+					}
+				]
+			},
+			"view_as": "e",
+			"expect": [
+				{
+					"cell": {
+						"row": {
+							"title": "Budget vote"
+						},
+						"column": "Headline",
+						"text": "Too short"
+					}
+				}
+			]
+		},
+		{
+			"criterion": "warning",
+			"fixtures": {
+				"users": [
+					{
+						"as": "e",
+						"role": "editor"
+					}
+				],
+				"posts": [
+					{
+						"title": "BUDGET VOTE",
+						"status": "pending"
+					}
+				]
+			},
+			"view_as": "e",
+			"expect": [
+				{
+					"cell": {
+						"row": {
+							"title": "BUDGET VOTE"
+						},
+						"column": "Headline",
+						"text": "All caps, Too short",
+						"tone": "warning"
+					}
+				}
+			]
+		},
+		{
+			"criterion": "good",
+			"fixtures": {
+				"users": [
+					{
+						"as": "e",
+						"role": "editor"
+					}
+				],
+				"posts": [
+					{
+						"title": "City hall votes on the budget tonight",
+						"status": "pending"
+					}
+				]
+			},
+			"view_as": "e",
+			"expect": [
+				{
+					"cell": {
+						"row": {
+							"title": "City hall votes on the budget tonight"
+						},
+						"column": "Headline",
+						"text": "Looks good",
+						"tone": "success"
+					}
+				}
+			]
+		}
+	],
+	"ui": {
+		"protocol": "a2ui/v0.9.1",
+		"catalogId": "graft:wordpress",
+		"components": [
+			{
+				"id": "root",
+				"component": "Table",
+				"rows": {
+					"path": "/pending/items"
+				},
+				"fields": [
+					{
+						"id": "title",
+						"label": "Title",
+						"type": "string",
+						"primary": true
+					},
+					{
+						"id": "headline",
+						"label": "Headline",
+						"type": "string",
+						"value": {
+							"call": "if",
+							"args": {
+								"condition": {
+									"call": "equals",
+									"args": {
+										"a": {
+											"call": "join",
+											"args": {
+												"values": [
+													{
+														"call": "if",
+														"args": {
+															"condition": {
+																"call": "regex",
+																"args": {
+																	"value": {
+																		"path": "title"
+																	},
+																	"pattern": "^[\\s\\S]{71,}$"
+																}
+															},
+															"then": "Too long",
+															"else": ""
+														}
+													},
+													{
+														"call": "if",
+														"args": {
+															"condition": {
+																"call": "regex",
+																"args": {
+																	"value": {
+																		"path": "title"
+																	},
+																	"pattern": "^[^a-z]*[A-Z][^a-z]*$"
+																}
+															},
+															"then": "All caps",
+															"else": ""
+														}
+													},
+													{
+														"call": "if",
+														"args": {
+															"condition": {
+																"call": "not",
+																"args": {
+																	"value": {
+																		"call": "regex",
+																		"args": {
+																			"value": {
+																				"path": "title"
+																			},
+																			"pattern": "\\S+\\s+\\S+\\s+\\S+"
+																		}
+																	}
+																}
+															},
+															"then": "Too short",
+															"else": ""
+														}
+													}
+												],
+												"separator": ", "
+											}
+										},
+										"b": ""
+									}
+								},
+								"then": "Looks good",
+								"else": {
+									"call": "join",
+									"args": {
+										"values": [
+											{
+												"call": "if",
+												"args": {
+													"condition": {
+														"call": "regex",
+														"args": {
+															"value": {
+																"path": "title"
+															},
+															"pattern": "^[\\s\\S]{71,}$"
+														}
+													},
+													"then": "Too long",
+													"else": ""
+												}
+											},
+											{
+												"call": "if",
+												"args": {
+													"condition": {
+														"call": "regex",
+														"args": {
+															"value": {
+																"path": "title"
+															},
+															"pattern": "^[^a-z]*[A-Z][^a-z]*$"
+														}
+													},
+													"then": "All caps",
+													"else": ""
+												}
+											},
+											{
+												"call": "if",
+												"args": {
+													"condition": {
+														"call": "not",
+														"args": {
+															"value": {
+																"call": "regex",
+																"args": {
+																	"value": {
+																		"path": "title"
+																	},
+																	"pattern": "\\S+\\s+\\S+\\s+\\S+"
+																}
+															}
+														}
+													},
+													"then": "Too short",
+													"else": ""
+												}
+											}
+										],
+										"separator": ", "
+									}
+								}
+							}
+						},
+						"tone": {
+							"call": "if",
+							"args": {
+								"condition": {
+									"call": "equals",
+									"args": {
+										"a": {
+											"call": "join",
+											"args": {
+												"values": [
+													{
+														"call": "if",
+														"args": {
+															"condition": {
+																"call": "regex",
+																"args": {
+																	"value": {
+																		"path": "title"
+																	},
+																	"pattern": "^[\\s\\S]{71,}$"
+																}
+															},
+															"then": "Too long",
+															"else": ""
+														}
+													},
+													{
+														"call": "if",
+														"args": {
+															"condition": {
+																"call": "regex",
+																"args": {
+																	"value": {
+																		"path": "title"
+																	},
+																	"pattern": "^[^a-z]*[A-Z][^a-z]*$"
+																}
+															},
+															"then": "All caps",
+															"else": ""
+														}
+													},
+													{
+														"call": "if",
+														"args": {
+															"condition": {
+																"call": "not",
+																"args": {
+																	"value": {
+																		"call": "regex",
+																		"args": {
+																			"value": {
+																				"path": "title"
+																			},
+																			"pattern": "\\S+\\s+\\S+\\s+\\S+"
+																		}
+																	}
+																}
+															},
+															"then": "Too short",
+															"else": ""
+														}
+													}
+												],
+												"separator": ", "
+											}
+										},
+										"b": ""
+									}
+								},
+								"then": "success",
+								"else": "warning"
+							}
+						}
+					}
+				],
+				"empty": "No posts are waiting for review."
+			}
+		]
+	},
+	"events": {},
+	"refs": {
+		"slot": "dashboard.widget",
+		"catalog": {
+			"Table": [
+				"empty",
+				"fields",
+				"rows"
+			]
+		},
+		"capabilities": [
+			"posts.list"
+		],
+		"scopes": [
+			"posts:read"
+		]
+	},
+	"provenance": {
+		"compiler": "a2ui-poc",
+		"model": "claude-opus-5-5",
+		"strategy": "compiled"
+	}
+}

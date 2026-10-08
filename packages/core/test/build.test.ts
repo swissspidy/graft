@@ -144,6 +144,13 @@ describe('validateBuild', () => {
 		expect(result.ok).toBe(true);
 	});
 
+	it('refuses a build without a tree when no UI format handles it', async () => {
+		const { tree: _tree, ...rest } = await build();
+		const result = await validateBuild({ ...rest, ui: { protocol: 'other/1', catalogId: 'x' }, events: {} }, surface);
+		expect(result.ok).toBe(false);
+		expect(result.diagnostics.map((d) => d.code)).toEqual(['build-unknown-format']);
+	});
+
 	it('rejects stored refs that do not match the content', async () => {
 		const b = await build();
 		b.refs.scopes = ['items:read'];
@@ -152,7 +159,7 @@ describe('validateBuild', () => {
 
 	it('reports unknown symbols, bad props and inputs, but not bindings', async () => {
 		const b = await build();
-		const list = (b.tree.children as Build['tree'][])[1]!;
+		const list = (b.tree!.children as Build['tree'][])[1]!;
 		list.props!.color = 'red';
 		list.props!.empty = { $slot: 'nothing' };
 		(list.props!.actions as unknown as Array<Record<string, unknown>>)[0]!.onClick = {
@@ -160,7 +167,7 @@ describe('validateBuild', () => {
 			input: { id: 'seven' },
 			then: ['refresh:elsewhere'],
 		};
-		(b.tree.children as Build['tree'][]).push({ type: 'chart' }, { type: 'text', children: [{ type: 'text' }] });
+		(b.tree!.children as Build['tree'][]).push({ type: 'chart' }, { type: 'text', children: [{ type: 'text' }] });
 		b.data.items!.input = { status: 'closed' };
 		b.data.more = { call: 'items.close', input: { id: { $data: 'items.first' } } };
 		b.refs = extractRefs(b, surface);

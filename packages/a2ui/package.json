@@ -1,0 +1,17 @@
+{
+  "name": "@graft/a2ui",
+  "version": "0.0.0",
+  "private": true,
+  "license": "Apache-2.0",
+  "description": "A2UI v0.9 surfaces as a Graft build's UI: the Graft catalog, snapshots for the verifier, static validation, refs and migrations. Built on @a2ui/web_core; no rendering.",
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts",
+    "./client": "./src/client.ts"
+  },
+  "dependencies": {
+    "@a2ui/web_core": "0.12.0",
+    "@graft/core": "workspace:*",
+    "zod": "^3.25.76"
+  }
+}

@@ -1,0 +1,918 @@
+{
+	"graft": 1,
+	"spec": {
+		"id": "submit-for-review",
+		"hash": "sha256:d7f9482406e766fe6ae200590bb89435eab9ff7f3341ae701697635114a23a30"
+	},
+	"surface": {
+		"host": "wordpress",
+		"hostVersion": "7.1.2",
+		"hash": "sha256:6f170822cb71accfa0c59633044953ce846b218fbcbd1f6406323c4f38e17cdc"
+	},
+	"mount": {
+		"slot": "dashboard.widget",
+		"title": "Submit for review"
+	},
+	"data": {
+		"drafts": {
+			"call": "posts.list",
+			"input": {
+				"post_type": "post",
+				"status": [
+					"draft"
+				],
+				"per_page": 100
+			}
+		},
+		"pending": {
+			"call": "posts.list",
+			"input": {
+				"post_type": "post",
+				"status": [
+					"pending"
+				],
+				"per_page": 100
+			}
+		}
+	},
+	"ui": {
+		"protocol": "a2ui/v0.9",
+		"catalogId": "graft:wordpress",
+		"initial": {
+			"form": {
+				"chosen": 0
+			}
+		},
+		"computed": {
+			"chosenDraft": {
+				"call": "filter",
+				"args": {
+					"items": {
+						"path": "/drafts/items"
+					},
+					"by": "id",
+					"equals": {
+						"path": "/form/chosen"
+					}
+				}
+			},
+			"sentPost": {
+				"call": "filter",
+				"args": {
+					"items": {
+						"path": "/pending/items"
+					},
+					"by": "id",
+					"equals": {
+						"path": "/form/chosen"
+					}
+				}
+			},
+			"confirming": {
+				"call": "greaterThan",
+				"args": {
+					"a": {
+						"call": "count",
+						"args": {
+							"value": {
+								"path": "/chosenDraft"
+							}
+						}
+					},
+					"b": 0
+				}
+			},
+			"isSent": {
+				"call": "and",
+				"args": {
+					"values": [
+						{
+							"call": "not",
+							"args": {
+								"value": {
+									"path": "/confirming"
+								}
+							}
+						},
+						{
+							"call": "greaterThan",
+							"args": {
+								"a": {
+									"call": "count",
+									"args": {
+										"value": {
+											"path": "/sentPost"
+										}
+									}
+								},
+								"b": 0
+							}
+						}
+					]
+				}
+			},
+			"picking": {
+				"call": "and",
+				"args": {
+					"values": [
+						{
+							"call": "not",
+							"args": {
+								"value": {
+									"path": "/confirming"
+								}
+							}
+						},
+						{
+							"call": "not",
+							"args": {
+								"value": {
+									"path": "/isSent"
+								}
+							}
+						}
+					]
+				}
+			},
+			"chosenTitle": {
+				"call": "join",
+				"args": {
+					"values": {
+						"call": "map",
+						"args": {
+							"items": {
+								"path": "/chosenDraft"
+							},
+							"by": "title"
+						}
+					},
+					"separator": ""
+				}
+			},
+			"sentTitle": {
+				"call": "join",
+				"args": {
+					"values": {
+						"call": "map",
+						"args": {
+							"items": {
+								"path": "/sentPost"
+							},
+							"by": "title"
+						}
+					},
+					"separator": ""
+				}
+			},
+			"listRows": {
+				"call": "if",
+				"args": {
+					"condition": {
+						"path": "/picking"
+					},
+					"then": {
+						"path": "/drafts/items"
+					},
+					"else": []
+				}
+			}
+		},
+		"components": [
+			{
+				"id": "root",
+				"component": "Column",
+				"children": [
+					"intro",
+					"drafts_table",
+					"confirm_text",
+					"confirm_row",
+					"sent_text"
+				]
+			},
+			{
+				"id": "intro",
+				"component": "Text",
+				"text": "Pick a draft to send to the editors.",
+				"variant": "caption",
+				"visible": {
+					"path": "/picking"
+				}
+			},
+			{
+				"id": "drafts_table",
+				"component": "Table",
+				"rows": {
+					"path": "/listRows"
+				},
+				"fields": [
+					{
+						"id": "title",
+						"label": "Draft",
+						"type": "string",
+						"primary": true
+					},
+					{
+						"id": "modified",
+						"label": "Last modified",
+						"type": "datetime"
+					}
+				],
+				"rowActions": [
+					{
+						"id": "choose",
+						"label": "Choose",
+						"variant": "default",
+						"visible": {
+							"path": "/picking"
+						},
+						"action": {
+							"functionCall": {
+								"call": "set",
+								"args": {
+									"target": "/form/chosen",
+									"value": {
+										"path": "id"
+									}
+								}
+							}
+						}
+					}
+				],
+				"empty": "No drafts to choose from.",
+				"visible": {
+					"path": "/picking"
+				}
+			},
+			{
+				"id": "confirm_text",
+				"component": "Text",
+				"text": {
+					"call": "formatString",
+					"args": {
+						"value": "Send “${/chosenTitle}” for review?"
+					}
+				},
+				"variant": "body",
+				"visible": {
+					"path": "/confirming"
+				}
+			},
+			{
+				"id": "confirm_row",
+				"component": "Row",
+				"children": [
+					"send",
+					"back"
+				],
+				"visible": {
+					"path": "/confirming"
+				}
+			},
+			{
+				"id": "send",
+				"component": "Button",
+				"child": "send_label",
+				"variant": "primary",
+				"visible": {
+					"path": "/confirming"
+				},
+				"action": {
+					"event": {
+						"name": "send",
+						"context": {
+							"id": {
+								"path": "/form/chosen"
+							}
+						}
+					}
+				}
+			},
+			{
+				"id": "send_label",
+				"component": "Text",
+				"text": "Send"
+			},
+			{
+				"id": "back",
+				"component": "Button",
+				"child": "back_label",
+				"variant": "default",
+				"visible": {
+					"path": "/confirming"
+				},
+				"action": {
+					"functionCall": {
+						"call": "set",
+						"args": {
+							"target": "/form/chosen",
+							"value": 0
+						}
+					}
+				}
+			},
+			{
+				"id": "back_label",
+				"component": "Text",
+				"text": "Back"
+			},
+			{
+				"id": "sent_text",
+				"component": "Text",
+				"text": {
+					"call": "formatString",
+					"args": {
+						"value": "Sent “${/sentTitle}” for review."
+					}
+				},
+				"variant": "body",
+				"visible": {
+					"path": "/isSent"
+				}
+			}
+		]
+	},
+	"events": {
+		"send": {
+			"call": "posts.update_status",
+			"input": {
+				"id": {
+					"$context": "id"
+				},
+				"status": "pending"
+			},
+			"then": [
+				"refresh:pending",
+				"refresh:drafts"
+			]
+		}
+	},
+	"checks": [
+		{
+			"criterion": "pick",
+			"expect": [
+				{
+					"rows": [
+						"Draft A",
+						"Draft B"
+					]
+				},
+				{
+					"action": "choose",
+					"row": {
+						"title": "Draft A"
+					},
+					"available": true
+				},
+				{
+					"action": "choose",
+					"row": {
+						"title": "Draft B"
+					},
+					"available": true
+				},
+				{
+					"action": "send",
+					"available": false
+				},
+				{
+					"action": "back",
+					"available": false
+				},
+				{
+					"post": {
+						"title": "Draft A",
+						"status": "draft"
+					}
+				},
+				{
+					"post": {
+						"title": "Draft B",
+						"status": "draft"
+					}
+				}
+			],
+			"fixtures": {
+				"users": [
+					{
+						"as": "carol",
+						"role": "contributor"
+					},
+					{
+						"as": "dave",
+						"role": "author"
+					}
+				],
+				"posts": [
+					{
+						"title": "Draft A",
+						"status": "draft",
+						"author": "carol"
+					},
+					{
+						"title": "Draft B",
+						"status": "draft",
+						"author": "carol"
+					},
+					{
+						"title": "Pending C",
+						"status": "pending",
+						"author": "carol"
+					},
+					{
+						"title": "Dave Draft",
+						"status": "draft",
+						"author": "dave"
+					}
+				]
+			},
+			"view_as": "carol"
+		},
+		{
+			"criterion": "pick",
+			"expect": [
+				{
+					"rows": [
+						"Alice Draft"
+					]
+				},
+				{
+					"action": "choose",
+					"row": {
+						"title": "Alice Draft"
+					},
+					"available": true
+				},
+				{
+					"action": "send",
+					"available": false
+				},
+				{
+					"action": "back",
+					"available": false
+				}
+			],
+			"fixtures": {
+				"users": [
+					{
+						"as": "alice",
+						"role": "author"
+					},
+					{
+						"as": "bob",
+						"role": "author"
+					}
+				],
+				"posts": [
+					{
+						"title": "Alice Draft",
+						"status": "draft",
+						"author": "alice"
+					},
+					{
+						"title": "Bob Draft",
+						"status": "draft",
+						"author": "bob"
+					}
+				]
+			},
+			"view_as": "alice"
+		},
+		{
+			"criterion": "confirm",
+			"expect": [
+				{
+					"text": "Send “Draft A” for review?"
+				},
+				{
+					"action": "send",
+					"available": true
+				},
+				{
+					"action": "back",
+					"available": true
+				},
+				{
+					"rows": []
+				},
+				{
+					"action": "choose",
+					"row": {
+						"title": "Draft B"
+					},
+					"available": false
+				},
+				{
+					"post": {
+						"title": "Draft A",
+						"status": "draft"
+					}
+				},
+				{
+					"post": {
+						"title": "Draft B",
+						"status": "draft"
+					}
+				}
+			],
+			"fixtures": {
+				"users": [
+					{
+						"as": "carol",
+						"role": "contributor"
+					}
+				],
+				"posts": [
+					{
+						"title": "Draft A",
+						"status": "draft",
+						"author": "carol"
+					},
+					{
+						"title": "Draft B",
+						"status": "draft",
+						"author": "carol"
+					}
+				]
+			},
+			"view_as": "carol",
+			"steps": [
+				{
+					"action": "choose",
+					"row": {
+						"title": "Draft A"
+					}
+				}
+			]
+		},
+		{
+			"criterion": "back",
+			"expect": [
+				{
+					"rows": [
+						"Draft A",
+						"Draft B"
+					]
+				},
+				{
+					"action": "choose",
+					"row": {
+						"title": "Draft A"
+					},
+					"available": true
+				},
+				{
+					"action": "choose",
+					"row": {
+						"title": "Draft B"
+					},
+					"available": true
+				},
+				{
+					"action": "send",
+					"available": false
+				},
+				{
+					"action": "back",
+					"available": false
+				},
+				{
+					"post": {
+						"title": "Draft A",
+						"status": "draft"
+					}
+				},
+				{
+					"post": {
+						"title": "Draft B",
+						"status": "draft"
+					}
+				}
+			],
+			"fixtures": {
+				"users": [
+					{
+						"as": "carol",
+						"role": "contributor"
+					}
+				],
+				"posts": [
+					{
+						"title": "Draft A",
+						"status": "draft",
+						"author": "carol"
+					},
+					{
+						"title": "Draft B",
+						"status": "draft",
+						"author": "carol"
+					}
+				]
+			},
+			"view_as": "carol",
+			"steps": [
+				{
+					"action": "choose",
+					"row": {
+						"title": "Draft A"
+					}
+				},
+				{
+					"action": "back"
+				}
+			]
+		},
+		{
+			"criterion": "back",
+			"expect": [
+				{
+					"text": "Send “Draft B” for review?"
+				},
+				{
+					"action": "send",
+					"available": true
+				},
+				{
+					"post": {
+						"title": "Draft A",
+						"status": "draft"
+					}
+				},
+				{
+					"post": {
+						"title": "Draft B",
+						"status": "draft"
+					}
+				}
+			],
+			"fixtures": {
+				"users": [
+					{
+						"as": "carol",
+						"role": "contributor"
+					}
+				],
+				"posts": [
+					{
+						"title": "Draft A",
+						"status": "draft",
+						"author": "carol"
+					},
+					{
+						"title": "Draft B",
+						"status": "draft",
+						"author": "carol"
+					}
+				]
+			},
+			"view_as": "carol",
+			"steps": [
+				{
+					"action": "choose",
+					"row": {
+						"title": "Draft A"
+					}
+				},
+				{
+					"action": "back"
+				},
+				{
+					"action": "choose",
+					"row": {
+						"title": "Draft B"
+					}
+				}
+			]
+		},
+		{
+			"criterion": "send",
+			"expect": [
+				{
+					"post": {
+						"title": "Draft B",
+						"status": "pending"
+					}
+				},
+				{
+					"post": {
+						"title": "Draft A",
+						"status": "draft"
+					}
+				},
+				{
+					"text": "Sent “Draft B” for review."
+				}
+			],
+			"fixtures": {
+				"users": [
+					{
+						"as": "carol",
+						"role": "contributor"
+					}
+				],
+				"posts": [
+					{
+						"title": "Draft A",
+						"status": "draft",
+						"author": "carol"
+					},
+					{
+						"title": "Draft B",
+						"status": "draft",
+						"author": "carol"
+					}
+				]
+			},
+			"view_as": "carol",
+			"steps": [
+				{
+					"action": "choose",
+					"row": {
+						"title": "Draft B"
+					}
+				},
+				{
+					"action": "send"
+				}
+			]
+		},
+		{
+			"criterion": "send",
+			"expect": [
+				{
+					"post": {
+						"title": "Alice Draft",
+						"status": "pending"
+					}
+				},
+				{
+					"post": {
+						"title": "Alice Other",
+						"status": "draft"
+					}
+				},
+				{
+					"text": "Sent “Alice Draft” for review."
+				}
+			],
+			"fixtures": {
+				"users": [
+					{
+						"as": "alice",
+						"role": "author"
+					}
+				],
+				"posts": [
+					{
+						"title": "Alice Draft",
+						"status": "draft",
+						"author": "alice"
+					},
+					{
+						"title": "Alice Other",
+						"status": "draft",
+						"author": "alice"
+					}
+				]
+			},
+			"view_as": "alice",
+			"steps": [
+				{
+					"action": "choose",
+					"row": {
+						"title": "Alice Draft"
+					}
+				},
+				{
+					"action": "send"
+				}
+			]
+		},
+		{
+			"criterion": "drafts-only",
+			"expect": [
+				{
+					"rows": [
+						"Draft One"
+					]
+				},
+				{
+					"action": "choose",
+					"row": {
+						"title": "Draft One"
+					},
+					"available": true
+				}
+			],
+			"fixtures": {
+				"users": [
+					{
+						"as": "erin",
+						"role": "editor"
+					}
+				],
+				"posts": [
+					{
+						"title": "Published One",
+						"status": "publish",
+						"author": "erin"
+					},
+					{
+						"title": "Scheduled One",
+						"status": "future",
+						"author": "erin"
+					},
+					{
+						"title": "Pending One",
+						"status": "pending",
+						"author": "erin"
+					},
+					{
+						"title": "Private One",
+						"status": "private",
+						"author": "erin"
+					},
+					{
+						"title": "Draft One",
+						"status": "draft",
+						"author": "erin"
+					}
+				]
+			},
+			"view_as": "erin"
+		},
+		{
+			"criterion": "drafts-only",
+			"expect": [
+				{
+					"rows": []
+				},
+				{
+					"action": "send",
+					"available": false
+				}
+			],
+			"fixtures": {
+				"users": [
+					{
+						"as": "carol",
+						"role": "contributor"
+					}
+				],
+				"posts": [
+					{
+						"title": "Pending Only",
+						"status": "pending",
+						"author": "carol"
+					}
+				]
+			},
+			"view_as": "carol"
+		}
+	],
+	"refs": {
+		"slot": "dashboard.widget",
+		"components": {},
+		"capabilities": [
+			"posts.list",
+			"posts.update_status"
+		],
+		"scopes": [
+			"posts.status:write",
+			"posts:read"
+		],
+		"catalog": {
+			"Button": [
+				"action",
+				"child",
+				"variant",
+				"visible"
+			],
+			"Column": [
+				"children"
+			],
+			"Row": [
+				"children",
+				"visible"
+			],
+			"Table": [
+				"empty",
+				"fields",
+				"rowActions",
+				"rows",
+				"visible"
+			],
+			"Text": [
+				"text",
+				"variant",
+				"visible"
+			]
+		}
+	},
+	"provenance": {
+		"compiler": "graft-compiler/0.1.0",
+		"model": "claude-opus-5-5",
+		"promptHash": "sha256:9bc0b07cf32f29c061d7309d0866b4ee727f0d2b66857f74592f5348dfd33268",
+		"strategy": "regenerated",
+		"replaces": "sha256:6d7a08946ec10c0236fe7c3eeafaf5927134637fabcb67902abbe3221c523235"
+	}
+}

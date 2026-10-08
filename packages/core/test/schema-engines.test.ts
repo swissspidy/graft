@@ -21,8 +21,8 @@ type Mutation = [string, (build: Build) => void];
 const mutations: Mutation[] = [
 	['unknown top-level field', (b) => ((b as unknown as Record<string, unknown>).extra = 1)],
 	['missing tree', (b) => delete (b as Partial<Build>).tree],
-	['unknown component', (b) => (b.tree.type = 'marquee')],
-	['bad prop value', (b) => (b.tree.children = [{ type: b.tree.children?.[0] && typeof b.tree.children !== 'string' ? b.tree.children[0]!.type : 'x', props: { nonsense: true } }])],
+	['unknown component', (b) => (b.tree!.type = 'marquee')],
+	['bad prop value', (b) => (b.tree!.children = [{ type: b.tree!.children?.[0] && typeof b.tree!.children !== 'string' ? b.tree!.children[0]!.type : 'x', props: { nonsense: true } }])],
 	['unknown capability', (b) => (b.data = { x: { call: 'nope.nothing', input: {} } })],
 	['check with a bad shape', (b) => (b.checks[0] = { criterion: 42 } as unknown as Build['checks'][number])],
 	['stale refs', (b) => (b.refs.capabilities = [])],

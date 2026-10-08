@@ -30,7 +30,7 @@ describe('verifyBuild', () => {
 			{ criterion: 'clerks', fixtures, view_as: 'm', steps: [{ action: 'close', row: { title: 'Nope' } }], expect: [{ rows: [] }] },
 		];
 		// Make the action visible to everyone so the host has to refuse it.
-		const list = (build.tree.children as Build['tree'][])[1]!;
+		const list = (build.tree!.children as Build['tree'][])[1]!;
 		(list.props!.actions as Array<Record<string, unknown>>)[0]!.visible = true;
 		build.refs = extractRefs(build, surface);
 		const result = await verifyBuild({ build, spec, surface, sandbox: fakeSandbox(), semantics, createCan });

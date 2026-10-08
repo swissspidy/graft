@@ -99,10 +99,10 @@ export interface SemanticsArgs {
 export type ComponentSemantics = Record<string, (args: SemanticsArgs) => void | false>;
 
 /**
- * Interprets a tree into a snapshot. Components without semantics
- * contribute their text children, if any.
+ * A snapshot and the emitter that fills it. Components reading into a
+ * snapshot go through the emitter, so every UI format reads the same way.
  */
-export function snapshotTree(tree: TreeNode, ctx: EvalContext, semantics: ComponentSemantics, widgets?: SnapshotWidgets): Snapshot {
+export function createSnapshotEmitter(): { snapshot: Snapshot; emit: SnapshotEmitter } {
 	const snapshot: Snapshot = { texts: [], tables: [], actions: [] };
 	const emit: SnapshotEmitter = {
 		text: (text) => {
@@ -134,15 +134,28 @@ export function snapshotTree(tree: TreeNode, ctx: EvalContext, semantics: Compon
 			}
 		},
 	};
+	return { snapshot, emit };
+}
+
+/**
+ * Interprets a tree into a snapshot. Components without semantics
+ * contribute their text children, if any.
+ */
+export function snapshotTree(tree: TreeNode, ctx: EvalContext, semantics: ComponentSemantics, widgets?: SnapshotWidgets): Snapshot {
+	const { snapshot, emit } = createSnapshotEmitter();
 
 	const problem = (text: string) => (snapshot.problems ??= []).push(text);
 
-	const visit = (node: TreeNode, path: string, out: SnapshotEmitter, at: EvalContext = ctx): void => {
+	/** `inputs`: in a widget, the input types it may draw; each shows its label where it stands. */
+	const visit = (node: TreeNode, path: string, out: SnapshotEmitter, at: EvalContext = ctx, inputs?: Set<string>): void => {
 		const raw = (node.props ?? {}) as Record<string, Value>;
 		const props = evaluate(raw, at) as Record<string, unknown>;
 		if (node.type === WIDGET) {
 			drawWidget(raw, props, path);
 			return;
+		}
+		if (inputs?.has(node.type) && typeof props.label === 'string') {
+			out.text(props.label);
 		}
 		const describe = semantics[node.type];
 		const result = describe?.({
@@ -160,7 +173,7 @@ export function snapshotTree(tree: TreeNode, ctx: EvalContext, semantics: Compon
 				out.text(node.children);
 			}
 		} else {
-			node.children?.forEach((child, i) => visit(child, `${path}/children/${i}`, out, at));
+			node.children?.forEach((child, i) => visit(child, `${path}/children/${i}`, out, at, inputs));
 		}
 	};
 
@@ -218,7 +231,7 @@ export function snapshotTree(tree: TreeNode, ctx: EvalContext, semantics: Compon
 			}
 			return resolved.available && resolved.action ? resolved.action : null;
 		};
-		visit(sub, `${path}/widget`, inWidget, { ...ctx, use });
+		visit(sub, `${path}/widget`, inWidget, { ...ctx, use }, new Set(widgets.limits.inputs ?? []));
 	};
 
 	visit(tree, '/tree', emit);
