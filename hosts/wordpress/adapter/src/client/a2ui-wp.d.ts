@@ -1,41 +1,25 @@
-// The part of a2ui-wp the client uses (bundled from packages/a2ui-wp until it
-// is published; scripts/build-client.ts aliases "a2ui-wp"). Declared here so
-// the adapter does not type-check its sources (that package checks itself).
+// The part of @swissspidy/a2ui-wp the client uses. 0.1.0 was published
+// without its build (dist/), so the bundle compiles its src/ (see
+// scripts/build-client.ts) and these declarations stand in for its types.
+// Drop this file once a release ships dist/.
 
-declare module 'a2ui-wp' {
+declare module '@swissspidy/a2ui-wp' {
 	import type { ComponentType } from 'react';
+	import type { Catalog, ComponentApi, DataContext, SurfaceModel } from '@a2ui/web_core/v0_9';
 
-	export type JsonValue = string | number | boolean | null | JsonValue[] | { [key: string]: JsonValue };
-	export type FunctionRegistry = Record<string, (args: Record<string, unknown>, context: { resolve(value: unknown): unknown; locale?: string }) => unknown>;
-
-	export interface DataModel {
-		get(path?: string): unknown;
-		set(path: string, value: JsonValue | undefined): void;
-		subscribe(listener: (path: string) => void): () => void;
-	}
-	export interface Surface {
-		readonly id: string;
-		readonly dataModel: DataModel;
-	}
-	export interface ResolveScope {
-		dataModel: DataModel;
-		functions: FunctionRegistry;
-		scopePath?: string;
-		locale?: string;
-	}
+	export type Surface = SurfaceModel<ComponentApi>;
 	export interface ActionMessage {
+		version: string;
 		action: { name: string; surfaceId: string; sourceComponentId: string; context?: Record<string, unknown> };
 	}
-	export type A2UIMessage = Record<string, unknown> & { version?: string };
 
 	export class A2UIProcessor {
-		constructor(options: { supportedCatalogIds?: string[]; locale?: string; functions?: FunctionRegistry });
-		readonly functions: FunctionRegistry;
-		processMessage(message: A2UIMessage): void;
-		processMessages(messages: A2UIMessage[]): void;
+		constructor(options?: { locale?: string; catalogs?: Catalog<ComponentApi>[] });
+		processMessage(message: unknown): void;
+		processMessages(messages: unknown[]): void;
 		getSurface(surfaceId: string): Surface | undefined;
-		createScope(surface: Surface, scopePath?: string): ResolveScope;
-		dispatchAction(surfaceId: string, componentId: string, action: unknown, scopePath?: string): void;
+		createScope(surface: Surface, scopePath?: string): DataContext;
+		dispatchAction(surfaceId: string, sourceComponentId: string, action: never, scopePath?: string): void;
 	}
 
 	export interface A2UIComponentProps<P = Record<string, unknown>> {
@@ -48,11 +32,9 @@ declare module 'a2ui-wp' {
 	export const A2UIRenderer: ComponentType<{ processor: A2UIProcessor; catalog?: ComponentCatalog; onAction?(message: ActionMessage): void | Promise<void> }>;
 	export const wordPressCatalog: ComponentCatalog;
 	export function createCatalog(overrides: ComponentCatalog): ComponentCatalog;
-	export function joinPointer(base: string | undefined, path: string): string;
-	export function resolveDynamicValue(value: unknown, scope: ResolveScope): unknown;
-	export function resolveBoolean(value: unknown, scope: ResolveScope): boolean;
 	export function useDynamicBoolean(value: unknown): boolean;
 	export function useDynamicString(value: unknown): string;
+	export function useBoundValue<T>(value: unknown, coerce: (resolved: unknown) => T): [T, (next: T) => void];
 	export function useProcessor(): A2UIProcessor;
 	export function useSurface(): Surface;
 	export function useScopePath(): string | undefined;

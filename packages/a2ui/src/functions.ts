@@ -1,7 +1,7 @@
 /**
- * The Graft catalog's functions as plain JavaScript, without A2UI's
- * function machinery: what a renderer bundles (a2ui-wp takes these as they
- * are) and what the catalog wraps with argument schemas for the verifier.
+ * The Graft catalog's functions as plain JavaScript, which the catalog
+ * wraps with argument schemas for the verifier and for renderers on
+ * web_core.
  * `can` and `set` need the live surface and are bound by whoever draws it.
  */
 

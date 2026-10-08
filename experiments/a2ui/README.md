@@ -9,7 +9,7 @@ used to live here now lives in:
 | --- | --- |
 | The format, catalog, verifier side | [`packages/a2ui`](../../packages/a2ui) (`@graft/a2ui`, on `@a2ui/web_core`) |
 | Core hooks | `packages/core/src/build/format.ts` |
-| WordPress | `hosts/wordpress/adapter/src/a2ui.ts`, `src/client/a2ui.tsx` (a2ui-wp), `e2e/a2ui.spec.ts` |
+| WordPress | `hosts/wordpress/adapter/src/a2ui.ts`, `src/client/a2ui.tsx` (@swissspidy/a2ui-wp), `e2e/a2ui.spec.ts` |
 | EmDash | `hosts/emdash/adapter/src/host/a2ui.ts`, `src/node/a2ui-smoke.ts` |
 | Example builds | `examples/a2ui/builds` (WordPress), `examples/emdash/a2ui/builds` |
 | Compiling | `graft compile --ui a2ui` |

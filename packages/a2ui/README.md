@@ -25,7 +25,8 @@ This package has no renderer. It gives core the A2UI format
   another.
 - **Refs, migrations, slot props and the compiler's UI phase** (`format.ts`).
 
-`@graft/a2ui/client` is what a browser renderer needs without web_core or
-zod: the catalog's functions as plain JavaScript, table fields and event
-inputs. WordPress draws A2UI builds with [a2ui-wp](../a2ui-wp) (React,
-`@wordpress/components`) and those.
+`@graft/a2ui/client` is what a browser renderer needs without core's
+validation: the Graft catalog, the data model's seeding, table fields and
+event inputs. WordPress draws A2UI builds with
+[a2ui-wp](https://www.npmjs.com/package/@swissspidy/a2ui-wp) (React,
+`@wordpress/components`, on web_core) and those.

@@ -1,12 +1,11 @@
-import { createContext, useContext, useEffect, useMemo } from 'react';
-import { pureFunctions, tableField, withContext, type A2UIBuild } from '@graft/a2ui/client';
+import { useEffect, useMemo } from 'react';
+import { TextareaControl } from '@wordpress/components';
+import { createGraftCatalog, seed, tableField, withContext, type A2UIBuild } from '@graft/a2ui/client';
 import {
 	A2UIProcessor,
 	A2UIRenderer,
 	createCatalog,
-	joinPointer,
-	resolveBoolean,
-	resolveDynamicValue,
+	useBoundValue,
 	useDynamicBoolean,
 	useDynamicString,
 	useProcessor,
@@ -16,45 +15,35 @@ import {
 	type A2UIComponentProps,
 	type ActionMessage,
 	type ComponentCatalog,
-	type FunctionRegistry,
-	type JsonValue,
-	type ResolveScope,
-} from 'a2ui-wp';
+} from '@swissspidy/a2ui-wp';
 import type { UiRootProps } from '@graft/renderer-react';
 import type { Field } from '../cells.ts';
 import { components } from './components.tsx';
 
 /**
- * Draws an A2UI build with a2ui-wp's renderer (@wordpress/components), for
- * GraftRoot: it gets the build's data sources as they load and `invoke`
- * for the actions its events resolve to, so data loading, the gateway,
- * `then`, notices and reloads are the tree runtime's own. The Graft runtime
- * plays the A2UI server: the data model is filled from the data sources,
- * and an action event becomes the capability call it is bound to.
+ * Draws an A2UI build with a2ui-wp (@wordpress/components on
+ * @a2ui/web_core), for GraftRoot: it gets the build's data sources as they
+ * load and `invoke` for the actions its events resolve to, so data
+ * loading, the gateway, `then`, notices and reloads are the tree runtime's
+ * own. The Graft runtime plays the A2UI server: the data model is filled
+ * from the data sources, and an action event becomes the capability call it
+ * is bound to.
+ *
+ * The surface uses the same Graft catalog as the verifier (@graft/a2ui):
+ * the same functions, resolved by the same web_core, so what the checks
+ * proved is what the viewer gets. `can` refines on the row in scope, and
+ * `set` writes the surface's data model through A2UI's own data context.
  */
 
 export const surfaceId = 'graft';
-
-/** The viewer's permission check, for tables to refine per row. */
-const CanContext = createContext<UiRootProps['can']>(() => false);
-
-/**
- * The catalog's functions in a2ui-wp's form. The pure ones are shared with
- * the verifier (@graft/a2ui); `can` and `set` need the live surface.
- */
-function functionsFor(can: UiRootProps['can'], set: (pointer: string, value: unknown) => void): FunctionRegistry {
-	const registry: FunctionRegistry = { ...pureFunctions(new Date()) };
-	registry.can = (args) => can(String(args.scope), args.on);
-	registry.set = (args) => set(String(args.target), args.value);
-	return registry;
-}
+const VERSION = 'v0.9';
 
 interface RowAction {
 	id: string;
 	label: string;
 	variant?: string;
 	visible?: unknown;
-	action: { event: { name: string; context?: Record<string, unknown> } };
+	action: unknown;
 }
 
 const GraftTable = components.table!;
@@ -64,46 +53,43 @@ const isRowAction = (value: unknown): value is RowAction => typeof value === 'ob
  * The catalog's Table: Graft's own WordPress table, so trees and A2UI
  * surfaces draw rows, cells and actions identically. Its `evaluate`
  * resolves the A2UI definitions in each row's scope; a row action
- * dispatches its A2UI event.
+ * dispatches its A2UI action (an event, or a local `set`).
  */
 function Table({ id, props }: A2UIComponentProps<{ rows?: { path: string }; fields?: Field[]; rowActions?: RowAction[]; empty?: unknown }>) {
 	const processor = useProcessor();
 	const surface = useSurface();
-	const can = useContext(CanContext);
-	const scopePath = useScopePath();
-	const rowsPath = props.rows?.path ? joinPointer(scopePath, props.rows.path) : undefined;
-	const rows = rowsPath ? surface.dataModel.get(rowsPath) : undefined;
+	const scope = processor.createScope(surface, useScopePath());
+	const rowsScope = props.rows?.path ? scope.nested(props.rows.path) : undefined;
+	const rows = rowsScope ? surface.dataModel.get(rowsScope.path) : undefined;
 	const list = Array.isArray(rows) ? rows : undefined;
 	// Field ids are JSON Pointers into the row: Graft's table reads them as bindings.
 	const fields = (props.fields ?? []).map(tableField);
 
 	const evaluate = (value: unknown, row?: unknown): unknown => {
-		if (row === undefined || !list) {
+		if (row === undefined || !list || !rowsScope) {
 			return value;
 		}
-		const path = joinPointer(rowsPath, String(list.indexOf(row)));
-		// `can` in a row refines on the row's post.
-		const scope = { ...processor.createScope(surface, path), functions: { ...processor.functions, can: (args: Record<string, unknown>) => can(String(args.scope), args.on ?? row) } };
+		const rowScope = rowsScope.nested(String(list.indexOf(row)));
 		if (isRowAction(value)) {
 			return {
 				id: value.id,
 				label: value.label,
 				primary: value.variant === 'primary',
-				visible: value.visible === undefined || resolveBoolean(value.visible, scope),
-				onClick: { action: value.action, path },
+				visible: value.visible === undefined || Boolean(rowScope.resolveDynamicValue(value.visible)),
+				onClick: { action: value.action, path: rowScope.path },
 			};
 		}
-		return resolveDynamicValue(value, scope);
+		return rowScope.resolveDynamicValue(value);
 	};
 	const invoke = async (onClick: unknown) => {
-		const { action, path } = onClick as { action: RowAction['action']; path: string };
-		processor.dispatchAction(surface.id, id, action as Parameters<typeof processor.dispatchAction>[2], path);
+		const { action, path } = onClick as { action: never; path: string };
+		processor.dispatchAction(surface.id, id, action, path);
 	};
 
 	return (
 		<GraftTable
 			node={{ type: 'table' }}
-			props={{ rows: list, fields, empty: props.empty === undefined ? undefined : String(resolveDynamicValue(props.empty, processor.createScope(surface, scopePath)) ?? '') }}
+			props={{ rows: list, fields, empty: props.empty === undefined ? undefined : String(scope.resolveDynamicValue(props.empty) ?? '') }}
 			raw={{ fields: fields as never, actions: (props.rowActions ?? []) as never }}
 			evaluate={evaluate as never}
 			invoke={invoke}
@@ -114,6 +100,7 @@ function Table({ id, props }: A2UIComponentProps<{ rows?: { path: string }; fiel
 }
 
 const BaseButton = wordPressCatalog.Button!;
+const BaseTextField = wordPressCatalog.TextField!;
 
 /**
  * a2ui-wp's Button, marked with its action id (`actionId`, else its
@@ -128,6 +115,19 @@ function Button(props: A2UIComponentProps<{ actionId?: unknown }>) {
 	);
 }
 
+/**
+ * a2ui-wp's TextField, except a long text: TextareaControl labels its own
+ * instance id and ignores `id`, so a2ui-wp 0.1.0's label points at nothing.
+ */
+function TextField(props: A2UIComponentProps<{ label?: unknown; value?: unknown; variant?: string }>) {
+	const label = useDynamicString(props.props.label ?? '');
+	const [value, setValue] = useBoundValue(props.props.value ?? '', (resolved) => (resolved === null || resolved === undefined ? '' : String(resolved)));
+	if (props.props.variant !== 'longText') {
+		return <BaseTextField {...props} />;
+	}
+	return <TextareaControl label={label} value={value} onChange={setValue} rows={4} __nextHasNoMarginBottom />;
+}
+
 /** The catalog's `visible`, on every component: false draws nothing. */
 const withVisible = (catalog: ComponentCatalog): ComponentCatalog =>
 	Object.fromEntries(
@@ -137,83 +137,61 @@ const withVisible = (catalog: ComponentCatalog): ComponentCatalog =>
 		]),
 	);
 
-const catalog = withVisible(createCatalog({ ...wordPressCatalog, Button, Table }));
-
-const isPlainObject = (value: unknown): value is Record<string, unknown> => typeof value === 'object' && value !== null && !Array.isArray(value);
+const catalog = withVisible(createCatalog({ ...wordPressCatalog, Button, TextField, Table }));
 
 /**
- * Resolves a value as the verifier (@a2ui/web_core) does: bindings and calls
- * anywhere in plain objects and lists, e.g. `{"form": {"title": {"path": "/slot/post/title"}}}`.
- * a2ui-wp passes a literal object through untouched.
- */
-function resolveDeep(value: unknown, scope: ResolveScope): unknown {
-	if (Array.isArray(value)) {
-		return value.map((item) => resolveDeep(item, scope));
-	}
-	if (isPlainObject(value) && !('path' in value) && !('call' in value)) {
-		return Object.fromEntries(Object.entries(value).map(([key, inner]) => [key, resolveDeep(inner, scope)]));
-	}
-	return resolveDynamicValue(value, scope);
-}
-
-/** Values of an A2UI `initial` or `computed` section, written into the model in order. */
-function seed(processor: A2UIProcessor, values: Record<string, unknown> | undefined) {
-	const surface = processor.getSurface(surfaceId);
-	if (!surface) {
-		return;
-	}
-	for (const [key, value] of Object.entries(values ?? {})) {
-		// A copy: what the viewer enters must not write into the build's own values.
-		surface.dataModel.set(`/${key}`, structuredClone(resolveDeep(value, processor.createScope(surface, '/')) ?? null) as JsonValue);
-	}
-}
-
-/**
- * The A2UI processor for one mounted build: its components, the slot, then
- * `initial`; `computed` follows every change of the model. `set`, the
- * catalog's local action, writes the model.
+ * The A2UI processor for one mounted build, on the Graft catalog for this
+ * viewer: its components, the slot, then `initial`; `computed` follows
+ * every change of the model.
  */
 export function createProcessor(build: A2UIBuild, slot: Record<string, unknown>, can: UiRootProps['can']): A2UIProcessor {
-	const version = build.ui.protocol.replace(/^a2ui\//, '');
-	const set = (pointer: string, value: unknown) => processor.getSurface(surfaceId)?.dataModel.set(pointer, (value ?? null) as JsonValue);
-	const processor: A2UIProcessor = new A2UIProcessor({ supportedCatalogIds: [build.ui.catalogId], locale: 'en-US', functions: functionsFor(can, set) });
+	const processor = new A2UIProcessor({ locale: 'en-US', catalogs: [createGraftCatalog({ id: build.ui.catalogId, can, now: new Date() })] });
 	processor.processMessages([
-		{ version, createSurface: { surfaceId, catalogId: build.ui.catalogId } },
-		{ version, updateComponents: { surfaceId, components: build.ui.components as never } },
-		{ version, updateDataModel: { surfaceId, path: '/slot', value: slot as JsonValue } },
+		{ version: VERSION, createSurface: { surfaceId, catalogId: build.ui.catalogId } },
+		{ version: VERSION, updateComponents: { surfaceId, components: build.ui.components } },
+		{ version: VERSION, updateDataModel: { surfaceId, path: '/slot', value: slot } },
 	]);
-	seed(processor, build.ui.initial);
-	let computing = false;
-	const recompute = () => {
-		if (computing || !build.ui.computed) {
-			return;
-		}
-		computing = true;
-		try {
-			seed(processor, build.ui.computed);
-		} finally {
-			computing = false;
-		}
-	};
-	processor.getSurface(surfaceId)?.dataModel.subscribe(recompute);
-	recompute();
+	const surface = processor.getSurface(surfaceId)!;
+	const root = processor.createScope(surface, '/');
+	// The verifier's own seeding: values copied, so what the viewer enters never writes into the build.
+	seed(root, build.ui.initial);
+	if (build.ui.computed) {
+		let computing = false;
+		const recompute = () => {
+			if (computing) {
+				return;
+			}
+			computing = true;
+			try {
+				// Only what changed: every write notifies this subscription again.
+				for (const [key, expression] of Object.entries(build.ui.computed!)) {
+					const value = root.resolveDynamicValue(expression as never);
+					if (JSON.stringify(value) !== JSON.stringify(surface.dataModel.get(`/${key}`))) {
+						surface.dataModel.set(`/${key}`, structuredClone(value));
+					}
+				}
+			} finally {
+				computing = false;
+			}
+		};
+		surface.dataModel.subscribe('/', recompute);
+		recompute();
+	}
 	return processor;
 }
 
 /** Draws an A2UI build for GraftRoot (its `ui`). */
 export function A2UIRoot({ build: raw, data, slot, can, invoke }: UiRootProps) {
 	const build = raw as unknown as A2UIBuild;
-	const version = build.ui.protocol.replace(/^a2ui\//, '');
-
 	// The build, slot and viewer are fixed for the lifetime of a root.
 	const processor = useMemo(() => createProcessor(build, slot, can), []);
 
 	// Data sources into the model, as they load and change.
 	useEffect(() => {
 		for (const [name, value] of Object.entries(data)) {
-			processor.processMessage({ version, updateDataModel: { surfaceId, path: `/${name}`, value: (value ?? null) as JsonValue } });
+			processor.processMessage({ version: VERSION, updateDataModel: { surfaceId, path: `/${name}`, value: value ?? null } });
 		}
-	}, [data, processor, version]);
+	}, [data, processor]);
 
 	// An action event: the capability call it is bound to, run as a tree's action would be.
 	const onAction = async ({ action }: ActionMessage) => {
@@ -234,11 +212,7 @@ export function A2UIRoot({ build: raw, data, slot, can, invoke }: UiRootProps) {
 		});
 	};
 
-	return (
-		<CanContext.Provider value={can}>
-			<A2UIRenderer processor={processor} catalog={catalog} onAction={onAction} />
-		</CanContext.Provider>
-	);
+	return <A2UIRenderer processor={processor} catalog={catalog} onAction={onAction} />;
 }
 
 // The runtime (mount.tsx) draws A2UI builds with this.

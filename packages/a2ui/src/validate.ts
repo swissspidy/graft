@@ -175,7 +175,8 @@ export function validateA2UI(value: Build, surface: Surface, host: A2UIHost, spe
 		if (!api) {
 			error('a2ui-unknown-component', `${path}/component`, `"${component.component}" is not in the ${host.catalogId} catalog (${[...catalog.components.keys()].join(', ')}).`);
 		} else {
-			for (const problem of schemaProblems(api.schema, component)) {
+			const { id: _id, component: _type, catalogId: _catalog, ...props } = component as A2UIComponent & { catalogId?: unknown };
+			for (const problem of schemaProblems(api.schema, props)) {
 				error('a2ui-props', `${path}${problem.path ? `/${problem.path}` : ''}`, `${component.component} "${component.id}": ${problem.message}.`);
 			}
 		}

@@ -45,8 +45,8 @@ export const action = z.union([eventAction, setAction]);
 const childList = z.union([z.array(z.string()), z.object({ componentId: z.string(), path: z.string() }).strict()]);
 const checks = z.array(z.object({ condition: dynamicBoolean, message: z.string() }).strict());
 
-/** Properties every component takes. */
-const common = { id: z.string(), component: z.string(), visible: dynamicBoolean.optional(), accessibility: z.record(dynamicAny).optional() };
+/** Properties every component takes, besides its envelope (`id`, `component`), which web_core strips before checking a schema. */
+const common = { visible: dynamicBoolean.optional(), accessibility: z.record(dynamicAny).optional() };
 const component = (name: string, props: z.ZodRawShape): ComponentApi => ({ name, schema: z.object({ ...common, ...props }).strict() });
 
 export const tableField = z

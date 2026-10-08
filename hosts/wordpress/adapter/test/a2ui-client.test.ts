@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
-import type { A2UIBuild } from '@graft/a2ui';
+import type { A2UIBuild } from '@graft/a2ui/client';
 import { createProcessor, surfaceId } from '../src/client/a2ui.tsx';
 
 // Tests run from the repository root.
@@ -20,7 +20,7 @@ describe('the A2UI client', () => {
 		expect(JSON.stringify(build)).toBe(before);
 	});
 
-	it('recomputes `computed` as the model changes, and `set` writes it', () => {
+	it('recomputes `computed` as the model changes', () => {
 		const build = example('pending-by-author');
 		const processor = createProcessor(build, {}, can);
 		const model = processor.getSurface(surfaceId)!.dataModel;
@@ -32,7 +32,8 @@ describe('the A2UI client', () => {
 		});
 		expect((model.get('/authors') as unknown[]).length).toBe(2);
 		expect((model.get('/shown') as unknown[]).length).toBe(2);
-		processor.functions.set!({ target: '/form/author', value: 4 }, { resolve: (v) => v });
+		// What the author buttons' `set` writes.
+		model.set('/form/author', 4);
 		expect((model.get('/shown') as Array<{ title: string }>).map((p) => p.title)).toEqual(['Bob one']);
 	});
 });

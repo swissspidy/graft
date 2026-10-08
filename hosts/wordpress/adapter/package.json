@@ -18,8 +18,13 @@
     "@graft/sandbox": "workspace:*"
   },
   "devDependencies": {
+    "@a2ui/web_core": "0.12.0",
+    "@swissspidy/a2ui-wp": "0.1.0",
     "@types/react": "^19.3.0",
     "@types/react-dom": "^19.3.0",
+    "@wordpress/element": "^8.7.0",
+    "@wordpress/i18n": "^6.28.0",
+    "@wordpress/icons": "^17.0.0",
     "esbuild": "^0.28.2",
     "react": "19.3.0",
     "react-dom": "19.3.0"

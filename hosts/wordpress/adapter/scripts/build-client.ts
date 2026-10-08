@@ -24,6 +24,8 @@ const globals: Record<string, [string, string]> = {
 	'react/jsx-runtime': ['window.ReactJSXRuntime', 'react-jsx-runtime'],
 	'@wordpress/components': ['window.wp.components', 'wp-components'],
 	'@wordpress/api-fetch': ['window.wp.apiFetch', 'wp-api-fetch'],
+	'@wordpress/element': ['window.wp.element', 'wp-element'],
+	'@wordpress/i18n': ['window.wp.i18n', 'wp-i18n'],
 };
 
 
@@ -38,6 +40,8 @@ const wordpressGlobals: Plugin = {
 		});
 	},
 };
+
+const a2uiWpSource = `${dirname(createRequire(import.meta.url).resolve('@swissspidy/a2ui-wp/package.json'))}/src/index.ts`;
 
 const options = {
 	entryPoints: {
@@ -56,8 +60,8 @@ const options = {
 	sourcemap: watch ? ('inline' as const) : false,
 	legalComments: 'none' as const,
 	plugins: [wordpressGlobals],
-	// a2ui-wp draws A2UI builds; bundled from its copy in the repository until it is published.
-	alias: { 'a2ui-wp': fileURLToPath(new URL('../../../../packages/a2ui-wp/src/index.ts', import.meta.url)) },
+	// a2ui-wp draws A2UI builds. 0.1.0 was published without dist/, so bundle its sources.
+	alias: { '@swissspidy/a2ui-wp': a2uiWpSource },
 	// The sandbox endpoint is embedded as text for the in-browser sandbox.
 	loader: { '.php': 'text' as const },
 	logLevel: 'info' as const,
