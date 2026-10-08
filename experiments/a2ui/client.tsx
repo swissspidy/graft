@@ -15,7 +15,7 @@ import {
 	type A2UIComponentProps,
 	type ActionMessage,
 	type JsonValue,
-} from '../../../swissspidy/a2ui-wp/src/index.ts';
+} from '../../packages/a2ui/src/index.ts';
 import { removeRow } from '../../packages/core/src/build/rows.ts';
 import { createCan } from '../../hosts/wordpress/adapter/src/can.ts';
 import type { Field } from '../../hosts/wordpress/adapter/src/cells.ts';

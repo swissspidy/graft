@@ -11,7 +11,7 @@ import {
 	type FunctionRegistry,
 	type JsonValue,
 	type ResolveScope,
-} from '../../../swissspidy/a2ui-wp/src/core/index.ts';
+} from '../../packages/a2ui/src/core/index.ts';
 import { cell, readPath, type Field } from '../../hosts/wordpress/adapter/src/cells.ts';
 import { withContext } from './events.ts';
 
