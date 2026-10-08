@@ -114,10 +114,24 @@ export function createSnapshotEmitter(): { snapshot: Snapshot; emit: SnapshotEmi
 			snapshot.tables.push(table);
 			for (const row of table.rows) {
 				emit.text(row.label);
+				for (const cell of Object.values(row.cells ?? {})) {
+					if (cell.text !== row.label) {
+						emit.text(cell.text);
+					}
+				}
+				for (const action of row.actions) {
+					if (action.available) {
+						emit.text(action.label);
+					}
+				}
 			}
 		},
 		action: (action) => {
 			snapshot.actions.push(action);
+			// An action the viewer can use shows its label (a button, a row action).
+			if (action.available) {
+				emit.text(action.label);
+			}
 		},
 	};
 	return { snapshot, emit };
@@ -186,6 +200,8 @@ export function snapshotTree(tree: TreeNode, ctx: EvalContext, semantics: Compon
 		const values = inputValues(drawnWidget.inputs, widgets.entered?.(path) ?? {});
 		for (const input of Object.values(drawnWidget.inputs)) {
 			(snapshot.inputs ??= []).push({ widget: path, id: input.id, ...(input.label !== undefined ? { label: input.label } : {}), value: values[input.id] });
+			// An input shows its label.
+			emit.text(input.label ?? '');
 		}
 		// Buttons in a widget: events update it; uses of its declared actions resolve, while
 		// drawing, to the action for one of its rows (or null when it is not offered).

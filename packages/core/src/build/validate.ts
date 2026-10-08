@@ -323,7 +323,8 @@ export function validateWidgetTree(tree: TreeNode, surface: Surface): string[] {
 		}
 		const children = component.children ?? 'none';
 		if (node.children !== undefined && (children === 'none' || (children === 'text' && typeof node.children !== 'string'))) {
-			diagnostics.push({ severity: 'error', code: 'widget-children', path, message: `"${node.type}" does not take these children.` });
+			const fix = children === 'none' ? 'it takes none, so leave "children" out (not even an empty list)' : 'they must be a single string';
+			diagnostics.push({ severity: 'error', code: 'widget-children', path, message: `"${node.type}" does not take these children: ${fix}.` });
 		}
 		checkAgainstSchema(component.props, node.props ?? {}, `${path}/props`, `Props of "${node.type}"`, diagnostics);
 	});
