@@ -26,8 +26,10 @@ export interface VerifyOptions {
 	/**
 	 * Reads the build's UI into a snapshot instead of walking `build.tree`,
 	 * for a build whose UI is in another format (e.g. an A2UI surface).
+	 * `entered` is what the viewer typed so far: input group, then input id,
+	 * as the snapshot's `inputs` name them.
 	 */
-	snapshot?(build: Build, ctx: EvalContext): Snapshot;
+	snapshot?(build: Build, ctx: EvalContext, entered: Record<string, Record<string, unknown>>): Snapshot;
 	/** Starts the host's sandbox for a build with code. Required to verify such builds. */
 	loadFunctions?(code: BuildCode, limits: NonNullable<Surface['functions']>['limits']): Promise<FunctionRunner>;
 }
@@ -187,7 +189,7 @@ async function runCheck(options: VerifyOptions, check: Check, index: number, fun
 	const widgetLimits = options.surface.functions?.widgets;
 	const snap = (instance: Omit<Instance, 'snapshot'>): Instance => {
 		const snapshot = options.snapshot
-			? options.snapshot(build, { data: instance.data, slot: instance.slot, can, now, fn })
+			? options.snapshot(build, { data: instance.data, slot: instance.slot, can, now, fn }, instance.entered)
 			: snapshotTree(
 				build.tree,
 				{ data: instance.data, slot: instance.slot, can, now, fn },

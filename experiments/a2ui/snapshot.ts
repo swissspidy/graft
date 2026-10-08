@@ -1,18 +1,18 @@
 import { createSnapshotEmitter, type Action, type Build, type EvalContext, type Snapshot, type SnapshotAction } from '../../packages/core/src/index.ts';
 import {
-	createBasicFunctions,
 	DataModel,
+	isDataBinding,
 	joinPointer,
 	resolveBoolean,
 	resolveDynamicValue,
 	resolveString,
 	type ChildList,
 	type ComponentDefinition,
-	type FunctionRegistry,
 	type JsonValue,
 	type ResolveScope,
 } from '../../packages/a2ui/src/core/index.ts';
 import { cell, readPath, type Field } from '../../hosts/wordpress/adapter/src/cells.ts';
+import { graftFunctions } from './catalog.ts';
 import { withContext } from './events.ts';
 
 /**
@@ -25,40 +25,105 @@ import { withContext } from './events.ts';
  * build's data sources and answering events with capability calls.
  */
 export interface A2UIBuild extends Omit<Build, 'tree'> {
-	ui: { protocol: string; catalogId: string; components: ComponentDefinition[] };
-	events: Record<string, { call: string; input?: unknown; then?: string[]; notice?: string }>;
+	ui: {
+		protocol: string;
+		catalogId: string;
+		/** Data model values set when the surface is drawn, as A2UI values (e.g. a form seeded from the slot). */
+		initial?: Record<string, unknown>;
+		components: ComponentDefinition[];
+	};
+	events: Record<string, EventBinding>;
+}
+
+export interface EventBinding {
+	call: string;
+	input?: unknown;
+	then?: string[];
+	notice?: string;
+}
+
+interface EventAction {
+	event: { name: string; context?: Record<string, unknown> };
 }
 
 interface RowAction {
 	id: string;
 	label: string;
 	visible?: unknown;
-	action: { event: { name: string; context?: Record<string, unknown> } };
+	action: EventAction;
 }
 
-const basic = createBasicFunctions({ locale: 'en-US' });
+/** Snapshot inputs of an A2UI surface are one group: the surface. */
+export const INPUT_GROUP = 'surface';
+
+/** The data model a surface starts with: data sources, the slot, then `initial`. */
+export function initialDataModel(build: A2UIBuild, data: Record<string, unknown>, slot: unknown, scope: (model: DataModel) => ResolveScope): DataModel {
+	const model = new DataModel({ ...data, slot } as JsonValue);
+	const at = scope(model);
+	for (const [key, value] of Object.entries(build.ui.initial ?? {})) {
+		model.set(`/${key}`, resolveInitial(value, at) as JsonValue);
+	}
+	return model;
+}
+
+// `initial` nests plain objects around A2UI values.
+const resolveInitial = (value: unknown, at: ResolveScope): unknown =>
+	value && typeof value === 'object' && !Array.isArray(value) && !isDataBinding(value) && !('call' in value)
+		? Object.fromEntries(Object.entries(value).map(([key, inner]) => [key, resolveInitial(inner, at)]))
+		: (resolveDynamicValue(value, at) ?? null);
 
 /**
  * Reads an A2UI surface into the same semantic snapshot a Graft tree gives,
- * with the WordPress catalog: the basic layout and text components, plus a
- * Table (A2UI's basic catalog has none).
+ * with the `graft:wordpress` catalog. `entered` holds what the viewer typed,
+ * by input component id; it is written to each input's bound path.
  */
-export function snapshotA2UI(build: A2UIBuild, ctx: EvalContext): Snapshot {
+export function snapshotA2UI(build: A2UIBuild, ctx: EvalContext, entered: Record<string, Record<string, unknown>> = {}): Snapshot {
 	const { snapshot, emit } = createSnapshotEmitter();
-	const problem = (text: string) => (snapshot.problems ??= []).push(text);
+	const problem = (text: string) => {
+		const problems = (snapshot.problems ??= []);
+		if (!problems.includes(text)) {
+			problems.push(text);
+		}
+	};
 	const components = new Map(build.ui.components.map((component) => [component.id, component]));
-	const dataModel = new DataModel(ctx.data as JsonValue);
+	const now = new Date(ctx.now ?? Date.now());
+	const scopeOf = (dataModel: DataModel, scopePath?: string, row?: unknown): ResolveScope => ({
+		dataModel,
+		functions: graftFunctions({ can: ctx.can, now, row }),
+		scopePath,
+		locale: 'en-US',
+	});
 
-	// `can` is a catalog function: the host's permission check, for the row in scope.
-	const scope = (scopePath?: string, row?: unknown): ResolveScope => {
-		const functions: FunctionRegistry = { ...basic, can: (args) => ctx.can(String(args.scope), row) };
-		return { dataModel, functions, scopePath, locale: 'en-US' };
+	let dataModel: DataModel;
+	try {
+		dataModel = initialDataModel(build, ctx.data, ctx.slot ?? null, (model) => scopeOf(model));
+	} catch (error) {
+		problem(`"initial" could not be resolved: ${(error as Error).message}`);
+		dataModel = new DataModel({ ...ctx.data, slot: ctx.slot ?? null } as JsonValue);
+	}
+	// What the viewer entered goes where each input is bound.
+	for (const [id, value] of Object.entries(entered[INPUT_GROUP] ?? {})) {
+		const binding = components.get(id)?.value;
+		if (isDataBinding(binding) && binding.path.startsWith('/')) {
+			dataModel.set(binding.path, value as JsonValue);
+		} else {
+			problem(`The input "${id}" has no absolute "value" binding to write to.`);
+		}
+	}
+	const scope = (scopePath?: string, row?: unknown) => scopeOf(dataModel, scopePath, row);
+	const safely = <T>(what: string, fallback: T, run: () => T): T => {
+		try {
+			return run();
+		} catch (error) {
+			problem(`${what}: ${(error as Error).message}`);
+			return fallback;
+		}
 	};
 
-	const event = (action: RowAction['action'], at: ResolveScope, row: unknown): Action | undefined => {
-		const binding = build.events[action.event.name];
-		if (!binding) {
-			problem(`The action event "${action.event.name}" is not bound to a capability.`);
+	const event = (action: EventAction | undefined, at: ResolveScope, row: unknown): Action | undefined => {
+		const binding = action?.event?.name ? build.events[action.event.name] : undefined;
+		if (!action?.event?.name || !binding) {
+			problem(action?.event?.name ? `The action event "${action.event.name}" is not bound to a capability.` : 'An action has no event.');
 			return undefined;
 		}
 		const context = Object.fromEntries(Object.entries(action.event.context ?? {}).map(([key, value]) => [key, resolveDynamicValue(value, at)]));
@@ -76,14 +141,29 @@ export function snapshotA2UI(build: A2UIBuild, ctx: EvalContext): Snapshot {
 		}
 	};
 
+	const label = (id: unknown, at: ResolveScope): string => {
+		const child = typeof id === 'string' ? components.get(id) : undefined;
+		return child?.component === 'Text' ? resolveString(child.text, at) : '';
+	};
+
+	const seen = new Set<string>();
 	const visit = (id: string, scopePath: string | undefined, row: unknown): void => {
 		const component = components.get(id);
 		if (!component) {
 			problem(`The surface has no component "${id}".`);
 			return;
 		}
+		const key = `${id}@${scopePath ?? ''}`;
+		if (seen.has(key)) {
+			problem(`The component "${id}" is drawn twice in the same place (a cycle?).`);
+			return;
+		}
+		seen.add(key);
 		const at = scope(scopePath, row);
-		const props = component as unknown as Record<string, unknown>;
+		const props = component as Record<string, unknown>;
+		if (props.visible !== undefined && !safely(`"visible" of "${id}"`, false, () => resolveBoolean(props.visible, at))) {
+			return;
+		}
 		switch (component.component) {
 			case 'Column':
 			case 'Row':
@@ -93,9 +173,27 @@ export function snapshotA2UI(build: A2UIBuild, ctx: EvalContext): Snapshot {
 			case 'Card':
 				children([props.child as string], scopePath, row);
 				return;
-			case 'Text':
-				emit.text(resolveString(props.text, at));
+			case 'Divider':
 				return;
+			case 'Text':
+				emit.text(safely(`The text of "${id}"`, '', () => resolveString(props.text, at)));
+				return;
+			case 'Button': {
+				// Not drawn as text: its label is in the action.
+				const checks = (props.checks as Array<{ condition: unknown }> | undefined) ?? [];
+				const passes = checks.every((check, i) => safely(`Check ${i + 1} of "${id}"`, false, () => resolveBoolean(check.condition, at)));
+				const action = event(props.action as EventAction | undefined, at, row);
+				emit.action({ id, label: label(props.child, at), available: passes && action !== undefined, ...(action ? { action } : {}), ...(row !== undefined ? { row } : {}) });
+				return;
+			}
+			case 'TextField':
+			case 'CheckBox': {
+				const fallback = component.component === 'CheckBox' ? false : '';
+				const value = safely(`The value of "${id}"`, null, () => resolveDynamicValue(props.value, at)) ?? fallback;
+				(snapshot.inputs ??= []).push({ widget: INPUT_GROUP, id, label: resolveString(props.label, at), value });
+				emit.text(resolveString(props.label, at));
+				return;
+			}
 			case 'Table': {
 				const binding = props.rows as { path?: string } | undefined;
 				const rowsPath = binding?.path ? joinPointer(scopePath, binding.path) : undefined;
@@ -110,19 +208,14 @@ export function snapshotA2UI(build: A2UIBuild, ctx: EvalContext): Snapshot {
 						const rowScope = scope(joinPointer(rowsPath, String(i)), record);
 						const actions = rowActions.map((rowAction): SnapshotAction => {
 							const action = event(rowAction.action, rowScope, record);
-							return {
-								id: rowAction.id,
-								label: rowAction.label,
-								available: (rowAction.visible === undefined || resolveBoolean(rowAction.visible, rowScope)) && action !== undefined,
-								...(action ? { action } : {}),
-								row: record,
-							};
+							const visible = rowAction.visible === undefined || safely(`"visible" of row action "${rowAction.id}"`, false, () => resolveBoolean(rowAction.visible, rowScope));
+							return { id: rowAction.id, label: rowAction.label, available: visible && action !== undefined, ...(action ? { action } : {}), row: record };
 						});
 						return {
 							label: primary ? String(readPath(record, primary.id) ?? '') : '',
 							record,
 							actions,
-							cells: Object.fromEntries(fields.map((field) => [field.label, cell(field, record, (value) => resolveDynamicValue(value, rowScope), 'en-US')])),
+							cells: Object.fromEntries(fields.map((field) => [field.label, cell(field, record, (value) => safely(`Field "${field.label}"`, null, () => resolveDynamicValue(value, rowScope)), 'en-US')])),
 						};
 					}),
 				});

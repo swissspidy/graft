@@ -25,9 +25,14 @@ capability calls through the gateway. Using the customization stays free of
 inference.
 
 The A2UI side is [swissspidy/a2ui-wp](https://github.com/swissspidy/a2ui-wp)'s
-protocol core and React renderer, imported from a clone next to this
-repository (`../swissspidy/a2ui-wp`), not copied: a2ui-wp is GPL-2.0-or-later
-and Graft is Apache-2.0.
+protocol core and React renderer, copied into [`packages/a2ui`](../../packages/a2ui)
+(still GPL-2.0-or-later until its relicense lands; see that README).
+
+The `graft:wordpress` catalog ([`catalog.ts`](catalog.ts)) is A2UI's basic
+layout, text and input components plus a Table, and two things the basic
+catalog lacks: `visible` on every component, and functions `if` (A2UI has
+no conditional), `count` (a length to show), `can` (the host's permission
+check) and `daysSince`.
 
 ## Results
 
@@ -58,11 +63,76 @@ a2ui-wp's renderer and catalog plus the Graft Table, against the e2e site.
   cells and actions are drawn by the same component in both formats. Only
   the gap under the heading differs (A2UI `Column` against Graft `stack`).
 
+**Compiling** (`ANTHROPIC_API_KEY=... npx tsx experiments/a2ui/compile.ts review-queue publish-checklist`):
+Claude writes the surface, data sources and event bindings against each
+spec's frozen checks (from `examples/builds`), with the same loop as the
+compiler's tree phase: structured output, assembly, static validation,
+verification in the sandbox, failures fed back. Results in [`compiled/`](compiled/),
+each with a log of every attempt.
+
+| Spec | Attempts | Checks |
+| --- | --- | --- |
+| review-queue | 2 | 5/5 |
+| publish-checklist | 1 | 13/13 |
+
+- review-queue's first attempt gated Approve on `{"path": "can.publish"}`:
+  a dotted path, which as a JSON Pointer is one key named `can.publish`, so
+  Approve was never available. The catalog invites this: Table field ids
+  are Graft's dotted paths (`author.name`) while bindings are JSON
+  Pointers. Pick one.
+- publish-checklist needed no code. The tree build is a widget with about
+  50 lines of JavaScript run in the host's function sandbox; the A2UI build
+  is declarative: inputs bound to `/form/*` (seeded from the slot through
+  `initial`), checklist lines as `if` + `formatString` + `length`/`regex`
+  over the bound values, and Publish gated by A2UI's own Button `checks`
+  (disabled with the reason, rather than hidden) plus `visible` from `can`.
+- **In the block editor** (`npx tsx experiments/a2ui/render-editor.ts`,
+  as `hosts/wordpress/e2e` checks the tree version): fields prefilled,
+  checklist follows typing, Publish disabled until saved, Save reloads,
+  Publish publishes. All pass, no page errors. Screenshots:
+  `test-results/a2ui-checklist-*.png`.
+
+**Upgrades** (`npx tsx experiments/a2ui/upgrade.ts`): the WordPress canary's
+synthetic host changes against the handwritten and both compiled A2UI
+builds, with an A2UI ladder ([`migrate.ts`](migrate.ts) for declared
+renames: capabilities in `data` and `events`, scopes in `can` calls, the
+slot in `mount`). The tree column is the outcome the canary test expects
+for the same specs' tree builds.
+
+| Scenario | review-queue (both) | Tree | publish-checklist | Tree |
+| --- | --- | --- | --- | --- |
+| noop | survived | survived | survived | survived |
+| rename-list-capability | migrated | migrated | survived | survived |
+| move-row-actions | survived | survived | survived | survived |
+| change-list-input | regenerated¹ | regenerated | survived | survived |
+| widen-publish-scope | needs_approval | needs_approval | needs_approval | needs_approval |
+| remove-status-update | failed | failed | failed | failed |
+| no-functions | survived | survived | **survived** | failed |
+| no-widgets | survived | survived | **survived** | failed |
+
+¹ With `REGENERATE=1`: the A2UI compiler with the old build as reference
+and the frozen checks; both builds regenerated in one attempt.
+
+The ladder works unchanged in shape. The difference is what hosts can
+break: an A2UI build's components and client functions belong to the
+catalog, so host releases cannot rename them (Graft surface migrations of
+components and props do not apply); catalog changes would be versioned on
+their own, as a new catalog id. And a build that needs no code survives a
+host that stops running code.
+
 ## What it took
 
 - Core: `createSnapshotEmitter()` (the snapshot emitter, shared by any UI
   format) and a `snapshot` option on `verifyBuild` for a build whose UI is
-  not a tree. Nothing else in core changed.
+  not a tree, given what the viewer typed so far. Nothing else in core
+  changed.
+- [`compiler.ts`](compiler.ts): output schema, prompt, assembly, static
+  validation (ids, references, reachability, known functions, bound
+  events, input bindings) and the attempt loop. A2UI's component list is
+  already flat, so it fits structured outputs (no recursive schemas)
+  without the tree's flatten-and-reassemble step.
+- a2ui-wp fix: a `longText` TextField's label pointed at nothing
+  (TextareaControl ignores `id` for its label). Should go upstream.
 - [`snapshot.ts`](snapshot.ts): reads an A2UI surface into Graft's semantic
   snapshot with a2ui-wp's resolver (about 120 lines with the Table).
 - [`client.tsx`](client.tsx): the runtime glue, and the Table: Graft's WordPress
@@ -73,10 +143,16 @@ a2ui-wp's renderer and catalog plus the Graft Table, against the e2e site.
 
 ## What it did not cover
 
-- Validation against the surface (`validateBuild`, `refs`), the compiler
-  (prompt, structured output, assembly), interactive widgets, inputs,
-  `$daysSince`/`$fn` equivalents, and the upgrade ladder's migrations
-  (renames would now rename A2UI component types and properties).
+- Validating event and data inputs against capability schemas (the
+  sandbox call catches it, later), refs as the gateway checks them, and the
+  checks phase (checks came from the example builds, frozen).
+- The editor's own unsaved changes: the tree runtime refuses to Save while
+  the editor has unsaved edits of its own; this client does not. That is
+  host runtime glue, not the build.
+- Specs that need real state machines (filtering, switching views): the
+  widget cases beyond forms. A2UI's data model plus `if` covered the
+  checklist; a list filtered by a picked author needs a filter function in
+  the catalog or local actions.
 - A2UI's own `checks` (input validation) next to Graft's checks: the names
   collide in one build file.
 - Data source inputs are literals here; Graft evaluates expressions there.

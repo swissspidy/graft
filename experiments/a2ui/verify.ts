@@ -38,7 +38,7 @@ const verify = (build: Build | A2UIBuild, ui?: 'a2ui'): Promise<Verification> =>
 		sandbox,
 		semantics,
 		createCan,
-		...(ui ? { snapshot: (b: Build, ctx) => snapshotA2UI(b as unknown as A2UIBuild, ctx) } : {}),
+		...(ui ? { snapshot: (b: Build, ctx, entered) => snapshotA2UI(b as unknown as A2UIBuild, ctx, entered) } : {}),
 	});
 
 const report = (name: string, verification: Verification) => {

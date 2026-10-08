@@ -1,0 +1,299 @@
+{
+	"graft": 1,
+	"spec": {
+		"id": "review-queue",
+		"hash": "sha256:3a531bb7dea69a073fba551905e3fb16908fcd375bbd4205c10b21abac437b04"
+	},
+	"surface": {
+		"host": "wordpress",
+		"hostVersion": "7.1.2",
+		"hash": "sha256:6f170822cb71accfa0c59633044953ce846b218fbcbd1f6406323c4f38e17cdc"
+	},
+	"mount": {
+		"slot": "admin.page",
+		"menu": {
+			"parent": "posts",
+			"title": "Review queue"
+		}
+	},
+	"data": {
+		"queue": {
+			"call": "posts.list",
+			"input": {
+				"post_type": "post",
+				"status": [
+					"pending"
+				],
+				"per_page": 100
+			}
+		}
+	},
+	"checks": [
+		{
+			"criterion": "pending-only",
+			"fixtures": {
+				"users": [
+					{
+						"as": "e",
+						"role": "editor"
+					}
+				],
+				"posts": [
+					{
+						"title": "Draft A",
+						"status": "pending"
+					},
+					{
+						"title": "Draft B",
+						"status": "draft"
+					},
+					{
+						"title": "Post C",
+						"status": "publish"
+					}
+				]
+			},
+			"view_as": "e",
+			"expect": [
+				{
+					"rows": [
+						"Draft A"
+					]
+				}
+			]
+		},
+		{
+			"criterion": "columns",
+			"fixtures": {
+				"users": [
+					{
+						"as": "e",
+						"role": "editor"
+					}
+				],
+				"posts": [
+					{
+						"title": "Draft A",
+						"status": "pending"
+					}
+				]
+			},
+			"view_as": "e",
+			"expect": [
+				{
+					"columns": [
+						"Title",
+						"Author",
+						"Submitted"
+					]
+				}
+			]
+		},
+		{
+			"criterion": "approve",
+			"fixtures": {
+				"users": [
+					{
+						"as": "e",
+						"role": "editor"
+					}
+				],
+				"posts": [
+					{
+						"title": "Draft A",
+						"status": "pending"
+					}
+				]
+			},
+			"view_as": "e",
+			"steps": [
+				{
+					"action": "approve",
+					"row": {
+						"title": "Draft A"
+					}
+				}
+			],
+			"expect": [
+				{
+					"rows": []
+				},
+				{
+					"post": {
+						"title": "Draft A",
+						"status": "publish"
+					}
+				}
+			]
+		},
+		{
+			"criterion": "contributors-no-approve",
+			"fixtures": {
+				"users": [
+					{
+						"as": "c",
+						"role": "contributor"
+					}
+				],
+				"posts": [
+					{
+						"title": "Draft A",
+						"status": "pending",
+						"author": "c"
+					}
+				]
+			},
+			"view_as": "c",
+			"expect": [
+				{
+					"rows": [
+						"Draft A"
+					]
+				},
+				{
+					"action": "approve",
+					"row": {
+						"title": "Draft A"
+					},
+					"available": false
+				}
+			]
+		},
+		{
+			"criterion": "empty-state",
+			"fixtures": {
+				"users": [
+					{
+						"as": "e",
+						"role": "editor"
+					}
+				],
+				"posts": []
+			},
+			"view_as": "e",
+			"expect": [
+				{
+					"rows": []
+				},
+				{
+					"text": "Nothing to review"
+				}
+			]
+		}
+	],
+	"refs": {
+		"slot": "admin.page",
+		"catalog": {
+			"Column": [
+				"children"
+			],
+			"Text": [
+				"text",
+				"variant"
+			],
+			"Table": [
+				"empty",
+				"fields",
+				"rowActions",
+				"rows"
+			]
+		},
+		"capabilities": [
+			"posts.list",
+			"posts.update_status"
+		],
+		"scopes": [
+			"posts.status:write",
+			"posts:read"
+		]
+	},
+	"provenance": {
+		"compiler": "a2ui-poc",
+		"model": "claude-opus-5-5",
+		"strategy": "compiled"
+	},
+	"ui": {
+		"protocol": "a2ui/v0.9.1",
+		"catalogId": "graft:wordpress",
+		"components": [
+			{
+				"id": "root",
+				"component": "Column",
+				"children": [
+					"heading",
+					"queue_table"
+				]
+			},
+			{
+				"id": "heading",
+				"component": "Text",
+				"text": "Review queue",
+				"variant": "h1"
+			},
+			{
+				"id": "queue_table",
+				"component": "Table",
+				"rows": {
+					"path": "/queue/items"
+				},
+				"fields": [
+					{
+						"id": "title",
+						"label": "Title",
+						"type": "string",
+						"primary": true
+					},
+					{
+						"id": "author.name",
+						"label": "Author",
+						"type": "user"
+					},
+					{
+						"id": "date",
+						"label": "Submitted",
+						"type": "datetime"
+					}
+				],
+				"rowActions": [
+					{
+						"id": "approve",
+						"label": "Approve",
+						"variant": "primary",
+						"visible": {
+							"call": "can",
+							"args": {
+								"scope": "posts.status:write"
+							}
+						},
+						"action": {
+							"event": {
+								"name": "approve",
+								"context": {
+									"id": {
+										"path": "id"
+									}
+								}
+							}
+						}
+					}
+				],
+				"empty": "Nothing to review"
+			}
+		]
+	},
+	"events": {
+		"approve": {
+			"call": "posts.update_status",
+			"input": {
+				"id": {
+					"$context": "id"
+				},
+				"status": "publish"
+			},
+			"then": [
+				"remove-row:queue"
+			],
+			"notice": "Post approved and published."
+		}
+	}
+}

@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, type ComponentType, type ReactNode } from 'react';
 import { createRoot } from 'react-dom/client';
 import apiFetch from '@wordpress/api-fetch';
 import { Notice } from '@wordpress/components';
@@ -9,10 +9,13 @@ import {
 	joinPointer,
 	resolveBoolean,
 	resolveDynamicValue,
+	useDynamicBoolean,
 	useProcessor,
 	useScopePath,
 	useSurface,
+	wordPressCatalog,
 	type A2UIComponentProps,
+	type ComponentCatalog,
 	type ActionMessage,
 	type JsonValue,
 } from '../../packages/a2ui/src/index.ts';
@@ -20,8 +23,9 @@ import { removeRow } from '../../packages/core/src/build/rows.ts';
 import { createCan } from '../../hosts/wordpress/adapter/src/can.ts';
 import type { Field } from '../../hosts/wordpress/adapter/src/cells.ts';
 import { components } from '../../hosts/wordpress/adapter/src/client/components.tsx';
+import { graftFunctions } from './catalog.ts';
 import { withContext } from './events.ts';
-import type { A2UIBuild } from './snapshot.ts';
+import { initialDataModel, type A2UIBuild } from './snapshot.ts';
 
 /**
  * Proof of concept: renders an A2UI build in wp-admin with a2ui-wp's
@@ -33,22 +37,29 @@ import type { A2UIBuild } from './snapshot.ts';
 
 declare global {
 	interface Window {
-		graftA2UI: { spec: string; build: A2UIBuild; scopes: Record<string, boolean> };
+		graftA2UI: { spec: string; build: A2UIBuild; scopes: Record<string, boolean>; slot?: Record<string, unknown>; panel?: string };
+		wp: {
+			plugins: { registerPlugin(name: string, settings: { render: () => unknown }): void };
+			editor: { PluginDocumentSettingPanel: (props: { name: string; title: string; children: unknown }) => unknown };
+		};
 	}
 }
 
-const { spec, build, scopes } = window.graftA2UI;
+const { spec, build, scopes, slot = null, panel } = window.graftA2UI;
 const can = createCan(scopes);
 const surfaceId = 'main';
 const version = build.ui.protocol.replace(/^a2ui\//, '');
 
 const call = (capability: string, input: unknown) => apiFetch<JsonValue>({ path: '/graft/v1/call', method: 'POST', data: { spec, capability, input } });
 
-const processor = new A2UIProcessor({ supportedCatalogIds: [build.ui.catalogId], locale: 'en-US' });
+const processor = new A2UIProcessor({ supportedCatalogIds: [build.ui.catalogId], locale: 'en-US', functions: graftFunctions({ can, now: new Date() }) });
 processor.processMessages([
 	{ version, createSurface: { surfaceId, catalogId: build.ui.catalogId } },
 	{ version, updateComponents: { surfaceId, components: build.ui.components } },
 ]);
+// The slot at /slot, then `initial` (e.g. a form seeded from the slot), as the verifier sees it.
+const seeded = initialDataModel(build, {}, slot, (dataModel) => ({ dataModel, functions: processor.functions, locale: 'en-US' })).snapshot();
+processor.processMessage({ version, updateDataModel: { surfaceId, path: '/', value: seeded } });
 
 const data: Record<string, unknown> = {};
 const load = async (names: string[]) => {
@@ -106,7 +117,7 @@ function Table({ id, props }: A2UIComponentProps<{ rows?: { path: string }; fiel
 	};
 	const invoke = async (onClick: unknown) => {
 		const { action, path } = onClick as { action: RowAction['action']; path: string };
-		processor.dispatchAction(surface.id, id, action, path);
+		processor.dispatchAction(surface.id, id, action as Parameters<typeof processor.dispatchAction>[2], path);
 	};
 
 	return (
@@ -122,7 +133,16 @@ function Table({ id, props }: A2UIComponentProps<{ rows?: { path: string }; fiel
 	);
 }
 
-const catalog = createCatalog({ Table });
+/** The catalog's `visible`, on every component: false draws nothing. */
+const withVisible = (catalog: ComponentCatalog): ComponentCatalog =>
+	Object.fromEntries(
+		Object.entries(catalog).map(([name, Component]) => [
+			name,
+			(props: A2UIComponentProps<{ visible?: unknown }>) => (useDynamicBoolean(props.props.visible ?? true) ? <Component {...props} /> : null),
+		]),
+	);
+
+const catalog = withVisible(createCatalog({ ...wordPressCatalog, Table }));
 
 function Page() {
 	const [notice, setNotice] = useState<{ status: 'success' | 'error'; text: string }>();
@@ -141,6 +161,10 @@ function Page() {
 		}
 		for (const op of binding.then ?? []) {
 			const [kind, target] = op.split(':') as [string, string];
+			if (kind === 'reload') {
+				window.location.reload();
+				return;
+			}
 			if (kind === 'refresh') {
 				await load([target]);
 			} else if (kind === 'remove-row') {
@@ -164,5 +188,19 @@ function Page() {
 	);
 }
 
-createRoot(document.getElementById('graft-a2ui')!).render(<Page />);
+if (panel) {
+	// The post.editor.panel slot: a document settings panel in the block editor's sidebar.
+	const Panel = window.wp.editor.PluginDocumentSettingPanel as unknown as ComponentType<{ name: string; title: string; children: ReactNode }>;
+	window.wp.plugins.registerPlugin('graft-a2ui', {
+		render: () => (
+			<Panel name="graft-a2ui" title={panel}>
+				<div id="graft-a2ui">
+					<Page />
+				</div>
+			</Panel>
+		),
+	});
+} else {
+	createRoot(document.getElementById('graft-a2ui')!).render(<Page />);
+}
 void load(Object.keys(build.data));
