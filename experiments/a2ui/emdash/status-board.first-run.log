@@ -1,0 +1,15 @@
+→ building the UI (attempt 1)
+✖ verification failed (attempt 1)
+✖ UI attempt 1 rejected:
+    Check for "contributors": Expected rows "Draft A", "Draft B", found "Post C".
+→ building the UI (attempt 2)
+✖ verification failed (attempt 2)
+✖ UI attempt 2 rejected:
+    Check for "contributors": Expected rows "Draft A", "Draft B", found "Post C".
+→ building the UI (attempt 3)
+✖ verification failed (attempt 3)
+✖ UI attempt 3 rejected:
+    Check for "unpublish": Expected the text "Nothing published" to be shown.
+    Check for "contributors": Expected rows "Draft A", "Draft B", found "Post C".
+Wrote the last (failing) candidate to experiments/a2ui/emdash/status-board.json
+exit 1

@@ -1,11 +1,14 @@
 import { describeSpec, describeSurface, usableCapabilities, type Build, type Check, type Migration, type Refs, type Spec, type Surface, type UiFormat } from '@graft/core';
 import { BASE_COMPONENTS, PROTOCOL } from './catalog.ts';
 import { CATALOG_GUIDE } from './guide.ts';
-import { snapshotA2UI, type A2UIHost } from './snapshot.ts';
+import { snapshotA2UI } from './snapshot.ts';
+import type { A2UIHost } from './walk.ts';
 import { isA2UIBuild, type A2UIBuild, type A2UIComponent, type EventBinding } from './types.ts';
 import { collectScopes, validateA2UI } from './validate.ts';
 
 export interface A2UIFormatHost extends A2UIHost {
+	/** The host's name, as surfaces give it (e.g. "wordpress"). */
+	host: string;
 	/** The host's components for the compiler's prompt, in the catalog guide's style. */
 	guide?: string;
 }
@@ -14,10 +17,11 @@ const isObject = (value: unknown): value is Record<string, unknown> => typeof va
 
 /** A2UI as a Graft UI format for one host: register it with `registerUiFormat`. */
 export function createA2UIFormat(host: A2UIFormatHost): UiFormat {
-	const componentNames = [...new Set([...BASE_COMPONENTS.map((c) => c.name), ...(host.components ?? []).map((c) => c.name)])].sort();
+	const componentNames = [...new Set([...BASE_COMPONENTS.map((c) => c.name).filter((name) => !(host.without ?? []).includes(name)), ...(host.components ?? []).map((c) => c.name)])].sort();
 	return {
 		name: 'A2UI',
-		handles: (build) => isA2UIBuild(build) && typeof build.ui.protocol === 'string' && build.ui.protocol.startsWith('a2ui/'),
+		host: host.host,
+		handles: (build) => isA2UIBuild(build) && typeof build.ui.protocol === 'string' && build.ui.protocol.startsWith('a2ui/') && build.ui.catalogId === host.catalogId,
 		validate: (build, surface, spec) => validateA2UI(build, surface, host, spec),
 		refs: (build) => a2uiRefs(build as unknown as A2UIBuild),
 		snapshot: (build, ctx, entered) => snapshotA2UI(build as unknown as A2UIBuild, ctx, entered, host),
@@ -29,6 +33,8 @@ export function createA2UIFormat(host: A2UIFormatHost): UiFormat {
 			schema: (spec, surface) => a2uiOutputSchema(spec, surface, componentNames),
 			assemble: (output) => assembleA2UI(output, host.catalogId) as { value?: Partial<Build>; problems: string[] },
 			content: (build) => ({ ui: (build as unknown as A2UIBuild).ui, events: (build as unknown as A2UIBuild).events }),
+			checksSystem: (base) =>
+				`${base.replace(/\nComponents \(props[\s\S]*?(?=\nCapabilities you may use)/, '')}\n\nThe customization's UI will be an A2UI surface:\n${catalogGuide(host)}\n\nIn checks, an action id is a button's action id or a table row action's id, and an input id is a text field's or checkbox's id.`,
 		},
 	};
 }

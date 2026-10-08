@@ -1,6 +1,7 @@
 import { readdir, readFile } from 'node:fs/promises';
 import { fileURLToPath } from 'node:url';
 import { hashSpec, validateSpec, type Build, type Surface, type Verification } from '@graft/core';
+import './a2ui.ts';
 import { verifyInWordPress } from './verify.ts';
 
 export const examplesDir = fileURLToPath(new URL('../../../../examples', import.meta.url));
@@ -21,8 +22,10 @@ export interface ExampleFixture {
  * surface, every build is verified in a WordPress sandbox first and the
  * verification record is included.
  */
-export async function exampleFixtures(options: { verifyAgainst?: Surface; dir?: string } = {}): Promise<Record<string, ExampleFixture>> {
+export async function exampleFixtures(options: { verifyAgainst?: Surface; dir?: string; buildsDir?: string } = {}): Promise<Record<string, ExampleFixture>> {
 	const dir = options.dir ?? examplesDir;
+	// The builds may come from elsewhere, e.g. the same specs built as A2UI (examples/a2ui/builds).
+	const buildsDir = options.buildsDir ?? `${dir}/builds`;
 	const fixtures: Record<string, ExampleFixture> = {};
 	for (const file of (await readdir(`${dir}/specs`)).filter((f) => f.endsWith('.md'))) {
 		const source = await readFile(`${dir}/specs/${file}`, 'utf8');
@@ -32,7 +35,7 @@ export async function exampleFixtures(options: { verifyAgainst?: Surface; dir?: 
 		}
 		let build: Record<string, unknown> | null = null;
 		try {
-			build = JSON.parse(await readFile(`${dir}/builds/${file.replace(/\.md$/, '.json')}`, 'utf8')) as Record<string, unknown>;
+			build = JSON.parse(await readFile(`${buildsDir}/${file.replace(/\.md$/, '.json')}`, 'utf8')) as Record<string, unknown>;
 		} catch {
 			// No hand-written build for this spec.
 		}

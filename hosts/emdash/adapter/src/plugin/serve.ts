@@ -1,6 +1,7 @@
 import { hasPermission } from '../host/permissions.ts';
 import { compileSchema, evaluate, extractRefs, inert, updateArgs, validateSpec, validateWidgetTree, type Build, type BuildCode, type FunctionRunner, type Surface, type SurfaceFunctions } from '@graft/core';
 import { findAction, readValue, renderTree, withWidgetStates, type Block, type Rendered } from '../host/blocks.ts';
+import { A2UI_STATE, nextA2UIState, renderA2UI } from '../host/a2ui.ts';
 import { createCan } from '../host/can.ts';
 import { roleName } from '../host/surface.ts';
 import { HostError, runCapability, usableScopes, type Viewer } from './host.ts';
@@ -166,10 +167,12 @@ async function renderInstance(ctx: PluginContext, viewer: Viewer, instance: Inst
 			}
 		: undefined;
 	const widgets = surface.functions?.widgets ? { limits: surface.functions.widgets, states, validate: (tree: NonNullable<Build['tree']>) => validateWidgetTree(tree, surface) } : undefined;
-	if (!served.build.tree) {
-		failures.push('This customization is not a tree, and EmDash only draws trees so far.');
-	}
-	const rendered = withWidgetStates(renderTree(served.build.tree ?? { type: 'stack' }, { data, slot, can, now, ...(fn ? { fn } : {}) }, served.record.id, widgets), served.record.id);
+	const at = { data, slot, can, now, ...(fn ? { fn } : {}) };
+	// A build in another UI format (A2UI) draws through its own renderer; its state rides like a widget's.
+	const drawn = served.build.tree
+		? renderTree(served.build.tree, at, served.record.id, widgets)
+		: renderA2UI(served.build, at, served.record.id, (states[A2UI_STATE] ?? {}) as Record<string, unknown>);
+	const rendered = withWidgetStates(drawn, served.record.id);
 	if (errors.length > 0) {
 		rendered.blocks.unshift({ type: 'banner', variant: 'error', title: 'Some data could not be loaded', description: errors.join(' ') });
 	}
@@ -219,6 +222,10 @@ async function act(
 	for (const instance of instances.filter((i) => i.served.record.id === specId)) {
 		const rendered = await renderInstance(ctx, viewer, instance, surface, load, states);
 		const found = findAction(rendered, actionId, value);
+		if (found?.event && !instance.served.build.tree) {
+			// A local A2UI action: the next state, nothing called.
+			return { states: { [specId]: { ...states, [A2UI_STATE]: nextA2UIState((states[A2UI_STATE] ?? {}) as Record<string, unknown>, found.event) } } };
+		}
 		if (found?.event) {
 			const drawn = rendered.widgets[found.event.widget];
 			if (!drawn?.props.update || !rendered.fn) {

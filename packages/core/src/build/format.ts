@@ -19,6 +19,8 @@ import type { Build, Check, Refs } from './types.ts';
 export interface UiFormat {
 	/** Name for messages, e.g. "A2UI". */
 	name: string;
+	/** The host it draws for (a surface's `host`); one format of a name per host. */
+	host: string;
 	/** Whether the build's UI is in this format. */
 	handles(build: unknown): boolean;
 	/**
@@ -56,18 +58,29 @@ export interface UiCompiler {
 	assemble(output: unknown, surface: Surface): { value?: Partial<Build>; problems: string[] };
 	/** Fields of a previous build that make up its UI, as the dedupe key and regeneration reference. */
 	content(build: Build): unknown;
+	/**
+	 * The checks phase's system prompt for a build in this format: checks
+	 * name actions, inputs and columns, so the writer should know what the
+	 * UI is made of. Given the tree version; without it, that is used.
+	 */
+	checksSystem?(base: string, spec: Spec, surface: Surface): string;
 }
 
 const formats: UiFormat[] = [];
 
-/** Makes a UI format known to core (once per format name; a later one replaces it). */
+/** Makes a UI format known to core (once per name and host; a later one replaces it). */
 export function registerUiFormat(format: UiFormat): void {
-	const i = formats.findIndex((f) => f.name === format.name);
+	const i = formats.findIndex((f) => f.name === format.name && f.host === format.host);
 	if (i >= 0) {
 		formats[i] = format;
 	} else {
 		formats.push(format);
 	}
+}
+
+/** A registered format by name (case-insensitive, e.g. "a2ui") for a host. */
+export function uiFormatNamed(name: string, host: string): UiFormat | undefined {
+	return formats.find((format) => format.name.toLowerCase() === name.toLowerCase() && format.host === host);
 }
 
 /** The format a build without a tree is in, if one is registered. */

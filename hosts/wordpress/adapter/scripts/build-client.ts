@@ -43,6 +43,8 @@ const options = {
 	entryPoints: {
 		runtime: fileURLToPath(new URL('../src/client/mount.tsx', import.meta.url)),
 		admin: fileURLToPath(new URL('../src/client/admin.tsx', import.meta.url)),
+		// Drawing A2UI builds: loaded before the runtime, only on screens that serve one.
+		a2ui: fileURLToPath(new URL('../src/client/a2ui.tsx', import.meta.url)),
 	},
 	metafile: true,
 	outdir: outDir,
@@ -54,6 +56,8 @@ const options = {
 	sourcemap: watch ? ('inline' as const) : false,
 	legalComments: 'none' as const,
 	plugins: [wordpressGlobals],
+	// a2ui-wp draws A2UI builds; bundled from its copy in the repository until it is published.
+	alias: { 'a2ui-wp': fileURLToPath(new URL('../../../../packages/a2ui-wp/src/index.ts', import.meta.url)) },
 	// The sandbox endpoint is embedded as text for the in-browser sandbox.
 	loader: { '.php': 'text' as const },
 	logLevel: 'info' as const,

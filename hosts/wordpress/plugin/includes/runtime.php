@@ -155,16 +155,12 @@ function enqueue_runtime(): void {
 	if ( ! is_readable( $asset_file ) ) {
 		return;
 	}
-	$asset  = require $asset_file;
-	$editor = editor_runtime_config();
-	// In the block editor, panels register with the editor's own plugin API.
-	$deps = $editor ? array_merge( $asset['dependencies'], array( 'wp-plugins', 'wp-editor', 'wp-data' ) ) : $asset['dependencies'];
-	wp_enqueue_script( 'graft-runtime', plugins_url( 'build/runtime.js', __DIR__ ), $deps, $asset['version'], true );
-	wp_enqueue_style( 'wp-components' );
+	$asset = require $asset_file;
 
 	$specs     = array();
 	$servable  = servable_specs();
 	$with_code = false;
+	$with_a2ui = false;
 	foreach ( array_keys( $rendered ) as $spec_id ) {
 		if ( isset( $servable[ $spec_id ] ) ) {
 			$specs[ $spec_id ] = array(
@@ -172,8 +168,22 @@ function enqueue_runtime(): void {
 				'scopes' => (object) usable_scopes( $servable[ $spec_id ]['record'] ),
 			);
 			$with_code = $with_code || isset( $servable[ $spec_id ]['build']['code'] );
+			$with_a2ui = $with_a2ui || isset( $servable[ $spec_id ]['build']['ui'] );
 		}
 	}
+
+	$editor = editor_runtime_config();
+	// In the block editor, panels register with the editor's own plugin API.
+	$deps = $editor ? array_merge( $asset['dependencies'], array( 'wp-plugins', 'wp-editor', 'wp-data' ) ) : $asset['dependencies'];
+	// Builds whose UI is an A2UI surface are drawn by build/a2ui.js, loaded first and only where one is served.
+	$a2ui_asset_file = dirname( __DIR__ ) . '/build/a2ui.asset.php';
+	if ( $with_a2ui && is_readable( $a2ui_asset_file ) ) {
+		$a2ui_asset = require $a2ui_asset_file;
+		wp_register_script( 'graft-a2ui', plugins_url( 'build/a2ui.js', __DIR__ ), $a2ui_asset['dependencies'], $a2ui_asset['version'], true );
+		$deps[] = 'graft-a2ui';
+	}
+	wp_enqueue_script( 'graft-runtime', plugins_url( 'build/runtime.js', __DIR__ ), $deps, $asset['version'], true );
+	wp_enqueue_style( 'wp-components' );
 	$config  = array( 'specs' => (object) $specs );
 	$surface = current_surface();
 	if ( $editor ) {

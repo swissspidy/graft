@@ -1,9 +1,9 @@
 import { describe, expect, it } from 'vitest';
-import { applyMigrations, extractRefs, registerUiFormat, validateBuild, verifyBuild, type Build } from '@graft/core';
+import { applyMigrations, compileSpec, extractRefs, hashSurface, registerUiFormat, validateBuild, verifyBuild, type Build } from '@graft/core';
 import { createCan, fakeSandbox, fixtures, pageBuild, semantics, spec, surface } from '../../core/test/fixtures/acme.ts';
 import { createA2UIFormat, type A2UIBuild } from '../src/index.ts';
 
-registerUiFormat(createA2UIFormat({ catalogId: 'graft:acme' }));
+registerUiFormat(createA2UIFormat({ host: 'acme', catalogId: 'graft:acme' }));
 
 /** The acme page build with its tree as an A2UI surface. */
 async function a2uiBuild(change?: (build: A2UIBuild) => void): Promise<Build> {
@@ -78,10 +78,13 @@ describe('A2UI builds', () => {
 		build.checks = [
 			{ criterion: 'open-only', fixtures, view_as: 'm', expect: [{ rows: ['Open A'] }, { text: 'Show done' }] },
 			{ criterion: 'open-only', fixtures, view_as: 'm', steps: [{ action: 'done' }], expect: [{ rows: ['Done B'] }] },
+			// Each check starts from the build as written: what one set never leaks into the next.
+			{ criterion: 'open-only', fixtures, view_as: 'm', expect: [{ rows: ['Open A'] }] },
 		];
 		expect((await validateBuild(build, surface)).diagnostics.filter((d) => d.severity === 'error')).toEqual([]);
 		const result = await verifyBuild({ build, spec, surface, sandbox: fakeSandbox(), semantics, createCan });
 		expect(result.results.flatMap((r) => r.failures)).toEqual([]);
+		expect((build as unknown as A2UIBuild).ui.initial).toEqual({ form: { status: 'open' } });
 	});
 
 	it('are refused for unknown components and functions, wrong props and arguments, and unbound events', async () => {
@@ -125,5 +128,48 @@ describe('A2UI builds', () => {
 		expect((components(migrated as unknown as Build)[2]!.rowActions as Array<{ visible: unknown }>)[0]!.visible).toEqual({ call: 'can', args: { scope: 'items:manage' } });
 		// Removing what the build uses cannot be migrated.
 		expect(applyMigrations(build, [{ op: 'remove', kind: 'capability', symbol: 'items.close' }])).toBeUndefined();
+	});
+});
+
+describe('compiling to A2UI', () => {
+	it('builds the UI phase in the format, sends problems back, and verifies against the frozen checks', async () => {
+		const target = (await a2uiBuild()) as unknown as A2UIBuild;
+		const answer = (pointer: string) => ({
+			components: target.ui.components.map(({ id, component, ...props }) => ({
+				id,
+				component,
+				props_json: JSON.stringify(component === 'Table' ? { ...props, rows: { path: pointer } } : props),
+			})),
+			initial_json: '{}',
+			computed_json: '{}',
+			data: Object.entries(target.data).map(([name, source]) => ({ name, call: source.call, input_json: JSON.stringify(source.input ?? null) })),
+			events: Object.entries(target.events).map(([name, e]) => ({ name, call: e.call, input_json: JSON.stringify(e.input), then: e.then ?? [], notice: null })),
+		});
+		const prompts: string[] = [];
+		const outputs = [answer('/open.items'), answer('/open/items')];
+		const model = {
+			async generate({ purpose, prompt }: { purpose: string; prompt: string }) {
+				expect(purpose).toBe('tree');
+				prompts.push(prompt);
+				return { output: outputs.shift(), model: 'scripted' };
+			},
+		};
+		const format = createA2UIFormat({ host: 'acme', catalogId: 'graft:acme' });
+		const result = await compileSpec({
+			spec,
+			specHash: target.spec.hash,
+			surface: { ...surface, hash: await hashSurface(surface) },
+			model,
+			host: { fixtures: '', assertions: '' },
+			checks: target.checks,
+			format,
+			verify: (build) => verifyBuild({ build, spec, surface, sandbox: fakeSandbox(), semantics, createCan }),
+		});
+		expect(result.ok).toBe(true);
+		expect(prompts).toHaveLength(2);
+		expect(prompts[1]).toContain('"/open.items" is not a JSON Pointer');
+		expect((result.build as unknown as A2UIBuild).ui.catalogId).toBe('graft:acme');
+		expect(result.build!.tree).toBeUndefined();
+		expect(result.verification!.passed).toBe(true);
 	});
 });

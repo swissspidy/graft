@@ -29,6 +29,9 @@ importers:
       '@anthropic-ai/sdk':
         specifier: ^0.129.0
         version: 0.129.0(zod@4.5.4)
+      '@graft/a2ui':
+        specifier: workspace:*
+        version: link:../../../packages/a2ui
       '@graft/core':
         specifier: workspace:*
         version: link:../../../packages/core
@@ -75,6 +78,9 @@ importers:
 
   hosts/wordpress/adapter:
     dependencies:
+      '@graft/a2ui':
+        specifier: workspace:*
+        version: link:../../../packages/a2ui
       '@graft/core':
         specifier: workspace:*
         version: link:../../../packages/core

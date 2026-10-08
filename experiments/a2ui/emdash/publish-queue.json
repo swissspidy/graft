@@ -1,60 +1,55 @@
 {
 	"graft": 1,
 	"spec": {
-		"id": "review-queue",
-		"hash": "sha256:3a531bb7dea69a073fba551905e3fb16908fcd375bbd4205c10b21abac437b04"
+		"id": "publish-queue",
+		"hash": "sha256:8bd2c50b0a07388e5276f99b5e1c367cd84067b58b8e46f6a8f8d896a2c947ef"
 	},
 	"surface": {
-		"host": "wordpress",
-		"hostVersion": "7.1.2",
-		"hash": "sha256:6f170822cb71accfa0c59633044953ce846b218fbcbd1f6406323c4f38e17cdc"
+		"host": "emdash",
+		"hostVersion": "1.0.1",
+		"hash": "sha256:b9329970caab68a82f9e7fe44db516aa9d4dfddfe028473af619f480e85a35a0"
 	},
 	"mount": {
 		"slot": "admin.page",
-		"menu": {
-			"parent": "posts",
-			"title": "Review queue"
-		}
+		"title": "Publish queue"
 	},
 	"data": {
 		"queue": {
-			"call": "posts.list",
+			"call": "content.list",
 			"input": {
-				"status": [
-					"pending"
-				],
-				"orderby": "date",
+				"collection": "posts",
+				"status": "draft",
 				"order": "asc"
 			}
 		}
 	},
 	"ui": {
-		"protocol": "a2ui/v0.9.1",
-		"catalogId": "graft:wordpress",
+		"protocol": "a2ui/v0.9",
+		"catalogId": "graft:emdash",
 		"components": [
 			{
 				"id": "root",
 				"component": "Column",
 				"children": [
 					"title",
-					"intro",
-					"queue"
+					"subtitle",
+					"queue_table"
 				]
 			},
 			{
 				"id": "title",
 				"component": "Text",
-				"variant": "h1",
-				"text": "Review queue"
+				"text": "Publish queue",
+				"variant": "h1"
 			},
 			{
-				"id": "intro",
+				"id": "subtitle",
 				"component": "Text",
-				"variant": "caption",
-				"text": "Posts waiting for review, oldest first."
+				"text": "Drafts, oldest first.",
+				"variant": "caption"
 			},
 			{
-				"id": "queue",
+				"id": "queue_table",
 				"component": "Table",
 				"rows": {
 					"path": "/queue/items"
@@ -67,29 +62,28 @@
 					},
 					{
 						"id": "author/name",
-						"label": "Author",
-						"type": "user"
+						"label": "Author"
 					},
 					{
-						"id": "date",
-						"label": "Submitted",
-						"type": "datetime"
+						"id": "updatedAt",
+						"label": "Last updated",
+						"type": "relative_time"
 					}
 				],
 				"rowActions": [
 					{
-						"id": "approve",
-						"label": "Approve",
+						"id": "publish",
+						"label": "Publish",
 						"variant": "primary",
 						"visible": {
 							"call": "can",
 							"args": {
-								"scope": "posts.status:write"
+								"scope": "content.status:write"
 							}
 						},
 						"action": {
 							"event": {
-								"name": "approve",
+								"name": "publish",
 								"context": {
 									"id": {
 										"path": "id"
@@ -99,28 +93,28 @@
 						}
 					}
 				],
-				"empty": "Nothing to review"
+				"empty": "Nothing waiting"
 			}
 		]
 	},
 	"events": {
-		"approve": {
-			"call": "posts.update_status",
+		"publish": {
+			"call": "content.publish",
 			"input": {
+				"collection": "posts",
 				"id": {
 					"$context": "id"
-				},
-				"status": "publish"
+				}
 			},
 			"then": [
-				"remove-row:queue"
+				"refresh:queue"
 			],
-			"notice": "Post published."
+			"notice": "Published."
 		}
 	},
 	"checks": [
 		{
-			"criterion": "pending-only",
+			"criterion": "drafts-only",
 			"fixtures": {
 				"users": [
 					{
@@ -128,18 +122,18 @@
 						"role": "editor"
 					}
 				],
-				"posts": [
+				"entries": [
 					{
 						"title": "Draft A",
-						"status": "pending"
-					},
-					{
-						"title": "Draft B",
 						"status": "draft"
 					},
 					{
-						"title": "Post C",
-						"status": "publish"
+						"title": "Post B",
+						"status": "published"
+					},
+					{
+						"title": "Later C",
+						"status": "scheduled"
 					}
 				]
 			},
@@ -161,10 +155,10 @@
 						"role": "editor"
 					}
 				],
-				"posts": [
+				"entries": [
 					{
 						"title": "Draft A",
-						"status": "pending"
+						"status": "draft"
 					}
 				]
 			},
@@ -174,13 +168,13 @@
 					"columns": [
 						"Title",
 						"Author",
-						"Submitted"
+						"Last updated"
 					]
 				}
 			]
 		},
 		{
-			"criterion": "approve",
+			"criterion": "publish",
 			"fixtures": {
 				"users": [
 					{
@@ -188,17 +182,17 @@
 						"role": "editor"
 					}
 				],
-				"posts": [
+				"entries": [
 					{
 						"title": "Draft A",
-						"status": "pending"
+						"status": "draft"
 					}
 				]
 			},
 			"view_as": "e",
 			"steps": [
 				{
-					"action": "approve",
+					"action": "publish",
 					"row": {
 						"title": "Draft A"
 					}
@@ -209,15 +203,15 @@
 					"rows": []
 				},
 				{
-					"post": {
+					"entry": {
 						"title": "Draft A",
-						"status": "publish"
+						"status": "published"
 					}
 				}
 			]
 		},
 		{
-			"criterion": "contributors-no-approve",
+			"criterion": "contributors-no-publish",
 			"fixtures": {
 				"users": [
 					{
@@ -225,11 +219,10 @@
 						"role": "contributor"
 					}
 				],
-				"posts": [
+				"entries": [
 					{
 						"title": "Draft A",
-						"status": "pending",
-						"author": "c"
+						"status": "draft"
 					}
 				]
 			},
@@ -241,7 +234,7 @@
 					]
 				},
 				{
-					"action": "approve",
+					"action": "publish",
 					"row": {
 						"title": "Draft A"
 					},
@@ -258,7 +251,7 @@
 						"role": "editor"
 					}
 				],
-				"posts": []
+				"entries": []
 			},
 			"view_as": "e",
 			"expect": [
@@ -266,13 +259,22 @@
 					"rows": []
 				},
 				{
-					"text": "Nothing to review"
+					"text": "Nothing waiting"
 				}
 			]
 		}
 	],
 	"refs": {
 		"slot": "admin.page",
+		"components": {},
+		"capabilities": [
+			"content.list",
+			"content.publish"
+		],
+		"scopes": [
+			"content.status:write",
+			"content:read"
+		],
 		"catalog": {
 			"Column": [
 				"children"
@@ -287,18 +289,13 @@
 				"text",
 				"variant"
 			]
-		},
-		"capabilities": [
-			"posts.list",
-			"posts.update_status"
-		],
-		"scopes": [
-			"posts.status:write",
-			"posts:read"
-		]
+		}
 	},
 	"provenance": {
-		"compiler": "handwritten",
-		"strategy": "handwritten"
+		"compiler": "graft-compiler/0.1.0",
+		"model": "claude-opus-5-5",
+		"promptHash": "sha256:953b7c79ab76f07033348092f4db34cc8918ba4bc144f2a5d6cdb23c2ec19706",
+		"strategy": "regenerated",
+		"replaces": "sha256:a4a23a474d5ef584dffe4477750c13f9905c49829deb32e606890222bab06169"
 	}
 }

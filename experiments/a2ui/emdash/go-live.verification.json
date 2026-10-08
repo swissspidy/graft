@@ -1,0 +1,40 @@
+{
+	"passed": true,
+	"spec": {
+		"id": "go-live",
+		"hash": "sha256:3b8e05760dae42cfce7ab1688ff8eaddbcff07e4d69b9c56187621a47822f29d"
+	},
+	"surface": {
+		"host": "emdash",
+		"hostVersion": "1.0.1",
+		"hash": "sha256:b9329970caab68a82f9e7fe44db516aa9d4dfddfe028473af619f480e85a35a0"
+	},
+	"results": [
+		{
+			"criterion": "state",
+			"check": 0,
+			"passed": true,
+			"failures": []
+		},
+		{
+			"criterion": "state",
+			"check": 1,
+			"passed": true,
+			"failures": []
+		},
+		{
+			"criterion": "go-live",
+			"check": 2,
+			"passed": true,
+			"failures": []
+		},
+		{
+			"criterion": "take-offline",
+			"check": 3,
+			"passed": true,
+			"failures": []
+		}
+	],
+	"unchecked": [],
+	"verifiedAt": "2026-10-08T12:54:21.076Z"
+}

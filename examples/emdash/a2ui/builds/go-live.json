@@ -1,0 +1,369 @@
+{
+	"graft": 1,
+	"spec": {
+		"id": "go-live",
+		"hash": "sha256:3b8e05760dae42cfce7ab1688ff8eaddbcff07e4d69b9c56187621a47822f29d"
+	},
+	"surface": {
+		"host": "emdash",
+		"hostVersion": "1.0.1",
+		"hash": "sha256:b9329970caab68a82f9e7fe44db516aa9d4dfddfe028473af619f480e85a35a0"
+	},
+	"mount": {
+		"slot": "content.editor.panel",
+		"collections": [
+			"posts"
+		]
+	},
+	"data": {},
+	"ui": {
+		"protocol": "a2ui/v0.9",
+		"catalogId": "graft:emdash",
+		"components": [
+			{
+				"id": "root",
+				"component": "Column",
+				"children": [
+					"live-text",
+					"not-live-text",
+					"actions"
+				]
+			},
+			{
+				"id": "live-text",
+				"component": "Text",
+				"text": "Live",
+				"variant": "h3",
+				"visible": {
+					"call": "equals",
+					"args": {
+						"a": {
+							"path": "/slot/entry/status"
+						},
+						"b": "published"
+					}
+				}
+			},
+			{
+				"id": "not-live-text",
+				"component": "Text",
+				"text": "Not live",
+				"variant": "h3",
+				"visible": {
+					"call": "notEquals",
+					"args": {
+						"a": {
+							"path": "/slot/entry/status"
+						},
+						"b": "published"
+					}
+				}
+			},
+			{
+				"id": "actions",
+				"component": "Row",
+				"children": [
+					"go-live",
+					"take-offline"
+				]
+			},
+			{
+				"id": "go-live-label",
+				"component": "Text",
+				"text": "Go live"
+			},
+			{
+				"id": "go-live",
+				"component": "Button",
+				"child": "go-live-label",
+				"variant": "primary",
+				"visible": {
+					"call": "and",
+					"args": {
+						"values": [
+							{
+								"call": "notEquals",
+								"args": {
+									"a": {
+										"path": "/slot/entry/status"
+									},
+									"b": "published"
+								}
+							},
+							{
+								"call": "can",
+								"args": {
+									"scope": "content.status:write",
+									"on": {
+										"path": "/slot/entry"
+									}
+								}
+							}
+						]
+					}
+				},
+				"action": {
+					"event": {
+						"name": "go-live",
+						"context": {
+							"collection": {
+								"path": "/slot/entry/collection"
+							},
+							"id": {
+								"path": "/slot/entry/id"
+							}
+						}
+					}
+				}
+			},
+			{
+				"id": "take-offline-label",
+				"component": "Text",
+				"text": "Take offline"
+			},
+			{
+				"id": "take-offline",
+				"component": "Button",
+				"child": "take-offline-label",
+				"variant": "default",
+				"visible": {
+					"call": "and",
+					"args": {
+						"values": [
+							{
+								"call": "equals",
+								"args": {
+									"a": {
+										"path": "/slot/entry/status"
+									},
+									"b": "published"
+								}
+							},
+							{
+								"call": "can",
+								"args": {
+									"scope": "content.status:write",
+									"on": {
+										"path": "/slot/entry"
+									}
+								}
+							}
+						]
+					}
+				},
+				"action": {
+					"event": {
+						"name": "take-offline",
+						"context": {
+							"collection": {
+								"path": "/slot/entry/collection"
+							},
+							"id": {
+								"path": "/slot/entry/id"
+							}
+						}
+					}
+				}
+			}
+		]
+	},
+	"events": {
+		"go-live": {
+			"call": "content.publish",
+			"input": {
+				"collection": {
+					"$context": "collection"
+				},
+				"id": {
+					"$context": "id"
+				}
+			},
+			"then": [
+				"reload:page"
+			],
+			"notice": "The post is live."
+		},
+		"take-offline": {
+			"call": "content.unpublish",
+			"input": {
+				"collection": {
+					"$context": "collection"
+				},
+				"id": {
+					"$context": "id"
+				}
+			},
+			"then": [
+				"reload:page"
+			],
+			"notice": "The post is offline."
+		}
+	},
+	"checks": [
+		{
+			"criterion": "state",
+			"fixtures": {
+				"users": [
+					{
+						"as": "e",
+						"role": "editor"
+					}
+				],
+				"entries": [
+					{
+						"title": "Post A",
+						"status": "published"
+					}
+				]
+			},
+			"view_as": "e",
+			"expect": [
+				{
+					"text": "Live"
+				},
+				{
+					"action": "go-live",
+					"available": false
+				}
+			]
+		},
+		{
+			"criterion": "state",
+			"fixtures": {
+				"users": [
+					{
+						"as": "e",
+						"role": "editor"
+					}
+				],
+				"entries": [
+					{
+						"title": "Draft B",
+						"status": "draft"
+					}
+				]
+			},
+			"view_as": "e",
+			"expect": [
+				{
+					"text": "Not live"
+				},
+				{
+					"action": "take-offline",
+					"available": false
+				}
+			]
+		},
+		{
+			"criterion": "go-live",
+			"fixtures": {
+				"users": [
+					{
+						"as": "e",
+						"role": "editor"
+					}
+				],
+				"entries": [
+					{
+						"title": "Draft B",
+						"status": "draft"
+					}
+				]
+			},
+			"view_as": "e",
+			"steps": [
+				{
+					"action": "go-live",
+					"row": {
+						"title": "Draft B"
+					}
+				}
+			],
+			"expect": [
+				{
+					"entry": {
+						"title": "Draft B",
+						"status": "published"
+					}
+				},
+				{
+					"text": "Live"
+				}
+			]
+		},
+		{
+			"criterion": "take-offline",
+			"fixtures": {
+				"users": [
+					{
+						"as": "e",
+						"role": "editor"
+					}
+				],
+				"entries": [
+					{
+						"title": "Post A",
+						"status": "published"
+					}
+				]
+			},
+			"view_as": "e",
+			"steps": [
+				{
+					"action": "take-offline",
+					"row": {
+						"title": "Post A"
+					}
+				}
+			],
+			"expect": [
+				{
+					"entry": {
+						"title": "Post A",
+						"status": "draft"
+					}
+				},
+				{
+					"text": "Not live"
+				}
+			]
+		}
+	],
+	"refs": {
+		"slot": "content.editor.panel",
+		"components": {},
+		"capabilities": [
+			"content.publish",
+			"content.unpublish"
+		],
+		"scopes": [
+			"content.status:write"
+		],
+		"catalog": {
+			"Button": [
+				"action",
+				"child",
+				"variant",
+				"visible"
+			],
+			"Column": [
+				"children"
+			],
+			"Row": [
+				"children"
+			],
+			"Text": [
+				"text",
+				"variant",
+				"visible"
+			]
+		}
+	},
+	"provenance": {
+		"compiler": "graft-compiler/0.1.0",
+		"model": "claude-opus-5-5",
+		"promptHash": "sha256:60b8edf1be2fa7a19add5616cd2574cef940ccd0f0216eba3593157654f7404c",
+		"strategy": "regenerated",
+		"replaces": "sha256:c5df93eb03b18b5377de54124aa646c9c3e9debe880706feac6484af866ff0a0"
+	}
+}

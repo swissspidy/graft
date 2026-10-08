@@ -1,0 +1,243 @@
+{
+	"graft": 1,
+	"spec": {
+		"id": "quick-approve",
+		"hash": "sha256:fab32bddc34329737c0707e45fd134830eae41761ea90fcd6560d27ca49b8a3d"
+	},
+	"surface": {
+		"host": "wordpress",
+		"hostVersion": "7.1.2",
+		"hash": "sha256:6f170822cb71accfa0c59633044953ce846b218fbcbd1f6406323c4f38e17cdc"
+	},
+	"mount": {
+		"slot": "posts.list.row-actions"
+	},
+	"ui": {
+		"protocol": "a2ui/v0.9",
+		"catalogId": "graft:wordpress",
+		"components": [
+			{
+				"id": "root",
+				"component": "Button",
+				"child": "approve-label",
+				"variant": "primary",
+				"actionId": "approve",
+				"visible": {
+					"call": "and",
+					"args": {
+						"values": [
+							{
+								"call": "equals",
+								"args": {
+									"a": {
+										"path": "/slot/post/status"
+									},
+									"b": "pending"
+								}
+							},
+							{
+								"path": "/slot/post/can/publish"
+							},
+							{
+								"call": "can",
+								"args": {
+									"scope": "posts.status:write",
+									"on": {
+										"path": "/slot/post"
+									}
+								}
+							}
+						]
+					}
+				},
+				"action": {
+					"event": {
+						"name": "approve",
+						"context": {
+							"id": {
+								"path": "/slot/post/id"
+							}
+						}
+					}
+				}
+			},
+			{
+				"id": "approve-label",
+				"component": "Text",
+				"text": "Approve"
+			}
+		]
+	},
+	"events": {
+		"approve": {
+			"call": "posts.update_status",
+			"input": {
+				"id": {
+					"$context": "id"
+				},
+				"status": "publish"
+			},
+			"then": [
+				"reload:page"
+			],
+			"notice": "Post approved and published."
+		}
+	},
+	"data": {},
+	"checks": [
+		{
+			"criterion": "shown-on-pending",
+			"fixtures": {
+				"users": [
+					{
+						"as": "e",
+						"role": "editor"
+					}
+				],
+				"posts": [
+					{
+						"title": "Draft A",
+						"status": "pending"
+					}
+				]
+			},
+			"view_as": "e",
+			"expect": [
+				{
+					"action": "approve",
+					"row": {
+						"title": "Draft A"
+					},
+					"available": true
+				}
+			]
+		},
+		{
+			"criterion": "hidden-otherwise",
+			"fixtures": {
+				"users": [
+					{
+						"as": "e",
+						"role": "editor"
+					}
+				],
+				"posts": [
+					{
+						"title": "Draft B",
+						"status": "draft"
+					},
+					{
+						"title": "Post C",
+						"status": "publish"
+					}
+				]
+			},
+			"view_as": "e",
+			"expect": [
+				{
+					"action": "approve",
+					"row": {
+						"title": "Draft B"
+					},
+					"available": false
+				},
+				{
+					"action": "approve",
+					"row": {
+						"title": "Post C"
+					},
+					"available": false
+				}
+			]
+		},
+		{
+			"criterion": "approve",
+			"fixtures": {
+				"users": [
+					{
+						"as": "e",
+						"role": "editor"
+					}
+				],
+				"posts": [
+					{
+						"title": "Draft A",
+						"status": "pending"
+					}
+				]
+			},
+			"view_as": "e",
+			"steps": [
+				{
+					"action": "approve",
+					"row": {
+						"title": "Draft A"
+					}
+				}
+			],
+			"expect": [
+				{
+					"post": {
+						"title": "Draft A",
+						"status": "publish"
+					}
+				}
+			]
+		},
+		{
+			"criterion": "requires-publish",
+			"fixtures": {
+				"users": [
+					{
+						"as": "c",
+						"role": "contributor"
+					}
+				],
+				"posts": [
+					{
+						"title": "Draft A",
+						"status": "pending",
+						"author": "c"
+					}
+				]
+			},
+			"view_as": "c",
+			"expect": [
+				{
+					"action": "approve",
+					"row": {
+						"title": "Draft A"
+					},
+					"available": false
+				}
+			]
+		}
+	],
+	"refs": {
+		"slot": "posts.list.row-actions",
+		"components": {},
+		"capabilities": [
+			"posts.update_status"
+		],
+		"scopes": [
+			"posts.status:write"
+		],
+		"catalog": {
+			"Button": [
+				"action",
+				"actionId",
+				"child",
+				"variant",
+				"visible"
+			],
+			"Text": [
+				"text"
+			]
+		}
+	},
+	"provenance": {
+		"compiler": "graft-compiler/0.1.0+a2ui",
+		"model": "claude-opus-5-5",
+		"strategy": "compiled"
+	}
+}

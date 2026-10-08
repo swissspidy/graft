@@ -1,5 +1,8 @@
 import { BASIC_FUNCTIONS, Catalog, createFunctionImplementation, type ComponentApi, type DataContext, type FunctionImplementation } from '@a2ui/web_core/v0_9';
 import { z } from 'zod';
+import { pureFunctions } from './functions.ts';
+
+export { readPointer } from './functions.ts';
 
 /**
  * The Graft A2UI catalog: the parts of A2UI's basic catalog a Graft build
@@ -57,7 +60,7 @@ export const tableField = z
 	})
 	.strict();
 export const rowAction = z
-	.object({ id: z.string(), label: z.string(), variant: z.enum(['primary', 'default', 'secondary']).optional(), visible: dynamicBoolean.optional(), action: eventAction })
+	.object({ id: z.string(), label: z.string(), variant: z.enum(['primary', 'default', 'secondary']).optional(), visible: dynamicBoolean.optional(), action })
 	.strict();
 
 export const BASE_COMPONENTS: ComponentApi[] = [
@@ -69,34 +72,44 @@ export const BASE_COMPONENTS: ComponentApi[] = [
 	component('Button', { child: z.string(), action, variant: z.enum(['primary', 'default', 'secondary', 'borderless']).optional(), checks: checks.optional(), actionId: dynamicString.optional() }),
 	component('TextField', { label: dynamicString, value: binding, variant: z.enum(['shortText', 'longText', 'number', 'obscured']).optional(), validationRegexp: z.string().optional(), checks: checks.optional() }),
 	component('CheckBox', { label: dynamicString, value: binding, checks: checks.optional() }),
-	component('Table', { rows: binding, fields: z.array(tableField), rowActions: z.array(rowAction).optional(), empty: z.string().optional() }),
+	component('Table', { rows: binding, fields: z.array(tableField), rowActions: z.array(rowAction).optional(), empty: dynamicString.optional() }),
 ];
 
 /** Component types that take what the viewer enters. */
 export const INPUT_COMPONENTS = new Set(['TextField', 'CheckBox']);
 
-/** Reads a relative JSON Pointer ("author/name") from a value. */
-export function readPointer(value: unknown, pointer: string): unknown {
-	if (pointer === '' || pointer === '/') {
-		return value;
-	}
-	return pointer
-		.replace(/^\//, '')
-		.split('/')
-		.map((key) => key.replace(/~1/g, '/').replace(/~0/g, '~'))
-		.reduce<unknown>((inner, key) => (inner && typeof inner === 'object' ? (inner as Record<string, unknown>)[key] : undefined), value);
-}
-
-const list = (value: unknown): unknown[] => (Array.isArray(value) ? value : []);
-const text = (value: unknown): string => (value === null || value === undefined ? '' : typeof value === 'object' ? JSON.stringify(value) : String(value));
-const number = (value: unknown): number => (typeof value === 'number' ? value : Number(value));
-const DAY = 86_400_000;
-
-const fn = (name: string, returnType: string, shape: z.ZodRawShape, run: (args: Record<string, unknown>, context: DataContext) => unknown, description?: string): FunctionImplementation =>
-	createFunctionImplementation({ name, returnType, schema: z.object(shape).strict(), ...(description ? { description } : {}) }, run as never);
-
 const ab = { a: dynamicAny, b: dynamicAny };
 const items = { items: dynamicAny, by: z.string().optional() };
+
+/** Argument schemas of the pure functions (see functions.ts). */
+const ARGS: Record<string, z.ZodRawShape> = {
+	equals: ab,
+	notEquals: ab,
+	greaterThan: ab,
+	lessThan: ab,
+	add: ab,
+	subtract: ab,
+	multiply: ab,
+	divide: ab,
+	if: { condition: dynamicAny, then: dynamicAny, else: dynamicAny },
+	contains: { string: dynamicAny, substring: dynamicAny },
+	startsWith: { string: dynamicAny, prefix: dynamicAny },
+	endsWith: { string: dynamicAny, suffix: dynamicAny },
+	lower: { value: dynamicAny },
+	upper: { value: dynamicAny },
+	replace: { value: dynamicAny, pattern: z.string(), with: dynamicAny },
+	count: { value: dynamicAny },
+	join: { values: dynamicAny, separator: dynamicAny.optional() },
+	filter: { ...items, equals: dynamicAny },
+	map: items,
+	distinct: items,
+	sort: { ...items, descending: dynamicAny.optional() },
+	slice: { items: dynamicAny, start: dynamicAny.optional(), end: dynamicAny.optional() },
+	daysSince: { value: dynamicAny },
+};
+
+const fn = (name: string, shape: z.ZodRawShape, run: (args: Record<string, unknown>, context: DataContext) => unknown, description?: string): FunctionImplementation =>
+	createFunctionImplementation({ name, returnType: 'any', schema: z.object(shape).strict(), ...(description ? { description } : {}) }, run as never);
 
 /** The record a function is evaluated for: the row or template item in scope, if any. */
 function rowOf(context: DataContext): unknown {
@@ -105,61 +118,12 @@ function rowOf(context: DataContext): unknown {
 
 /** Functions on top of A2UI's basic ones, for one viewer at one moment. */
 export function graftFunctions({ can, now }: CatalogContext): FunctionImplementation[] {
+	const pure = pureFunctions(now);
 	return [
-		// Comparisons and arithmetic.
-		fn('equals', 'boolean', ab, ({ a, b }) => JSON.stringify(a ?? null) === JSON.stringify(b ?? null)),
-		fn('notEquals', 'boolean', ab, ({ a, b }) => JSON.stringify(a ?? null) !== JSON.stringify(b ?? null)),
-		fn('greaterThan', 'boolean', ab, ({ a, b }) => number(a) > number(b)),
-		fn('lessThan', 'boolean', ab, ({ a, b }) => number(a) < number(b)),
-		fn('add', 'number', ab, ({ a, b }) => number(a) + number(b)),
-		fn('subtract', 'number', ab, ({ a, b }) => number(a) - number(b)),
-		fn('multiply', 'number', ab, ({ a, b }) => number(a) * number(b)),
-		fn('divide', 'number', ab, ({ a, b }) => (number(b) === 0 ? null : number(a) / number(b))),
-		fn('if', 'any', { condition: dynamicAny, then: dynamicAny, else: dynamicAny }, (args) => (args.condition ? args.then : args.else)),
-		// Strings.
-		fn('contains', 'boolean', { string: dynamicAny, substring: dynamicAny }, ({ string, substring }) => text(string).includes(text(substring))),
-		fn('startsWith', 'boolean', { string: dynamicAny, prefix: dynamicAny }, ({ string, prefix }) => text(string).startsWith(text(prefix))),
-		fn('endsWith', 'boolean', { string: dynamicAny, suffix: dynamicAny }, ({ string, suffix }) => text(string).endsWith(text(suffix))),
-		fn('lower', 'string', { value: dynamicAny }, ({ value }) => text(value).toLowerCase()),
-		fn('upper', 'string', { value: dynamicAny }, ({ value }) => text(value).toUpperCase()),
-		fn('replace', 'string', { value: dynamicAny, pattern: z.string(), with: dynamicAny }, ({ value, pattern, with: replacement }) =>
-			text(value).replace(new RegExp(String(pattern), 'g'), text(replacement)),
-		),
-		fn('count', 'number', { value: dynamicAny }, ({ value }) => (typeof value === 'string' || Array.isArray(value) ? value.length : 0)),
-		fn('join', 'string', { values: dynamicAny, separator: dynamicAny.optional() }, ({ values, separator }) =>
-			list(values).map(text).filter(Boolean).join(separator === undefined ? ', ' : text(separator)),
-		),
-		// Lists; "by" is a JSON Pointer into each item ("" for the item itself).
-		fn('filter', 'array', { ...items, equals: dynamicAny }, ({ items: all, by, equals }) =>
-			list(all).filter((item) => JSON.stringify(readPointer(item, String(by ?? '')) ?? null) === JSON.stringify(equals ?? null)),
-		),
-		fn('map', 'array', items, ({ items: all, by }) => list(all).map((item) => readPointer(item, String(by ?? '')) ?? null)),
-		fn('distinct', 'array', items, ({ items: all, by }) => {
-			const seen = new Set<string>();
-			return list(all).filter((item) => {
-				const key = JSON.stringify(readPointer(item, String(by ?? '')) ?? null);
-				return seen.has(key) ? false : (seen.add(key), true);
-			});
-		}),
-		fn('sort', 'array', { ...items, descending: dynamicAny.optional() }, ({ items: all, by, descending }) =>
-			[...list(all)].sort((a, b) => {
-				const x = readPointer(a, String(by ?? ''));
-				const y = readPointer(b, String(by ?? ''));
-				const order = typeof x === 'number' && typeof y === 'number' ? x - y : text(x).localeCompare(text(y));
-				return descending ? -order : order;
-			}),
-		),
-		fn('slice', 'array', { items: dynamicAny, start: dynamicAny.optional(), end: dynamicAny.optional() }, ({ items: all, start, end }) =>
-			list(all).slice(number(start ?? 0), end === undefined || end === null ? undefined : number(end)),
-		),
-		// The host.
-		fn('can', 'boolean', { scope: z.string(), on: dynamicAny.optional() }, ({ scope, on }, context) => can(String(scope), on ?? rowOf(context)), 'Whether the viewer may use a permission scope; in a row it refines on the row.'),
-		fn('daysSince', 'number', { value: dynamicAny }, ({ value }) => {
-			const time = typeof value === 'string' || typeof value === 'number' ? new Date(value).getTime() : NaN;
-			return Number.isNaN(time) ? null : Math.floor((now.getTime() - time) / DAY);
-		}),
+		...Object.entries(pure).map(([name, run]) => fn(name, ARGS[name] ?? {}, (args) => run(args))),
+		fn('can', { scope: z.string(), on: dynamicAny.optional() }, ({ scope, on }, context) => can(String(scope), on ?? rowOf(context)), 'Whether the viewer may use a permission scope; in a row it refines on the row.'),
 		// The local action: writes the data model, where the surface is live.
-		fn('set', 'void', { target: z.string().startsWith('/'), value: dynamicAny }, ({ target, value }, context) => {
+		fn('set', { target: z.string().startsWith('/'), value: dynamicAny }, ({ target, value }, context) => {
 			context.set(String(target), value ?? null);
 		}),
 	];
@@ -170,11 +134,13 @@ export interface CatalogOptions extends CatalogContext {
 	id: string;
 	/** Host components beyond the base ones (they may replace one by name). */
 	components?: ComponentApi[];
+	/** Base components the host cannot draw. */
+	without?: string[];
 }
 
 /** The Graft catalog for one host, viewer and moment. */
-export function createGraftCatalog({ id, components = [], ...context }: CatalogOptions): Catalog<ComponentApi> {
-	const byName = new Map(BASE_COMPONENTS.map((c) => [c.name, c]));
+export function createGraftCatalog({ id, components = [], without = [], ...context }: CatalogOptions): Catalog<ComponentApi> {
+	const byName = new Map(BASE_COMPONENTS.filter((c) => !without.includes(c.name)).map((c) => [c.name, c]));
 	for (const extra of components) {
 		byName.set(extra.name, extra);
 	}

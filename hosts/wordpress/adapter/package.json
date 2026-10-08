@@ -12,6 +12,7 @@
     "surface:generate": "tsx src/cli.ts"
   },
   "dependencies": {
+    "@graft/a2ui": "workspace:*",
     "@graft/core": "workspace:*",
     "@graft/renderer-react": "workspace:*",
     "@graft/sandbox": "workspace:*"

@@ -1,7 +1,9 @@
 import type { HostGuide } from '@graft/core';
+import { a2uiNotes } from './a2ui.ts';
 
 /** What the compiler needs to know about EmDash beyond the surface. */
 export const hostGuide: HostGuide = {
+	formats: { A2UI: a2uiNotes },
 	fixtures: `A JSON object:
 {"users": [{"as": "<alias>", "role": "admin|editor|author|contributor|subscriber"}],
  "entries": [{"title": "<unique title>", "status": "draft|published|scheduled", "collection": "posts"}]}

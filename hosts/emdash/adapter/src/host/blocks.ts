@@ -94,7 +94,7 @@ export function rowKey(row: unknown, index: number): string {
 	return typeof id === 'string' || typeof id === 'number' ? String(id) : `#${index}`;
 }
 
-function button(props: Record<string, unknown>, actionId: string, widget: string | undefined, value?: string, row?: unknown): { element?: Block; action: RenderedAction } {
+export function button(props: Record<string, unknown>, actionId: string, widget: string | undefined, value?: string, row?: unknown): { element?: Block; action: RenderedAction } {
 	const onClick = props.onClick;
 	const event = widget !== undefined && isWidgetEvent(onClick) ? onClick : undefined;
 	const available = props.visible !== false && props.disabled !== true && (isAction(onClick) || event !== undefined);

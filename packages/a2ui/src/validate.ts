@@ -2,7 +2,7 @@ import type { Catalog, ComponentApi } from '@a2ui/web_core/v0_9';
 import { compileSchema, type Build, type Diagnostic, type Spec, type Surface } from '@graft/core';
 import type { z } from 'zod';
 import { createGraftCatalog, INPUT_COMPONENTS } from './catalog.ts';
-import type { A2UIHost } from './snapshot.ts';
+import type { A2UIHost } from './walk.ts';
 import type { A2UIBuild, A2UIComponent } from './types.ts';
 
 const isObject = (value: unknown): value is Record<string, unknown> => typeof value === 'object' && value !== null && !Array.isArray(value);
@@ -15,7 +15,7 @@ const dotted = (path: string) => path.split('/').some((segment) => /^[A-Za-z_]\w
 
 /** The catalog as validation sees it: no viewer, so `can` and `daysSince` never run. */
 function catalogFor(host: A2UIHost): Catalog<ComponentApi> {
-	return createGraftCatalog({ id: host.catalogId, components: host.components ?? [], can: () => false, now: new Date(0) });
+	return createGraftCatalog({ id: host.catalogId, components: host.components ?? [], without: host.without ?? [], can: () => false, now: new Date(0) });
 }
 
 /** zod issues outside dynamic values: a binding or call stands for anything its schema allows. */

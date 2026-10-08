@@ -1,0 +1,702 @@
+{
+	"graft": 1,
+	"spec": {
+		"id": "status-board",
+		"hash": "sha256:be0c7a3ea99ebdb2922afe82fd56276c46a031d4031222f5f4fb5b90feac6830"
+	},
+	"surface": {
+		"host": "emdash",
+		"hostVersion": "1.0.1",
+		"hash": "sha256:b9329970caab68a82f9e7fe44db516aa9d4dfddfe028473af619f480e85a35a0"
+	},
+	"mount": {
+		"slot": "admin.page",
+		"title": "Status board"
+	},
+	"data": {
+		"posts": {
+			"call": "content.list",
+			"input": {
+				"collection": "posts",
+				"order": "desc",
+				"limit": 100
+			}
+		}
+	},
+	"ui": {
+		"protocol": "a2ui/v0.9",
+		"catalogId": "graft:emdash",
+		"initial": {
+			"form": {
+				"status": "published"
+			}
+		},
+		"computed": {
+			"drafts": {
+				"call": "filter",
+				"args": {
+					"items": {
+						"path": "/posts/items"
+					},
+					"by": "status",
+					"equals": "draft"
+				}
+			},
+			"published": {
+				"call": "filter",
+				"args": {
+					"items": {
+						"path": "/posts/items"
+					},
+					"by": "status",
+					"equals": "published"
+				}
+			},
+			"draftCount": {
+				"call": "count",
+				"args": {
+					"value": {
+						"path": "/drafts"
+					}
+				}
+			},
+			"publishedCount": {
+				"call": "count",
+				"args": {
+					"value": {
+						"path": "/published"
+					}
+				}
+			},
+			"shown": {
+				"call": "filter",
+				"args": {
+					"items": {
+						"path": "/posts/items"
+					},
+					"by": "status",
+					"equals": {
+						"call": "if",
+						"args": {
+							"condition": {
+								"call": "equals",
+								"args": {
+									"a": {
+										"path": "/form/status"
+									},
+									"b": "published"
+								}
+							},
+							"then": "published",
+							"else": "draft"
+						}
+					}
+				}
+			}
+		},
+		"components": [
+			{
+				"id": "root",
+				"component": "Column",
+				"children": [
+					"summary",
+					"tabs",
+					"list"
+				]
+			},
+			{
+				"id": "summary",
+				"component": "Text",
+				"variant": "caption",
+				"text": {
+					"call": "formatString",
+					"args": {
+						"value": "Drafts: ${/draftCount} · Published: ${/publishedCount}"
+					}
+				}
+			},
+			{
+				"id": "tabs",
+				"component": "Row",
+				"children": [
+					"drafts",
+					"published"
+				]
+			},
+			{
+				"id": "drafts",
+				"component": "Button",
+				"child": "drafts-label",
+				"variant": {
+					"call": "if",
+					"args": {
+						"condition": {
+							"call": "equals",
+							"args": {
+								"a": {
+									"path": "/form/status"
+								},
+								"b": "draft"
+							}
+						},
+						"then": "primary",
+						"else": "default"
+					}
+				},
+				"action": {
+					"functionCall": {
+						"call": "set",
+						"args": {
+							"target": "/form/status",
+							"value": "draft"
+						}
+					}
+				}
+			},
+			{
+				"id": "drafts-label",
+				"component": "Text",
+				"text": {
+					"call": "formatString",
+					"args": {
+						"value": "Drafts (${/draftCount})"
+					}
+				}
+			},
+			{
+				"id": "published",
+				"component": "Button",
+				"child": "published-label",
+				"variant": {
+					"call": "if",
+					"args": {
+						"condition": {
+							"call": "equals",
+							"args": {
+								"a": {
+									"path": "/form/status"
+								},
+								"b": "published"
+							}
+						},
+						"then": "primary",
+						"else": "default"
+					}
+				},
+				"action": {
+					"functionCall": {
+						"call": "set",
+						"args": {
+							"target": "/form/status",
+							"value": "published"
+						}
+					}
+				}
+			},
+			{
+				"id": "published-label",
+				"component": "Text",
+				"text": {
+					"call": "formatString",
+					"args": {
+						"value": "Published (${/publishedCount})"
+					}
+				}
+			},
+			{
+				"id": "list",
+				"component": "Table",
+				"rows": {
+					"path": "/shown"
+				},
+				"fields": [
+					{
+						"id": "title",
+						"label": "Title",
+						"primary": true
+					},
+					{
+						"id": "updatedAt",
+						"label": "Last updated",
+						"type": "relative_time"
+					}
+				],
+				"rowActions": [
+					{
+						"id": "publish",
+						"label": "Publish",
+						"variant": "primary",
+						"visible": {
+							"call": "and",
+							"args": {
+								"values": [
+									{
+										"call": "equals",
+										"args": {
+											"a": {
+												"path": "/form/status"
+											},
+											"b": "draft"
+										}
+									},
+									{
+										"call": "can",
+										"args": {
+											"scope": "content.status:write"
+										}
+									}
+								]
+							}
+						},
+						"action": {
+							"event": {
+								"name": "publish",
+								"context": {
+									"id": {
+										"path": "id"
+									}
+								}
+							}
+						}
+					},
+					{
+						"id": "unpublish",
+						"label": "Unpublish",
+						"variant": "default",
+						"visible": {
+							"call": "and",
+							"args": {
+								"values": [
+									{
+										"call": "equals",
+										"args": {
+											"a": {
+												"path": "/form/status"
+											},
+											"b": "published"
+										}
+									},
+									{
+										"call": "can",
+										"args": {
+											"scope": "content.status:write"
+										}
+									}
+								]
+							}
+						},
+						"action": {
+							"event": {
+								"name": "unpublish",
+								"context": {
+									"id": {
+										"path": "id"
+									}
+								}
+							}
+						}
+					}
+				],
+				"empty": {
+					"call": "if",
+					"args": {
+						"condition": {
+							"call": "equals",
+							"args": {
+								"a": {
+									"path": "/form/status"
+								},
+								"b": "published"
+							}
+						},
+						"then": "Nothing published",
+						"else": "No drafts"
+					}
+				}
+			}
+		]
+	},
+	"events": {
+		"publish": {
+			"call": "content.publish",
+			"input": {
+				"collection": "posts",
+				"id": {
+					"$context": "id"
+				}
+			},
+			"then": [
+				"refresh:posts"
+			],
+			"notice": "Published."
+		},
+		"unpublish": {
+			"call": "content.unpublish",
+			"input": {
+				"collection": "posts",
+				"id": {
+					"$context": "id"
+				}
+			},
+			"then": [
+				"refresh:posts"
+			],
+			"notice": "Taken offline."
+		}
+	},
+	"checks": [
+		{
+			"criterion": "drafts-first",
+			"fixtures": {
+				"users": [
+					{
+						"as": "e",
+						"role": "editor"
+					}
+				],
+				"entries": [
+					{
+						"title": "Draft A",
+						"status": "draft"
+					},
+					{
+						"title": "Draft B",
+						"status": "draft"
+					},
+					{
+						"title": "Post C",
+						"status": "published"
+					}
+				]
+			},
+			"view_as": "e",
+			"expect": [
+				{
+					"rows": [
+						"Draft A",
+						"Draft B"
+					]
+				},
+				{
+					"text": "Drafts: 2 · Published: 1"
+				},
+				{
+					"action": "drafts"
+				},
+				{
+					"action": "published"
+				}
+			]
+		},
+		{
+			"criterion": "switch",
+			"fixtures": {
+				"users": [
+					{
+						"as": "e",
+						"role": "editor"
+					}
+				],
+				"entries": [
+					{
+						"title": "Draft A",
+						"status": "draft"
+					},
+					{
+						"title": "Draft B",
+						"status": "draft"
+					},
+					{
+						"title": "Post C",
+						"status": "published"
+					}
+				]
+			},
+			"view_as": "e",
+			"steps": [
+				{
+					"action": "published"
+				}
+			],
+			"expect": [
+				{
+					"rows": [
+						"Post C"
+					]
+				}
+			]
+		},
+		{
+			"criterion": "switch",
+			"fixtures": {
+				"users": [
+					{
+						"as": "e",
+						"role": "editor"
+					}
+				],
+				"entries": [
+					{
+						"title": "Draft A",
+						"status": "draft"
+					},
+					{
+						"title": "Draft B",
+						"status": "draft"
+					},
+					{
+						"title": "Post C",
+						"status": "published"
+					}
+				]
+			},
+			"view_as": "e",
+			"steps": [
+				{
+					"action": "published"
+				},
+				{
+					"action": "drafts"
+				}
+			],
+			"expect": [
+				{
+					"rows": [
+						"Draft A",
+						"Draft B"
+					]
+				}
+			]
+		},
+		{
+			"criterion": "publish",
+			"fixtures": {
+				"users": [
+					{
+						"as": "e",
+						"role": "editor"
+					}
+				],
+				"entries": [
+					{
+						"title": "Draft A",
+						"status": "draft"
+					},
+					{
+						"title": "Draft B",
+						"status": "draft"
+					},
+					{
+						"title": "Post C",
+						"status": "published"
+					}
+				]
+			},
+			"view_as": "e",
+			"steps": [
+				{
+					"action": "publish",
+					"row": {
+						"title": "Draft B"
+					}
+				}
+			],
+			"expect": [
+				{
+					"rows": [
+						"Draft A"
+					]
+				},
+				{
+					"text": "Drafts: 1 · Published: 2"
+				},
+				{
+					"entry": {
+						"title": "Draft B",
+						"status": "published"
+					}
+				}
+			]
+		},
+		{
+			"criterion": "unpublish",
+			"fixtures": {
+				"users": [
+					{
+						"as": "e",
+						"role": "editor"
+					}
+				],
+				"entries": [
+					{
+						"title": "Draft A",
+						"status": "draft"
+					},
+					{
+						"title": "Draft B",
+						"status": "draft"
+					},
+					{
+						"title": "Post C",
+						"status": "published"
+					}
+				]
+			},
+			"view_as": "e",
+			"steps": [
+				{
+					"action": "published"
+				},
+				{
+					"action": "unpublish",
+					"row": {
+						"title": "Post C"
+					}
+				}
+			],
+			"expect": [
+				{
+					"rows": []
+				},
+				{
+					"text": "Nothing published"
+				},
+				{
+					"entry": {
+						"title": "Post C",
+						"status": "draft"
+					}
+				}
+			]
+		},
+		{
+			"criterion": "contributors",
+			"fixtures": {
+				"users": [
+					{
+						"as": "c",
+						"role": "contributor"
+					}
+				],
+				"entries": [
+					{
+						"title": "Draft A",
+						"status": "draft"
+					},
+					{
+						"title": "Draft B",
+						"status": "draft"
+					},
+					{
+						"title": "Post C",
+						"status": "published"
+					}
+				]
+			},
+			"view_as": "c",
+			"expect": [
+				{
+					"rows": [
+						"Draft A",
+						"Draft B"
+					]
+				},
+				{
+					"action": "publish",
+					"row": {
+						"title": "Draft A"
+					},
+					"available": false
+				}
+			]
+		},
+		{
+			"criterion": "contributors",
+			"fixtures": {
+				"users": [
+					{
+						"as": "c",
+						"role": "contributor"
+					}
+				],
+				"entries": [
+					{
+						"title": "Draft A",
+						"status": "draft"
+					},
+					{
+						"title": "Draft B",
+						"status": "draft"
+					},
+					{
+						"title": "Post C",
+						"status": "published"
+					}
+				]
+			},
+			"view_as": "c",
+			"steps": [
+				{
+					"action": "published"
+				}
+			],
+			"expect": [
+				{
+					"rows": [
+						"Post C"
+					]
+				},
+				{
+					"action": "unpublish",
+					"row": {
+						"title": "Post C"
+					},
+					"available": false
+				}
+			]
+		}
+	],
+	"refs": {
+		"slot": "admin.page",
+		"components": {},
+		"capabilities": [
+			"content.list",
+			"content.publish",
+			"content.unpublish"
+		],
+		"scopes": [
+			"content.status:write",
+			"content:read"
+		],
+		"catalog": {
+			"Button": [
+				"action",
+				"child",
+				"variant"
+			],
+			"Column": [
+				"children"
+			],
+			"Row": [
+				"children"
+			],
+			"Table": [
+				"empty",
+				"fields",
+				"rowActions",
+				"rows"
+			],
+			"Text": [
+				"text",
+				"variant"
+			]
+		}
+	},
+	"provenance": {
+		"compiler": "graft-compiler/0.1.0",
+		"model": "claude-opus-5-5",
+		"promptHash": "sha256:4b61855ee2ce6bc935b466e80947c37c850e3fa372334ca938840308c61ad180",
+		"strategy": "regenerated",
+		"replaces": "sha256:3a2cee296781fdd5e92d512bb705610b73dc2ab75a469d07c117f365d74fcb22"
+	}
+}

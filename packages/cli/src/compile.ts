@@ -1,5 +1,5 @@
 import { readFile, writeFile } from 'node:fs/promises';
-import { compileSpec, hashSpec, validateSpec, type Build, type CompileEvent, type CompileResult, type ModelClient } from '@graft/core';
+import { compileSpec, hashSpec, uiFormatNamed, uiFormatOf, validateSpec, type Build, type CompileEvent, type CompileResult, type ModelClient } from '@graft/core';
 import { hostTools } from './hosts.ts';
 import { loadSurface } from './validate.ts';
 
@@ -12,15 +12,17 @@ export interface CompileCommandOptions {
 	attempts?: number;
 	/** A previous build of the same spec version whose checks are reused (and layout referenced). */
 	previous?: string;
+	/** Build the UI in another format than a tree (e.g. "a2ui"); default: the previous build's, else a tree. */
+	ui?: string;
 	log?(line: string): void;
 }
 
 function describe(event: CompileEvent): string {
 	switch (event.type) {
 		case 'request':
-			return `→ ${event.purpose === 'checks' ? 'writing checks from the criteria' : 'building the tree'} (attempt ${event.attempt})`;
+			return `→ ${event.purpose === 'checks' ? 'writing checks from the criteria' : 'building the UI'} (attempt ${event.attempt})`;
 		case 'rejected':
-			return `✖ ${event.purpose} attempt ${event.attempt} rejected:\n${event.problems.map((p) => `    ${p}`).join('\n')}`;
+			return `✖ ${event.purpose === 'checks' ? 'checks' : 'UI'} attempt ${event.attempt} rejected:\n${event.problems.map((p) => `    ${p}`).join('\n')}`;
 		case 'verified':
 			return event.passed ? `✔ verification passed (attempt ${event.attempt})` : `✖ verification failed (attempt ${event.attempt})`;
 	}
@@ -43,6 +45,10 @@ export async function compileFile(specFile: string, options: CompileCommandOptio
 	const host = await hostTools(surface);
 
 	const previous = options.previous ? (JSON.parse(await readFile(options.previous, 'utf8')) as Build) : undefined;
+	const format = options.ui ? uiFormatNamed(options.ui, surface.host) : previous ? uiFormatOf(previous) : undefined;
+	if (options.ui && !format) {
+		throw new Error(`No UI format "${options.ui}" for ${surface.host}.`);
+	}
 	const sandbox = options.verify === false ? undefined : await host.startSandbox();
 	try {
 		const result = await compileSpec({
@@ -52,6 +58,7 @@ export async function compileFile(specFile: string, options: CompileCommandOptio
 			model: options.model,
 			host: host.guide,
 			maxAttempts: options.attempts ?? 3,
+			...(format ? { format } : {}),
 			...(previous ? { previous, checks: previous.checks } : {}),
 			...(sandbox
 				? { verify: async (build: Build) => (await host.verify([{ build, spec, surface }], sandbox))[0]! }

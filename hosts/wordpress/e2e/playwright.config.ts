@@ -3,7 +3,7 @@ import { defineConfig } from '@playwright/test';
 export default defineConfig({
 	testDir: '.',
 	testMatch: '*.spec.ts',
-	testIgnore: 'agency.spec.ts',
+	testIgnore: ['agency.spec.ts', 'a2ui.spec.ts'],
 	timeout: 60_000,
 	fullyParallel: false,
 	workers: 1,

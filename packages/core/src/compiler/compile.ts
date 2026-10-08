@@ -2,6 +2,7 @@ import buildSchema from '../../../../schemas/build.schema.json' with { type: 'js
 import '../ajv.ts';
 import { describeSchemaError } from '../schema-errors.ts';
 import { lazyValidator, type Validator } from '../schema.ts';
+import { uiFormatOf } from '../build/format.ts';
 import { extractRefs } from '../build/refs.ts';
 import type { Build, Check } from '../build/types.ts';
 import { validateBuild } from '../build/validate.ts';
@@ -37,7 +38,9 @@ export async function compileSpec(options: CompileOptions): Promise<CompileResul
 	// Phase 1: checks.
 	let checks = options.checks;
 	if (!checks) {
-		const system = checksSystem(spec, surface, host);
+		const base = checksSystem(spec, surface, host);
+		const format = options.format ?? (options.previous ? uiFormatOf(options.previous) : undefined);
+		const system = format?.compiler?.checksSystem?.(base, spec, surface) ?? base;
 		const schema = checksOutputSchema(spec);
 		let feedback: string[] = [];
 		for (let attempt = 1; attempt <= maxAttempts && !checks; attempt++) {
@@ -69,11 +72,13 @@ export async function compileSpec(options: CompileOptions): Promise<CompileResul
 	}
 
 	// Phase 2: the UI (a tree, or the format's) and data against the frozen checks.
-	const ui = options.format?.compiler;
-	if (options.format && !ui) {
-		throw new Error(`The ${options.format.name} format has no compiler.`);
+	// Regenerating a build in another format keeps its format.
+	const format = options.format ?? (options.previous ? uiFormatOf(options.previous) : undefined);
+	const ui = format?.compiler;
+	if (format && !ui) {
+		throw new Error(`The ${format.name} format has no compiler.`);
 	}
-	const system = ui ? ui.system(spec, surface, host.formats?.[options.format!.name]) : treeSystem(spec, surface, host);
+	const system = ui ? ui.system(spec, surface, host.formats?.[format!.name]) : treeSystem(spec, surface, host);
 	const schema = ui ? ui.schema(spec, surface) : treeOutputSchema(spec, surface);
 	const surfaceHash = surface.hash ?? '';
 	let feedback: string[] = [];

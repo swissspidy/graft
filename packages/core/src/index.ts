@@ -1,5 +1,5 @@
 export { hasErrors, type Diagnostic, type Severity } from './diagnostics.ts';
-export { isTreeBuild, registerUiFormat, requireUiFormat, uiFormatOf, type UiCompiler, type UiFormat } from './build/format.ts';
+export { isTreeBuild, registerUiFormat, requireUiFormat, uiFormatNamed, uiFormatOf, type UiCompiler, type UiFormat } from './build/format.ts';
 export { ajvEngine, createAjv } from './ajv.ts';
 export { compileSchema, setSchemaEngine, type SchemaEngine, type SchemaError, type Validator } from './schema.ts';
 export { parseSpec, type ParsedSpec } from './spec/parse.ts';

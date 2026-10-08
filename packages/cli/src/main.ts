@@ -37,7 +37,8 @@ Commands:
     --out <file>       Where to write the build (default: <spec id>.build.json)
     --model <id>       Model (default: ${DEFAULT_MODEL})
     --attempts <n>     Attempts per phase (default: 3)
-    --previous <file>  Earlier build of the same spec version: reuse its checks, regenerate the tree
+    --previous <file>  Earlier build of the same spec version: reuse its checks, regenerate the UI
+    --ui a2ui          Build the UI as an A2UI surface instead of a tree
     --no-verify        Only validate candidates, do not run their checks
                        Needs ANTHROPIC_API_KEY (or an \`ant auth login\` profile).
   canary               Upgrade every tenant's customizations ahead of a host change
@@ -175,6 +176,7 @@ export async function main(argv: string[]): Promise<number> {
 				attempts: { type: 'string', default: '3' },
 				previous: { type: 'string' },
 				verify: { type: 'boolean', default: true },
+				ui: { type: 'string' },
 			},
 		});
 		const [file] = positionals;
@@ -197,6 +199,7 @@ export async function main(argv: string[]): Promise<number> {
 			verify: values.verify,
 			attempts: Number(values.attempts),
 			...(values.previous ? { previous: values.previous } : {}),
+			...(values.ui ? { ui: values.ui } : {}),
 		});
 		return result.ok ? 0 : 1;
 	}
