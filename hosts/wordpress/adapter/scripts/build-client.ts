@@ -41,8 +41,6 @@ const wordpressGlobals: Plugin = {
 	},
 };
 
-const a2uiWpSource = `${dirname(createRequire(import.meta.url).resolve('@swissspidy/a2ui-wp/package.json'))}/src/index.ts`;
-
 const options = {
 	entryPoints: {
 		runtime: fileURLToPath(new URL('../src/client/mount.tsx', import.meta.url)),
@@ -60,8 +58,6 @@ const options = {
 	sourcemap: watch ? ('inline' as const) : false,
 	legalComments: 'none' as const,
 	plugins: [wordpressGlobals],
-	// a2ui-wp draws A2UI builds. 0.1.0 was published without dist/, so bundle its sources.
-	alias: { '@swissspidy/a2ui-wp': a2uiWpSource },
 	// The sandbox endpoint is embedded as text for the in-browser sandbox.
 	loader: { '.php': 'text' as const },
 	logLevel: 'info' as const,

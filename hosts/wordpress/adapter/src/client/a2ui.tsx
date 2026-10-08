@@ -1,11 +1,9 @@
 import { useEffect, useMemo } from 'react';
-import { TextareaControl } from '@wordpress/components';
 import { createGraftCatalog, seed, tableField, withContext, type A2UIBuild } from '@graft/a2ui/client';
 import {
 	A2UIProcessor,
 	A2UIRenderer,
 	createCatalog,
-	useBoundValue,
 	useDynamicBoolean,
 	useDynamicString,
 	useProcessor,
@@ -100,7 +98,6 @@ function Table({ id, props }: A2UIComponentProps<{ rows?: { path: string }; fiel
 }
 
 const BaseButton = wordPressCatalog.Button!;
-const BaseTextField = wordPressCatalog.TextField!;
 
 /**
  * a2ui-wp's Button, marked with its action id (`actionId`, else its
@@ -115,19 +112,6 @@ function Button(props: A2UIComponentProps<{ actionId?: unknown }>) {
 	);
 }
 
-/**
- * a2ui-wp's TextField, except a long text: TextareaControl labels its own
- * instance id and ignores `id`, so a2ui-wp 0.1.0's label points at nothing.
- */
-function TextField(props: A2UIComponentProps<{ label?: unknown; value?: unknown; variant?: string }>) {
-	const label = useDynamicString(props.props.label ?? '');
-	const [value, setValue] = useBoundValue(props.props.value ?? '', (resolved) => (resolved === null || resolved === undefined ? '' : String(resolved)));
-	if (props.props.variant !== 'longText') {
-		return <BaseTextField {...props} />;
-	}
-	return <TextareaControl label={label} value={value} onChange={setValue} rows={4} __nextHasNoMarginBottom />;
-}
-
 /** The catalog's `visible`, on every component: false draws nothing. */
 const withVisible = (catalog: ComponentCatalog): ComponentCatalog =>
 	Object.fromEntries(
@@ -137,7 +121,7 @@ const withVisible = (catalog: ComponentCatalog): ComponentCatalog =>
 		]),
 	);
 
-const catalog = withVisible(createCatalog({ ...wordPressCatalog, Button, TextField, Table }));
+const catalog = withVisible(createCatalog({ ...wordPressCatalog, Button, Table }));
 
 /**
  * The A2UI processor for one mounted build, on the Graft catalog for this
