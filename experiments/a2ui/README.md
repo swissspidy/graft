@@ -28,8 +28,10 @@ What stays here is evidence:
 - [`specs/submit-for-review.md`](specs/submit-for-review.md) and
   [`wizard/`](wizard/): a two-step flow, compiled end to end (checks phase
   included). The first run hit a catalog gap (row actions could not be
-  local actions). The second passed all nine checks, with a bug the checks
-  cannot see: `initial` picks post 41.
+  local actions). The second (`second-run.json`) passed all nine checks,
+  with a bug the checks cannot see: `initial` picks post 41. The validator
+  now refuses that (`a2ui-initial-row-value`); the third run, reusing the
+  checks, passed on its first attempt and starts with nothing chosen.
 
 ## What the runs showed, in order
 

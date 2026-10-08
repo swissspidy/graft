@@ -233,6 +233,18 @@ export function validateA2UI(value: Build, surface: Surface, host: A2UIHost, spe
 		});
 	}
 
+	// What a row writes cannot start as a literal: `initial` would name a row of some other site's data.
+	for (const target of rowWrittenTargets(build.ui)) {
+		const start = pointerIn(build.ui.initial, target);
+		if (start !== undefined && start !== null && start !== '' && start !== 0 && start !== false) {
+			error(
+				'a2ui-initial-row-value',
+				`/ui/initial${target}`,
+				`"${target}" is set from a row, so it cannot start as ${JSON.stringify(start)}: that value comes from data this build was written against, not the site's. Start it empty (null).`,
+			);
+		}
+	}
+
 	// `can` checks scopes the surface has.
 	const scopes = new Set<string>();
 	collectScopes(build.ui, scopes);
@@ -255,4 +267,27 @@ export function collectScopes(value: unknown, into: Set<string>): Set<string> {
 		Object.values(value).forEach((item) => collectScopes(item, into));
 	}
 	return into;
+}
+
+/** Pointers a local `set` writes from a row's own field ({"path": "id"} in a row's scope). */
+function rowWrittenTargets(value: unknown, into = new Set<string>()): Set<string> {
+	if (Array.isArray(value)) {
+		value.forEach((item) => rowWrittenTargets(item, into));
+	} else if (isObject(value)) {
+		const args = value.call === 'set' && isObject(value.args) ? value.args : undefined;
+		if (args && typeof args.target === 'string' && isBinding(args.value) && !args.value.path.startsWith('/')) {
+			into.add(args.target);
+		}
+		Object.values(value).forEach((item) => rowWrittenTargets(item, into));
+	}
+	return into;
+}
+
+/** The value at an absolute JSON Pointer, or undefined. */
+function pointerIn(value: unknown, pointer: string): unknown {
+	return pointer
+		.split('/')
+		.slice(1)
+		.map((part) => part.replace(/~1/g, '/').replace(/~0/g, '~'))
+		.reduce<unknown>((at, key) => (isObject(at) || Array.isArray(at) ? (at as Record<string, unknown>)[key] : undefined), value);
 }

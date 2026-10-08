@@ -111,6 +111,21 @@ describe('A2UI builds', () => {
 		);
 	});
 
+	it('are refused when what a row writes starts as a literal row value', async () => {
+		const choose = (initial: unknown) =>
+			a2uiBuild((b) => {
+				b.ui.initial = { form: { chosen: initial } };
+				const action = (b.ui.components[2]!.rowActions as Array<Record<string, unknown>>)[0]!;
+				action.action = { functionCall: { call: 'set', args: { target: '/form/chosen', value: { path: 'id' } } } };
+				b.events = {};
+			});
+		const codes = async (initial: unknown) => (await validateBuild(await choose(initial), surface)).diagnostics.map((d) => `${d.code} ${d.path}`);
+		// A submit-for-review compile opened at post 41's confirm step wherever post 41 was a draft.
+		expect(await codes(41)).toContain('a2ui-initial-row-value /ui/initial/form/chosen');
+		expect(await codes(null)).not.toContain('a2ui-initial-row-value /ui/initial/form/chosen');
+		expect(await codes(0)).not.toContain('a2ui-initial-row-value /ui/initial/form/chosen');
+	});
+
 	it('need approval, not rejection, when an upgrade makes their calls need more scopes', async () => {
 		const build = await a2uiBuild();
 		const narrow = { ...spec, manifest: { ...spec.manifest, permissions: ['items:read'] } };
