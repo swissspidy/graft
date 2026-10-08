@@ -139,6 +139,32 @@ describe('compileSpec', () => {
 		expect(result.build!.checks).toEqual(first.checks);
 	});
 
+	it('rejects checks that view as a user missing from their fixtures, before any tree', async () => {
+		const model = scripted({
+			checks: [{ unverifiable: [], checks: [...goodChecks.checks.slice(0, 3), check('empty', [{ text: 'All done' }], [], 'admin', [])] }, goodChecks],
+			tree: [tree(listProps, { status: 'open' })],
+		});
+		const result = await compileSpec({ spec, specHash, surface, model, host, verify });
+		expect(result.ok).toBe(true);
+		expect(result.attempts[0]!.problems).toEqual([
+			'Check 4 (empty) views as "admin", who is not in its fixtures\' users; add that user or view as one of them.',
+		]);
+		expect(result.attempts.filter((a) => a.phase === 'tree')).toHaveLength(1);
+	});
+
+	it('rejects checks that view as someone when their fixtures have no users at all', async () => {
+		const noUsers = { ...check('empty', [{ text: 'All done' }], [], 'm', []), fixtures_json: JSON.stringify({ items: [] }) };
+		const model = scripted({
+			checks: [{ unverifiable: [], checks: [...goodChecks.checks.slice(0, 3), noUsers] }, goodChecks],
+			tree: [tree(listProps, { status: 'open' })],
+		});
+		const result = await compileSpec({ spec, specHash, surface, model, host, verify });
+		expect(result.ok).toBe(true);
+		expect(result.attempts[0]!.problems).toEqual([
+			'Check 4 (empty) views as "m", who is not in its fixtures\' users; add that user or view as one of them.',
+		]);
+	});
+
 	it('gives up after the attempt budget and returns the last candidate', async () => {
 		const model = scripted({ checks: [goodChecks], tree: [tree(listProps, {}), tree(listProps, {})] });
 		const result = await compileSpec({ spec, specHash, surface, model, host, verify, maxAttempts: 2 });

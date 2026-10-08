@@ -94,7 +94,7 @@ describe('renderTree', () => {
 describe('semantics', () => {
 	it('reads what the Block Kit translation shows', () => {
 		const snapshot = snapshotTree(table, ctx([entry('a', 'Draft A', true), entry('b', 'Draft B', false)], { 'content.status:write': true }), semantics);
-		expect(snapshot.texts).toEqual(['Queue', 'Draft A', 'Draft B']);
+		expect(snapshot.texts).toEqual(['Queue', 'Draft A', 'Ada', 'Publish', 'Draft B', 'Ada']);
 		expect(snapshot.tables[0]!.columns).toEqual(['Title', 'Author']);
 		expect(snapshot.tables[0]!.rows.map((r) => [r.label, r.actions[0]!.available])).toEqual([
 			['Draft A', true],

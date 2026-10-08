@@ -19,9 +19,10 @@ const CHECK_VOCABULARY = `A check proves one acceptance criterion. It seeds its 
 - steps: [{"action": "<action id>", "row": {<fields identifying the row, e.g. "title": "Draft A">}}], or, to type into a widget's input, {"fill": "<input id>", "value": "<text>" (true/false for a checkbox), "row": {...}}
 - expectations (each an object):
   {"rows": ["label", ...]}: the labels (primary field) of the listed rows, in any order; [] for none.
-  {"columns": ["Label", ...]}: the column labels, in order.
+  {"columns": ["Label", ...]}: every column label, in order (the whole list, not just the ones a criterion names; use "cell" to check one column).
+  rows and columns read the first table shown, so a tree (or widget) the checks list rows in shows that table first and draws choices such as filters as buttons, not as another table.
   {"text": "..."}: this text is shown somewhere.
-  {"action": "<action id>", "row": {...}, "available": true|false}: whether the action is available (for that row).
+  {"action": "<action id>", "row": {...}, "available": true|false}: whether the action is available (for that row). Only a table row's actions have a row; a button outside a table has none, so give each such button its own action id (e.g. "author-alice") and leave "row" out.
   {"cell": {"row": {...}, "column": "Label", "text": "...", "tone": "..."}}: what a table cell shows for that row (text: contained; tone: the mark, when the column has one).
   {"input": "<input id>", "value": <value>, "row": {...}}: what a widget's input shows.
   plus the host assertions below.
@@ -140,7 +141,7 @@ function functionsGuide(limits: NonNullable<Surface['functions']>['limits']): st
 function widgetsGuide(widgets: NonNullable<NonNullable<Surface['functions']>['widgets']>): string {
 	return `Interactive widgets (use only when the spec needs state that changes as the viewer clicks, e.g. filtering or switching views):
 - A "widget" node names two functions from "code": {"type": "widget", "props": {"render": "draw", "update": "choose", "input": {"$data": "queue.items"}, "state": {"author": null}}}.
-- render(input, state) returns a tree of nodes {type, props, children} using only: ${widgets.components.join(', ')}; at most ${widgets.maxNodes} nodes. Props are plain data (no expressions); give every button an "id" the checks can use.
+- render(input, state) returns a tree of nodes {type, props, children} using only: ${widgets.components.join(', ')}; at most ${widgets.maxNodes} nodes. "children" follows the component's children rule above: leave it out where it is "none", a single string (not a list) where it is "text", a list of nodes where it is "any". Props are plain data (no expressions); give every button an "id" the checks can use.
 - A button's onClick is {"$event": "name", "payload": <data>}: clicking it calls update(state, "name", payload, input), which returns the next state, and render draws again.
 - To change something, declare the action on the widget node: "actions": {"approve": {"call": {"$call": ..., "input": {"id": {"$field": "id"}}, "then": ["refresh:<source>"]}, "visible": {"$can": ...}}}, with "input" a list of records that have an "id". A drawn button then uses it with onClick {"$use": "approve", "row": <row id>}; in a table's actions, {"$use": "approve"} applies to each row. Code can only offer a declared action on a row of the input; it can never call a capability itself.
 - Checks click widget buttons with steps: {"action": "<button id>"}.${
