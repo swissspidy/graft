@@ -1,7 +1,7 @@
 import { readdirSync, readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
-import { answerA2UI, assembleA2UI, type A2UIBuild } from '@graft/a2ui';
-import { validateBuild, validateSpec, type Build, type Surface } from '@graft/core';
+import { answerA2UI, assembleA2UI, type A2UIBuild } from '@swissspidy/graft-a2ui';
+import { validateBuild, validateSpec, type Build, type Surface } from '@swissspidy/graft-core';
 import '../src/host/a2ui.ts';
 
 // Tests run from the repository root.

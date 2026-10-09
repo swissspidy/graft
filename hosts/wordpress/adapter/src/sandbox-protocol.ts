@@ -1,4 +1,4 @@
-import { SandboxCallError, type Sandbox } from '@graft/core';
+import { SandboxCallError, type Sandbox } from '@swissspidy/graft-core';
 import type { HostDump } from './surface-types.ts';
 
 /**

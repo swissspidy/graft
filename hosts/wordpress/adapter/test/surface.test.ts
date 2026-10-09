@@ -1,7 +1,7 @@
 import { readFileSync, readdirSync } from 'node:fs';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
-import { hashSpec, validateBuild, validateSpec, validateSurface, type Surface } from '@graft/core';
+import { hashSpec, validateBuild, validateSpec, validateSurface, type Surface } from '@swissspidy/graft-core';
 import { assembleSurface, paths, type HostDump } from '../src/index.ts';
 
 const examplesDir = join(import.meta.dirname, '../../../../examples/specs');

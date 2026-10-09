@@ -9,7 +9,7 @@
     ".": "./src/index.ts"
   },
   "dependencies": {
-    "@graft/core": "workspace:*"
+    "@swissspidy/graft-core": "workspace:*"
   },
   "peerDependencies": {
     "react": "^18 || ^19"

@@ -14,8 +14,8 @@
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.129.0",
-    "@graft/a2ui": "workspace:*",
-    "@graft/core": "workspace:*"
+    "@swissspidy/graft-a2ui": "workspace:*",
+    "@swissspidy/graft-core": "workspace:*"
   },
   "peerDependencies": {
     "emdash": "^1.0.1"

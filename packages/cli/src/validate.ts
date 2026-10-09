@@ -1,6 +1,6 @@
 import { readdir, readFile, stat } from 'node:fs/promises';
 import { isAbsolute, join, relative } from 'node:path';
-import { validateSpec, validateSurface, type Diagnostic, type Spec, type Surface } from '@graft/core';
+import { validateSpec, validateSurface, type Diagnostic, type Spec, type Surface } from '@swissspidy/graft-core';
 
 export interface FileResult {
 	file: string;

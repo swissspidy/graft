@@ -3,7 +3,7 @@ import { createRoot } from 'react-dom/client';
 import apiFetch from '@wordpress/api-fetch';
 import { Notice as WPNotice } from '@wordpress/components';
 import { GraftRoot, type Gateway, type Notice, type UiRootProps } from '@graft/renderer-react';
-import type { Build } from '@graft/core/runtime';
+import type { Build } from '@swissspidy/graft-core/runtime';
 import { createCan } from '../can.ts';
 
 export { createCan };

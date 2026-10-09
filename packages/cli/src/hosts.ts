@@ -1,4 +1,4 @@
-import type { Build, CanaryOptions, CanaryReport, CorpusEntry, HostGuide, Sandbox, Spec, Surface, Verification } from '@graft/core';
+import type { Build, CanaryOptions, CanaryReport, CorpusEntry, HostGuide, Sandbox, Spec, Surface, Verification } from '@swissspidy/graft-core';
 
 /**
  * The host adapters the CLI can drive: a compiler guide, a verification

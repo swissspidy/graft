@@ -1,6 +1,6 @@
 import { readdir, readFile } from 'node:fs/promises';
 import { join } from 'node:path';
-import { runCanary, validateSpec, verifyBuild, type Build, type CanaryOptions, type CanaryReport, type CorpusEntry, type Migration, type Surface, type UpgradeOutcome } from '@graft/core';
+import { runCanary, validateSpec, verifyBuild, type Build, type CanaryOptions, type CanaryReport, type CorpusEntry, type Migration, type Surface, type UpgradeOutcome } from '@swissspidy/graft-core';
 import { createCan } from '../host/can.ts';
 import type { HostPatch } from '../host/patch.ts';
 import '../host/a2ui.ts';

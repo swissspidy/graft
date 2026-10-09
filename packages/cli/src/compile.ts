@@ -1,5 +1,5 @@
 import { readFile, writeFile } from 'node:fs/promises';
-import { compileSpec, hashSpec, validateSpec, type Build, type CompileEvent, type CompileResult, type ModelClient } from '@graft/core';
+import { compileSpec, hashSpec, validateSpec, type Build, type CompileEvent, type CompileResult, type ModelClient } from '@swissspidy/graft-core';
 import { hostTools } from './hosts.ts';
 import { loadSurface } from './validate.ts';
 

@@ -1,5 +1,5 @@
 import type { Catalog, ComponentApi } from '@a2ui/web_core/v0_9';
-import { compileSchema, type Build, type Diagnostic, type Spec, type Surface } from '@graft/core';
+import { compileSchema, type Build, type Diagnostic, type Spec, type Surface } from '@swissspidy/graft-core';
 import type { z } from 'zod';
 import { createGraftCatalog, INPUT_COMPONENTS } from './catalog.ts';
 import type { A2UIHost } from './walk.ts';

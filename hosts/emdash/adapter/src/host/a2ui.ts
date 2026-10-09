@@ -1,5 +1,5 @@
-import { createA2UIFormat, INPUT_GROUP, walkA2UI, type A2UIBuild, type A2UIFormatHost, type DrawnButton } from '@graft/a2ui';
-import { registerUiFormat, type Build, type EvalContext } from '@graft/core';
+import { createA2UIFormat, INPUT_GROUP, walkA2UI, type A2UIBuild, type A2UIFormatHost, type DrawnButton } from '@swissspidy/graft-a2ui';
+import { registerUiFormat, type Build, type EvalContext } from '@swissspidy/graft-core';
 import { button, rowKey, toneMarkers, type Block, type Rendered, type RenderedAction, type Tone } from './blocks.ts';
 
 /**

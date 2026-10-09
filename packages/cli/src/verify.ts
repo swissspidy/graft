@@ -1,6 +1,6 @@
 import { mkdir, readdir, readFile, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
-import { hashSpec, validateBuild, validateSpec, type Build, type Spec, type Surface, type Verification } from '@graft/core';
+import { hashSpec, validateBuild, validateSpec, type Build, type Spec, type Surface, type Verification } from '@swissspidy/graft-core';
 import { hostTools, loadHostFormats } from './hosts.ts';
 import { loadSurface } from './validate.ts';
 

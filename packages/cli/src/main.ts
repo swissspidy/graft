@@ -6,7 +6,7 @@ import { canaryCommand } from './canary.ts';
 import { compileFile } from './compile.ts';
 import { emdashSiteInstall, emdashSitePull, emdashSiteVerify } from './site-emdash.ts';
 import { sitePull, siteVerify, type Site } from './site.ts';
-import { formatCanaryReport } from '@graft/core';
+import { formatCanaryReport } from '@swissspidy/graft-core';
 import { formatVerification, verifyFiles } from './verify.ts';
 import { formatResults, loadSurface, validateFiles } from './validate.ts';
 

@@ -1,7 +1,7 @@
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
-import { describeCheck, type Build } from '@graft/core';
+import { describeCheck, type Build } from '@swissspidy/graft-core';
 import { describers } from '../src/index.ts';
 
 const build = JSON.parse(readFileSync(join(import.meta.dirname, '../../../../examples/builds/review-queue.json'), 'utf8')) as Build;

@@ -1,4 +1,4 @@
-import type { CheckDescribers } from '@graft/core/runtime';
+import type { CheckDescribers } from '@swissspidy/graft-core/runtime';
 
 /** Plain-language describers for WordPress fixtures and host assertions. */
 

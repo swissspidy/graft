@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { applyMigrations, compileSpec, extractRefs, hashSurface, modelAnswers, registerUiFormat, validateBuild, verifyBuild, type Build, type CompileOptions } from '@graft/core';
+import { applyMigrations, compileSpec, extractRefs, hashSurface, modelAnswers, registerUiFormat, validateBuild, verifyBuild, type Build, type CompileOptions } from '@swissspidy/graft-core';
 import { createCan, fakeSandbox, fixtures, format, pageBuild, spec, surface } from '../../core/test/fixtures/acme.ts';
 import { answerA2UI, assembleA2UI, createA2UIFormat, type A2UIBuild } from '../src/index.ts';
 

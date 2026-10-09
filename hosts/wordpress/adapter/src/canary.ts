@@ -11,7 +11,7 @@ import {
 	type Migration,
 	type Surface,
 	type UpgradeOutcome,
-} from '@graft/core';
+} from '@swissspidy/graft-core';
 import { createCan } from './can.ts';
 import { playgroundVersion } from './playground.ts';
 import { startSandbox, type WordPressSandbox } from './sandbox.ts';

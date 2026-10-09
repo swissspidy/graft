@@ -1,5 +1,5 @@
 import { fileURLToPath } from 'node:url';
-import { formatCanaryReport, type Build, type Surface, type Value } from '@graft/core';
+import { formatCanaryReport, type Build, type Surface, type Value } from '@swissspidy/graft-core';
 import { loadCorpus, runEmDashCanary, scenarios } from './canary.ts';
 import { loadSurface } from './examples.ts';
 import { startSandbox } from './sandbox.ts';

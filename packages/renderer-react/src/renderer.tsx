@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState, type ComponentType } from 'react';
-import { evaluate, isAction, removeRow, type Action, type Build, type EvalContext } from '@graft/core/runtime';
+import { evaluate, isAction, removeRow, type Action, type Build, type EvalContext } from '@swissspidy/graft-core/runtime';
 
 export { removeRow };
 

@@ -1,4 +1,4 @@
-import { hashSurface, validateSurface } from '@graft/core';
+import { hashSurface, validateSurface } from '@swissspidy/graft-core';
 import { readFile } from 'node:fs/promises';
 import { describe, expect, it } from 'vitest';
 import { hostSurface } from '../src/host/surface.ts';

@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import apiFetch from '@wordpress/api-fetch';
 import { Button, Notice } from '@wordpress/components';
-import { compileSpec, hashSpec, validateSpec, type Build, type CompileEvent, type ModelClient, type Spec, type Surface, type Verification } from '@graft/core';
+import { compileSpec, hashSpec, validateSpec, type Build, type CompileEvent, type ModelClient, type Spec, type Surface, type Verification } from '@swissspidy/graft-core';
 import { hostGuide } from '../guide.ts';
 
 /**

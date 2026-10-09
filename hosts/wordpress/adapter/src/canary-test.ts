@@ -1,6 +1,6 @@
 import { readFile } from 'node:fs/promises';
 import { fileURLToPath } from 'node:url';
-import { formatCanaryReport, type Build, type Surface, type Value } from '@graft/core';
+import { formatCanaryReport, type Build, type Surface, type Value } from '@swissspidy/graft-core';
 import './a2ui.ts';
 import { loadCorpus, runWordPressCanary, scenarios } from './canary.ts';
 import { paths } from './playground.ts';

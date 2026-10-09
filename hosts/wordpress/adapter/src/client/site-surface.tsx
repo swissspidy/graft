@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import apiFetch from '@wordpress/api-fetch';
 import { Button, Notice, Spinner } from '@wordpress/components';
-import { hasErrors, upgradeBuild, validateSpec, validateSurface, type Build, type Surface, type UpgradeResult, type Verification } from '@graft/core';
+import { hasErrors, upgradeBuild, validateSpec, validateSurface, type Build, type Surface, type UpgradeResult, type Verification } from '@swissspidy/graft-core';
 import { assembleSurface } from '../assemble.ts';
 import type { HostDump } from '../surface-types.ts';
 

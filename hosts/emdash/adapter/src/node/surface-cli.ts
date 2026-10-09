@@ -1,6 +1,6 @@
 import { readFile, writeFile } from 'node:fs/promises';
 import { fileURLToPath } from 'node:url';
-import { hashSurface, validateSurface, type Surface } from '@graft/core';
+import { hashSurface, validateSurface, type Surface } from '@swissspidy/graft-core';
 import { hostSurface } from '../host/surface.ts';
 import { emdashVersion } from '../index.ts';
 

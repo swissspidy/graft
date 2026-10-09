@@ -56,7 +56,7 @@ The core now validates through a schema engine
 - **Lazy compilation.** Nothing compiles at import time; validators are
   compiled on first use and cached per schema.
 - **Ajv stays the default engine.**
-- **A second engine for sandboxes.** `@graft/core/cfworker`, built on
+- **A second engine for sandboxes.** `@swissspidy/graft-core/cfworker`, built on
   `@cfworker/json-schema`, generates no code. It maps errors to Ajv's
   shape, so diagnostics read the same.
 - **A workerd workaround.** Under workerd, cfworker resolves `$ref`

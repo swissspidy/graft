@@ -1,5 +1,5 @@
 import { hasPermission } from '../host/permissions.ts';
-import { compileSchema, evaluate, extractRefs, validateSpec, type Build, type Surface } from '@graft/core';
+import { compileSchema, evaluate, extractRefs, validateSpec, type Build, type Surface } from '@swissspidy/graft-core';
 import { findAction, readValue, withState, type Block, type Rendered } from '../host/blocks.ts';
 import { nextA2UIState, renderA2UI } from '../host/a2ui.ts';
 import { createCan } from '../host/can.ts';

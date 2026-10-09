@@ -1,4 +1,4 @@
-import type { Capability, JsonSchema, Scope, Slot, Surface } from '@graft/core';
+import type { Capability, JsonSchema, Scope, Slot, Surface } from '@swissspidy/graft-core';
 
 /**
  * The EmDash host surface: where builds mount, what they may call and the

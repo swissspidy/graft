@@ -12,8 +12,8 @@
     "surface:generate": "tsx src/cli.ts"
   },
   "dependencies": {
-    "@graft/a2ui": "workspace:*",
-    "@graft/core": "workspace:*",
+    "@swissspidy/graft-a2ui": "workspace:*",
+    "@swissspidy/graft-core": "workspace:*",
     "@graft/renderer-react": "workspace:*"
   },
   "devDependencies": {

@@ -1,4 +1,4 @@
-import type { Build, EventBinding } from '@graft/core';
+import type { Build, EventBinding } from '@swissspidy/graft-core';
 
 export type { EventBinding };
 

@@ -1,4 +1,4 @@
-import { extractRefs, hashSpec, nextSpecState, validateBuild, validateSpec, type Build, type Diagnostic, type SpecEvent, type SpecState, type Surface, type Verification } from '@graft/core';
+import { extractRefs, hashSpec, nextSpecState, validateBuild, validateSpec, type Build, type Diagnostic, type SpecEvent, type SpecState, type Surface, type Verification } from '@swissspidy/graft-core';
 
 /**
  * Customizations, stored in the plugin's KV. One record per spec id, with

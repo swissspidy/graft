@@ -1,6 +1,6 @@
 import { readdir, readFile } from 'node:fs/promises';
 import { fileURLToPath } from 'node:url';
-import { hashSpec, validateSpec, type Build, type Surface, type Verification } from '@graft/core';
+import { hashSpec, validateSpec, type Build, type Surface, type Verification } from '@swissspidy/graft-core';
 import './a2ui.ts';
 import { verifyInWordPress } from './verify.ts';
 
@@ -63,4 +63,4 @@ export async function exampleFixtures(options: { verifyAgainst?: Surface; dir?: 
 	return fixtures;
 }
 
-export { modelAnswers } from '@graft/core';
+export { modelAnswers } from '@swissspidy/graft-core';

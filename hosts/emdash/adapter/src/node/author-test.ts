@@ -1,6 +1,6 @@
 import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
-import { modelAnswers } from '@graft/core';
+import { modelAnswers } from '@swissspidy/graft-core';
 import { loadExamples, ROOT } from './examples.ts';
 import { saveSettings, startModelStub } from './model-stub.ts';
 import { asUser, login, pluginRoute, startEmDash } from './server.ts';

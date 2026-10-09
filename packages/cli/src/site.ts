@@ -1,6 +1,6 @@
 import { mkdir, readdir, readFile, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
-import { hashSpec, validateSpec, type Build, type Surface, type Verification } from '@graft/core';
+import { hashSpec, validateSpec, type Build, type Surface, type Verification } from '@swissspidy/graft-core';
 
 /** A WordPress site with the Graft plugin, reached with an application password. */
 export interface Site {
