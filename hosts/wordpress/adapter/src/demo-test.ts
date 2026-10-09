@@ -3,7 +3,7 @@ import { createServer } from 'node:http';
 import { mkdtemp, readFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { extname, join } from 'node:path';
-import { chromium } from '@playwright/test';
+import { chromium, expect } from '@playwright/test';
 import { DEFAULT_PHP, PLAYGROUND_CLI } from './playground.ts';
 
 /**
@@ -48,15 +48,21 @@ try {
 		playground.on('exit', (code) => reject(new Error(`Playground exited with ${code}`)));
 	});
 
-	const browser = await chromium.launch();
+	const browser = await chromium.launch(process.env.CHROMIUM ? { executablePath: process.env.CHROMIUM } : {});
 	const page = await browser.newPage();
 	const login = async (user: string) => {
 		await page.context().clearCookies();
 		await page.goto(`http://127.0.0.1:${site}/wp-login.php`);
-		await page.fill('#user_login', user);
-		await page.fill('#user_pass', 'password');
-		await page.click('#wp-submit');
-		await page.waitForURL(/wp-admin/);
+		// WordPress can reset the password field just after it is filled (see e2e/login.ts): retry until the admin is reached.
+		await expect(async () => {
+			if (/\/wp-admin\//.test(page.url())) {
+				return;
+			}
+			await page.fill('#user_login', user, { timeout: 5_000 });
+			await page.fill('#user_pass', 'password', { timeout: 5_000 });
+			await page.click('#wp-submit', { timeout: 5_000 });
+			await page.waitForURL(/wp-admin/, { waitUntil: 'domcontentloaded', timeout: 20_000 });
+		}).toPass({ timeout: 90_000 });
 	};
 	await login('admin');
 	await page.goto(`http://127.0.0.1:${site}/wp-admin/index.php`);
@@ -86,8 +92,9 @@ try {
 	);
 	await check('stale drafts shows a draft untouched for 45 days', () => widget('stale-drafts').getByText('45', { exact: true }).waitFor({ timeout: 30_000 }));
 	await check('pending by author filters by author', async () => {
-		await widget('pending-by-author').locator('[data-graft-action="author-grace-hopper"]').click({ timeout: 30_000 });
-		// The widget redraws once its update has run: wait for Ada's post to go.
+		// Author buttons' action ids are "author-" and the lowercased display name.
+		await widget('pending-by-author').locator('[data-graft-action="author-grace hopper"]').click({ timeout: 30_000 });
+		// The list filters locally: wait for Ada's post to go.
 		await widget('pending-by-author').locator('tbody tr', { hasText: 'BUDGET SHOWDOWN' }).waitFor({ state: 'detached', timeout: 30_000 });
 		await widget('pending-by-author').locator('tbody tr', { hasText: 'Library hours' }).waitFor();
 	});
