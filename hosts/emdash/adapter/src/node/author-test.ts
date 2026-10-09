@@ -27,8 +27,8 @@ const texts = (blocks?: Block[]) => JSON.stringify(blocks ?? []);
 
 const example = (await loadExamples()).find((e) => e.name === 'publish-queue')!;
 const target = example.build;
-const wrong = modelAnswers(target, { queue: { collection: 'posts', status: 'pending', order: 'asc' } }).tree;
-const outputs = [modelAnswers(target).checks, wrong, modelAnswers(target).tree];
+const wrong = modelAnswers(target, { queue: { collection: 'posts', status: 'pending', order: 'asc' } }).ui;
+const outputs = [modelAnswers(target).checks, wrong, modelAnswers(target).ui];
 
 const stub = await startModelStub(outputs);
 const { requests } = stub;
@@ -75,9 +75,9 @@ try {
 	const retryPrompt = JSON.stringify((requests[2]!.body as { messages?: unknown }).messages);
 	check('the rejection is fed back to the model', retryPrompt.includes('must be one of') && !JSON.stringify((requests[1]!.body as { messages?: unknown }).messages).includes('must be one of'), retryPrompt.slice(0, 2000));
 
-	const { specs } = await pluginRoute<{ specs: Array<{ id: string; versions: Array<{ state: string; build?: { tree?: unknown; ui?: { catalogId?: string } } }> }> }>(site, 'specs');
+	const { specs } = await pluginRoute<{ specs: Array<{ id: string; versions: Array<{ state: string; build?: { ui?: { catalogId?: string } } }> }> }>(site, 'specs');
 	const draft = specs.find((s) => s.id === 'publish-queue')?.versions.at(-1);
-	check('the draft holds the compiled build, an A2UI surface', draft?.state === 'draft' && draft.build?.ui?.catalogId === 'graft:emdash' && draft.build.tree === undefined, draft);
+	check('the draft holds the compiled build, an A2UI surface', draft?.state === 'draft' && draft.build?.ui?.catalogId === 'graft:emdash', draft);
 
 	const verified = await promisify(execFile)('pnpm', ['-s', 'graft', 'site', 'verify', '--site', site.url, '--token', site.token], { cwd: ROOT, maxBuffer: 1 << 24 }).then(
 		(r) => r.stdout,

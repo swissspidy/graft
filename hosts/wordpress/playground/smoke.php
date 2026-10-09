@@ -507,9 +507,6 @@ $forged['hash']        = 'sha256:' . str_repeat( 'a', 64 );
 $forged['fingerprint'] = 'sha256:' . str_repeat( 'b', 64 );
 $stored                = Graft\store_site_surface( $forged );
 check( 'a site surface must describe this site', is_wp_error( $stored ) && 'graft_invalid_surface' === $stored->get_error_code() );
-$forged['fingerprint'] = Graft\host_fingerprint();
-$forged['components']  = array( 'script' => array( 'props' => array() ) );
-check( "a site surface must carry the plugin's components", is_wp_error( Graft\store_site_surface( $forged ) ) );
 // Earlier checks filter the host's surface, so give the shipped snapshot this host's fingerprint.
 $same                = $known;
 $same['fingerprint'] = Graft\host_fingerprint();

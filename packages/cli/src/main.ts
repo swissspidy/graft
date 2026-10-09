@@ -38,8 +38,6 @@ Commands:
     --model <id>       Model (default: ${DEFAULT_MODEL})
     --attempts <n>     Attempts per phase (default: 3)
     --previous <file>  Earlier build of the same spec version: reuse its checks, regenerate the UI
-    --ui <format>      a2ui or tree (default: the previous build's format, else
-                       the host's: a2ui on WordPress and EmDash)
     --no-verify        Only validate candidates, do not run their checks
                        Needs ANTHROPIC_API_KEY (or an \`ant auth login\` profile).
   canary               Upgrade every tenant's customizations ahead of a host change
@@ -177,7 +175,6 @@ export async function main(argv: string[]): Promise<number> {
 				attempts: { type: 'string', default: '3' },
 				previous: { type: 'string' },
 				verify: { type: 'boolean', default: true },
-				ui: { type: 'string' },
 			},
 		});
 		const [file] = positionals;
@@ -200,7 +197,6 @@ export async function main(argv: string[]): Promise<number> {
 			verify: values.verify,
 			attempts: Number(values.attempts),
 			...(values.previous ? { previous: values.previous } : {}),
-			...(values.ui ? { ui: values.ui } : {}),
 		});
 		return result.ok ? 0 : 1;
 	}

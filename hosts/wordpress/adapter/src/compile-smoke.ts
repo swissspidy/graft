@@ -9,7 +9,7 @@ import { verifyInWordPress } from './verify.ts';
 /**
  * Runs the whole compile pipeline against a real WordPress sandbox with a
  * scripted model (no API key needed): the model replays the review-queue
- * build (an A2UI surface, the host's format for new builds) as structured
+ * build (an A2UI surface) as structured
  * output, but its first answer omits the status filter. The compiler must
  * reject that candidate in verification, feed the failure back, and accept
  * the second.
@@ -22,7 +22,7 @@ const spec = validateSpec(source, { surface }).spec!;
 
 const answers = {
 	checks: [modelAnswers(handwritten).checks],
-	tree: [modelAnswers(handwritten, { queue: { orderby: 'date', order: 'asc' } }).tree, modelAnswers(handwritten).tree],
+	ui: [modelAnswers(handwritten, { queue: { orderby: 'date', order: 'asc' } }).ui, modelAnswers(handwritten).ui],
 };
 const prompts: string[] = [];
 const model: ModelClient = {
@@ -45,41 +45,12 @@ try {
 	});
 	const failures: string[] = [];
 	if (!result.ok) failures.push('the compile did not succeed');
-	if (result.attempts.filter((a) => a.phase === 'tree').length !== 2) failures.push('expected exactly two UI attempts');
-	if (!result.build?.ui || result.build.tree) failures.push('the build is not an A2UI surface');
+	if (result.attempts.filter((a) => a.phase === 'ui').length !== 2) failures.push('expected exactly two UI attempts');
+	if (!result.build?.ui) failures.push('the build is not an A2UI surface');
 	if (!prompts[2]?.includes('Check for "pending-only"')) failures.push('the verification failure was not fed back');
 	if (JSON.stringify(result.build?.data) !== JSON.stringify(handwritten.data)) failures.push('the accepted build is not the corrected one');
 	console.log(failures.length ? `✖ ${failures.join('; ')}` : '✔ compile pipeline: rejected the wrong A2UI surface in WordPress, accepted the fix');
 
-	// A tree with code: the first answer's function never returns. The
-	// sandbox stops it, verification fails, and the compiler asks again.
-	const headlineSource = await readFile(`${examplesDir}/specs/headline-check.md`, 'utf8');
-	const headline = JSON.parse(await readFile(`${examplesDir}/builds/headline-check.json`, 'utf8')) as Build;
-	const headlineSpec = validateSpec(headlineSource, { surface }).spec!;
-	const looping = { ...(modelAnswers(headline).tree as object), code: { source: 'function headlineVerdict(title) { for (;;) {} }', functions: ['headlineVerdict'] } };
-	const codeAnswers = { checks: [modelAnswers(headline).checks], tree: [looping, modelAnswers(headline).tree] };
-	const codePrompts: string[] = [];
-	const withCode = await compileSpec({
-		spec: headlineSpec,
-		specHash: await hashSpec(headlineSource),
-		surface,
-		model: {
-			async generate(request) {
-				codePrompts.push(request.prompt);
-				return { output: codeAnswers[request.purpose].shift(), model: 'scripted' };
-			},
-		},
-		host: hostGuide,
-		format: 'tree',
-		verify: async (build) => (await verifyInWordPress([{ build, spec: headlineSpec, surface }], { sandbox }))[0]!,
-		onEvent: (event) => console.log(JSON.stringify(event)),
-	});
-	const codeFailures: string[] = [];
-	if (!withCode.ok) codeFailures.push('the compile with code did not succeed');
-	if (!codePrompts[2]?.includes('ran longer than')) codeFailures.push('the stopped function was not fed back');
-	if (JSON.stringify(withCode.build?.code) !== JSON.stringify(headline.code)) codeFailures.push('the accepted build does not carry the working code');
-	console.log(codeFailures.length ? `✖ ${codeFailures.join('; ')}` : '✔ compile pipeline with code: stopped the looping function, accepted the fix');
-	failures.push(...codeFailures);
 	process.exitCode = failures.length ? 1 : 0;
 } finally {
 	await sandbox.close();

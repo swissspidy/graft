@@ -3,12 +3,11 @@ import type { Surface } from '../surface/types.ts';
 
 /**
  * Output schemas for the model. Structured outputs do not allow recursive
- * schemas or open objects, so the tree comes back as a flat node list with
- * parent ids, and free-form JSON (props, inputs, fixtures, expectations) as
- * JSON strings. The compiler reassembles and fully validates the result.
+ * schemas or open objects, so free-form JSON (fixtures, expectations) comes
+ * back as JSON strings. The compiler reassembles and fully validates the
+ * result. A UI format brings the schema of its own phase.
  */
 
-const nullable = (schema: Record<string, unknown>) => ({ anyOf: [schema, { type: 'null' }] });
 const names = (values: string[]) => (values.length > 0 ? { type: 'string', enum: values } : { type: 'string' });
 
 export function checksOutputSchema(spec: Spec): Record<string, unknown> {
@@ -56,62 +55,4 @@ export function usableCapabilities(spec: Spec, surface: Surface): string[] {
 		.filter(([, capability]) => capability.scopes.every((scope) => spec.manifest.permissions.includes(scope)))
 		.map(([name]) => name)
 		.sort();
-}
-
-export function treeOutputSchema(spec: Spec, surface: Surface): Record<string, unknown> {
-	const reads = usableCapabilities(spec, surface).filter((name) => surface.capabilities[name]?.kind === 'read');
-	const code = surface.functions
-		? {
-				code: {
-					...nullable({
-						type: 'object',
-						additionalProperties: false,
-						required: ['source', 'functions'],
-						properties: {
-							source: { type: 'string', description: 'Plain JavaScript declaring each function at top level.' },
-							functions: { type: 'array', items: { type: 'string' }, description: 'The names $fn may call.' },
-						},
-					}),
-					description: 'Pure functions for $fn; null when the expressions suffice.',
-				},
-			}
-		: {};
-	return {
-		type: 'object',
-		additionalProperties: false,
-		required: ['nodes', 'data', ...Object.keys(code)],
-		properties: {
-			...code,
-			nodes: {
-				type: 'array',
-				description: 'The UI tree, flattened. Exactly one node has parent null (the root). Children keep array order.',
-				items: {
-					type: 'object',
-					additionalProperties: false,
-					required: ['id', 'parent', 'type', 'props_json', 'text'],
-					properties: {
-						id: { type: 'string' },
-						parent: nullable({ type: 'string' }),
-						type: names(Object.keys(surface.components).sort()),
-						props_json: { type: 'string', description: 'JSON object of props; "{}" for none.' },
-						text: { ...nullable({ type: 'string' }), description: 'Text children for text components; null otherwise.' },
-					},
-				},
-			},
-			data: {
-				type: 'array',
-				description: 'Named data sources.',
-				items: {
-					type: 'object',
-					additionalProperties: false,
-					required: ['name', 'call', 'input_json'],
-					properties: {
-						name: { type: 'string' },
-						call: names(reads),
-						input_json: { type: 'string', description: 'JSON input for the capability; "null" for none.' },
-					},
-				},
-			},
-		},
-	};
 }

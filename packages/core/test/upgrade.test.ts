@@ -11,7 +11,7 @@ import {
 	type Surface,
 	type UpgradeOptions,
 } from '../src/index.ts';
-import { createCan, fakeSandbox, pageBuild, semantics, spec, specSource, surface, type FakeHostOptions } from './fixtures/acme.ts';
+import { createCan, fakeSandbox, pageBuild, spec, specSource, surface, type FakeHostOptions } from './fixtures/acme.ts';
 
 const specHash = await hashSpec(specSource);
 const grant = ['items:read', 'items:write'];
@@ -32,7 +32,7 @@ function upgrade(build: Build, to: Surface, host: FakeHostOptions = {}, extra: P
 		grant,
 		from: surface,
 		to,
-		verify: (candidate, g) => verifyBuild({ build: candidate, spec, surface: to, sandbox: fakeSandbox(host), semantics, createCan, grant: g }),
+		verify: (candidate, g) => verifyBuild({ build: candidate, spec, surface: to, sandbox: fakeSandbox(host), createCan, grant: g }),
 		...extra,
 	});
 }
@@ -42,15 +42,24 @@ async function linkBuild(): Promise<Build> {
 	const build = await pageBuild();
 	build.mount = { slot: 'item.actions' };
 	build.data = {};
-	build.tree = {
-		type: 'link',
-		props: {
-			id: 'close',
-			label: 'Close',
-			visible: { $and: [{ $eq: [{ $slot: 'item.status' }, 'open'] }, { $can: 'items:write' }] },
-			onClick: { $call: 'items.close', input: { id: { $slot: 'item.id' } }, then: ['reload:page'] },
-		},
+	build.ui = {
+		...build.ui,
+		components: [
+			{
+				id: 'root',
+				component: 'Button',
+				child: 'close-label',
+				actionId: 'close',
+				action: { event: { name: 'close', context: { id: { path: '/slot/item/id' } } } },
+				checks: [
+					{ condition: { call: 'equals', args: { a: { path: '/slot/item/status' }, b: 'open' } }, message: 'Only open items close.' },
+					{ condition: { call: 'can', args: { scope: 'items:write' } }, message: 'Only managers close items.' },
+				],
+			},
+			{ id: 'close-label', component: 'Text', text: 'Close' },
+		],
 	};
+	build.events = { close: { call: 'items.close', input: { id: { $context: 'id' } }, then: ['reload:page'] } };
 	const close = {
 		criterion: 'close',
 		fixtures: { users: [{ as: 'm', role: 'manager' }], items: [{ title: 'Open A', status: 'open' }, { title: 'Done B', status: 'done' }] },
@@ -68,7 +77,7 @@ describe('staticCheck', () => {
 	it('ignores text-only changes and classifies the rest', async () => {
 		const build = await pageBuild();
 		const text = surfaceB((s) => {
-			s.components.list!.description = 'Now with better docs';
+			s.slots.page!.description = 'Now with better docs';
 			s.capabilities['items.list']!.description = 'Lists items.';
 		});
 		expect(staticCheck(build, surface, text)).toEqual({ changes: [], start: 'reverify' });
@@ -132,17 +141,14 @@ describe('compatibleSchema', () => {
 });
 
 describe('applyMigrations', () => {
-	it('renames capabilities in data and actions, and props with value maps', async () => {
+	it('renames capabilities in data and events, and refuses removals the build uses', async () => {
 		const build = await pageBuild();
 		const migrated = applyMigrations(build, [
 			{ op: 'rename', kind: 'capability', from: 'items.close', to: 'items.archive' },
-			{ op: 'rename', kind: 'component', from: 'list', to: 'grid' },
-			{ op: 'rename-prop', component: 'grid', from: 'empty', to: 'emptyText' },
+			{ op: 'rename', kind: 'capability', from: 'items.list', to: 'items.query' },
 		])!;
-		const grid = (migrated.tree!.children as Build['tree'][])[1]!;
-		expect(grid.type).toBe('grid');
-		expect(grid.props!.emptyText).toBe('All done');
-		expect(JSON.stringify(grid.props)).toContain('"$call":"items.archive"');
+		expect(migrated.events.close!.call).toBe('items.archive');
+		expect(migrated.data.open!.call).toBe('items.query');
 		expect(applyMigrations(build, [{ op: 'remove', kind: 'capability', symbol: 'items.close' }])).toBeUndefined();
 		expect(applyMigrations(build, [{ op: 'remove', kind: 'capability', symbol: 'unused' }])).toEqual(build);
 	});
@@ -182,7 +188,7 @@ describe('upgradeBuild', () => {
 			grant,
 			from: typed,
 			to: wider,
-			verify: (candidate, g) => verifyBuild({ build: candidate, spec, surface: wider, sandbox: fakeSandbox(), semantics, createCan, grant: g }),
+			verify: (candidate, g) => verifyBuild({ build: candidate, spec, surface: wider, sandbox: fakeSandbox(), createCan, grant: g }),
 		});
 		expect(result.outcome).toBe('survived');
 		expect(result.path[0]!.note).toBe('capability items.list changed compatibly');
@@ -273,7 +279,7 @@ describe('runCanary', () => {
 			to,
 			verify: (candidate, s, g) => {
 				verifications++;
-				return verifyBuild({ build: candidate, spec: s, surface: to, sandbox: fakeSandbox(), semantics, createCan, grant: g });
+				return verifyBuild({ build: candidate, spec: s, surface: to, sandbox: fakeSandbox(), createCan, grant: g });
 			},
 		});
 		expect(report.entries.map((e) => [e.tenant, e.outcome, e.shared])).toEqual([

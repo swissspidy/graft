@@ -5,8 +5,7 @@ import { Button, Card, CardBody, CardHeader, Notice, Spinner } from '@wordpress/
 import { describeCheck, verifyBuild, type Build, type Surface } from '@graft/core';
 import { createCan } from '../can.ts';
 import { playgroundVersion } from '../playground-version.ts';
-import { semantics } from '../semantics.ts';
-import { loadFunctions } from '@graft/sandbox';
+import '../a2ui.ts';
 import { browserSandbox } from './browser-sandbox.ts';
 import { parseSpec } from '@graft/core/parse';
 import { describers } from '../describe.ts';
@@ -23,7 +22,6 @@ interface AdminConfig {
 	scopes: Record<string, string>;
 	browserVerification: boolean;
 	surface: (Surface & { hash: string }) | null;
-	quickjsWasm: string;
 	policy: {
 		managedBy: string | null;
 		contact: string | null;
@@ -181,10 +179,8 @@ function App({ config }: { config: AdminConfig }) {
 				spec,
 				surface: config.surface!,
 				sandbox,
-				semantics,
 				createCan,
 				...(grant ? { grant } : {}),
-				loadFunctions: (code, limits) => loadFunctions(code, limits, { wasmLocation: config.quickjsWasm }),
 			});
 	};
 

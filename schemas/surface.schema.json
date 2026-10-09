@@ -2,9 +2,9 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://graft.dev/schemas/surface/1.json",
   "title": "Graft surface",
-  "description": "The extension contract a host adapter publishes for one host version: slots, components, capabilities, permission scopes and migrations from the previous surface. Identified by its content hash.",
+  "description": "The extension contract a host adapter publishes for one host version: slots, capabilities, permission scopes and migrations from the previous surface. Identified by its content hash.",
   "type": "object",
-  "required": ["graft", "host", "hostVersion", "slots", "components", "capabilities", "scopes"],
+  "required": ["graft", "host", "hostVersion", "slots", "capabilities", "scopes"],
   "additionalProperties": false,
   "properties": {
     "graft": { "const": 1 },
@@ -29,11 +29,6 @@
       "propertyNames": { "$ref": "#/$defs/symbol" },
       "additionalProperties": { "$ref": "#/$defs/slot" }
     },
-    "components": {
-      "type": "object",
-      "propertyNames": { "$ref": "#/$defs/symbol" },
-      "additionalProperties": { "$ref": "#/$defs/component" }
-    },
     "capabilities": {
       "type": "object",
       "propertyNames": { "$ref": "#/$defs/symbol" },
@@ -49,42 +44,6 @@
       "type": "array",
       "items": { "type": "string" },
       "uniqueItems": true
-    },
-    "functions": {
-      "description": "Present when builds may carry pure functions (code, $fn), with the limits they run under.",
-      "type": "object",
-      "required": ["runtime", "limits"],
-      "additionalProperties": false,
-      "properties": {
-        "runtime": { "const": "quickjs" },
-        "limits": {
-          "type": "object",
-          "required": ["timeMs", "memoryBytes", "outputBytes", "sourceBytes"],
-          "additionalProperties": false,
-          "properties": {
-            "timeMs": { "description": "CPU time per call, in milliseconds.", "type": "integer", "minimum": 1 },
-            "memoryBytes": { "description": "Heap of the whole sandbox, in bytes.", "type": "integer", "minimum": 1 },
-            "outputBytes": { "description": "Largest JSON result of one call, in bytes.", "type": "integer", "minimum": 1 },
-            "sourceBytes": { "description": "Largest code source, in bytes.", "type": "integer", "minimum": 1 }
-          }
-        },
-        "widgets": {
-          "description": "Present when builds may use interactive widgets: the components their functions may draw with.",
-          "type": "object",
-          "required": ["components", "maxNodes"],
-          "additionalProperties": false,
-          "properties": {
-            "components": { "type": "array", "items": { "type": "string" }, "uniqueItems": true },
-            "inputs": {
-              "description": "Which of those components are inputs: they take an id, show a value the viewer can change, and a widget's declared actions read it with $input.",
-              "type": "array",
-              "items": { "type": "string" },
-              "uniqueItems": true
-            },
-            "maxNodes": { "type": "integer", "minimum": 1 }
-          }
-        }
-      }
     },
     "model": {
       "description": "The host's content model the surface was generated from, in a host-defined shape (for WordPress: the exposed post types with their fields and taxonomies). Verification sandboxes use it to reproduce the site. Part of the contract, so it is hashed.",
@@ -119,26 +78,11 @@
         "anchor": { "description": "Host hook or component the slot attaches to. What re-anchoring replaces.", "type": "string" },
         "options": { "$ref": "#/$defs/jsonSchema" },
         "provides": {
-          "description": "Props the slot passes into the tree, e.g. the current post id.",
+          "description": "Props the slot passes to the UI, e.g. the current post id.",
           "$ref": "#/$defs/jsonSchema"
-        },
-        "accepts": {
-          "description": "Components allowed at the root of a tree mounted here. Omitted means any.",
-          "type": "array",
-          "items": { "$ref": "#/$defs/symbol" }
         },
         "successor": { "description": "Slot that replaces this one if it is deprecated.", "$ref": "#/$defs/symbol" },
         "deprecated": { "type": "boolean" }
-      }
-    },
-    "component": {
-      "type": "object",
-      "required": ["props"],
-      "additionalProperties": false,
-      "properties": {
-        "description": { "type": "string" },
-        "props": { "$ref": "#/$defs/jsonSchema" },
-        "children": { "enum": ["none", "any", "text"], "default": "none" }
       }
     },
     "capability": {
@@ -182,7 +126,7 @@
         {
           "properties": {
             "op": { "const": "rename" },
-            "kind": { "enum": ["slot", "component", "capability", "scope"] },
+            "kind": { "enum": ["slot", "capability", "scope"] },
             "from": { "type": "string" },
             "to": { "type": "string" }
           },
@@ -190,21 +134,8 @@
         },
         {
           "properties": {
-            "op": { "const": "rename-prop" },
-            "component": { "type": "string" },
-            "from": { "type": "string" },
-            "to": { "type": "string" },
-            "values": {
-              "description": "Optional value map applied while renaming.",
-              "type": "object"
-            }
-          },
-          "required": ["op", "component", "from", "to"]
-        },
-        {
-          "properties": {
             "op": { "const": "remove" },
-            "kind": { "enum": ["slot", "component", "capability", "scope", "prop"] },
+            "kind": { "enum": ["slot", "capability", "scope"] },
             "symbol": { "type": "string" }
           },
           "required": ["op", "kind", "symbol"]

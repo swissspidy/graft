@@ -11,18 +11,10 @@ export interface Slot {
 	anchor?: string;
 	/** Schema for the spec's `mount` options (everything except `slot`). */
 	options?: JsonSchema;
-	/** Props the slot passes into the tree. */
+	/** Props the slot passes to the UI. */
 	provides?: JsonSchema;
-	/** Components allowed at the root of a tree mounted here. */
-	accepts?: string[];
 	successor?: string;
 	deprecated?: boolean;
-}
-
-export interface Component {
-	description?: string;
-	props: JsonSchema;
-	children?: 'none' | 'any' | 'text';
 }
 
 export interface Capability {
@@ -44,9 +36,8 @@ export interface Scope {
 }
 
 export type Migration =
-	| { op: 'rename'; kind: 'slot' | 'component' | 'capability' | 'scope'; from: string; to: string }
-	| { op: 'rename-prop'; component: string; from: string; to: string; values?: Record<string, unknown> }
-	| { op: 'remove'; kind: 'slot' | 'component' | 'capability' | 'scope' | 'prop'; symbol: string };
+	| { op: 'rename'; kind: 'slot' | 'capability' | 'scope'; from: string; to: string }
+	| { op: 'remove'; kind: 'slot' | 'capability' | 'scope'; symbol: string };
 
 export interface Surface {
 	graft: 1;
@@ -58,40 +49,14 @@ export interface Surface {
 	fingerprint?: string;
 	previous?: string;
 	slots: Record<string, Slot>;
-	components: Record<string, Component>;
 	capabilities: Record<string, Capability>;
 	scopes: Record<string, Scope>;
 	audiences?: string[];
 	migrations?: Migration[];
-	/** Present when builds may carry pure functions (`code`, `$fn`), and the limits they run under. */
-	functions?: SurfaceFunctions;
 	/**
 	 * The host's content model the surface was generated from, in a
 	 * host-defined shape (WordPress: exposed post types, their fields and
 	 * taxonomies). Sandboxes use it to reproduce the site; it is hashed.
 	 */
 	model?: Record<string, unknown>;
-}
-
-export interface SurfaceFunctions {
-	runtime: 'quickjs';
-	limits: {
-		/** CPU time per call, in milliseconds. */
-		timeMs: number;
-		/** Heap of the whole sandbox, in bytes. */
-		memoryBytes: number;
-		/** Largest JSON result of one call, in bytes. */
-		outputBytes: number;
-		/** Largest `code.source`, in bytes. */
-		sourceBytes: number;
-	};
-	/** Present when builds may use interactive widgets: what their functions may draw with. */
-	widgets?: {
-		/** Components a widget's tree may use. */
-		components: string[];
-		/** Which of those are inputs: they have an id and show a value the viewer can change ($input). */
-		inputs?: string[];
-		/** Most nodes one render may return. */
-		maxNodes: number;
-	};
 }

@@ -8,7 +8,7 @@ import type { Verification } from '../verifier/run.ts';
 /** One structured-output request to a model. */
 export interface ModelRequest {
 	/** Which compiler phase is asking. */
-	purpose: 'checks' | 'tree';
+	purpose: 'checks' | 'ui';
 	/** Stable per surface and spec: suitable for prompt caching. */
 	system: string;
 	prompt: string;
@@ -34,15 +34,10 @@ export interface HostGuide {
 	fixtures: string;
 	/** Host assertions checks may use besides rows/columns/text/action. */
 	assertions: string;
-	/** Anything else the compiler should know about building for this host. */
+	/** The UI format builds are compiled in, by name (e.g. "A2UI"), when neither the caller nor a previous build decides. */
+	ui: string;
+	/** Anything else the compiler should know about building the UI for this host. */
 	notes?: string;
-	/** The same for building in another UI format, by format name (e.g. "A2UI"). */
-	formats?: Record<string, string>;
-	/**
-	 * The UI format new builds are compiled in, by name (e.g. "A2UI"),
-	 * when neither the caller nor a previous build decides. Default: a tree.
-	 */
-	ui?: string;
 }
 
 export interface CompileOptions {
@@ -61,12 +56,8 @@ export interface CompileOptions {
 	checks?: Check[];
 	/** The build being replaced, as a reference for layout and wording (regeneration). */
 	previous?: Build;
-	/**
-	 * Build the UI in this format, or as a tree ("tree"). Default: the
-	 * previous build's format, else the host's (`HostGuide.ui`), else a
-	 * tree; a previous tree regenerates in the host's format.
-	 */
-	format?: UiFormat | 'tree';
+	/** Build the UI in this format. Default: the previous build's, else the host's (`HostGuide.ui`). */
+	format?: UiFormat;
 	/** Attempts per phase. Default 3. */
 	maxAttempts?: number;
 	compilerVersion?: string;

@@ -4,9 +4,9 @@ import { button, rowKey, toneMarkers, type Block, type Rendered, type RenderedAc
 
 /**
  * A2UI on EmDash: the Graft catalog as `graft:emdash`, drawn on the server
- * as Block Kit like a tree. Block Kit has no inputs here, so the catalog
- * has none; a local `set` is a round trip whose state rides in the
- * buttons' values, as widget states do.
+ * as Block Kit. Block Kit has no inputs here, so the catalog has none; a
+ * local `set` is a round trip whose state rides in the buttons' values
+ * (blocks.ts).
  */
 export const emdashA2UI: A2UIFormatHost = {
 	host: 'emdash',
@@ -24,9 +24,6 @@ export const emdashA2UIFormat = createA2UIFormat(emdashA2UI);
 
 registerUiFormat(emdashA2UIFormat);
 
-/** Where an A2UI render keeps its state among a customization's widget states. */
-export const A2UI_STATE = 'a2ui';
-
 /** What the compiler should know about EmDash when building A2UI surfaces. */
 export const a2uiNotes = `EmDash specifics:
 - The surface renders as EmDash Block Kit on the server: Text "h1"/"h2"/"h3" become headers, "caption" context, other text sections; buttons in a Row (or next to each other) share one actions block. There are no inputs: TextField and CheckBox do not exist here.
@@ -41,11 +38,15 @@ const formats = new Set(['text', 'badge', 'relative_time', 'number', 'code']);
 
 /** A drawn A2UI button as a Block Kit button (or nothing, when unavailable) and the action it stands for. */
 function toBlock(drawn: DrawnButton, actionId: string, value?: string): { element?: Block; action: RenderedAction } {
-	const onClick = drawn.set ? { $event: drawn.set.target, payload: drawn.set.value } : drawn.action;
 	return button(
-		{ id: drawn.id, label: drawn.label, visible: drawn.available, onClick, ...(drawn.variant === 'primary' ? { style: 'primary' } : {}) },
+		{
+			id: drawn.id,
+			label: drawn.label,
+			available: drawn.available,
+			...(drawn.set ? { event: { group: INPUT_GROUP, name: drawn.set.target, payload: drawn.set.value } } : drawn.action ? { action: drawn.action } : {}),
+			...(drawn.variant === 'primary' ? { style: 'primary' as const } : {}),
+		},
 		actionId,
-		drawn.set ? INPUT_GROUP : undefined,
 		value,
 		drawn.row,
 	);
@@ -54,10 +55,10 @@ function toBlock(drawn: DrawnButton, actionId: string, value?: string): { elemen
 /**
  * Renders an A2UI build to Block Kit for a context, with the state its
  * local actions set (pointer to value, in order). `prefix` namespaces
- * action ids as for trees.
+ * action ids, so several customizations can share a page.
  */
 export function renderA2UI(build: Build, ctx: EvalContext, prefix: string, state: Record<string, unknown> = {}): Rendered {
-	const rendered: Rendered = { blocks: [], actions: [], widgets: {}, problems: [] };
+	const rendered: Rendered = { blocks: [], actions: [], state, problems: [] };
 	let out: Block[] = rendered.blocks;
 	let buttons = 0;
 	/** Buttons next to each other share one actions block. */
@@ -133,8 +134,6 @@ export function renderA2UI(build: Build, ctx: EvalContext, prefix: string, state
 			}
 		},
 	});
-	// The state rides in the buttons' values (see withWidgetStates), so a click brings it back.
-	rendered.widgets[A2UI_STATE] = { props: {} as never, state };
 	return rendered;
 }
 

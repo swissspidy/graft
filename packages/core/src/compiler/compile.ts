@@ -7,9 +7,9 @@ import { extractRefs } from '../build/refs.ts';
 import type { Build, Check } from '../build/types.ts';
 import { validateBuild } from '../build/validate.ts';
 import { canonicalJson, sha256 } from '../surface/hash.ts';
-import { assembleChecks, assembleTree, assembleUnverifiable } from './assemble.ts';
-import { checksPrompt, checksSystem, treePrompt, treeSystem } from './prompt.ts';
-import { checksOutputSchema, treeOutputSchema } from './schemas.ts';
+import { assembleChecks, assembleUnverifiable } from './assemble.ts';
+import { checksPrompt, checksSystem } from './prompt.ts';
+import { checksOutputSchema } from './schemas.ts';
 import type { CompileAttempt, CompileOptions, CompileResult } from './types.ts';
 
 export const COMPILER_VERSION = 'graft-compiler/0.1.0';
@@ -17,25 +17,14 @@ export const COMPILER_VERSION = 'graft-compiler/0.1.0';
 // The check definition, with the definitions it refers to.
 const validateCheck: Validator = lazyValidator({ $defs: buildSchema.$defs, $ref: '#/$defs/check' });
 
-/**
- * The format to build the UI in, undefined for a tree: the caller's, else
- * the previous build's, else the host's. A tree regenerates in the host's
- * format when it has one: that is how tree builds move over.
- */
-function compileFormat(options: CompileOptions): UiFormat | undefined {
-	if (options.format) {
-		return options.format === 'tree' ? undefined : options.format;
-	}
-	const previous = options.previous ? uiFormatOf(options.previous) : undefined;
-	if (previous) {
-		return previous;
-	}
-	if (!options.host.ui) {
-		return undefined;
-	}
-	const format = uiFormatNamed(options.host.ui, options.surface.host);
+/** The format to build the UI in: the caller's, else the previous build's, else the host's. */
+function compileFormat(options: CompileOptions): UiFormat {
+	const format = options.format ?? (options.previous ? uiFormatOf(options.previous) : undefined) ?? uiFormatNamed(options.host.ui, options.surface.host);
 	if (!format) {
 		throw new Error(`No UI format "${options.host.ui}" is registered for ${options.surface.host}.`);
+	}
+	if (!format.compiler) {
+		throw new Error(`The ${format.name} format has no compiler.`);
 	}
 	return format;
 }
@@ -46,8 +35,8 @@ function compileFormat(options: CompileOptions): UiFormat | undefined {
  * 1. Checks: the model turns the acceptance criteria into executable checks,
  *    without seeing any implementation. They are then frozen (or passed in
  *    from an earlier build of the same spec version).
- * 2. UI: the model builds the UI (in the format, else a tree) and data
- *    sources against the frozen checks. Each candidate is assembled, validated against the surface and
+ * 2. UI: the model builds the UI (in its format) and data sources against
+ *    the frozen checks. Each candidate is assembled, validated against the surface and
  *    spec, and verified; problems go back to the model until it passes or
  *    the attempts run out.
  *
@@ -62,8 +51,7 @@ export async function compileSpec(options: CompileOptions): Promise<CompileResul
 	let checks = options.checks;
 	if (!checks) {
 		const base = checksSystem(spec, surface, host);
-		const format = compileFormat(options);
-		const system = format?.compiler?.checksSystem?.(base, spec, surface) ?? base;
+		const system = compileFormat(options).compiler!.checksSystem?.(base, spec, surface) ?? base;
 		const schema = checksOutputSchema(spec);
 		let feedback: string[] = [];
 		for (let attempt = 1; attempt <= maxAttempts && !checks; attempt++) {
@@ -94,25 +82,21 @@ export async function compileSpec(options: CompileOptions): Promise<CompileResul
 		}
 	}
 
-	// Phase 2: the UI (a tree, or the format's) and data against the frozen checks.
-	const format = compileFormat(options);
-	const ui = format?.compiler;
-	if (format && !ui) {
-		throw new Error(`The ${format.name} format has no compiler.`);
-	}
-	const system = ui ? ui.system(spec, surface, host.formats?.[format!.name]) : treeSystem(spec, surface, host);
-	const schema = ui ? ui.schema(spec, surface) : treeOutputSchema(spec, surface);
+	// Phase 2: the UI and data against the frozen checks.
+	const ui = compileFormat(options).compiler!;
+	const system = ui.system(spec, surface, host.notes);
+	const schema = ui.schema(spec, surface);
 	const surfaceHash = surface.hash ?? '';
 	let feedback: string[] = [];
 	let candidate: Build | undefined;
 	for (let attempt = 1; attempt <= maxAttempts; attempt++) {
-		options.onEvent?.({ type: 'request', purpose: 'tree', attempt });
-		const prompt = ui ? ui.prompt(spec, checks, options.previous, feedback) : treePrompt(spec, checks, options.previous, feedback);
-		const response = await model.generate({ purpose: 'tree', system, prompt, schema });
-		const assembled = ui ? ui.assemble(response.output, surface) : assembleTree(response.output);
+		options.onEvent?.({ type: 'request', purpose: 'ui', attempt });
+		const prompt = ui.prompt(spec, checks, options.previous, feedback);
+		const response = await model.generate({ purpose: 'ui', system, prompt, schema });
+		const assembled = ui.assemble(response.output, surface);
 		if (!assembled.value) {
-			attempts.push({ phase: 'tree', problems: assembled.problems, diagnostics: [] });
-			options.onEvent?.({ type: 'rejected', purpose: 'tree', attempt, problems: assembled.problems });
+			attempts.push({ phase: 'ui', problems: assembled.problems, diagnostics: [] });
+			options.onEvent?.({ type: 'rejected', purpose: 'ui', attempt, problems: assembled.problems });
 			feedback = assembled.problems;
 			continue;
 		}
@@ -132,9 +116,11 @@ export async function compileSpec(options: CompileOptions): Promise<CompileResul
 			surface: { host: surface.host, hostVersion: surface.hostVersion, hash: surfaceHash },
 			mount: spec.manifest.mount,
 			data: {},
+			ui: { protocol: '', catalogId: '' },
+			events: {},
 			...assembled.value,
 			checks,
-			refs: { slot: spec.manifest.mount.slot, components: {}, capabilities: [], scopes: [] },
+			refs: { slot: spec.manifest.mount.slot, capabilities: [], scopes: [], catalog: {} },
 			provenance,
 		};
 		candidate.refs = extractRefs(candidate, surface);
@@ -143,14 +129,14 @@ export async function compileSpec(options: CompileOptions): Promise<CompileResul
 		const errors = validation.diagnostics.filter((d) => d.severity === 'error');
 		if (errors.length > 0) {
 			const problems = errors.map((d) => `${d.path ?? ''}: ${d.message}`);
-			attempts.push({ phase: 'tree', problems, diagnostics: validation.diagnostics });
-			options.onEvent?.({ type: 'rejected', purpose: 'tree', attempt, problems });
+			attempts.push({ phase: 'ui', problems, diagnostics: validation.diagnostics });
+			options.onEvent?.({ type: 'rejected', purpose: 'ui', attempt, problems });
 			feedback = problems;
 			continue;
 		}
 
 		if (!options.verify) {
-			attempts.push({ phase: 'tree', problems: [], diagnostics: validation.diagnostics });
+			attempts.push({ phase: 'ui', problems: [], diagnostics: validation.diagnostics });
 			return { ok: true, build: candidate, checks, attempts };
 		}
 		const verification = await options.verify(candidate);
@@ -159,11 +145,11 @@ export async function compileSpec(options: CompileOptions): Promise<CompileResul
 			...verification.results.filter((r) => !r.passed).flatMap((r) => r.failures.map((f) => `Check for "${r.criterion}": ${f}`)),
 			...verification.unchecked.map((id) => `Criterion "${id}" has no check.`),
 		];
-		attempts.push({ phase: 'tree', problems, diagnostics: validation.diagnostics, verification });
+		attempts.push({ phase: 'ui', problems, diagnostics: validation.diagnostics, verification });
 		if (verification.passed) {
 			return { ok: true, build: candidate, checks, verification, attempts };
 		}
-		options.onEvent?.({ type: 'rejected', purpose: 'tree', attempt, problems });
+		options.onEvent?.({ type: 'rejected', purpose: 'ui', attempt, problems });
 		feedback = problems;
 	}
 
@@ -185,7 +171,7 @@ function checkProblems(checks: Check[], criteria: string[]): string[] {
 			problems.push(`Check ${i + 1} (${check.criterion}) is malformed: ${(validateCheck.errors ?? []).map((e) => describeSchemaError(e, '', 'the check')).join(' ')}.`);
 			return;
 		}
-		// Caught here, a viewer missing from the fixtures costs a checks attempt instead of every tree attempt.
+		// Caught here, a viewer missing from the fixtures costs a checks attempt instead of every UI attempt.
 		// Hosts only render for fixture users, so fixtures without users have no one to view as.
 		const users = (check.fixtures as { users?: unknown } | undefined)?.users;
 		if (check.view_as !== undefined) {

@@ -16,13 +16,13 @@ import {
 } from '@swissspidy/a2ui-wp';
 import type { UiRootProps } from '@graft/renderer-react';
 import type { Field } from '../cells.ts';
-import { components } from './components.tsx';
+import { Table as GraftTable } from './table.tsx';
 
 /**
  * Draws an A2UI build with a2ui-wp (@wordpress/components on
  * @a2ui/web_core), for GraftRoot: it gets the build's data sources as they
  * load and `invoke` for the actions its events resolve to, so data
- * loading, the gateway, `then`, notices and reloads are the tree runtime's
+ * loading, the gateway, `then`, notices and reloads are the runtime's
  * own. The Graft runtime plays the A2UI server: the data model is filled
  * from the data sources, and an action event becomes the capability call it
  * is bound to.
@@ -44,12 +44,11 @@ interface RowAction {
 	action: unknown;
 }
 
-const GraftTable = components.table!;
 const isRowAction = (value: unknown): value is RowAction => typeof value === 'object' && value !== null && 'action' in value && 'label' in value;
 
 /**
- * The catalog's Table: Graft's own WordPress table, so trees and A2UI
- * surfaces draw rows, cells and actions identically. Its `evaluate`
+ * The catalog's Table: Graft's own WordPress table, drawing rows, cells
+ * and actions as the verifier reads them. Its `evaluate`
  * resolves the A2UI definitions in each row's scope; a row action
  * dispatches its A2UI action (an event, or a local `set`).
  */
@@ -86,14 +85,11 @@ function Table({ id, props }: A2UIComponentProps<{ rows?: { path: string }; fiel
 
 	return (
 		<GraftTable
-			node={{ type: 'table' }}
-			props={{ rows: list, fields, empty: props.empty === undefined ? undefined : String(scope.resolveDynamicValue(props.empty) ?? '') }}
-			raw={{ fields: fields as never, actions: (props.rowActions ?? []) as never }}
-			evaluate={evaluate as never}
+			props={{ rows: list as Array<Record<string, unknown>> | undefined, fields, empty: props.empty === undefined ? undefined : String(scope.resolveDynamicValue(props.empty) ?? '') }}
+			raw={{ fields, actions: props.rowActions ?? [] }}
+			evaluate={evaluate}
 			invoke={invoke}
-		>
-			{null}
-		</GraftTable>
+		/>
 	);
 }
 
@@ -177,7 +173,7 @@ export function A2UIRoot({ build: raw, data, slot, can, invoke }: UiRootProps) {
 		}
 	}, [data, processor]);
 
-	// An action event: the capability call it is bound to, run as a tree's action would be.
+	// An action event: the capability call it is bound to, run through GraftRoot's invoke.
 	const onAction = async ({ action }: ActionMessage) => {
 		const binding = build.events[action.name];
 		if (!binding) {

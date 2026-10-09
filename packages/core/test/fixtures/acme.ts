@@ -4,11 +4,12 @@ import {
 	hashSurface,
 	SandboxCallError,
 	validateSpec,
+	registerUiFormat,
 	type Build,
-	type ComponentSemantics,
 	type Sandbox,
 	type Surface,
 } from '../../src/index.ts';
+import { createA2UIFormat } from '../../../a2ui/src/index.ts';
 
 /**
  * A tiny fake host ("acme") for verifier and compiler tests: items with
@@ -23,12 +24,6 @@ export const surface: Surface = {
 		page: { kind: 'owned', title: 'Page' },
 		'item.actions': { kind: 'extension', title: 'Item actions', provides: { type: 'object', properties: { item: {} } } },
 	},
-	components: {
-		stack: { props: {}, children: 'any' },
-		text: { props: {}, children: 'text' },
-		list: { props: {} },
-		link: { props: {} },
-	},
 	capabilities: {
 		'items.list': { kind: 'read', input: {}, output: {}, scopes: ['items:read'] },
 		'items.close': { kind: 'write', input: {}, output: {}, scopes: ['items:write'] },
@@ -36,29 +31,9 @@ export const surface: Surface = {
 	scopes: { 'items:read': { title: 'See items' }, 'items:write': { title: 'Close items' } },
 };
 
-/** Semantics a host adapter would provide for these components. */
-export const semantics: ComponentSemantics = {
-	list: ({ props, raw, evaluate, emit }) => {
-		const rows = (props.rows as Array<{ id: number; title: string }> | undefined) ?? [];
-		emit.table({
-			columns: ['Title'],
-			rows: rows.map((row) => ({
-				label: row.title,
-				record: row,
-				actions: ((raw.actions ?? []) as never[]).map((a) => {
-					const action = evaluate(a, row) as { id: string; label: string; visible?: unknown; onClick: never };
-					return { id: action.id, label: action.label, available: action.visible !== false, action: action.onClick, row };
-				}),
-			})),
-		});
-		if (rows.length === 0 && typeof props.empty === 'string') {
-			emit.text(props.empty);
-		}
-	},
-	link: ({ props, emit }) => {
-		emit.action({ id: String(props.id), label: String(props.label), available: props.visible !== false, action: props.onClick as never });
-	},
-};
+/** Acme draws A2UI surfaces from its own catalog. */
+export const format = createA2UIFormat({ host: 'acme', catalogId: 'graft:acme' });
+registerUiFormat(format);
 
 export interface FakeHostOptions {
 	/** Capability names of the new host mapped to the ones this host implements. */
@@ -153,7 +128,7 @@ export const fixtures = {
 
 export const createCan = (usable: Record<string, boolean>) => (scope: string) => usable[scope] === true;
 
-/** The page build for the spec: a list of open items with a Close action. */
+/** The page build for the spec: an A2UI table of open items with a Close action. */
 export async function pageBuild(input: Build['data'][string]['input'] = { status: 'open' }): Promise<Build> {
 	const build: Build = {
 		graft: 1,
@@ -161,27 +136,25 @@ export async function pageBuild(input: Build['data'][string]['input'] = { status
 		surface: { host: 'acme', hostVersion: '1.0', hash: await hashSurface(surface) },
 		mount: { slot: 'page' },
 		data: { open: { call: 'items.list', input } },
-		tree: {
-			type: 'stack',
-			children: [
-				{ type: 'text', children: 'Open items' },
+		ui: {
+			protocol: 'a2ui/v0.9',
+			catalogId: 'graft:acme',
+			components: [
+				{ id: 'root', component: 'Column', children: ['title', 'list'] },
+				{ id: 'title', component: 'Text', text: 'Open items', variant: 'h1' },
 				{
-					type: 'list',
-					props: {
-						rows: { $data: 'open.items' },
-						empty: 'All done',
-						actions: [
-							{
-								id: 'close',
-								label: 'Close',
-								visible: { $can: 'items:write' },
-								onClick: { $call: 'items.close', input: { id: { $field: 'id' } }, then: ['remove-row:open'] },
-							},
-						],
-					},
+					id: 'list',
+					component: 'Table',
+					rows: { path: '/open/items' },
+					fields: [{ id: 'title', label: 'Title', primary: true }],
+					rowActions: [
+						{ id: 'close', label: 'Close', visible: { call: 'can', args: { scope: 'items:write' } }, action: { event: { name: 'close', context: { id: { path: 'id' } } } } },
+					],
+					empty: 'All done',
 				},
 			],
 		},
+		events: { close: { call: 'items.close', input: { id: { $context: 'id' } }, then: ['remove-row:open'] } },
 		checks: [
 			{ criterion: 'open-only', fixtures, view_as: 'm', expect: [{ rows: ['Open A'] }, { columns: ['Title'] }, { text: 'Open items' }] },
 			{
@@ -194,7 +167,7 @@ export async function pageBuild(input: Build['data'][string]['input'] = { status
 			{ criterion: 'clerks', fixtures, view_as: 'c', expect: [{ rows: ['Open A'] }, { action: 'close', row: { title: 'Open A' }, available: false }] },
 			{ criterion: 'empty', fixtures: { ...fixtures, items: [] }, view_as: 'm', expect: [{ text: 'All done' }] },
 		],
-		refs: { slot: 'page', components: {}, capabilities: [], scopes: [] },
+		refs: { slot: 'page', capabilities: [], scopes: [], catalog: {} },
 		provenance: { compiler: 'test' },
 	};
 	build.refs = extractRefs(build, surface);

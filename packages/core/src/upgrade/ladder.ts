@@ -103,7 +103,7 @@ export async function upgradeBuild(options: UpgradeOptions): Promise<UpgradeResu
 		}
 
 		candidate = rebase(candidate, target, rung, replaces);
-		const key = canonicalJson({ tree: candidate.tree ?? null, ui: candidate.ui ?? null, events: candidate.events ?? null, data: candidate.data, mount: candidate.mount });
+		const key = canonicalJson({ ui: candidate.ui, events: candidate.events, data: candidate.data, mount: candidate.mount });
 		if (tried.has(key)) {
 			path.push({ state: rung, note: 'same candidate as before' });
 			continue;
@@ -154,13 +154,7 @@ function rebase(candidate: Build, to: Surface, rung: LadderStart, replaces: stri
 }
 
 export function describeChange(change: RefChange): string {
-	if (change.kind === 'functions') {
-		if (change.change === 'removed') {
-			return change.symbol === 'widgets' ? 'the host no longer runs interactive widgets' : 'the host no longer runs build functions';
-		}
-		return 'what build functions may use changed';
-	}
-	const label = change.kind === 'prop' ? `prop ${change.symbol}` : `${change.kind} ${change.symbol}`;
+	const label = `${change.kind} ${change.symbol}`;
 	const how = change.migration
 		? change.migration.op === 'remove'
 			? 'removed'

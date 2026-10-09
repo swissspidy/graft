@@ -1,8 +1,8 @@
 import { readFileSync, readdirSync } from 'node:fs';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
-import { createAjv, hashSpec, validateBuild, validateSpec, validateSurface, type Surface } from '@graft/core';
-import { assembleSurface, components, paths, type HostDump } from '../src/index.ts';
+import { hashSpec, validateBuild, validateSpec, validateSurface, type Surface } from '@graft/core';
+import { assembleSurface, paths, type HostDump } from '../src/index.ts';
 
 const examplesDir = join(import.meta.dirname, '../../../../examples/specs');
 const surfaceFiles = readdirSync(paths.surfaces).filter((f) => f.endsWith('.json'));
@@ -16,10 +16,6 @@ describe('checked-in surfaces', () => {
 		const result = await validateSurface(load(file));
 		expect(result.diagnostics).toEqual([]);
 		expect(result.hash).toBe(load(file).hash);
-	});
-
-	it.each(surfaceFiles)('%s carries the adapter components unchanged', (file) => {
-		expect(load(file).components).toEqual(components);
 	});
 
 	it.each(surfaceFiles)('every example spec validates against %s', (file) => {
@@ -49,7 +45,6 @@ describe('checked-in surfaces', () => {
 			kind: 'extension',
 			screen: 'edit-post',
 			anchor: 'filter:post_row_actions',
-			accepts: ['row-action'],
 		});
 		expect(surface.capabilities['posts.list']).toMatchObject({ kind: 'read', scopes: ['posts:read'], binding: { ability: 'graft/posts-list' } });
 		expect(surface.capabilities['posts.update_status']).toMatchObject({ kind: 'write', scopes: ['posts.status:write'] });
@@ -68,7 +63,6 @@ describe('the agency example (examples/agency)', () => {
 		expect(Object.keys(model.postTypes)).toEqual(['event', 'page', 'post']);
 		expect(Object.keys(model.postTypes.event!.fields)).toEqual(['capacity', 'event_date', 'sold_out', 'venue']);
 		expect(model.postTypes.event!.taxonomies).toEqual(['event_type']);
-		expect(surface.components).toEqual(components);
 	});
 
 	it('has builds valid for it and their specs', async () => {
@@ -89,39 +83,6 @@ describe('the agency example (examples/agency)', () => {
 			expect(bundle.builds.map((b: { build: unknown }) => b.build), file).toEqual([JSON.parse(readFileSync(join(agencyDir, 'builds', `${id}.json`), 'utf8'))]);
 			expect(bundle.builds.every((b: { verification: { passed: boolean } }) => b.verification.passed), file).toBe(true);
 		}
-	});
-});
-
-describe('components', () => {
-	const ajv = createAjv();
-
-	it('accept the props a review-queue table needs', () => {
-		const validate = ajv.compile(components.table!.props);
-		const props = {
-			rows: [{ id: 1, title: 'Draft A' }],
-			fields: [
-				{ id: 'title', label: 'Title', primary: true },
-				{ id: 'author.name', label: 'Author', type: 'user' },
-				{ id: 'date', label: 'Submitted', type: 'datetime' },
-			],
-			actions: [
-				{
-					id: 'approve',
-					label: 'Approve',
-					visible: { $can: 'posts.status:write', on: { $field: 'id' } },
-					onClick: { $call: 'posts.update_status', input: { id: { $field: 'id' }, status: 'publish' }, then: ['remove-row:queue'] },
-				},
-			],
-			empty: 'Nothing to review',
-		};
-		expect(validate(props), JSON.stringify(validate.errors)).toBe(true);
-		expect(validate({ ...props, html: '<script>' })).toBe(false);
-		expect(validate({ ...props, actions: [{ id: 'x', label: 'X', onClick: 'alert(1)' }] })).toBe(false);
-	});
-
-	it('are about eight, as the ADR planned, plus widgets and their inputs', () => {
-		// The widget draws with the others (ADR 0006); inputs only work inside one (ADR 0007).
-		expect(Object.keys(components).sort()).toEqual(['button', 'card', 'checkbox', 'empty-state', 'heading', 'notice', 'row-action', 'select', 'stack', 'table', 'text', 'text-input', 'textarea', 'widget']);
 	});
 });
 

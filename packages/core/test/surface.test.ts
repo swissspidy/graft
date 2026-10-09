@@ -17,11 +17,8 @@ function surface(): Surface {
 					additionalProperties: false,
 				},
 			},
-			'list.row-actions': { kind: 'extension', title: 'Row actions', screen: 'list', accepts: ['button'] },
+			'list.row-actions': { kind: 'extension', title: 'Row actions', screen: 'list' },
 			'old.page': { kind: 'owned', title: 'Old', deprecated: true, successor: 'admin.page' },
-		},
-		components: {
-			button: { props: { type: 'object', properties: { label: { type: 'string' } } } },
 		},
 		capabilities: {
 			'items.list': {
@@ -79,14 +76,12 @@ describe('validateSurface', () => {
 
 	it('reports references to undeclared symbols', async () => {
 		const s = surface();
-		s.slots['list.row-actions']!.accepts = ['link'];
 		s.slots['old.page']!.successor = 'gone.page';
 		s.capabilities['items.list']!.scopes = ['items:write'];
 		s.migrations = [{ op: 'rename', kind: 'capability', from: 'things.list', to: 'things.all' }];
 		const result = await validateSurface(s);
 		expect(result.ok).toBe(false);
 		expect(result.diagnostics.map((d) => [d.code, d.path])).toEqual([
-			['surface-unknown-component', '/slots/list.row-actions/accepts'],
 			['surface-unknown-slot', '/slots/old.page/successor'],
 			['surface-unknown-scope', '/capabilities/items.list/scopes'],
 			['surface-migration-target', '/migrations/0/to'],
@@ -96,9 +91,9 @@ describe('validateSurface', () => {
 	// Ajv only: the cfworker engine does not reject unknown keywords.
 	it.skipIf(process.env.GRAFT_SCHEMA_ENGINE === 'cfworker')('rejects embedded schemas that do not compile', async () => {
 		const s = surface();
-		s.components.button!.props = { type: 'object', properties: { label: { type: 'strin' } } };
+		s.capabilities['items.list']!.input = { type: 'object', properties: { label: { type: 'strin' } } };
 		expect((await validateSurface(s)).diagnostics).toEqual([
-			expect.objectContaining({ code: 'surface-invalid-schema', path: '/components/button/props' }),
+			expect.objectContaining({ code: 'surface-invalid-schema', path: '/capabilities/items.list/input' }),
 		]);
 	});
 

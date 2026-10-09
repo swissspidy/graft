@@ -5,12 +5,12 @@ import { INPUT_GROUP, walkA2UI, type A2UIHost, type DrawnButton } from './walk.t
 /** A drawn button as the verifier sees it: a local `set` is kept like what the viewer enters. */
 function snapshotAction(button: DrawnButton): SnapshotAction {
 	const { set, variant: _variant, ...rest } = button;
-	return set ? { ...rest, event: { widget: INPUT_GROUP, name: set.target, payload: set.value } } : rest;
+	return set ? { ...rest, event: { group: INPUT_GROUP, name: set.target, payload: set.value } } : rest;
 }
 
 /**
- * Reads an A2UI surface into the semantic snapshot a Graft tree gives,
- * with the Graft catalog: what the viewer reads and what they can do.
+ * Reads an A2UI surface into Graft's semantic snapshot, with the Graft
+ * catalog: what the viewer reads and what they can do.
  * `entered` holds what the viewer typed (by input component id) and what
  * local actions set (by pointer), in order.
  */
@@ -24,7 +24,7 @@ export function snapshotA2UI(build: A2UIBuild, ctx: EvalContext, entered: Record
 		},
 		button: (button) => emit.action(snapshotAction(button)),
 		input: ({ id, label, value }) => {
-			(snapshot.inputs ??= []).push({ widget: INPUT_GROUP, id, label, value });
+			(snapshot.inputs ??= []).push({ group: INPUT_GROUP, id, label, value });
 			emit.text(label);
 		},
 		table: (table) => {

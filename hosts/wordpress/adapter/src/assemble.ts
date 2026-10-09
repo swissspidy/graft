@@ -1,14 +1,11 @@
 import { hashSurface, type Slot, type Surface } from '@graft/core';
-import { components } from './components.ts';
-import { functions } from './functions.ts';
 import { normalizeWordPressSchema } from './normalize-schema.ts';
 import type { HostDump, WordPressModel } from './surface-types.ts';
 
 // Browser-safe: the admin screen assembles a site's own surface with it.
 
 /**
- * Merges the plugin's host dump with the adapter's components into a
- * surface: schemas normalized to draft 2020-12, maps sorted for stable
+ * Turns the plugin's host dump into a surface: schemas normalized to draft 2020-12, maps sorted for stable
  * diffs, content hash filled in.
  */
 export async function assembleSurface(dump: HostDump): Promise<Surface> {
@@ -30,11 +27,9 @@ export async function assembleSurface(dump: HostDump): Promise<Surface> {
 
 	const contract = {
 		slots,
-		components: mapSorted(components, (c) => c),
 		capabilities,
 		scopes: mapSorted(dump.scopes, (s) => s),
 		audiences: [...dump.audiences],
-		functions,
 		...(dump.model ? { model: normalizeModel(dump.model) } : {}),
 	};
 	const header = { graft: 1, host: dump.host, hostVersion: dump.hostVersion } as const;

@@ -7,7 +7,7 @@
 	"surface": {
 		"host": "emdash",
 		"hostVersion": "1.0.1",
-		"hash": "sha256:b9329970caab68a82f9e7fe44db516aa9d4dfddfe028473af619f480e85a35a0"
+		"hash": "sha256:d4d02fe0b6b027e2e67408ca5db4436e3bf0680604dfb68e0ff262b5a4ead6eb"
 	},
 	"mount": {
 		"slot": "admin.page",
@@ -266,7 +266,6 @@
 	],
 	"refs": {
 		"slot": "admin.page",
-		"components": {},
 		"capabilities": [
 			"content.list",
 			"content.publish"

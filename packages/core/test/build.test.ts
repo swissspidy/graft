@@ -4,13 +4,13 @@ import {
 	extractRefs,
 	hashSpec,
 	hashSurface,
-	isAction,
 	validateBuild,
 	validateSpec,
 	type Build,
 	type EvalContext,
 	type Surface,
 } from '../src/index.ts';
+import './fixtures/acme.ts';
 
 const surface: Surface = {
 	graft: 1,
@@ -21,34 +21,7 @@ const surface: Surface = {
 		'row.actions': {
 			kind: 'extension',
 			title: 'Row actions',
-			accepts: ['link'],
 			provides: { type: 'object', properties: { item: { type: 'object' } } },
-		},
-	},
-	components: {
-		stack: { props: { type: 'object', additionalProperties: false }, children: 'any' },
-		text: { props: { type: 'object', additionalProperties: false }, children: 'text' },
-		list: {
-			props: {
-				type: 'object',
-				properties: {
-					rows: { type: 'array' },
-					empty: { type: 'string' },
-					actions: {
-						type: 'array',
-						items: {
-							type: 'object',
-							properties: { label: { type: 'string' }, onClick: { type: 'object', required: ['$call'] }, visible: {} },
-							required: ['label', 'onClick'],
-						},
-					},
-				},
-				required: ['rows'],
-				additionalProperties: false,
-			},
-		},
-		link: {
-			props: { type: 'object', properties: { label: { type: 'string' }, onClick: { type: 'object' } }, required: ['label'] },
 		},
 	},
 	capabilities: {
@@ -93,31 +66,30 @@ async function build(): Promise<Build> {
 		surface: { host: 'acme', hash: await hashSurface(surface) },
 		mount: { slot: 'page' },
 		data: { items: { call: 'items.list', input: { status: 'open' } } },
-		tree: {
-			type: 'stack',
-			children: [
-				{ type: 'text', children: 'Open items' },
+		ui: {
+			protocol: 'a2ui/v0.9',
+			catalogId: 'graft:acme',
+			components: [
+				{ id: 'root', component: 'Column', children: ['title', 'list'] },
+				{ id: 'title', component: 'Text', text: 'Open items' },
 				{
-					type: 'list',
-					props: {
-						rows: { $data: 'items.items' },
-						empty: 'Nothing open',
-						actions: [
-							{
-								label: 'Close',
-								visible: { $can: 'items:write' },
-								onClick: { $call: 'items.close', input: { id: { $field: 'id' } }, then: ['remove-row:items'], notice: 'Closed.' },
-							},
-						],
-					},
+					id: 'list',
+					component: 'Table',
+					rows: { path: '/items/items' },
+					fields: [{ id: 'title', label: 'Title', primary: true }],
+					rowActions: [
+						{ id: 'close', label: 'Close', visible: { call: 'can', args: { scope: 'items:write' } }, action: { event: { name: 'close', context: { id: { path: 'id' } } } } },
+					],
+					empty: 'Nothing open',
 				},
 			],
 		},
+		events: { close: { call: 'items.close', input: { id: { $context: 'id' } }, then: ['remove-row:items'], notice: 'Closed.' } },
 		checks: [
 			{ criterion: 'open-only', expect: [{ rows: 1 }] },
 			{ criterion: 'close', expect: [{ action: 'close' }] },
 		],
-		refs: { slot: 'page', components: {}, capabilities: [], scopes: [] },
+		refs: { slot: 'page', capabilities: [], scopes: [], catalog: {} },
 		provenance: { compiler: 'handwritten', strategy: 'handwritten' },
 	};
 	b.refs = extractRefs(b, surface);
@@ -127,12 +99,12 @@ async function build(): Promise<Build> {
 const spec = validateSpec(specSource).spec!;
 
 describe('extractRefs', () => {
-	it('collects components with props, capabilities and scopes', async () => {
+	it('collects catalog components with properties, capabilities and scopes', async () => {
 		expect((await build()).refs).toEqual({
 			slot: 'page',
-			components: { list: ['actions', 'empty', 'rows'], stack: [], text: [] },
 			capabilities: ['items.close', 'items.list'],
 			scopes: ['items:read', 'items:write'],
+			catalog: { Column: ['children'], Table: ['empty', 'fields', 'rowActions', 'rows'], Text: ['text'] },
 		});
 	});
 });
@@ -144,9 +116,8 @@ describe('validateBuild', () => {
 		expect(result.ok).toBe(true);
 	});
 
-	it('refuses a build without a tree when no UI format handles it', async () => {
-		const { tree: _tree, ...rest } = await build();
-		const result = await validateBuild({ ...rest, ui: { protocol: 'other/1', catalogId: 'x' }, events: {} }, surface);
+	it('refuses a build when no UI format handles it', async () => {
+		const result = await validateBuild({ ...(await build()), ui: { protocol: 'other/1', catalogId: 'x' }, events: {} }, surface);
 		expect(result.ok).toBe(false);
 		expect(result.diagnostics.map((d) => d.code)).toEqual(['build-unknown-format']);
 	});
@@ -157,28 +128,19 @@ describe('validateBuild', () => {
 		expect((await validateBuild(b, surface)).diagnostics.map((d) => d.code)).toEqual(['build-refs-mismatch']);
 	});
 
-	it('reports unknown symbols, bad props and inputs, but not bindings', async () => {
+	it('reports unknown components, bad inputs and data sources', async () => {
 		const b = await build();
-		const list = (b.tree!.children as Build['tree'][])[1]!;
-		list.props!.color = 'red';
-		list.props!.empty = { $slot: 'nothing' };
-		(list.props!.actions as unknown as Array<Record<string, unknown>>)[0]!.onClick = {
-			$call: 'items.close',
-			input: { id: 'seven' },
-			then: ['refresh:elsewhere'],
-		};
-		(b.tree!.children as Build['tree'][]).push({ type: 'chart' }, { type: 'text', children: [{ type: 'text' }] });
+		(b.ui.components as Array<Record<string, unknown>>).push({ id: 'chart', component: 'Chart' });
+		b.events.close = { call: 'items.close', input: { id: 'seven' }, then: ['refresh:elsewhere'] };
 		b.data.items!.input = { status: 'closed' };
 		b.data.more = { call: 'items.close', input: { id: { $data: 'items.first' } } };
 		b.refs = extractRefs(b, surface);
 		const codes = (await validateBuild(b, surface)).diagnostics.map((d) => `${d.code} ${d.path}`);
 		expect(codes).toEqual([
-			'build-invalid-value /tree/children/1/props/color',
-			'build-unknown-slot-prop /tree/children/1/props/empty',
-			'build-invalid-value /tree/children/1/props/actions/0/onClick/input/id',
-			'build-unknown-data /tree/children/1/props/actions/0/onClick/then/0',
-			'build-unknown-component /tree/children/2/type',
-			'build-children /tree/children/3/children',
+			'a2ui-unreachable /ui/components',
+			'a2ui-unknown-component /ui/components/3/component',
+			'build-invalid-value /events/close/input',
+			'build-unknown-data /events/close/then/0',
 			'build-invalid-value /data/items/input/status',
 			'build-data-not-read /data/more/call',
 		]);
@@ -189,10 +151,7 @@ describe('validateBuild', () => {
 		b.mount.slot = 'row.actions';
 		b.surface.hash = 'sha256:other';
 		b.refs = extractRefs(b, surface);
-		expect((await validateBuild(b, surface)).diagnostics.map((d) => d.code)).toEqual([
-			'build-surface-mismatch',
-			'build-root-not-accepted',
-		]);
+		expect((await validateBuild(b, surface)).diagnostics.map((d) => d.code)).toEqual(['build-surface-mismatch']);
 	});
 
 	it('checks the build against its spec', async () => {
@@ -216,36 +175,33 @@ describe('validateBuild', () => {
 describe('evaluate', () => {
 	const ctx: EvalContext = {
 		data: { items: { items: [{ id: 7, title: 'A' }] } },
-		slot: { item: { id: 3 } },
-		row: { id: 7, owner: { name: 'Ada' } },
+		slot: { item: { id: 3, owner: { name: 'Ada' } }, other: { id: 7 } },
 		can: (scope, on) => scope === 'items:write' && (on as { id: number } | undefined)?.id === 7,
 	};
 
-	it('resolves bindings, permission checks and actions', () => {
+	it('resolves bindings and permission checks', () => {
 		expect(evaluate({ $data: 'items.items.0.title' }, ctx)).toBe('A');
-		expect(evaluate({ $field: 'owner.name' }, ctx)).toBe('Ada');
+		expect(evaluate({ $slot: 'item.owner.name' }, ctx)).toBe('Ada');
 		expect(evaluate({ $slot: 'item.id' }, ctx)).toBe(3);
 		expect(evaluate({ $data: 'missing.path' }, ctx)).toBeUndefined();
-		expect(evaluate({ $can: 'items:write' }, ctx)).toBe(true);
+		expect(evaluate({ $can: 'items:write' }, ctx)).toBe(false);
 		expect(evaluate({ $can: 'items:write', on: { $slot: 'item' } }, ctx)).toBe(false);
-		const action = evaluate({ $call: 'items.close', input: { id: { $field: 'id' } }, then: ['remove-row:items'], notice: 'Closed.' }, ctx);
-		expect(isAction(action)).toBe(true);
-		expect(action).toEqual({ $action: true, capability: 'items.close', input: { id: 7 }, then: ['remove-row:items'], notice: 'Closed.', row: ctx.row });
-		expect(evaluate([{ label: { $field: 'id' } }, 'x'], ctx)).toEqual([{ label: 7 }, 'x']);
+		expect(evaluate({ $can: 'items:write', on: { $slot: 'other' } }, ctx)).toBe(true);
+		expect(evaluate([{ label: { $slot: 'other.id' } }, 'x'], ctx)).toEqual([{ label: 7 }, 'x']);
 	});
 
 	it('evaluates logic over values and permission checks', () => {
-		expect(evaluate({ $eq: [{ $field: 'id' }, 7] }, ctx)).toBe(true);
-		expect(evaluate({ $eq: [{ $field: 'owner' }, { name: 'Ada' }] }, ctx)).toBe(true);
-		expect(evaluate({ $eq: [{ $field: 'missing' }, null] }, ctx)).toBe(true);
-		expect(evaluate({ $and: [{ $eq: [{ $field: 'id' }, 7] }, { $can: 'items:write' }] }, ctx)).toBe(true);
+		expect(evaluate({ $eq: [{ $slot: 'other.id' }, 7] }, ctx)).toBe(true);
+		expect(evaluate({ $eq: [{ $slot: 'item.owner' }, { name: 'Ada' }] }, ctx)).toBe(true);
+		expect(evaluate({ $eq: [{ $slot: 'missing' }, null] }, ctx)).toBe(true);
+		expect(evaluate({ $and: [{ $eq: [{ $slot: 'other.id' }, 7] }, { $can: 'items:write', on: { $slot: 'other' } }] }, ctx)).toBe(true);
 		expect(evaluate({ $and: [true, { $can: 'items:write', on: { $slot: 'item' } }] }, ctx)).toBe(false);
 		expect(evaluate({ $or: [false, { $not: { $eq: [1, 2] } }] }, ctx)).toBe(true);
 		expect(evaluate({ $and: [true, 'yes'] }, ctx)).toBe(false);
 	});
 
 	it('does not read inherited properties', () => {
-		expect(evaluate({ $field: 'constructor' }, ctx)).toBeUndefined();
+		expect(evaluate({ $slot: 'constructor' }, ctx)).toBeUndefined();
 		expect(evaluate({ $data: '__proto__' }, ctx)).toBeUndefined();
 	});
 });

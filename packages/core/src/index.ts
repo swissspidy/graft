@@ -1,5 +1,5 @@
 export { hasErrors, type Diagnostic, type Severity } from './diagnostics.ts';
-export { isTreeBuild, registerUiFormat, requireUiFormat, uiFormatNamed, uiFormatOf, type UiCompiler, type UiFormat } from './build/format.ts';
+export { registerUiFormat, requireUiFormat, uiFormatNamed, uiFormatOf, type UiCompiler, type UiFormat } from './build/format.ts';
 export { ajvEngine, createAjv } from './ajv.ts';
 export { compileSchema, setSchemaEngine, type SchemaEngine, type SchemaError, type Validator } from './schema.ts';
 export { parseSpec, type ParsedSpec } from './spec/parse.ts';
@@ -10,58 +10,32 @@ export type { Criterion, Section, Spec, SpecManifest } from './spec/types.ts';
 export { createBundle, type CustomizationBundle } from './bundle.ts';
 export { validateSurface, type SurfaceValidation } from './surface/validate.ts';
 export { canonicalJson, hashSurface, sha256 } from './surface/hash.ts';
-export type { Capability, Component, JsonSchema, Migration, Scope, Slot, Surface, SurfaceFunctions } from './surface/types.ts';
+export type { Capability, JsonSchema, Migration, Scope, Slot, Surface } from './surface/types.ts';
 export { hashSpec, normalizeSpecSource } from './spec/hash.ts';
-export type { AndExpr, Binding, Build, BuildUi, EventBinding, CheckStep, InputRef, BuildCode, CallExpr, CanExpr, Check, DataRef, DataSource, EqExpr, Expression, FieldRef, FnExpr, Logic, NotExpr, OrExpr, Refs, SlotRef, TreeNode, Value } from './build/types.ts';
-export { getPath, isAnd, isBinding, isInputRef, isCall, isCan, isDataRef, isEq, isExpression, isFieldRef, isFn, isNot, isOr, isSlotRef, walkTree, walkValue } from './build/expressions.ts';
-export { evaluate, inert, isAction, type Action, type EvalContext } from './build/evaluate.ts';
-export { FunctionError, functionKey, type AsyncFunctionRunner, type FunctionCall, type FunctionErrorKind, type FunctionResult, type FunctionRunner } from './build/functions.ts';
+export type { AndExpr, Binding, Build, BuildUi, CanExpr, Check, CheckStep, CompareExpr, Computed, DataRef, DataSource, DaysSinceExpr, EqExpr, EventBinding, Expression, IfExpr, Logic, NotExpr, OrExpr, Refs, SlotRef, Value } from './build/types.ts';
+export { getPath, isAnd, isBinding, isCan, isDataRef, isEq, isExpression, isNot, isOr, isSlotRef, walkValue } from './build/expressions.ts';
+export { evaluate, isAction, type Action, type EvalContext } from './build/evaluate.ts';
 export { extractRefs } from './build/refs.ts';
-export { validateBuild, validateWidgetTree, type BuildValidation, type ValidateBuildOptions } from './build/validate.ts';
+export { validateBuild, type BuildValidation, type ValidateBuildOptions } from './build/validate.ts';
 export { nextSpecState, specEvents, specLifecycle, type SpecEvent, type SpecState } from './lifecycle/spec.ts';
 export { removeRow } from './build/rows.ts';
-export {
-	initialState,
-	inputEvent,
-	inputValues,
-	isWidgetEvent,
-	isWidgetUse,
-	renderArgs,
-	resolveWidgetUse,
-	sanitizeWidgetTree,
-	updateArgs,
-	WIDGET,
-	widgetInputs,
-	widgetProps,
-	widgetRow,
-	type ResolvedUse,
-	type WidgetAction,
-	type WidgetEvent,
-	type WidgetInput,
-	type WidgetLimits,
-	type WidgetProps,
-	type WidgetUse,
-} from './build/widgets.ts';
 export { FixtureError, SandboxCallError, type Sandbox } from './verifier/sandbox.ts';
 export {
 	allActions,
-	snapshotTree,
 	createSnapshotEmitter,
-	type ComponentSemantics,
-	type SemanticsArgs,
 	type Snapshot,
 	type SnapshotAction,
 	type SnapshotEmitter,
 	type SnapshotCell,
 	type SnapshotRow,
+	type SnapshotInput,
 	type SnapshotTable,
-	type SnapshotWidgets,
 } from './verifier/snapshot.ts';
 export { matchesRecord, verifyBuild, type CheckResult, type Verification, type VerifyOptions } from './verifier/run.ts';
 export { buildHash, compileSpec, COMPILER_VERSION } from './compiler/compile.ts';
 export { modelAnswers } from './compiler/answers.ts';
-export { assembleChecks, assembleTree, assembleUnverifiable } from './compiler/assemble.ts';
-export { checksOutputSchema, treeOutputSchema, usableCapabilities } from './compiler/schemas.ts';
+export { assembleChecks, assembleUnverifiable } from './compiler/assemble.ts';
+export { checksOutputSchema, usableCapabilities } from './compiler/schemas.ts';
 export { describeSpec, describeSurface } from './compiler/prompt.ts';
 export type {
 	CompileAttempt,

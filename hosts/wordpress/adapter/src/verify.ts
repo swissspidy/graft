@@ -1,8 +1,7 @@
 import { verifyBuild, type Build, type Spec, type Surface, type Verification } from '@graft/core';
 import { createCan } from './can.ts';
 import { startSandbox, type SandboxOptions, type WordPressSandbox } from './sandbox.ts';
-import { semantics } from './semantics.ts';
-import { loadFunctions } from '@graft/sandbox';
+import './a2ui.ts';
 
 export interface VerifyTarget {
 	build: Build;
@@ -22,7 +21,7 @@ export async function verifyInWordPress(
 	try {
 		const results: Verification[] = [];
 		for (const target of targets) {
-			results.push(await verifyBuild({ ...target, sandbox, semantics, createCan, loadFunctions }));
+			results.push(await verifyBuild({ ...target, sandbox, createCan }));
 		}
 		return results;
 	} finally {

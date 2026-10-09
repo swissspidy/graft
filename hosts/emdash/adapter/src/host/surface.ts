@@ -1,5 +1,4 @@
-import type { Capability, JsonSchema, Scope, Slot, Surface, SurfaceFunctions } from '@graft/core';
-import { components } from './components.ts';
+import type { Capability, JsonSchema, Scope, Slot, Surface } from '@graft/core';
 
 /**
  * The EmDash host surface: where builds mount, what they may call and the
@@ -116,19 +115,6 @@ export const scopes: Record<string, Scope> = {
 const empty: JsonSchema = { type: 'object', properties: {}, additionalProperties: false };
 const title = (max: number): JsonSchema => ({ type: 'string', minLength: 1, maxLength: max });
 
-/**
- * EmDash runs build functions on the server, in QuickJS: compiled to
- * WebAssembly in the native plugin, to asm.js in the plugin sandbox (which
- * compiles no WebAssembly at run time). The deadline allows for the slower
- * asm.js build. Widgets draw with the display components and buttons,
- * which go through the same Block Kit translation as the build's own.
- */
-export const functions: SurfaceFunctions = {
-	runtime: 'quickjs',
-	limits: { timeMs: 100, memoryBytes: 8 * 1024 * 1024, outputBytes: 16 * 1024, sourceBytes: 32 * 1024 },
-	widgets: { components: ['stack', 'header', 'section', 'context', 'divider', 'banner', 'fields', 'stats', 'empty', 'table', 'actions', 'button'], maxNodes: 200 },
-};
-
 export const slots: Record<string, Slot> = {
 	'admin.page': {
 		kind: 'owned',
@@ -137,7 +123,6 @@ export const slots: Record<string, Slot> = {
 		anchor: 'plugin-admin-page',
 		options: { type: 'object', properties: { title: title(40) }, required: ['title'], additionalProperties: false },
 		provides: empty,
-		accepts: ['stack'],
 	},
 	'dashboard.widget': {
 		kind: 'owned',
@@ -147,7 +132,6 @@ export const slots: Record<string, Slot> = {
 		anchor: 'plugin-dashboard-widget',
 		options: { type: 'object', properties: { title: title(60) }, required: ['title'], additionalProperties: false },
 		provides: empty,
-		accepts: ['stack'],
 	},
 	'content.editor.panel': {
 		kind: 'extension',
@@ -163,7 +147,6 @@ export const slots: Record<string, Slot> = {
 			additionalProperties: false,
 		},
 		provides: { type: 'object', properties: { entry }, required: ['entry'], additionalProperties: false },
-		accepts: ['stack'],
 	},
 };
 
@@ -182,10 +165,8 @@ export function hostSurface(hostVersion: string): Surface {
 		host: 'emdash',
 		hostVersion,
 		slots,
-		components,
 		capabilities,
 		scopes,
 		audiences: Object.keys(roles),
-		functions,
 	};
 }

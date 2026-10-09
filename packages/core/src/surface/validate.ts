@@ -42,20 +42,11 @@ export async function validateSurface(value: unknown): Promise<SurfaceValidation
 
 	for (const [name, slot] of Object.entries(surface.slots)) {
 		const path = `/slots/${escape(name)}`;
-		for (const component of slot.accepts ?? []) {
-			if (!surface.components[component]) {
-				error('surface-unknown-component', `${path}/accepts`, `Slot "${name}" accepts unknown component "${component}".`);
-			}
-		}
 		if (slot.successor && !surface.slots[slot.successor]) {
 			error('surface-unknown-slot', `${path}/successor`, `Slot "${name}" names unknown successor "${slot.successor}".`);
 		}
 		checkEmbedded(slot.options, `${path}/options`, diagnostics);
 		checkEmbedded(slot.provides, `${path}/provides`, diagnostics);
-	}
-
-	for (const [name, component] of Object.entries(surface.components)) {
-		checkEmbedded(component.props, `/components/${escape(name)}/props`, diagnostics);
 	}
 
 	for (const [name, capability] of Object.entries(surface.capabilities)) {
@@ -71,7 +62,6 @@ export async function validateSurface(value: unknown): Promise<SurfaceValidation
 
 	const collections = {
 		slot: surface.slots,
-		component: surface.components,
 		capability: surface.capabilities,
 		scope: surface.scopes,
 	};

@@ -9,7 +9,6 @@ export {
 	assembleA2UI,
 	catalogGuide,
 	createA2UIFormat,
-	describeHost,
 	migrateA2UI,
 	slotPropsUsedA2UI,
 	type A2UIFormatHost,

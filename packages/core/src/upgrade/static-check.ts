@@ -1,17 +1,17 @@
 import { requireUiFormat } from '../build/format.ts';
-import { isSlotRef, walkTree, walkValue } from '../build/expressions.ts';
+import { isSlotRef, walkValue } from '../build/expressions.ts';
 import type { Build } from '../build/types.ts';
 import { canonicalJson } from '../surface/hash.ts';
 import type { Migration, Surface } from '../surface/types.ts';
 
-export type RefKind = 'slot' | 'component' | 'prop' | 'capability' | 'scope' | 'functions';
+export type RefKind = 'slot' | 'capability' | 'scope';
 
 export interface RefChange {
 	kind: RefKind;
-	/** The symbol: a name, or `component.prop` for props. */
+	/** The symbol's name. */
 	symbol: string;
 	change: 'removed' | 'changed' | 'deprecated';
-	/** Only permission metadata changed (a capability's scopes); the tree is unaffected. */
+	/** Only permission metadata changed (a capability's scopes); the UI is unaffected. */
 	refsOnly?: boolean;
 	/**
 	 * The schemas changed compatibly: the capability or slot accepts at
@@ -33,26 +33,13 @@ export interface StaticCheck {
 
 // Structural parts only: titles and descriptions change with translations
 // and copy edits without changing what a build can rely on.
-const slotContract = (slot: Surface['slots'][string]) => ({ kind: slot.kind, options: slot.options, provides: slot.provides, accepts: slot.accepts });
+const slotContract = (slot: Surface['slots'][string]) => ({ kind: slot.kind, options: slot.options, provides: slot.provides });
 const slotCompatible = (before: Surface['slots'][string], after: Surface['slots'][string]) =>
 	before.kind === after.kind &&
-	canonicalJson(before.accepts ?? null) === canonicalJson(after.accepts ?? null) &&
 	compatibleSchema(before.options ?? {}, after.options ?? {}, 'accepts') &&
 	compatibleSchema(before.provides ?? {}, after.provides ?? {}, 'provides');
-const componentContract = (c: Surface['components'][string]) => ({ props: c.props, children: c.children ?? 'none' });
-const propSchema = (c: Surface['components'][string] | undefined, prop: string) =>
-	typeof c?.props === 'object' ? ((c.props.properties as Record<string, unknown> | undefined) ?? {})[prop] : undefined;
-
 function findMigration(migrations: Migration[], kind: RefKind, symbol: string): Migration | undefined {
-	return migrations.find((m) => {
-		if (m.op === 'rename') {
-			return m.kind === kind && m.from === symbol;
-		}
-		if (m.op === 'rename-prop') {
-			return kind === 'prop' && `${m.component}.${m.from}` === symbol;
-		}
-		return false;
-	});
+	return migrations.find((m) => m.op === 'rename' && m.kind === kind && m.from === symbol);
 }
 
 /**
@@ -80,35 +67,6 @@ export function staticCheck(build: Build, from: Surface, to: Surface): StaticChe
 		add({ kind: 'slot', symbol: slotId, change: 'changed', ...(oldSlot && slotCompatible(oldSlot, newSlot) ? { compatible: true } : {}) });
 	}
 
-	// Components and the props the build uses.
-	for (const [name, props] of Object.entries(build.refs.components)) {
-		const oldComponent = from.components[name];
-		const newComponent = to.components[name];
-		if (!newComponent) {
-			add({ kind: 'component', symbol: name, change: 'removed' });
-			continue;
-		}
-		if (oldComponent && canonicalJson(componentContract(oldComponent)) === canonicalJson(componentContract(newComponent))) {
-			continue;
-		}
-		let propChange = false;
-		for (const prop of props) {
-			const before = propSchema(oldComponent, prop);
-			const after = propSchema(newComponent, prop);
-			if (after === undefined) {
-				add({ kind: 'prop', symbol: `${name}.${prop}`, change: 'removed' });
-				propChange = true;
-			} else if (canonicalJson(before ?? null) !== canonicalJson(after)) {
-				add({ kind: 'prop', symbol: `${name}.${prop}`, change: 'changed' });
-				propChange = true;
-			}
-		}
-		if (!propChange) {
-			// Something else changed (a new required prop, children rules).
-			add({ kind: 'component', symbol: name, change: 'changed' });
-		}
-	}
-
 	// Capabilities.
 	for (const name of build.refs.capabilities) {
 		const before = from.capabilities[name];
@@ -128,20 +86,6 @@ export function staticCheck(build: Build, from: Surface, to: Surface): StaticChe
 	for (const scope of build.refs.scopes) {
 		if (!to.scopes[scope]) {
 			add({ kind: 'scope', symbol: scope, change: 'removed' });
-		}
-	}
-
-	// Build functions: the host must still run them. New limits only need a re-verification.
-	if (build.code) {
-		const usesWidgets = Object.hasOwn(build.refs.components, 'widget');
-		if (!to.functions || (usesWidgets && !to.functions.widgets)) {
-			add({ kind: 'functions', symbol: usesWidgets && to.functions ? 'widgets' : (from.functions?.runtime ?? 'quickjs'), change: 'removed' });
-		} else {
-			// Only what the build relies on: the runtime and limits, and what widgets may draw if it has one.
-			const relied = (f: Surface['functions']) => ({ runtime: f?.runtime, limits: f?.limits, ...(usesWidgets ? { widgets: f?.widgets } : {}) });
-			if (canonicalJson(relied(from.functions)) !== canonicalJson(relied(to.functions))) {
-				add({ kind: 'functions', symbol: to.functions.runtime, change: 'changed', refsOnly: true });
-			}
 		}
 	}
 
@@ -241,11 +185,7 @@ export function slotPropsUsed(build: Build): string[] {
 			used.add(value.$slot.split('.')[0] ?? '');
 		}
 	};
-	if (build.tree) {
-		walkTree(build.tree, '', (node) => walkValue(node.props as never, '', visit));
-	} else {
-		requireUiFormat(build).slotPropsUsed(build).forEach((prop) => used.add(prop));
-	}
+	requireUiFormat(build).slotPropsUsed(build).forEach((prop) => used.add(prop));
 	for (const source of Object.values(build.data)) {
 		walkValue(source.input, '', visit);
 	}
