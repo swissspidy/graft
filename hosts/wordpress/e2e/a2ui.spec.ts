@@ -1,4 +1,5 @@
 import { expect, test, type Page } from '@playwright/test';
+import { login } from './login.ts';
 
 /**
  * The example specs built as A2UI surfaces (examples/a2ui/builds) instead of
@@ -9,14 +10,6 @@ import { expect, test, type Page } from '@playwright/test';
  * Tests run in order because they publish posts.
  */
 test.describe.configure({ mode: 'serial' });
-
-async function login(page: Page, user: string) {
-	await page.goto('/wp-login.php');
-	await page.fill('#user_login', user);
-	await page.fill('#user_pass', 'password');
-	await page.click('#wp-submit');
-	await page.waitForURL(/wp-admin/, { waitUntil: 'domcontentloaded' });
-}
 
 const listRow = (page: Page, title: string) => page.locator('#the-list tr', { hasText: title });
 const queue = (page: Page) => page.locator('.graft-page table');

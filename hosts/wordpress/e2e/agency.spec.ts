@@ -1,4 +1,5 @@
 import { expect, test, type Page } from '@playwright/test';
+import { login } from './login.ts';
 
 /**
  * The agency angle, on the Riverside Arts Centre (playground/sites/riverside.php):
@@ -8,15 +9,6 @@ import { expect, test, type Page } from '@playwright/test';
  * Tests run in order.
  */
 test.describe.configure({ mode: 'serial' });
-
-async function login(page: Page, user: string) {
-	await page.goto('/wp-login.php');
-	await page.fill('#user_login', user);
-	await page.fill('#user_pass', 'password');
-	await page.click('#wp-submit');
-	// The admin page's DOM is enough: its images and feeds may be slow to finish loading.
-	await page.waitForURL(/wp-admin/, { waitUntil: 'domcontentloaded' });
-}
 
 const customizations = '/wp-admin/tools.php?page=graft-customizations';
 const listRow = (page: Page, title: string) => page.locator('#the-list tr', { hasText: title });
