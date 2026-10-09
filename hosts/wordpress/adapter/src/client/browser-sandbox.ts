@@ -3,23 +3,25 @@ import sandboxIndex from '../../../playground/sandbox/index.php';
 import sandboxCanary from '../../../playground/sandbox/canary.php';
 import sandboxModel from '../../../playground/sandbox/model.php';
 import { protocolSandbox, type ProtocolSandbox } from '../sandbox-protocol.ts';
+import type * as PlaygroundClient from './playground-client.ts';
 
 /**
  * A verification sandbox in the admin's browser: a private, throwaway
  * WordPress in WordPress Playground (hidden iframe) with this site's Graft
  * plugin and the sandbox endpoint installed. Nothing from the site's
  * database goes along; checks seed their own fixtures.
+ *
+ * Playground's client ships with the plugin (build/playground-client.js,
+ * the version the CLI uses) and loads only when a sandbox starts; the
+ * iframe loads remote.html from the Playground URL the site configures
+ * (graft_playground_url), which serves the WordPress and PHP builds.
  */
 
-const PLAYGROUND = 'https://playground.wordpress.net';
-
-interface PlaygroundClient {
-	isReady(): Promise<void>;
-	request(request: { url: string; method: string; headers: Record<string, string>; body: string }): Promise<{ httpStatusCode: number; text: string }>;
-}
-
-interface PlaygroundModule {
-	startPlaygroundWeb(options: { iframe: HTMLIFrameElement; remoteUrl: string; blueprint: Record<string, unknown> }): Promise<PlaygroundClient>;
+export interface PlaygroundOptions {
+	/** build/playground-client.js on this site. */
+	client: string;
+	/** The Playground that serves remote.html. */
+	url: string;
 }
 
 function base64ToBytes(base64: string): Uint8Array {
@@ -31,41 +33,18 @@ function base64ToBytes(base64: string): Uint8Array {
 	return bytes;
 }
 
-/**
- * Imports Playground's client, retrying when playground.wordpress.net does
- * not answer: a CDN hiccup otherwise fails the whole check. The retries
- * span about a minute, since an outage of a few seconds is common. Retries
- * add a query so the browser fetches the module again instead of reusing
- * the failed import.
- */
-async function loadPlaygroundClient(): Promise<PlaygroundModule> {
-	const delays = [1_000, 3_000, 6_000, 10_000, 15_000, 25_000];
-	for (let attempt = 0; ; attempt++) {
-		try {
-			const url = `${PLAYGROUND}/client/index.js${attempt ? `?retry=${attempt}` : ''}`;
-			return (await import(/* @vite-ignore */ url)) as PlaygroundModule;
-		} catch (error) {
-			const delay = delays[attempt];
-			if (delay === undefined) {
-				throw error;
-			}
-			await new Promise((resolve) => setTimeout(resolve, delay));
-		}
-	}
-}
-
 let starting: Promise<ProtocolSandbox> | undefined;
 
 /** Starts (once per page) and returns the browser sandbox. */
-export function browserSandbox(wp: string): Promise<ProtocolSandbox> {
-	starting ??= start(wp).catch((error: unknown) => {
+export function browserSandbox(wp: string, playground: PlaygroundOptions): Promise<ProtocolSandbox> {
+	starting ??= start(wp, playground).catch((error: unknown) => {
 		starting = undefined;
 		throw error;
 	});
 	return starting;
 }
 
-async function start(wp: string): Promise<ProtocolSandbox> {
+async function start(wp: string, playground: PlaygroundOptions): Promise<ProtocolSandbox> {
 	const token = Array.from(crypto.getRandomValues(new Uint8Array(24)), (b) => b.toString(16).padStart(2, '0')).join('');
 	const { zip } = await apiFetch<{ zip: string }>({ path: '/graft/v1/sandbox-package' });
 
@@ -75,10 +54,10 @@ async function start(wp: string): Promise<ProtocolSandbox> {
 	iframe.setAttribute('aria-hidden', 'true');
 	document.body.append(iframe);
 
-	const { startPlaygroundWeb } = await loadPlaygroundClient();
+	const { startPlaygroundWeb } = (await import(/* @vite-ignore */ playground.client)) as typeof PlaygroundClient;
 	const client = await startPlaygroundWeb({
 		iframe,
-		remoteUrl: `${PLAYGROUND}/remote.html`,
+		remoteUrl: `${playground.url.replace(/\/+$/, '')}/remote.html`,
 		blueprint: {
 			preferredVersions: { wp, php: '8.3' },
 			steps: [
