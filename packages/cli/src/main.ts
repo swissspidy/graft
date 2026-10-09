@@ -38,7 +38,8 @@ Commands:
     --model <id>       Model (default: ${DEFAULT_MODEL})
     --attempts <n>     Attempts per phase (default: 3)
     --previous <file>  Earlier build of the same spec version: reuse its checks, regenerate the UI
-    --ui a2ui          Build the UI as an A2UI surface instead of a tree
+    --ui <format>      a2ui or tree (default: the previous build's format, else
+                       the host's: a2ui on WordPress and EmDash)
     --no-verify        Only validate candidates, do not run their checks
                        Needs ANTHROPIC_API_KEY (or an \`ant auth login\` profile).
   canary               Upgrade every tenant's customizations ahead of a host change

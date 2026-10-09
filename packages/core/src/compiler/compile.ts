@@ -2,7 +2,7 @@ import buildSchema from '../../../../schemas/build.schema.json' with { type: 'js
 import '../ajv.ts';
 import { describeSchemaError } from '../schema-errors.ts';
 import { lazyValidator, type Validator } from '../schema.ts';
-import { uiFormatOf } from '../build/format.ts';
+import { uiFormatNamed, uiFormatOf, type UiFormat } from '../build/format.ts';
 import { extractRefs } from '../build/refs.ts';
 import type { Build, Check } from '../build/types.ts';
 import { validateBuild } from '../build/validate.ts';
@@ -18,13 +18,34 @@ export const COMPILER_VERSION = 'graft-compiler/0.1.0';
 const validateCheck: Validator = lazyValidator({ $defs: buildSchema.$defs, $ref: '#/$defs/check' });
 
 /**
+ * The format to build the UI in, undefined for a tree: the caller's, else
+ * the previous build's, else the host's.
+ */
+function compileFormat(options: CompileOptions): UiFormat | undefined {
+	if (options.format) {
+		return options.format === 'tree' ? undefined : options.format;
+	}
+	if (options.previous) {
+		return uiFormatOf(options.previous);
+	}
+	if (!options.host.ui) {
+		return undefined;
+	}
+	const format = uiFormatNamed(options.host.ui, options.surface.host);
+	if (!format) {
+		throw new Error(`No UI format "${options.host.ui}" is registered for ${options.surface.host}.`);
+	}
+	return format;
+}
+
+/**
  * Compiles a spec into a build for one surface, in two phases:
  *
  * 1. Checks: the model turns the acceptance criteria into executable checks,
  *    without seeing any implementation. They are then frozen (or passed in
  *    from an earlier build of the same spec version).
- * 2. Tree: the model builds the tree and data sources against the frozen
- *    checks. Each candidate is assembled, validated against the surface and
+ * 2. UI: the model builds the UI (in the format, else a tree) and data
+ *    sources against the frozen checks. Each candidate is assembled, validated against the surface and
  *    spec, and verified; problems go back to the model until it passes or
  *    the attempts run out.
  *
@@ -39,7 +60,7 @@ export async function compileSpec(options: CompileOptions): Promise<CompileResul
 	let checks = options.checks;
 	if (!checks) {
 		const base = checksSystem(spec, surface, host);
-		const format = options.format ?? (options.previous ? uiFormatOf(options.previous) : undefined);
+		const format = compileFormat(options);
 		const system = format?.compiler?.checksSystem?.(base, spec, surface) ?? base;
 		const schema = checksOutputSchema(spec);
 		let feedback: string[] = [];
@@ -73,7 +94,7 @@ export async function compileSpec(options: CompileOptions): Promise<CompileResul
 
 	// Phase 2: the UI (a tree, or the format's) and data against the frozen checks.
 	// Regenerating a build in another format keeps its format.
-	const format = options.format ?? (options.previous ? uiFormatOf(options.previous) : undefined);
+	const format = compileFormat(options);
 	const ui = format?.compiler;
 	if (format && !ui) {
 		throw new Error(`The ${format.name} format has no compiler.`);

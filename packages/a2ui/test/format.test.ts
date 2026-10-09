@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
-import { applyMigrations, compileSpec, extractRefs, hashSurface, registerUiFormat, validateBuild, verifyBuild, type Build } from '@graft/core';
+import { applyMigrations, compileSpec, extractRefs, hashSurface, modelAnswers, registerUiFormat, validateBuild, verifyBuild, type Build, type CompileOptions } from '@graft/core';
 import { createCan, fakeSandbox, fixtures, pageBuild, semantics, spec, surface } from '../../core/test/fixtures/acme.ts';
-import { createA2UIFormat, type A2UIBuild } from '../src/index.ts';
+import { answerA2UI, assembleA2UI, createA2UIFormat, type A2UIBuild } from '../src/index.ts';
 
 registerUiFormat(createA2UIFormat({ host: 'acme', catalogId: 'graft:acme' }));
 
@@ -158,17 +158,9 @@ describe('A2UI builds', () => {
 describe('compiling to A2UI', () => {
 	it('builds the UI phase in the format, sends problems back, and verifies against the frozen checks', async () => {
 		const target = (await a2uiBuild()) as unknown as A2UIBuild;
-		const answer = (pointer: string) => ({
-			components: target.ui.components.map(({ id, component, ...props }) => ({
-				id,
-				component,
-				props_json: JSON.stringify(component === 'Table' ? { ...props, rows: { path: pointer } } : props),
-			})),
-			initial_json: '{}',
-			computed_json: '{}',
-			data: Object.entries(target.data).map(([name, source]) => ({ name, call: source.call, input_json: JSON.stringify(source.input ?? null) })),
-			events: Object.entries(target.events).map(([name, e]) => ({ name, call: e.call, input_json: JSON.stringify(e.input), then: e.then ?? [], notice: null })),
-		});
+		// The target's UI as model output, its table bound to `pointer`.
+		const answer = (pointer: string) =>
+			answerA2UI({ ...target, ui: { ...target.ui, components: target.ui.components.map((c) => (c.component === 'Table' ? { ...c, rows: { path: pointer } } : c)) } });
 		const prompts: string[] = [];
 		const outputs = [answer('/open.items'), answer('/open/items')];
 		const model = {
@@ -195,5 +187,49 @@ describe('compiling to A2UI', () => {
 		expect((result.build as unknown as A2UIBuild).ui.catalogId).toBe('graft:acme');
 		expect(result.build!.tree).toBeUndefined();
 		expect(result.verification!.passed).toBe(true);
+	});
+});
+
+describe('the format a build is compiled in', () => {
+	/** Compiles the acme spec with frozen checks, the model answering with `answers` (one per UI attempt). */
+	const compile = async (answers: unknown[], options: Partial<CompileOptions> = {}) => {
+		const target = await pageBuild();
+		const result = await compileSpec({
+			spec,
+			specHash: target.spec.hash,
+			surface: { ...surface, hash: await hashSurface(surface) },
+			model: { generate: async () => ({ output: answers.shift(), model: 'scripted' }) },
+			host: { fixtures: '', assertions: '' },
+			checks: target.checks,
+			...options,
+		});
+		return result.build;
+	};
+
+	it("is the host's when nothing else decides", async () => {
+		const build = await compile([modelAnswers(await a2uiBuild()).tree], { host: { fixtures: '', assertions: '', ui: 'A2UI' } });
+		expect(build?.tree).toBeUndefined();
+		expect((build as unknown as A2UIBuild).ui.catalogId).toBe('graft:acme');
+	});
+
+	it("is the previous build's when regenerating, and a tree when asked", async () => {
+		const host = { fixtures: '', assertions: '', ui: 'A2UI' };
+		const tree = await pageBuild();
+		expect((await compile([modelAnswers(tree).tree], { host, previous: tree }))?.tree).toBeDefined();
+		expect((await compile([modelAnswers(tree).tree], { host, format: 'tree' }))?.tree).toBeDefined();
+	});
+
+	it('is a tree for a host without one', async () => {
+		expect((await compile([modelAnswers(await pageBuild()).tree]))?.tree).toBeDefined();
+	});
+});
+
+describe('model answers for an A2UI build', () => {
+	it('assemble back into the same UI, data and events', async () => {
+		const build = (await a2uiBuild((b) => {
+			b.ui.initial = { form: { status: 'open' } };
+			b.ui.computed = { count: { call: 'count', args: { items: { path: '/open/items' } } } };
+		})) as unknown as A2UIBuild;
+		expect(assembleA2UI(answerA2UI(build), 'graft:acme')).toEqual({ value: { ui: build.ui, data: build.data, events: build.events }, problems: [] });
 	});
 });

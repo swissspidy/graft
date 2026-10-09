@@ -3,6 +3,8 @@ import { a2uiNotes } from './a2ui.ts';
 
 /** What the compiler needs to know about EmDash beyond the surface. */
 export const hostGuide: HostGuide = {
+	// New builds are A2UI surfaces; a previous build keeps its format.
+	ui: 'A2UI',
 	formats: { A2UI: a2uiNotes },
 	fixtures: `A JSON object:
 {"users": [{"as": "<alias>", "role": "admin|editor|author|contributor|subscriber"}],

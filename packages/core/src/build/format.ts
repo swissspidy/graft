@@ -64,6 +64,12 @@ export interface UiCompiler {
 	 * UI is made of. Given the tree version; without it, that is used.
 	 */
 	checksSystem?(base: string, spec: Spec, surface: Surface): string;
+	/**
+	 * A build in the format as the model's output for its UI phase (the
+	 * inverse of `assemble`), for scripted models in tests. `dataInput`
+	 * replaces data source inputs by name.
+	 */
+	answer?(build: Build, dataInput?: Record<string, unknown>): unknown;
 }
 
 const formats: UiFormat[] = [];

@@ -118,7 +118,8 @@ installed.
 
 1. An administrator opens **Tools → Customizations → New customization**,
    writes a spec (validated against the site as they type) and clicks
-   **Build it**. The compiler runs in the browser; model requests go through
+   **Build it**. The compiler runs in the browser and builds an A2UI
+   surface ([ADR 0009](docs/adr/0009-a2ui.md)); model requests go through
    the site's WordPress AI client, so provider keys never reach the browser.
 2. The checks run in a private, throwaway WordPress started in the admin's
    browser ([Playground](https://wordpress.org/playground/) in a hidden
@@ -167,7 +168,8 @@ pnpm graft verify --surface hosts/emdash/adapter/surfaces/1.0.json --spec exampl
 pnpm graft bundle --spec examples/agency/specs/upcoming-events.md --surface examples/agency/surface.json \
   --out upcoming-events.bundle.json examples/agency/builds/upcoming-events.json   # a verified customization as one file
 
-# Compile with Claude (ANTHROPIC_API_KEY; default claude-opus-5-5)
+# Compile with Claude (ANTHROPIC_API_KEY; default claude-opus-5-5). New builds are
+# A2UI surfaces on WordPress and EmDash; --ui tree builds a tree instead.
 pnpm graft compile examples/specs/review-queue.md \
   --surface hosts/wordpress/plugin/surfaces/7.1.json --out review-queue.build.json
 
@@ -192,18 +194,18 @@ pnpm graft site verify --site <url> --token <token>
 | `pnpm test:wp` | Plugin smoke test in Playground on PHP 7.4 and 8.4: abilities, store, lifecycle, gateway, host changes, security regressions |
 | `pnpm verify:examples` | The example builds' checks in a WordPress sandbox |
 | `pnpm verify:agency` | The agency example builds' checks, in a sandbox that reproduces the client site's content model |
-| `pnpm test:compile` | The compile pipeline with a scripted model against WordPress, including a build whose code loops |
+| `pnpm test:compile` | The compile pipeline with a scripted model against WordPress: an A2UI build, and a tree whose code loops |
 | `pnpm test:canary` | Eight synthetic host changes, each forcing one rung, against a five-tenant corpus (one with code and a widget) |
 | `pnpm test:e2e` | Playwright in wp-admin: serving, gateway and its audit log, build functions and their lazy loading, an interactive widget, the publish checklist in the block editor, approval, authoring, `graft site` |
 | `pnpm test:e2e:a2ui` | Playwright on the e2e site with the example specs built as A2UI surfaces: Dashboard widgets, local state, row actions, the review queue, approval and the block editor panel, with no code |
 | `pnpm test:canary:a2ui` | The same synthetic host changes against the example specs built as A2UI |
 | `pnpm test:e2e:agency` | Playwright on a client site an agency built: custom post types, fields and terms, the agency's policy and managed customization, and upgrading after the agency changes the content model |
 | `pnpm verify:emdash` | The EmDash example builds' checks in a throwaway EmDash |
-| `pnpm test:compile:emdash` | The compile pipeline with a scripted model against EmDash |
+| `pnpm test:compile:emdash` | The compile pipeline with a scripted model against EmDash, building an A2UI surface |
 | `pnpm test:canary:emdash` | Six synthetic EmDash changes, each forcing one rung, against a two-tenant corpus (one with code and a widget) |
 | `pnpm test:site:emdash` | `graft site` against a live EmDash: install with local verification, verify drafts, pull into the canary |
 | `pnpm test:emdash:sandboxed` | The same, with Graft in EmDash's plugin sandbox (workerd) |
-| `pnpm test:author:emdash` | Writing a customization in the EmDash admin, with a stubbed Claude API, in both formats |
+| `pnpm test:author:emdash` | Writing a customization (an A2UI surface) in the EmDash admin, with a stubbed Claude API, natively and sandboxed |
 | `pnpm test:cfworker` | The unit tests again on the schema engine used where code generation is forbidden |
 | `pnpm test:emdash:a2ui` | The EmDash examples built as A2UI: installed, approved and served as Block Kit, natively and sandboxed |
 | `pnpm test:emdash` | EmDash plugin smoke test: install, approve, serve per role, forged and refused actions, a widget's events and actions |

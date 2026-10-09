@@ -22,8 +22,9 @@ await mkdir(dir, { recursive: true });
 // Verify the example builds first: the site only serves verified builds.
 const surface = JSON.parse(await readFile(join(paths.surfaces, `${wp}.json`), 'utf8'));
 await writeFile(join(dir, 'examples.json'), JSON.stringify(await exampleFixtures({ verifyAgainst: surface })));
-// The scripted model answers with the waiting-posts build, for authoring tests.
-await writeFile(join(dir, 'model.json'), JSON.stringify(modelAnswers(JSON.parse(await readFile(join(examplesDir, 'builds/waiting-posts.json'), 'utf8')))));
+// The scripted model answers with the waiting-posts build, for authoring tests:
+// an A2UI surface, the format wp-admin builds new customizations in.
+await writeFile(join(dir, 'model.json'), JSON.stringify(modelAnswers(JSON.parse(await readFile(join(examplesDir, 'a2ui/builds/waiting-posts.json'), 'utf8')))));
 await writeFile(
 	join(dir, 'blueprint.json'),
 	JSON.stringify({
