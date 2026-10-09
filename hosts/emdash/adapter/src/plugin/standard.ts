@@ -1,5 +1,5 @@
-import { setSchemaEngine } from '@graft/core';
-import { cfworkerEngine } from '@graft/core/cfworker';
+import { setSchemaEngine } from '@swissspidy/graft-core';
+import { cfworkerEngine } from '@swissspidy/graft-core/cfworker';
 import type { PluginContext } from 'emdash';
 import { GraftRouteError, graftRoutes, type RouteRequest } from './routes.ts';
 

@@ -1,4 +1,4 @@
-import { compileSpec, hashSpec, validateSpec, type Diagnostic, type ModelClient, type ModelResponse, type Surface } from '@graft/core';
+import { compileSpec, hashSpec, validateSpec, type Diagnostic, type ModelClient, type ModelResponse, type Surface } from '@swissspidy/graft-core';
 import { hostGuide } from '../host/guide.ts';
 import type { KV, Store } from './store.ts';
 

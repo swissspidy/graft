@@ -1,4 +1,4 @@
-import { hashSurface, type Surface } from '@graft/core';
+import { hashSurface, type Surface } from '@swissspidy/graft-core';
 import { baseSlot, patchSurface, resolveCall, type HostPatch } from '../host/patch.ts';
 import type { PluginContext } from 'emdash';
 import { roles, type RoleName } from '../host/surface.ts';

@@ -1,5 +1,5 @@
 import Anthropic from '@anthropic-ai/sdk';
-import type { ModelClient } from '@graft/core';
+import type { ModelClient } from '@swissspidy/graft-core';
 
 export interface AnthropicModelOptions {
 	model?: string;

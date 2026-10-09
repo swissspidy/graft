@@ -1,4 +1,4 @@
-import { createSnapshotEmitter, type EvalContext, type Snapshot, type SnapshotAction } from '@graft/core';
+import { createSnapshotEmitter, type EvalContext, type Snapshot, type SnapshotAction } from '@swissspidy/graft-core';
 import type { A2UIBuild } from './types.ts';
 import { INPUT_GROUP, walkA2UI, type A2UIHost, type DrawnButton } from './walk.ts';
 

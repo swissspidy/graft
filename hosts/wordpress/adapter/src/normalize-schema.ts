@@ -1,4 +1,4 @@
-import type { JsonSchema } from '@graft/core';
+import type { JsonSchema } from '@swissspidy/graft-core';
 
 type SchemaObject = Record<string, unknown>;
 

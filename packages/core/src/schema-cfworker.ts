@@ -6,8 +6,8 @@ import type { SchemaEngine, SchemaError, Validator } from './schema.ts';
  * the EmDash plugin sandbox), on @cfworker/json-schema. Errors are mapped
  * to Ajv's shape so diagnostics read the same:
  *
- *   import { setSchemaEngine } from '@graft/core';
- *   import { cfworkerEngine } from '@graft/core/cfworker';
+ *   import { setSchemaEngine } from '@swissspidy/graft-core';
+ *   import { cfworkerEngine } from '@swissspidy/graft-core/cfworker';
  *   setSchemaEngine(cfworkerEngine());
  *
  * Unlike Ajv it does not reject unknown keywords in schemas, so surfaces

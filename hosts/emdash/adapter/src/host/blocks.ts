@@ -1,4 +1,4 @@
-import type { Action } from '@graft/core/runtime';
+import type { Action } from '@swissspidy/graft-core/runtime';
 
 /**
  * EmDash Block Kit for a customization (the A2UI renderer, ./a2ui.ts,

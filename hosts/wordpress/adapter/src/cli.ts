@@ -1,7 +1,7 @@
 import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import { basename, join, resolve } from 'node:path';
 import { parseArgs } from 'node:util';
-import { hasErrors, validateSurface } from '@graft/core';
+import { hasErrors, validateSurface } from '@swissspidy/graft-core';
 import { assembleSurface, generateSurface, type GeneratedSurface, type HostDump } from './surface.ts';
 import { paths } from './playground.ts';
 

@@ -10,7 +10,7 @@
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.129.0",
-    "@graft/core": "workspace:*",
+    "@swissspidy/graft-core": "workspace:*",
     "@graft/emdash": "workspace:*",
     "@graft/wordpress-adapter": "workspace:*",
     "tsx": "^4.20.0"

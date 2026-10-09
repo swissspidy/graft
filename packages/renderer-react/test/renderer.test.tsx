@@ -2,7 +2,7 @@
 import { act } from 'react';
 import { createRoot } from 'react-dom/client';
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import type { Build } from '@graft/core';
+import type { Build } from '@swissspidy/graft-core';
 import { GraftRoot, removeRow, type Gateway, type UiRootProps } from '../src/index.ts';
 
 (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;

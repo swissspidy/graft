@@ -1,6 +1,6 @@
 import { mkdir, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
-import { compileSpec, type Build, type CanaryReport, type ModelClient, type Spec, type Surface } from '@graft/core';
+import { compileSpec, type Build, type CanaryReport, type ModelClient, type Spec, type Surface } from '@swissspidy/graft-core';
 import { hostTools } from './hosts.ts';
 import { loadSurface } from './validate.ts';
 

@@ -1,15 +1,60 @@
 {
-  "name": "@graft/core",
-  "version": "0.0.0",
-  "private": true,
+  "name": "@swissspidy/graft-core",
+  "version": "0.1.0",
   "license": "Apache-2.0",
   "description": "Host-agnostic Graft core: spec parsing and validation, surfaces, builds, verifier and lifecycle. No I/O.",
+  "keywords": [
+    "graft",
+    "specs",
+    "customization",
+    "verification",
+    "wordpress",
+    "emdash"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/swissspidy/graft.git",
+    "directory": "packages/core"
+  },
+  "homepage": "https://github.com/swissspidy/graft#readme",
+  "bugs": "https://github.com/swissspidy/graft/issues",
   "type": "module",
+  "engines": {
+    "node": ">=22"
+  },
+  "files": [
+    "dist",
+    "README.md"
+  ],
   "exports": {
     ".": "./src/index.ts",
     "./runtime": "./src/runtime.ts",
     "./parse": "./src/spec/parse.ts",
     "./cfworker": "./src/schema-cfworker.ts"
+  },
+  "publishConfig": {
+    "access": "public",
+    "exports": {
+      ".": {
+        "types": "./dist/index.d.ts",
+        "default": "./dist/index.js"
+      },
+      "./runtime": {
+        "types": "./dist/runtime.d.ts",
+        "default": "./dist/runtime.js"
+      },
+      "./parse": {
+        "types": "./dist/spec/parse.d.ts",
+        "default": "./dist/spec/parse.js"
+      },
+      "./cfworker": {
+        "types": "./dist/schema-cfworker.d.ts",
+        "default": "./dist/schema-cfworker.js"
+      }
+    }
+  },
+  "scripts": {
+    "prepack": "tsx ../../scripts/build-packages.ts packages/core"
   },
   "dependencies": {
     "@cfworker/json-schema": "^4.1.1",

@@ -1,5 +1,5 @@
 import { readFile, writeFile } from 'node:fs/promises';
-import { createBundle, hashSpec, validateBuild, validateSpec, type Build, type CustomizationBundle, type Surface, type Verification } from '@graft/core';
+import { createBundle, hashSpec, validateBuild, validateSpec, type Build, type CustomizationBundle, type Surface, type Verification } from '@swissspidy/graft-core';
 import { hostTools, loadHostFormats } from './hosts.ts';
 import { loadSurface } from './validate.ts';
 

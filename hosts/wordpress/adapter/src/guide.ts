@@ -1,4 +1,4 @@
-import type { HostGuide } from '@graft/core';
+import type { HostGuide } from '@swissspidy/graft-core';
 import { a2uiNotes } from './a2ui.ts';
 
 /** What the compiler needs to know about WordPress beyond the surface. */

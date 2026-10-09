@@ -1,4 +1,4 @@
-import type { ModelClient, Surface } from '@graft/core';
+import type { ModelClient, Surface } from '@swissspidy/graft-core';
 import type { Block } from '../host/blocks.ts';
 import { AuthoringError, startJob, stepJob, type Job, type Jobs } from './author.ts';
 import type { Store } from './store.ts';

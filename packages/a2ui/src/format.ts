@@ -1,4 +1,4 @@
-import { describeSpec, describeSurface, usableCapabilities, type Build, type Check, type Migration, type Refs, type Spec, type Surface, type UiFormat } from '@graft/core';
+import { describeSpec, describeSurface, usableCapabilities, type Build, type Check, type Migration, type Refs, type Spec, type Surface, type UiFormat } from '@swissspidy/graft-core';
 import { BASE_COMPONENTS, PROTOCOL } from './catalog.ts';
 import { CATALOG_GUIDE } from './guide.ts';
 import { snapshotA2UI } from './snapshot.ts';

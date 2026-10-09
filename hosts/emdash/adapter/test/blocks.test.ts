@@ -1,4 +1,4 @@
-import { validateBuild, type Build } from '@graft/core';
+import { validateBuild, type Build } from '@swissspidy/graft-core';
 import { readFile } from 'node:fs/promises';
 import { describe, expect, it } from 'vitest';
 import { findAction, readValue, withState, type Block } from '../src/host/blocks.ts';

@@ -1,10 +1,14 @@
-# @graft/a2ui
+# @swissspidy/graft-a2ui
 
 A2UI v0.9 surfaces as a Graft build's UI, on [`@a2ui/web_core`](https://www.npmjs.com/package/@a2ui/web_core)
-(Apache-2.0). A build either has a `tree` or a `ui` (an A2UI surface) with
-`events` binding its action events to capability calls. Everything else in
-the build, and everything around it (spec, frozen checks, gateway, grants,
-verification, upgrades), stays Graft's. See [ADR 0009](../../docs/adr/0009-a2ui.md).
+(Apache-2.0). A build's UI is an A2UI surface (`ui`), with `events` binding
+its action events to capability calls. Everything else in the build, and
+everything around it (spec, frozen checks, gateway, grants, verification,
+upgrades), stays Graft's. See [ADR 0009](https://github.com/swissspidy/graft/blob/main/docs/adr/0009-a2ui.md).
+
+```sh
+npm install @swissspidy/graft-a2ui @swissspidy/graft-core
+```
 
 This package has no renderer. It gives core the A2UI format
 (`createA2UIFormat`, registered by each host with `registerUiFormat`):
@@ -25,7 +29,7 @@ This package has no renderer. It gives core the A2UI format
   another.
 - **Refs, migrations, slot props and the compiler's UI phase** (`format.ts`).
 
-`@graft/a2ui/client` is what a browser renderer needs without core's
+`@swissspidy/graft-a2ui/client` is what a browser renderer needs without core's
 validation: the Graft catalog, the data model's seeding, table fields and
 event inputs. WordPress draws A2UI builds with
 [a2ui-wp](https://www.npmjs.com/package/@swissspidy/a2ui-wp) (React,

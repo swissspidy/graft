@@ -1,5 +1,5 @@
 import { useEffect, useMemo } from 'react';
-import { createGraftCatalog, seed, tableField, withContext, type A2UIBuild } from '@graft/a2ui/client';
+import { createGraftCatalog, seed, tableField, withContext, type A2UIBuild } from '@swissspidy/graft-a2ui/client';
 import {
 	A2UIProcessor,
 	A2UIRenderer,
@@ -27,7 +27,7 @@ import { Table as GraftTable } from './table.tsx';
  * from the data sources, and an action event becomes the capability call it
  * is bound to.
  *
- * The surface uses the same Graft catalog as the verifier (@graft/a2ui):
+ * The surface uses the same Graft catalog as the verifier (@swissspidy/graft-a2ui):
  * the same functions, resolved by the same web_core, so what the checks
  * proved is what the viewer gets. `can` refines on the row in scope, and
  * `set` writes the surface's data model through A2UI's own data context.

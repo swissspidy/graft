@@ -1,5 +1,5 @@
 import { DataContext, DataModel, SurfaceModel, type ComponentApi } from '@a2ui/web_core/v0_9';
-import type { Action, EvalContext } from '@graft/core';
+import type { Action, EvalContext } from '@swissspidy/graft-core';
 import { createGraftCatalog } from './catalog.ts';
 import { withContext } from './events.ts';
 import { tableField } from './table.ts';

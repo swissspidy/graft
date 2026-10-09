@@ -14,6 +14,9 @@ importers:
       '@types/node':
         specifier: ^26.6.3
         version: 26.6.3
+      esbuild:
+        specifier: ^0.28.2
+        version: 0.28.2
       tsx:
         specifier: ^4.20.0
         version: 4.23.15
@@ -29,10 +32,10 @@ importers:
       '@anthropic-ai/sdk':
         specifier: ^0.129.0
         version: 0.129.0(zod@4.5.4)
-      '@graft/a2ui':
+      '@swissspidy/graft-a2ui':
         specifier: workspace:*
         version: link:../../../packages/a2ui
-      '@graft/core':
+      '@swissspidy/graft-core':
         specifier: workspace:*
         version: link:../../../packages/core
     devDependencies:
@@ -75,15 +78,15 @@ importers:
 
   hosts/wordpress/adapter:
     dependencies:
-      '@graft/a2ui':
-        specifier: workspace:*
-        version: link:../../../packages/a2ui
-      '@graft/core':
-        specifier: workspace:*
-        version: link:../../../packages/core
       '@graft/renderer-react':
         specifier: workspace:*
         version: link:../../../packages/renderer-react
+      '@swissspidy/graft-a2ui':
+        specifier: workspace:*
+        version: link:../../../packages/a2ui
+      '@swissspidy/graft-core':
+        specifier: workspace:*
+        version: link:../../../packages/core
     devDependencies:
       '@a2ui/web_core':
         specifier: 0.12.0
@@ -121,7 +124,7 @@ importers:
       '@a2ui/web_core':
         specifier: 0.12.0
         version: 0.12.0
-      '@graft/core':
+      '@swissspidy/graft-core':
         specifier: workspace:*
         version: link:../core
       zod:
@@ -133,15 +136,15 @@ importers:
       '@anthropic-ai/sdk':
         specifier: ^0.129.0
         version: 0.129.0(zod@4.6.5)
-      '@graft/core':
-        specifier: workspace:*
-        version: link:../core
       '@graft/emdash':
         specifier: workspace:*
         version: link:../../hosts/emdash/adapter
       '@graft/wordpress-adapter':
         specifier: workspace:*
         version: link:../../hosts/wordpress/adapter
+      '@swissspidy/graft-core':
+        specifier: workspace:*
+        version: link:../core
       tsx:
         specifier: ^4.20.0
         version: 4.23.15
@@ -163,7 +166,7 @@ importers:
 
   packages/renderer-react:
     dependencies:
-      '@graft/core':
+      '@swissspidy/graft-core':
         specifier: workspace:*
         version: link:../core
     devDependencies:

@@ -1,4 +1,4 @@
-import { describeCheck, validateSpec, type Surface } from '@graft/core';
+import { describeCheck, validateSpec, type Surface } from '@swissspidy/graft-core';
 import type { Block } from '../host/blocks.ts';
 import { describers } from '../host/describe.ts';
 import { activeVersion, pendingVersion, type SpecRecord } from './store.ts';

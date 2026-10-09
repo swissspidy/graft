@@ -1,5 +1,5 @@
-import { createA2UIFormat, type A2UIFormatHost } from '@graft/a2ui';
-import { registerUiFormat } from '@graft/core';
+import { createA2UIFormat, type A2UIFormatHost } from '@swissspidy/graft-a2ui';
+import { registerUiFormat } from '@swissspidy/graft-core';
 import { cell, type Field } from './cells.ts';
 
 /**

@@ -1,4 +1,4 @@
-import type { Verification } from '@graft/core';
+import type { Verification } from '@swissspidy/graft-core';
 import { loadExamples } from './examples.ts';
 import { startSandbox, verifyInEmDash } from './sandbox.ts';
 import { asUser, contentApi, login, pluginRoute, startEmDash } from './server.ts';

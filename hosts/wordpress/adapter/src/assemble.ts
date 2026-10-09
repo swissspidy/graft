@@ -1,4 +1,4 @@
-import { hashSurface, type Slot, type Surface } from '@graft/core';
+import { hashSurface, type Slot, type Surface } from '@swissspidy/graft-core';
 import { normalizeWordPressSchema } from './normalize-schema.ts';
 import type { HostDump, WordPressModel } from './surface-types.ts';
 

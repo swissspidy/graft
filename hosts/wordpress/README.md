@@ -122,7 +122,7 @@ expectations over a semantic snapshot.
   `available`), and the host assertion `post` (`{ title, status }`).
 - **Slot instances:** owned slots render once; `posts.list.row-actions`
   renders once per post in the Posts screen's "All" view for that user.
-- **Snapshots** come from the A2UI format (`@graft/a2ui`), resolved with the
+- **Snapshots** come from the A2UI format (`@swissspidy/graft-a2ui`), resolved with the
   same web_core and catalog the browser uses; table cells read as
   `adapter/src/cells.ts` formats them for both.
 

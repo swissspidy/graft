@@ -1,6 +1,6 @@
 import { readFile } from 'node:fs/promises';
 import { fileURLToPath } from 'node:url';
-import { validateSpec, type Build, type Spec, type Surface } from '@graft/core';
+import { validateSpec, type Build, type Spec, type Surface } from '@swissspidy/graft-core';
 // The example builds are A2UI surfaces.
 import '../host/a2ui.ts';
 

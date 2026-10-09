@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
-import type { A2UIBuild } from '@graft/a2ui/client';
+import type { A2UIBuild } from '@swissspidy/graft-a2ui/client';
 import { createProcessor, surfaceId } from '../src/client/a2ui.tsx';
 
 // Tests run from the repository root.

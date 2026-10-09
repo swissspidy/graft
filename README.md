@@ -205,6 +205,7 @@ pnpm graft site verify --site <url> --token <token>
 | `pnpm test:emdash:sandboxed` | The same, with Graft in EmDash's plugin sandbox (workerd) |
 | `pnpm test:author:emdash` | Writing a customization (an A2UI surface) in the EmDash admin, with a stubbed Claude API, natively and sandboxed |
 | `pnpm test:cfworker` | The unit tests again on the schema engine used where code generation is forbidden |
+| `pnpm test:packages` | The npm packages, packed as published, installed outside the workspace and imported |
 | `pnpm test:emdash` | EmDash plugin smoke test: install, approve, serve per role, forged and refused actions, the status board's local state and actions |
 | `pnpm test:e2e:emdash` | Playwright in the EmDash admin: the page, the widget and the editor panel |
 
@@ -246,14 +247,29 @@ Known limits:
 | --- | --- |
 | `docs/adr` | Architecture decision records |
 | `schemas/` | JSON Schemas for spec, surface and build, and the spec lifecycle table |
-| `packages/core` | Host-agnostic, no I/O: specs, surfaces, builds, expression evaluator, verifier, compiler, upgrade ladder, canary |
-| `packages/a2ui` | The A2UI format on `@a2ui/web_core`: the Graft catalog, validation, refs, snapshots, migrations and the compiler's UI phase |
+| `packages/core` | Host-agnostic, no I/O: specs, surfaces, builds, expression evaluator, verifier, compiler, upgrade ladder, canary ([`@swissspidy/graft-core`](packages/core/README.md) on npm) |
+| `packages/a2ui` | The A2UI format on `@a2ui/web_core`: the Graft catalog, validation, refs, snapshots, migrations and the compiler's UI phase ([`@swissspidy/graft-a2ui`](packages/a2ui/README.md) on npm) |
 | `packages/renderer-react` | Loads a build's data through the capability gateway and runs its actions; the format's renderer draws it |
 | `packages/cli` | The `graft` command |
 | `hosts/wordpress` | The WordPress adapter: plugin, A2UI client, surface generator, sandbox, tests ([README](hosts/wordpress/README.md)) |
 | `hosts/emdash` | The EmDash adapter: a native plugin that serves builds as Block Kit, surface, sandbox, test site, tests ([README](hosts/emdash/README.md)) |
 | `examples/` | Example specs and their builds, A2UI surfaces (WordPress; EmDash in `examples/emdash`; an agency-built client site in `examples/agency`) |
 | `fixtures/canary` | A multi-tenant corpus for the canary |
+
+## Packages on npm
+
+`@swissspidy/graft-core` and `@swissspidy/graft-a2ui` are published from
+`packages/core` and `packages/a2ui`. In the workspace they export their
+TypeScript sources; `pnpm build:packages` bundles each into `dist/` (ES
+modules and type declarations), which is what `publishConfig.exports`
+points the published packages at. The other packages stay private.
+
+To release, set the same `version` in both package.json files, merge, and
+publish a GitHub release tagged `v<version>`: the release workflow runs the
+tests, checks the tag against the versions and publishes both with
+provenance, authenticated by npm trusted publishing. The first release of
+a new package is published by hand (`pnpm -r --filter "./packages/{core,a2ui}" publish --access public`),
+since npm configures trusted publishing per existing package.
 
 ## License
 

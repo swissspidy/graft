@@ -1,5 +1,5 @@
 /**
- * What a browser renderer needs, without @graft/core's validation (ajv,
+ * What a browser renderer needs, without @swissspidy/graft-core's validation (ajv,
  * yaml): the Graft catalog on web_core, the verifier's seeding of the data
  * model, table fields, event inputs and the build's types. Keeps a page
  * that draws A2UI builds small.

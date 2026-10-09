@@ -1,5 +1,5 @@
 import Anthropic from '@anthropic-ai/sdk';
-import type { ModelClient } from '@graft/core';
+import type { ModelClient } from '@swissspidy/graft-core';
 import type { PluginContext } from 'emdash';
 import { DEFAULT_MODEL_ENDPOINT } from './manifest.ts';
 

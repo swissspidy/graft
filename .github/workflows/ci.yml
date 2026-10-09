@@ -34,6 +34,8 @@ jobs:
       - name: Tests again on the schema engine used in sandboxes (no code generation)
         run: pnpm test:cfworker
       - run: pnpm validate:examples
+      - name: The npm packages install and import outside the workspace
+        run: pnpm test:packages
 
   wordpress:
     runs-on: ubuntu-latest

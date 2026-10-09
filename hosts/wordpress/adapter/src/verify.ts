@@ -1,4 +1,4 @@
-import { verifyBuild, type Build, type Spec, type Surface, type Verification } from '@graft/core';
+import { verifyBuild, type Build, type Spec, type Surface, type Verification } from '@swissspidy/graft-core';
 import { createCan } from './can.ts';
 import { startSandbox, type SandboxOptions, type WordPressSandbox } from './sandbox.ts';
 import './a2ui.ts';

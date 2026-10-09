@@ -1,17 +1,51 @@
 {
-  "name": "@graft/a2ui",
-  "version": "0.0.0",
-  "private": true,
+  "name": "@swissspidy/graft-a2ui",
+  "version": "0.1.0",
   "license": "Apache-2.0",
   "description": "A2UI v0.9 surfaces as a Graft build's UI: the Graft catalog, snapshots for the verifier, static validation, refs and migrations. Built on @a2ui/web_core; no rendering.",
+  "keywords": [
+    "graft",
+    "a2ui",
+    "generative-ui"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/swissspidy/graft.git",
+    "directory": "packages/a2ui"
+  },
+  "homepage": "https://github.com/swissspidy/graft#readme",
+  "bugs": "https://github.com/swissspidy/graft/issues",
   "type": "module",
+  "engines": {
+    "node": ">=22"
+  },
+  "files": [
+    "dist",
+    "README.md"
+  ],
   "exports": {
     ".": "./src/index.ts",
     "./client": "./src/client.ts"
   },
+  "publishConfig": {
+    "access": "public",
+    "exports": {
+      ".": {
+        "types": "./dist/index.d.ts",
+        "default": "./dist/index.js"
+      },
+      "./client": {
+        "types": "./dist/client.d.ts",
+        "default": "./dist/client.js"
+      }
+    }
+  },
+  "scripts": {
+    "prepack": "tsx ../../scripts/build-packages.ts packages/a2ui"
+  },
   "dependencies": {
     "@a2ui/web_core": "0.12.0",
-    "@graft/core": "workspace:*",
+    "@swissspidy/graft-core": "workspace:*",
     "zod": "^3.25.76"
   }
 }

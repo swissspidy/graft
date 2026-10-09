@@ -1,4 +1,4 @@
-import type { JsonSchema, Scope, Surface } from '@graft/core';
+import type { JsonSchema, Scope, Surface } from '@swissspidy/graft-core';
 
 /**
  * A synthetic host change for the canary: what a future EmDash (or a future

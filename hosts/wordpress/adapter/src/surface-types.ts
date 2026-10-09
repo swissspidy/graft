@@ -1,4 +1,4 @@
-import type { Slot, Surface } from '@graft/core';
+import type { Slot, Surface } from '@swissspidy/graft-core';
 
 /** The host half of the surface as printed by the plugin (see dump-surface.php). */
 export interface HostDump {

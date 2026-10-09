@@ -1,4 +1,4 @@
-import { validateSurface, type Diagnostic, type Surface } from '@graft/core';
+import { validateSurface, type Diagnostic, type Surface } from '@swissspidy/graft-core';
 import { assembleSurface } from './assemble.ts';
 import { lastJsonLine, runPhp } from './playground.ts';
 import type { HostDump, WordPressModel } from './surface-types.ts';

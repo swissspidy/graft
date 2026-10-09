@@ -1,4 +1,4 @@
-import { compileSpec, hashSpec, modelAnswers, type ModelClient } from '@graft/core';
+import { compileSpec, hashSpec, modelAnswers, type ModelClient } from '@swissspidy/graft-core';
 import { hostGuide } from '../host/guide.ts';
 import { loadExamples } from './examples.ts';
 import { startSandbox, verifyInEmDash } from './sandbox.ts';

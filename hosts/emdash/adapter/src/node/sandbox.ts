@@ -1,4 +1,4 @@
-import { FixtureError, SandboxCallError, verifyBuild, type Build, type Sandbox, type Spec, type Surface, type Verification } from '@graft/core';
+import { FixtureError, SandboxCallError, verifyBuild, type Build, type Sandbox, type Spec, type Surface, type Verification } from '@swissspidy/graft-core';
 import { createCan } from '../host/can.ts';
 import type { HostPatch } from '../host/patch.ts';
 import '../host/a2ui.ts';

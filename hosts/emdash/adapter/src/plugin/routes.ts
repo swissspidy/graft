@@ -1,4 +1,4 @@
-import { hashSurface, type Surface, type Verification } from '@graft/core';
+import { hashSurface, type Surface, type Verification } from '@swissspidy/graft-core';
 import type { PluginContext } from 'emdash';
 import { hostSurface } from '../host/surface.ts';
 import { createJobs } from './author.ts';
