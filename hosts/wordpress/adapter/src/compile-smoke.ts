@@ -16,7 +16,7 @@ import { verifyInWordPress } from './verify.ts';
  */
 
 const source = await readFile(`${examplesDir}/specs/review-queue.md`, 'utf8');
-const handwritten = JSON.parse(await readFile(`${examplesDir}/a2ui/builds/review-queue.json`, 'utf8')) as Build;
+const handwritten = JSON.parse(await readFile(`${examplesDir}/builds/review-queue.json`, 'utf8')) as Build;
 const surface = JSON.parse(await readFile(`${paths.surfaces}/7.1.json`, 'utf8'));
 const spec = validateSpec(source, { surface }).spec!;
 

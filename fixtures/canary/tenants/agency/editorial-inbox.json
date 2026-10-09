@@ -28,76 +28,96 @@
 			}
 		}
 	},
-	"tree": {
-		"type": "stack",
-		"props": {
-			"gap": 4
-		},
-		"children": [
+	"ui": {
+		"protocol": "a2ui/v0.9",
+		"catalogId": "graft:wordpress",
+		"components": [
 			{
-				"type": "heading",
-				"props": {
-					"level": 1
-				},
-				"children": "Editorial inbox"
+				"id": "root",
+				"component": "Column",
+				"children": [
+					"heading",
+					"intro",
+					"queue_table"
+				]
 			},
 			{
-				"type": "text",
-				"props": {
-					"variant": "muted"
-				},
-				"children": "Posts waiting for review, oldest first."
+				"id": "heading",
+				"component": "Text",
+				"text": "Editorial inbox",
+				"variant": "h1"
 			},
 			{
-				"type": "table",
-				"props": {
-					"rows": {
-						"$data": "queue.items"
+				"id": "intro",
+				"component": "Text",
+				"text": "Posts waiting for review, oldest first.",
+				"variant": "caption"
+			},
+			{
+				"id": "queue_table",
+				"component": "Table",
+				"rows": {
+					"path": "/queue/items"
+				},
+				"fields": [
+					{
+						"id": "title",
+						"label": "Title",
+						"type": "string",
+						"primary": true
 					},
-					"fields": [
-						{
-							"id": "title",
-							"label": "Title",
-							"primary": true
+					{
+						"id": "author/name",
+						"label": "Author",
+						"type": "user"
+					},
+					{
+						"id": "date",
+						"label": "Submitted",
+						"type": "datetime"
+					}
+				],
+				"rowActions": [
+					{
+						"id": "approve",
+						"label": "Approve",
+						"variant": "primary",
+						"visible": {
+							"call": "can",
+							"args": {
+								"scope": "posts.status:write"
+							}
 						},
-						{
-							"id": "author.name",
-							"label": "Author",
-							"type": "user"
-						},
-						{
-							"id": "date",
-							"label": "Submitted",
-							"type": "datetime"
-						}
-					],
-					"actions": [
-						{
-							"id": "approve",
-							"label": "Approve",
-							"primary": true,
-							"visible": {
-								"$can": "posts.status:write"
-							},
-							"onClick": {
-								"$call": "posts.update_status",
-								"input": {
+						"action": {
+							"event": {
+								"name": "approve",
+								"context": {
 									"id": {
-										"$field": "id"
-									},
-									"status": "publish"
-								},
-								"then": [
-									"remove-row:queue"
-								],
-								"notice": "Post published."
+										"path": "id"
+									}
+								}
 							}
 						}
-					],
-					"empty": "Inbox zero"
-				}
+					}
+				],
+				"empty": "Inbox zero"
 			}
 		]
+	},
+	"events": {
+		"approve": {
+			"call": "posts.update_status",
+			"input": {
+				"id": {
+					"$context": "id"
+				},
+				"status": "publish"
+			},
+			"then": [
+				"remove-row:queue"
+			],
+			"notice": "Post published."
+		}
 	},
 	"checks": [
 		{
@@ -254,23 +274,7 @@
 	],
 	"refs": {
 		"slot": "admin.page",
-		"components": {
-			"heading": [
-				"level"
-			],
-			"stack": [
-				"gap"
-			],
-			"table": [
-				"actions",
-				"empty",
-				"fields",
-				"rows"
-			],
-			"text": [
-				"variant"
-			]
-		},
+		"components": {},
 		"capabilities": [
 			"posts.list",
 			"posts.update_status"
@@ -278,10 +282,28 @@
 		"scopes": [
 			"posts.status:write",
 			"posts:read"
-		]
+		],
+		"catalog": {
+			"Column": [
+				"children"
+			],
+			"Table": [
+				"empty",
+				"fields",
+				"rowActions",
+				"rows"
+			],
+			"Text": [
+				"text",
+				"variant"
+			]
+		}
 	},
 	"provenance": {
-		"compiler": "handwritten",
-		"strategy": "handwritten"
+		"compiler": "graft-compiler/0.1.0",
+		"model": "claude-opus-5-5",
+		"promptHash": "sha256:d0212b06dd7f651e42a44aefc40c02eb7860853c9eba1509703b99450e49dbb3",
+		"strategy": "regenerated",
+		"replaces": "sha256:6955b6d1b73bf609aced127699d1f05b1e772a32b2213e8636019ee45f2b8fd8"
 	}
 }

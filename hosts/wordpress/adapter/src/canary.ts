@@ -62,7 +62,6 @@ export const scenarios: Scenario[] = [
 		description: 'posts.list takes "statuses" instead of "status"; no migration describes it.',
 		patch: { variants: ['posts-list-statuses'], capabilities: { ability: { 'posts.list': 'graft-canary/posts-list' } } },
 		migrations: [],
-		// The headline check is recompiled, and its code comes through.
 		expect: { 'review-queue': 'regenerated', 'quick-approve': 'survived', 'editorial-inbox': 'regenerated', 'headline-check': 'regenerated', 'pending-by-author': 'regenerated', 'publish-checklist': 'survived' },
 	},
 	{
@@ -88,7 +87,8 @@ export const scenarios: Scenario[] = [
 		patch: {},
 		migrations: [],
 		surface: ({ functions: _, ...rest }) => rest,
-		expect: { 'review-queue': 'survived', 'quick-approve': 'survived', 'editorial-inbox': 'survived', 'headline-check': 'failed', 'pending-by-author': 'failed', 'publish-checklist': 'failed' },
+		// No build runs code: A2UI surfaces use catalog functions.
+		expect: { 'review-queue': 'survived', 'quick-approve': 'survived', 'editorial-inbox': 'survived', 'headline-check': 'survived', 'pending-by-author': 'survived', 'publish-checklist': 'survived' },
 	},
 	{
 		name: 'no-widgets',
@@ -99,7 +99,7 @@ export const scenarios: Scenario[] = [
 			const { widgets: _, ...functions } = surface.functions!;
 			return { ...surface, functions };
 		},
-		expect: { 'review-queue': 'survived', 'quick-approve': 'survived', 'editorial-inbox': 'survived', 'headline-check': 'survived', 'pending-by-author': 'failed', 'publish-checklist': 'failed' },
+		expect: { 'review-queue': 'survived', 'quick-approve': 'survived', 'editorial-inbox': 'survived', 'headline-check': 'survived', 'pending-by-author': 'survived', 'publish-checklist': 'survived' },
 	},
 ];
 

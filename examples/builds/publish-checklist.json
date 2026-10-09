@@ -13,75 +13,446 @@
 		"slot": "post.editor.panel",
 		"title": "Publish checklist"
 	},
-	"data": {},
-	"tree": {
-		"type": "widget",
-		"props": {
-			"render": "draw",
-			"update": "edit",
-			"input": [
-				{
-					"$slot": "post"
-				}
-			],
-			"state": {
-				"title": null,
-				"excerpt": null,
+	"ui": {
+		"protocol": "a2ui/v0.9",
+		"catalogId": "graft:wordpress",
+		"initial": {
+			"form": {
+				"title": {
+					"path": "/slot/post/title"
+				},
+				"excerpt": {
+					"path": "/slot/post/excerpt"
+				},
 				"facts": false
+			}
+		},
+		"components": [
+			{
+				"id": "root",
+				"component": "Column",
+				"children": [
+					"title",
+					"excerpt",
+					"facts",
+					"divider",
+					"check_len",
+					"check_caps",
+					"check_excerpt",
+					"check_facts",
+					"save",
+					"publish",
+					"unsaved"
+				]
 			},
-			"actions": {
-				"save": {
-					"call": {
-						"$call": "posts.update_fields",
-						"input": {
-							"id": {
-								"$field": "id"
-							},
-							"title": {
-								"$input": "title"
-							},
-							"excerpt": {
-								"$input": "excerpt"
+			{
+				"id": "title",
+				"component": "TextField",
+				"label": "Headline",
+				"value": {
+					"path": "/form/title"
+				},
+				"variant": "shortText"
+			},
+			{
+				"id": "excerpt",
+				"component": "TextField",
+				"label": "Excerpt",
+				"value": {
+					"path": "/form/excerpt"
+				},
+				"variant": "longText"
+			},
+			{
+				"id": "facts",
+				"component": "CheckBox",
+				"label": "Facts and names checked",
+				"value": {
+					"path": "/form/facts"
+				}
+			},
+			{
+				"id": "divider",
+				"component": "Divider"
+			},
+			{
+				"id": "check_len",
+				"component": "Text",
+				"variant": "body",
+				"text": {
+					"call": "if",
+					"args": {
+						"condition": {
+							"call": "length",
+							"args": {
+								"value": {
+									"path": "/form/title"
+								},
+								"min": 20,
+								"max": 70
 							}
 						},
-						"then": [
-							"reload:page"
-						],
-						"notice": "Saved."
-					},
-					"visible": {
-						"$can": "posts:write"
+						"then": "✓ Headline is 20 to 70 characters",
+						"else": {
+							"call": "formatString",
+							"args": {
+								"value": "✗ Headline is 20 to 70 characters (${count(value: ${/form/title})} now)"
+							}
+						}
+					}
+				}
+			},
+			{
+				"id": "check_caps",
+				"component": "Text",
+				"variant": "body",
+				"text": {
+					"call": "if",
+					"args": {
+						"condition": {
+							"call": "not",
+							"args": {
+								"value": {
+									"call": "regex",
+									"args": {
+										"value": {
+											"path": "/form/title"
+										},
+										"pattern": "^[^a-z]*[A-Z][^a-z]*$"
+									}
+								}
+							}
+						},
+						"then": "✓ Headline is not in capitals",
+						"else": "✗ Headline is not in capitals"
+					}
+				}
+			},
+			{
+				"id": "check_excerpt",
+				"component": "Text",
+				"variant": "body",
+				"text": {
+					"call": "if",
+					"args": {
+						"condition": {
+							"call": "length",
+							"args": {
+								"value": {
+									"path": "/form/excerpt"
+								},
+								"min": 50
+							}
+						},
+						"then": "✓ Excerpt of at least 50 characters",
+						"else": {
+							"call": "formatString",
+							"args": {
+								"value": "✗ Excerpt of at least 50 characters (${count(value: ${/form/excerpt})} now)"
+							}
+						}
+					}
+				}
+			},
+			{
+				"id": "check_facts",
+				"component": "Text",
+				"variant": "body",
+				"text": {
+					"call": "if",
+					"args": {
+						"condition": {
+							"path": "/form/facts"
+						},
+						"then": "✓ Facts and names checked",
+						"else": "✗ Facts and names checked"
+					}
+				}
+			},
+			{
+				"id": "save_label",
+				"component": "Text",
+				"text": "Save"
+			},
+			{
+				"id": "save",
+				"component": "Button",
+				"child": "save_label",
+				"variant": "default",
+				"action": {
+					"event": {
+						"name": "save",
+						"context": {
+							"id": {
+								"path": "/slot/post/id"
+							},
+							"title": {
+								"path": "/form/title"
+							},
+							"excerpt": {
+								"path": "/form/excerpt"
+							}
+						}
 					}
 				},
-				"publish": {
-					"call": {
-						"$call": "posts.update_status",
-						"input": {
-							"id": {
-								"$field": "id"
-							},
-							"status": "publish"
+				"checks": [
+					{
+						"condition": {
+							"call": "length",
+							"args": {
+								"value": {
+									"path": "/form/title"
+								},
+								"min": 1,
+								"max": 200
+							}
 						},
-						"then": [
-							"reload:page"
-						],
-						"notice": "Published."
+						"message": "The headline must be 1 to 200 characters."
 					},
-					"visible": {
-						"$can": "posts.status:write"
+					{
+						"condition": {
+							"call": "length",
+							"args": {
+								"value": {
+									"path": "/form/excerpt"
+								},
+								"max": 1000
+							}
+						},
+						"message": "The excerpt must be at most 1000 characters."
+					}
+				]
+			},
+			{
+				"id": "publish_label",
+				"component": "Text",
+				"text": "Publish"
+			},
+			{
+				"id": "publish",
+				"component": "Button",
+				"child": "publish_label",
+				"variant": "primary",
+				"visible": {
+					"call": "and",
+					"args": {
+						"values": [
+							{
+								"call": "can",
+								"args": {
+									"scope": "posts.status:write",
+									"on": {
+										"path": "/slot/post"
+									}
+								}
+							},
+							{
+								"path": "/slot/post/can/publish"
+							},
+							{
+								"call": "notEquals",
+								"args": {
+									"a": {
+										"path": "/slot/post/status"
+									},
+									"b": "publish"
+								}
+							}
+						]
+					}
+				},
+				"action": {
+					"event": {
+						"name": "publish",
+						"context": {
+							"id": {
+								"path": "/slot/post/id"
+							}
+						}
+					}
+				},
+				"checks": [
+					{
+						"condition": {
+							"call": "length",
+							"args": {
+								"value": {
+									"path": "/form/title"
+								},
+								"min": 20,
+								"max": 70
+							}
+						},
+						"message": "The headline must be 20 to 70 characters."
+					},
+					{
+						"condition": {
+							"call": "not",
+							"args": {
+								"value": {
+									"call": "regex",
+									"args": {
+										"value": {
+											"path": "/form/title"
+										},
+										"pattern": "^[^a-z]*[A-Z][^a-z]*$"
+									}
+								}
+							}
+						},
+						"message": "The headline must not be in capitals."
+					},
+					{
+						"condition": {
+							"call": "length",
+							"args": {
+								"value": {
+									"path": "/form/excerpt"
+								},
+								"min": 50
+							}
+						},
+						"message": "The excerpt must be at least 50 characters."
+					},
+					{
+						"condition": {
+							"path": "/form/facts"
+						},
+						"message": "Check facts and names first."
+					},
+					{
+						"condition": {
+							"call": "and",
+							"args": {
+								"values": [
+									{
+										"call": "equals",
+										"args": {
+											"a": {
+												"path": "/form/title"
+											},
+											"b": {
+												"path": "/slot/post/title"
+											}
+										}
+									},
+									{
+										"call": "equals",
+										"args": {
+											"a": {
+												"path": "/form/excerpt"
+											},
+											"b": {
+												"path": "/slot/post/excerpt"
+											}
+										}
+									}
+								]
+							}
+						},
+						"message": "Save your changes before publishing."
+					}
+				]
+			},
+			{
+				"id": "unsaved",
+				"component": "Text",
+				"variant": "caption",
+				"text": "Save your changes before publishing.",
+				"visible": {
+					"call": "and",
+					"args": {
+						"values": [
+							{
+								"call": "can",
+								"args": {
+									"scope": "posts.status:write",
+									"on": {
+										"path": "/slot/post"
+									}
+								}
+							},
+							{
+								"path": "/slot/post/can/publish"
+							},
+							{
+								"call": "notEquals",
+								"args": {
+									"a": {
+										"path": "/slot/post/status"
+									},
+									"b": "publish"
+								}
+							},
+							{
+								"call": "or",
+								"args": {
+									"values": [
+										{
+											"call": "notEquals",
+											"args": {
+												"a": {
+													"path": "/form/title"
+												},
+												"b": {
+													"path": "/slot/post/title"
+												}
+											}
+										},
+										{
+											"call": "notEquals",
+											"args": {
+												"a": {
+													"path": "/form/excerpt"
+												},
+												"b": {
+													"path": "/slot/post/excerpt"
+												}
+											}
+										}
+									]
+								}
+							}
+						]
 					}
 				}
 			}
-		}
-	},
-	"code": {
-		"language": "javascript",
-		"source": "// The checklist for a headline and excerpt, and whether facts were checked.\nfunction checklist(title, excerpt, facts) {\n\tconst headline = String(title || '').trim();\n\tconst summary = String(excerpt || '').trim();\n\tconst letters = headline.replace(/[^A-Za-zÀ-ɏ]/g, '');\n\treturn [\n\t\t{ label: 'Headline is 20 to 70 characters', ok: headline.length >= 20 && headline.length <= 70, now: headline.length },\n\t\t{ label: 'Headline is not in capitals', ok: !(letters.length >= 4 && letters === letters.toUpperCase()) },\n\t\t{ label: 'Excerpt of at least 50 characters', ok: summary.length >= 50, now: summary.length },\n\t\t{ label: 'Facts and names checked', ok: facts === true },\n\t];\n}\n\n// The fields, the checklist as they read now, and the buttons that fit.\nfunction draw(posts, state) {\n\tconst post = posts[0];\n\tif (!post) {\n\t\treturn { type: 'text', children: 'Save the post to see its checklist.' };\n\t}\n\tconst title = state.title === null ? post.title : state.title;\n\tconst excerpt = state.excerpt === null ? post.excerpt : state.excerpt;\n\tconst items = checklist(title, excerpt, state.facts);\n\tconst ready = items.every((item) => item.ok);\n\tconst changed = title !== post.title || excerpt !== post.excerpt;\n\tconst buttons = [];\n\tif (changed) {\n\t\tbuttons.push({ type: 'button', props: { id: 'save', label: 'Save', variant: 'secondary', onClick: { $use: 'save', row: post.id } } });\n\t}\n\tif (ready && !changed && post.status !== 'publish') {\n\t\tbuttons.push({ type: 'button', props: { id: 'publish', label: 'Publish', variant: 'primary', onClick: { $use: 'publish', row: post.id } } });\n\t}\n\treturn {\n\t\ttype: 'stack',\n\t\tprops: { gap: 3 },\n\t\tchildren: [\n\t\t\t{ type: 'text-input', props: { id: 'title', label: 'Headline', value: post.title, onChange: { $event: 'title' } } },\n\t\t\t{ type: 'textarea', props: { id: 'excerpt', label: 'Excerpt', value: post.excerpt, rows: 3, onChange: { $event: 'excerpt' } } },\n\t\t\t{ type: 'checkbox', props: { id: 'facts', label: 'Facts and names checked', value: false, onChange: { $event: 'facts' } } },\n\t\t\t{\n\t\t\t\ttype: 'stack',\n\t\t\t\tprops: { gap: 1 },\n\t\t\t\tchildren: items.map((item) => ({\n\t\t\t\t\ttype: 'text',\n\t\t\t\t\tprops: { variant: item.ok ? 'body' : 'strong' },\n\t\t\t\t\tchildren: `${item.ok ? '✓' : '✗'} ${item.label}${!item.ok && typeof item.now === 'number' ? ` (${item.now} now)` : ''}`,\n\t\t\t\t})),\n\t\t\t},\n\t\t\tchanged && ready ? { type: 'text', props: { variant: 'muted' }, children: 'Save your changes before publishing.' } : null,\n\t\t\tbuttons.length ? { type: 'stack', props: { direction: 'row', gap: 2 }, children: buttons } : null,\n\t\t].filter(Boolean),\n\t};\n}\n\n// What the writer typed or ticked.\nfunction edit(state, event, value) {\n\tif (event === 'title' || event === 'excerpt') {\n\t\treturn { ...state, [event]: String(value) };\n\t}\n\tif (event === 'facts') {\n\t\treturn { ...state, facts: value === true };\n\t}\n\treturn state;\n}\n",
-		"functions": [
-			"draw",
-			"edit"
 		]
 	},
+	"events": {
+		"save": {
+			"call": "posts.update_fields",
+			"input": {
+				"id": {
+					"$context": "id"
+				},
+				"title": {
+					"$context": "title"
+				},
+				"excerpt": {
+					"$context": "excerpt"
+				}
+			},
+			"then": [
+				"reload:page"
+			],
+			"notice": "Headline and excerpt saved."
+		},
+		"publish": {
+			"call": "posts.update_status",
+			"input": {
+				"id": {
+					"$context": "id"
+				},
+				"status": "publish"
+			},
+			"then": [
+				"reload:page"
+			],
+			"notice": "Post published."
+		}
+	},
+	"data": {},
 	"checks": [
 		{
 			"criterion": "prefilled",
@@ -572,15 +943,7 @@
 	],
 	"refs": {
 		"slot": "post.editor.panel",
-		"components": {
-			"widget": [
-				"actions",
-				"input",
-				"render",
-				"state",
-				"update"
-			]
-		},
+		"components": {},
 		"capabilities": [
 			"posts.update_fields",
 			"posts.update_status"
@@ -588,10 +951,38 @@
 		"scopes": [
 			"posts.status:write",
 			"posts:write"
-		]
+		],
+		"catalog": {
+			"Button": [
+				"action",
+				"checks",
+				"child",
+				"variant",
+				"visible"
+			],
+			"CheckBox": [
+				"label",
+				"value"
+			],
+			"Column": [
+				"children"
+			],
+			"Divider": [],
+			"Text": [
+				"text",
+				"variant",
+				"visible"
+			],
+			"TextField": [
+				"label",
+				"value",
+				"variant"
+			]
+		}
 	},
 	"provenance": {
-		"compiler": "handwritten",
-		"strategy": "handwritten"
+		"compiler": "graft-compiler/0.1.0+a2ui",
+		"model": "claude-opus-5-5",
+		"strategy": "compiled"
 	}
 }

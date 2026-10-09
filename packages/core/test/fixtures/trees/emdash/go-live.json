@@ -1,0 +1,307 @@
+{
+	"graft": 1,
+	"spec": {
+		"id": "go-live",
+		"hash": "sha256:3b8e05760dae42cfce7ab1688ff8eaddbcff07e4d69b9c56187621a47822f29d"
+	},
+	"surface": {
+		"host": "emdash",
+		"hostVersion": "1.0.1",
+		"hash": "sha256:b9329970caab68a82f9e7fe44db516aa9d4dfddfe028473af619f480e85a35a0"
+	},
+	"mount": {
+		"slot": "content.editor.panel",
+		"collections": [
+			"posts"
+		]
+	},
+	"data": {},
+	"tree": {
+		"type": "stack",
+		"children": [
+			{
+				"type": "banner",
+				"props": {
+					"title": "Live",
+					"variant": "default",
+					"visible": {
+						"$eq": [
+							{
+								"$slot": "entry.status"
+							},
+							"published"
+						]
+					}
+				}
+			},
+			{
+				"type": "banner",
+				"props": {
+					"title": "Not live",
+					"variant": "alert",
+					"visible": {
+						"$not": {
+							"$eq": [
+								{
+									"$slot": "entry.status"
+								},
+								"published"
+							]
+						}
+					}
+				}
+			},
+			{
+				"type": "actions",
+				"children": [
+					{
+						"type": "button",
+						"props": {
+							"id": "go-live",
+							"label": "Go live",
+							"style": "primary",
+							"visible": {
+								"$and": [
+									{
+										"$not": {
+											"$eq": [
+												{
+													"$slot": "entry.status"
+												},
+												"published"
+											]
+										}
+									},
+									{
+										"$can": "content.status:write",
+										"on": {
+											"$slot": "entry"
+										}
+									}
+								]
+							},
+							"onClick": {
+								"$call": "content.publish",
+								"input": {
+									"collection": {
+										"$slot": "entry.collection"
+									},
+									"id": {
+										"$slot": "entry.id"
+									}
+								},
+								"then": [
+									"reload:page"
+								],
+								"notice": "The post is live."
+							}
+						}
+					},
+					{
+						"type": "button",
+						"props": {
+							"id": "take-offline",
+							"label": "Take offline",
+							"style": "danger",
+							"confirm": "Take this post offline?",
+							"visible": {
+								"$and": [
+									{
+										"$eq": [
+											{
+												"$slot": "entry.status"
+											},
+											"published"
+										]
+									},
+									{
+										"$can": "content.status:write",
+										"on": {
+											"$slot": "entry"
+										}
+									}
+								]
+							},
+							"onClick": {
+								"$call": "content.unpublish",
+								"input": {
+									"collection": {
+										"$slot": "entry.collection"
+									},
+									"id": {
+										"$slot": "entry.id"
+									}
+								},
+								"then": [
+									"reload:page"
+								],
+								"notice": "The post is offline."
+							}
+						}
+					}
+				]
+			}
+		]
+	},
+	"checks": [
+		{
+			"criterion": "state",
+			"fixtures": {
+				"users": [
+					{
+						"as": "e",
+						"role": "editor"
+					}
+				],
+				"entries": [
+					{
+						"title": "Post A",
+						"status": "published"
+					}
+				]
+			},
+			"view_as": "e",
+			"expect": [
+				{
+					"text": "Live"
+				},
+				{
+					"action": "go-live",
+					"available": false
+				}
+			]
+		},
+		{
+			"criterion": "state",
+			"fixtures": {
+				"users": [
+					{
+						"as": "e",
+						"role": "editor"
+					}
+				],
+				"entries": [
+					{
+						"title": "Draft B",
+						"status": "draft"
+					}
+				]
+			},
+			"view_as": "e",
+			"expect": [
+				{
+					"text": "Not live"
+				},
+				{
+					"action": "take-offline",
+					"available": false
+				}
+			]
+		},
+		{
+			"criterion": "go-live",
+			"fixtures": {
+				"users": [
+					{
+						"as": "e",
+						"role": "editor"
+					}
+				],
+				"entries": [
+					{
+						"title": "Draft B",
+						"status": "draft"
+					}
+				]
+			},
+			"view_as": "e",
+			"steps": [
+				{
+					"action": "go-live",
+					"row": {
+						"title": "Draft B"
+					}
+				}
+			],
+			"expect": [
+				{
+					"entry": {
+						"title": "Draft B",
+						"status": "published"
+					}
+				},
+				{
+					"text": "Live"
+				}
+			]
+		},
+		{
+			"criterion": "take-offline",
+			"fixtures": {
+				"users": [
+					{
+						"as": "e",
+						"role": "editor"
+					}
+				],
+				"entries": [
+					{
+						"title": "Post A",
+						"status": "published"
+					}
+				]
+			},
+			"view_as": "e",
+			"steps": [
+				{
+					"action": "take-offline",
+					"row": {
+						"title": "Post A"
+					}
+				}
+			],
+			"expect": [
+				{
+					"entry": {
+						"title": "Post A",
+						"status": "draft"
+					}
+				},
+				{
+					"text": "Not live"
+				}
+			]
+		}
+	],
+	"refs": {
+		"slot": "content.editor.panel",
+		"components": {
+			"actions": [],
+			"banner": [
+				"title",
+				"variant",
+				"visible"
+			],
+			"button": [
+				"confirm",
+				"id",
+				"label",
+				"onClick",
+				"style",
+				"visible"
+			],
+			"stack": []
+		},
+		"capabilities": [
+			"content.publish",
+			"content.unpublish"
+		],
+		"scopes": [
+			"content.status:write"
+		]
+	},
+	"provenance": {
+		"compiler": "handwritten",
+		"strategy": "handwritten"
+	}
+}

@@ -1,9 +1,11 @@
 # Compiling with Claude: a real run
 
-The builds in [`examples/builds`](../examples/builds) are hand-written, so
-the tests can run without a model. This page records what happened when
-Claude compiled the same specs for real, with `graft compile` and the CLI's
-default model, against WordPress 7.1 in Playground (October 2026).
+This page records what happened when Claude compiled the example specs
+for real, with `graft compile` and the CLI's default model, against
+WordPress 7.1 in Playground (October 2026). The builds were trees, compared
+with hand-written tree builds of the same specs. Builds are A2UI surfaces
+now, and [`examples/builds`](../examples/builds) holds the ones Claude
+compiled ([ADR 0009](adr/0009-a2ui.md) records those runs).
 
 ## Results
 

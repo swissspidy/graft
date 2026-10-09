@@ -63,7 +63,8 @@ export interface CompileOptions {
 	previous?: Build;
 	/**
 	 * Build the UI in this format, or as a tree ("tree"). Default: the
-	 * previous build's format, else the host's (`HostGuide.ui`), else a tree.
+	 * previous build's format, else the host's (`HostGuide.ui`), else a
+	 * tree; a previous tree regenerates in the host's format.
 	 */
 	format?: UiFormat | 'tree';
 	/** Attempts per phase. Default 3. */

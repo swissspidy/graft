@@ -13,49 +13,204 @@
 		"slot": "dashboard.widget",
 		"title": "Pending by author"
 	},
+	"ui": {
+		"protocol": "a2ui/v0.9",
+		"catalogId": "graft:wordpress",
+		"initial": {
+			"form": {
+				"author": ""
+			}
+		},
+		"computed": {
+			"authors": {
+				"call": "distinct",
+				"args": {
+					"items": {
+						"path": "/pending/items"
+					},
+					"by": "author/id"
+				}
+			},
+			"shown": {
+				"call": "if",
+				"args": {
+					"condition": {
+						"call": "equals",
+						"args": {
+							"a": {
+								"path": "/form/author"
+							},
+							"b": ""
+						}
+					},
+					"then": {
+						"path": "/pending/items"
+					},
+					"else": {
+						"call": "filter",
+						"args": {
+							"items": {
+								"path": "/pending/items"
+							},
+							"by": "author/id",
+							"equals": {
+								"path": "/form/author"
+							}
+						}
+					}
+				}
+			}
+		},
+		"components": [
+			{
+				"id": "root",
+				"component": "Column",
+				"children": [
+					"authors-row",
+					"pending-table"
+				]
+			},
+			{
+				"id": "authors-row",
+				"component": "Row",
+				"children": [
+					"everyone",
+					"author-list"
+				]
+			},
+			{
+				"id": "everyone",
+				"component": "Button",
+				"child": "everyone-label",
+				"variant": "default",
+				"action": {
+					"functionCall": {
+						"call": "set",
+						"args": {
+							"target": "/form/author",
+							"value": ""
+						}
+					}
+				}
+			},
+			{
+				"id": "everyone-label",
+				"component": "Text",
+				"text": "Everyone"
+			},
+			{
+				"id": "author-list",
+				"component": "Row",
+				"children": {
+					"componentId": "author-btn",
+					"path": "/authors"
+				}
+			},
+			{
+				"id": "author-btn",
+				"component": "Button",
+				"child": "author-btn-label",
+				"variant": "default",
+				"actionId": {
+					"call": "formatString",
+					"args": {
+						"value": "author-${lower(value: ${author/name})}"
+					}
+				},
+				"action": {
+					"functionCall": {
+						"call": "set",
+						"args": {
+							"target": "/form/author",
+							"value": {
+								"path": "author/id"
+							}
+						}
+					}
+				}
+			},
+			{
+				"id": "author-btn-label",
+				"component": "Text",
+				"text": {
+					"path": "author/name"
+				}
+			},
+			{
+				"id": "pending-table",
+				"component": "Table",
+				"rows": {
+					"path": "/shown"
+				},
+				"fields": [
+					{
+						"id": "title",
+						"label": "Title",
+						"type": "string",
+						"primary": true
+					},
+					{
+						"id": "author/name",
+						"label": "Author",
+						"type": "string"
+					},
+					{
+						"id": "date",
+						"label": "Date",
+						"type": "datetime"
+					}
+				],
+				"rowActions": [
+					{
+						"id": "approve",
+						"label": "Approve",
+						"variant": "primary",
+						"visible": {
+							"call": "can",
+							"args": {
+								"scope": "posts.status:write"
+							}
+						},
+						"action": {
+							"event": {
+								"name": "approve",
+								"context": {
+									"id": {
+										"path": "id"
+									}
+								}
+							}
+						}
+					}
+				],
+				"empty": "No pending posts."
+			}
+		]
+	},
+	"events": {
+		"approve": {
+			"call": "posts.update_status",
+			"input": {
+				"id": {
+					"$context": "id"
+				},
+				"status": "publish"
+			},
+			"then": [
+				"refresh:pending"
+			],
+			"notice": "Post approved and published."
+		}
+	},
 	"data": {
 		"pending": {
 			"call": "posts.list",
 			"input": {
+				"post_type": "post",
 				"status": [
 					"pending"
 				],
-				"per_page": 50,
-				"orderby": "date",
-				"order": "desc"
-			}
-		}
-	},
-	"tree": {
-		"type": "widget",
-		"props": {
-			"render": "draw",
-			"update": "choose",
-			"input": {
-				"$data": "pending.items"
-			},
-			"state": {
-				"author": null
-			},
-			"actions": {
-				"approve": {
-					"call": {
-						"$call": "posts.update_status",
-						"input": {
-							"id": {
-								"$field": "id"
-							},
-							"status": "publish"
-						},
-						"then": [
-							"refresh:pending"
-						],
-						"notice": "Published."
-					},
-					"visible": {
-						"$can": "posts.status:write"
-					}
-				}
+				"per_page": 100
 			}
 		}
 	},
@@ -365,15 +520,7 @@
 	],
 	"refs": {
 		"slot": "dashboard.widget",
-		"components": {
-			"widget": [
-				"actions",
-				"input",
-				"render",
-				"state",
-				"update"
-			]
-		},
+		"components": {},
 		"capabilities": [
 			"posts.list",
 			"posts.update_status"
@@ -381,18 +528,34 @@
 		"scopes": [
 			"posts.status:write",
 			"posts:read"
-		]
-	},
-	"code": {
-		"language": "javascript",
-		"source": "// The buttons (one per author, with how many posts each has waiting)\n// and the pending posts of the chosen author, or everyone's.\nfunction draw(posts, state) {\n\tconst all = Array.isArray(posts) ? posts : [];\n\tconst chosen = state && state.author;\n\tconst authors = [];\n\tfor (const post of all) {\n\t\tconst found = authors.find((a) => a.name === post.author.name);\n\t\tif (found) {\n\t\t\tfound.count += 1;\n\t\t} else {\n\t\t\tauthors.push({ name: post.author.name, count: 1 });\n\t\t}\n\t}\n\tauthors.sort((a, b) => a.name.localeCompare(b.name));\n\tconst slug = (text) => text.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '');\n\tconst button = (id, label, author) => ({\n\t\ttype: 'button',\n\t\tprops: {\n\t\t\tid,\n\t\t\tlabel,\n\t\t\tvariant: (chosen || null) === author ? 'primary' : 'secondary',\n\t\t\tonClick: { $event: 'choose', payload: { author } },\n\t\t},\n\t});\n\treturn {\n\t\ttype: 'stack',\n\t\tprops: { gap: 3 },\n\t\tchildren: [\n\t\t\t{\n\t\t\t\ttype: 'stack',\n\t\t\t\tprops: { direction: 'row', gap: 2 },\n\t\t\t\tchildren: [button('everyone', `Everyone (${all.length})`, null)].concat(\n\t\t\t\t\tauthors.map((a) => button(`author-${slug(a.name)}`, `${a.name} (${a.count})`, a.name)),\n\t\t\t\t),\n\t\t\t},\n\t\t\t{\n\t\t\t\ttype: 'table',\n\t\t\t\tprops: {\n\t\t\t\t\trows: all.filter((post) => !chosen || post.author.name === chosen),\n\t\t\t\t\tfields: [\n\t\t\t\t\t\t{ id: 'title', label: 'Title', primary: true },\n\t\t\t\t\t\t{ id: 'author.name', label: 'Author' },\n\t\t\t\t\t],\n\t\t\t\t\t// The widget's declared \"approve\" action, on each row.\n\t\t\t\t\tactions: [{ id: 'approve', label: 'Approve', primary: true, onClick: { $use: 'approve' } }],\n\t\t\t\t\tempty: 'Nothing is waiting',\n\t\t\t\t},\n\t\t\t},\n\t\t],\n\t};\n}\n\n// Choosing an author, or everyone.\nfunction choose(state, event, payload) {\n\treturn event === 'choose' ? { author: payload && payload.author ? payload.author : null } : state;\n}\n",
-		"functions": [
-			"draw",
-			"choose"
-		]
+		],
+		"catalog": {
+			"Button": [
+				"action",
+				"actionId",
+				"child",
+				"variant"
+			],
+			"Column": [
+				"children"
+			],
+			"Row": [
+				"children"
+			],
+			"Table": [
+				"empty",
+				"fields",
+				"rowActions",
+				"rows"
+			],
+			"Text": [
+				"text"
+			]
+		}
 	},
 	"provenance": {
-		"compiler": "handwritten",
-		"strategy": "handwritten"
+		"compiler": "graft-compiler/0.1.0+a2ui",
+		"model": "claude-opus-5-5",
+		"strategy": "compiled"
 	}
 }

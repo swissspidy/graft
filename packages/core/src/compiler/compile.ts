@@ -19,14 +19,16 @@ const validateCheck: Validator = lazyValidator({ $defs: buildSchema.$defs, $ref:
 
 /**
  * The format to build the UI in, undefined for a tree: the caller's, else
- * the previous build's, else the host's.
+ * the previous build's, else the host's. A tree regenerates in the host's
+ * format when it has one: that is how tree builds move over.
  */
 function compileFormat(options: CompileOptions): UiFormat | undefined {
 	if (options.format) {
 		return options.format === 'tree' ? undefined : options.format;
 	}
-	if (options.previous) {
-		return uiFormatOf(options.previous);
+	const previous = options.previous ? uiFormatOf(options.previous) : undefined;
+	if (previous) {
+		return previous;
 	}
 	if (!options.host.ui) {
 		return undefined;
@@ -93,7 +95,6 @@ export async function compileSpec(options: CompileOptions): Promise<CompileResul
 	}
 
 	// Phase 2: the UI (a tree, or the format's) and data against the frozen checks.
-	// Regenerating a build in another format keeps its format.
 	const format = compileFormat(options);
 	const ui = format?.compiler;
 	if (format && !ui) {

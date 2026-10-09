@@ -23,68 +23,89 @@
 			}
 		}
 	},
-	"tree": {
-		"type": "stack",
-		"children": [
+	"ui": {
+		"protocol": "a2ui/v0.9",
+		"catalogId": "graft:emdash",
+		"components": [
 			{
-				"type": "table",
-				"props": {
-					"rows": {
-						"$data": "drafts.items"
+				"id": "root",
+				"component": "Column",
+				"children": [
+					"drafts-table"
+				]
+			},
+			{
+				"id": "drafts-table",
+				"component": "Table",
+				"rows": {
+					"path": "/drafts/items"
+				},
+				"fields": [
+					{
+						"id": "title",
+						"label": "Title",
+						"primary": true
 					},
-					"columns": [
-						{
-							"key": "title",
-							"label": "Title",
-							"primary": true
-						},
-						{
-							"key": "age",
-							"label": "Days since update",
-							"format": "number",
-							"value": {
-								"$daysSince": {
-									"$field": "updatedAt"
+					{
+						"id": "age",
+						"label": "Days since update",
+						"type": "number",
+						"value": {
+							"call": "daysSince",
+							"args": {
+								"value": {
+									"path": "updatedAt"
 								}
-							},
-							"tone": {
-								"$if": [
-									{
-										"$gte": [
-											{
-												"$daysSince": {
-													"$field": "updatedAt"
+							}
+						},
+						"tone": {
+							"call": "if",
+							"args": {
+								"condition": {
+									"call": "greaterThan",
+									"args": {
+										"a": {
+											"call": "daysSince",
+											"args": {
+												"value": {
+													"path": "updatedAt"
 												}
-											},
-											30
-										]
-									},
-									"error",
-									{
-										"$if": [
-											{
-												"$gte": [
-													{
-														"$daysSince": {
-															"$field": "updatedAt"
-														}
-													},
-													7
-												]
-											},
-											"warning",
-											"success"
-										]
+											}
+										},
+										"b": 29
 									}
-								]
+								},
+								"then": "error",
+								"else": {
+									"call": "if",
+									"args": {
+										"condition": {
+											"call": "greaterThan",
+											"args": {
+												"a": {
+													"call": "daysSince",
+													"args": {
+														"value": {
+															"path": "updatedAt"
+														}
+													}
+												},
+												"b": 6
+											}
+										},
+										"then": "warning",
+										"else": "success"
+									}
+								}
 							}
 						}
-					],
-					"empty": "No drafts"
-				}
+					}
+				],
+				"empty": "No drafts"
 			}
 		]
 	},
+	"events": {},
 	"checks": [
 		{
 			"criterion": "drafts-only",
@@ -249,23 +270,29 @@
 	],
 	"refs": {
 		"slot": "dashboard.widget",
-		"components": {
-			"stack": [],
-			"table": [
-				"columns",
-				"empty",
-				"rows"
-			]
-		},
+		"components": {},
 		"capabilities": [
 			"content.list"
 		],
 		"scopes": [
 			"content:read"
-		]
+		],
+		"catalog": {
+			"Column": [
+				"children"
+			],
+			"Table": [
+				"empty",
+				"fields",
+				"rows"
+			]
+		}
 	},
 	"provenance": {
-		"compiler": "handwritten",
-		"strategy": "handwritten"
+		"compiler": "graft-compiler/0.1.0",
+		"model": "claude-opus-5-5",
+		"promptHash": "sha256:da9b9763dadf70d0fea7011cb5241cd78e22d95bf327fe90d5762348afc9ed88",
+		"strategy": "regenerated",
+		"replaces": "sha256:2575c80612da8975a09e860d48cfd0a4001a7198c9456b9f16525488e1967f7b"
 	}
 }

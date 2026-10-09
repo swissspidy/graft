@@ -148,7 +148,7 @@ async function main(): Promise<number> {
 		check('the editor panel shows "Not live" and Go live', texts(panel.data?.blocks).includes('Not live') && texts(goLive ? [goLive] : []).includes('Go live'), panel);
 		const button = (goLive?.elements as Block[] | undefined)?.[0];
 		const wentLive = await asUser<{ blocks: Block[]; toast?: { message: string } }>(server, editor.cookie, panelPath, { type: 'block_action', action_id: button?.action_id });
-		check('Go live publishes from the panel and shows "Live"', wentLive.data?.toast?.message === 'The post is live.' && texts(wentLive.data?.blocks).includes('"title":"Live"'), wentLive);
+		check('Go live publishes from the panel and shows "Live"', wentLive.data?.toast?.message === 'The post is live.' && texts(wentLive.data?.blocks).includes('"Live"'), wentLive);
 		const contributorPanel = await asUser<{ blocks: Block[] }>(server, contributor.cookie, panelPath, { type: 'panel_load' });
 		// EmDash itself refuses contributors the panel of someone else's entry.
 		check("contributors do not get the panel of others' entries", contributorPanel.status === 403 && !texts(contributorPanel.data?.blocks).includes('Go live'), contributorPanel);

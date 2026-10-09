@@ -5,7 +5,7 @@ import type { A2UIBuild } from '@graft/a2ui/client';
 import { createProcessor, surfaceId } from '../src/client/a2ui.tsx';
 
 // Tests run from the repository root.
-const example = (name: string) => JSON.parse(readFileSync(`${process.cwd()}/examples/a2ui/builds/${name}.json`, 'utf8')) as A2UIBuild;
+const example = (name: string) => JSON.parse(readFileSync(`${process.cwd()}/examples/builds/${name}.json`, 'utf8')) as A2UIBuild;
 const can = () => true;
 
 describe('the A2UI client', () => {

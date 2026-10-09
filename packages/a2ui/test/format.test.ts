@@ -214,9 +214,20 @@ describe('the format a build is compiled in', () => {
 
 	it("is the previous build's when regenerating, and a tree when asked", async () => {
 		const host = { fixtures: '', assertions: '', ui: 'A2UI' };
+		const a2ui = await a2uiBuild();
+		expect((await compile([modelAnswers(a2ui).tree], { host, previous: a2ui }))?.tree).toBeUndefined();
 		const tree = await pageBuild();
-		expect((await compile([modelAnswers(tree).tree], { host, previous: tree }))?.tree).toBeDefined();
 		expect((await compile([modelAnswers(tree).tree], { host, format: 'tree' }))?.tree).toBeDefined();
+	});
+
+	it("moves a tree to the host's format when regenerating it", async () => {
+		const host = { fixtures: '', assertions: '', ui: 'A2UI' };
+		const build = await compile([modelAnswers(await a2uiBuild()).tree], { host, previous: await pageBuild() });
+		expect(build?.tree).toBeUndefined();
+		expect((build as unknown as A2UIBuild).ui.catalogId).toBe('graft:acme');
+		expect(build?.provenance.strategy).toBe('regenerated');
+		// Without a format of its own, a host regenerates trees as trees.
+		expect((await compile([modelAnswers(await pageBuild()).tree], { previous: await pageBuild() }))?.tree).toBeDefined();
 	});
 
 	it('is a tree for a host without one', async () => {

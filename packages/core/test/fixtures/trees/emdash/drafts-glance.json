@@ -24,40 +24,32 @@
 			}
 		}
 	},
-	"ui": {
-		"protocol": "a2ui/v0.9",
-		"catalogId": "graft:emdash",
-		"components": [
+	"tree": {
+		"type": "stack",
+		"children": [
 			{
-				"id": "root",
-				"component": "Column",
-				"children": [
-					"drafts_table"
-				]
-			},
-			{
-				"id": "drafts_table",
-				"component": "Table",
-				"rows": {
-					"path": "/drafts/items"
-				},
-				"fields": [
-					{
-						"id": "title",
-						"label": "Title",
-						"primary": true
+				"type": "table",
+				"props": {
+					"rows": {
+						"$data": "drafts.items"
 					},
-					{
-						"id": "updatedAt",
-						"label": "Updated",
-						"type": "relative_time"
-					}
-				],
-				"empty": "No drafts"
+					"columns": [
+						{
+							"key": "title",
+							"label": "Title",
+							"primary": true
+						},
+						{
+							"key": "updatedAt",
+							"label": "Updated",
+							"format": "relative_time"
+						}
+					],
+					"empty": "No drafts"
+				}
 			}
 		]
 	},
-	"events": {},
 	"checks": [
 		{
 			"criterion": "drafts-only",
@@ -158,29 +150,23 @@
 	],
 	"refs": {
 		"slot": "dashboard.widget",
-		"components": {},
+		"components": {
+			"stack": [],
+			"table": [
+				"columns",
+				"empty",
+				"rows"
+			]
+		},
 		"capabilities": [
 			"content.list"
 		],
 		"scopes": [
 			"content:read"
-		],
-		"catalog": {
-			"Column": [
-				"children"
-			],
-			"Table": [
-				"empty",
-				"fields",
-				"rows"
-			]
-		}
+		]
 	},
 	"provenance": {
-		"compiler": "graft-compiler/0.1.0",
-		"model": "claude-opus-5-5",
-		"promptHash": "sha256:ec1d940d50a9f4242618551f135deeffa30cf12683502b413f5f57e78a7a2fe6",
-		"strategy": "regenerated",
-		"replaces": "sha256:b4b717100c38efae661ba617a29c4804005ee322389e77a4a55f44ad33c8fd63"
+		"compiler": "handwritten",
+		"strategy": "handwritten"
 	}
 }

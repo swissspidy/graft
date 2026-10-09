@@ -24,7 +24,7 @@ export interface ExampleFixture {
  */
 export async function exampleFixtures(options: { verifyAgainst?: Surface; dir?: string; buildsDir?: string } = {}): Promise<Record<string, ExampleFixture>> {
 	const dir = options.dir ?? examplesDir;
-	// The builds may come from elsewhere, e.g. the same specs built as A2UI (examples/a2ui/builds).
+	// The builds may come from elsewhere.
 	const buildsDir = options.buildsDir ?? `${dir}/builds`;
 	const fixtures: Record<string, ExampleFixture> = {};
 	for (const file of (await readdir(`${dir}/specs`)).filter((f) => f.endsWith('.md'))) {

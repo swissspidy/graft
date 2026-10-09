@@ -13,10 +13,39 @@
 		"slot": "dashboard.widget",
 		"title": "Waiting for review"
 	},
+	"ui": {
+		"protocol": "a2ui/v0.9",
+		"catalogId": "graft:wordpress",
+		"components": [
+			{
+				"id": "root",
+				"component": "Table",
+				"rows": {
+					"path": "/pending/items"
+				},
+				"fields": [
+					{
+						"id": "title",
+						"label": "Title",
+						"type": "string",
+						"primary": true
+					},
+					{
+						"id": "author/name",
+						"label": "Author",
+						"type": "string"
+					}
+				],
+				"empty": "Nothing is waiting"
+			}
+		]
+	},
+	"events": {},
 	"data": {
-		"waiting": {
+		"pending": {
 			"call": "posts.list",
 			"input": {
+				"post_type": "post",
 				"status": [
 					"pending"
 				],
@@ -24,27 +53,6 @@
 				"orderby": "date",
 				"order": "desc"
 			}
-		}
-	},
-	"tree": {
-		"type": "table",
-		"props": {
-			"rows": {
-				"$data": "waiting.items"
-			},
-			"fields": [
-				{
-					"id": "title",
-					"label": "Title",
-					"primary": true
-				},
-				{
-					"id": "author.name",
-					"label": "Author",
-					"type": "user"
-				}
-			],
-			"empty": "Nothing is waiting"
 		}
 	},
 	"checks": [
@@ -160,22 +168,24 @@
 	],
 	"refs": {
 		"slot": "dashboard.widget",
-		"components": {
-			"table": [
-				"empty",
-				"fields",
-				"rows"
-			]
-		},
+		"components": {},
 		"capabilities": [
 			"posts.list"
 		],
 		"scopes": [
 			"posts:read"
-		]
+		],
+		"catalog": {
+			"Table": [
+				"empty",
+				"fields",
+				"rows"
+			]
+		}
 	},
 	"provenance": {
-		"compiler": "handwritten",
-		"strategy": "handwritten"
+		"compiler": "graft-compiler/0.1.0+a2ui",
+		"model": "claude-opus-5-5",
+		"strategy": "compiled"
 	}
 }

@@ -23,94 +23,70 @@
 			}
 		}
 	},
-	"ui": {
-		"protocol": "a2ui/v0.9",
-		"catalogId": "graft:emdash",
-		"components": [
+	"tree": {
+		"type": "stack",
+		"children": [
 			{
-				"id": "root",
-				"component": "Column",
-				"children": [
-					"title",
-					"subtitle",
-					"queue_table"
-				]
-			},
-			{
-				"id": "title",
-				"component": "Text",
-				"text": "Publish queue",
-				"variant": "h1"
-			},
-			{
-				"id": "subtitle",
-				"component": "Text",
-				"text": "Drafts, oldest first.",
-				"variant": "caption"
-			},
-			{
-				"id": "queue_table",
-				"component": "Table",
-				"rows": {
-					"path": "/queue/items"
-				},
-				"fields": [
-					{
-						"id": "title",
-						"label": "Title",
-						"primary": true
-					},
-					{
-						"id": "author/name",
-						"label": "Author"
-					},
-					{
-						"id": "updatedAt",
-						"label": "Last updated",
-						"type": "relative_time"
-					}
-				],
-				"rowActions": [
-					{
-						"id": "publish",
-						"label": "Publish",
-						"variant": "primary",
-						"visible": {
-							"call": "can",
-							"args": {
-								"scope": "content.status:write"
-							}
-						},
-						"action": {
-							"event": {
-								"name": "publish",
-								"context": {
-									"id": {
-										"path": "id"
-									}
-								}
-							}
-						}
-					}
-				],
-				"empty": "Nothing waiting"
-			}
-		]
-	},
-	"events": {
-		"publish": {
-			"call": "content.publish",
-			"input": {
-				"collection": "posts",
-				"id": {
-					"$context": "id"
+				"type": "header",
+				"props": {
+					"text": "Publish queue"
 				}
 			},
-			"then": [
-				"refresh:queue"
-			],
-			"notice": "Published."
-		}
+			{
+				"type": "context",
+				"props": {
+					"text": "Drafts, oldest first."
+				}
+			},
+			{
+				"type": "table",
+				"props": {
+					"rows": {
+						"$data": "queue.items"
+					},
+					"columns": [
+						{
+							"key": "title",
+							"label": "Title",
+							"primary": true
+						},
+						{
+							"key": "author.name",
+							"label": "Author"
+						},
+						{
+							"key": "updatedAt",
+							"label": "Last updated",
+							"format": "relative_time"
+						}
+					],
+					"actions": [
+						{
+							"id": "publish",
+							"label": "Publish",
+							"style": "primary",
+							"visible": {
+								"$can": "content.status:write"
+							},
+							"onClick": {
+								"$call": "content.publish",
+								"input": {
+									"collection": "posts",
+									"id": {
+										"$field": "id"
+									}
+								},
+								"then": [
+									"refresh:queue"
+								],
+								"notice": "Published."
+							}
+						}
+					],
+					"empty": "Nothing waiting"
+				}
+			}
+		]
 	},
 	"checks": [
 		{
@@ -266,7 +242,21 @@
 	],
 	"refs": {
 		"slot": "admin.page",
-		"components": {},
+		"components": {
+			"context": [
+				"text"
+			],
+			"header": [
+				"text"
+			],
+			"stack": [],
+			"table": [
+				"actions",
+				"columns",
+				"empty",
+				"rows"
+			]
+		},
 		"capabilities": [
 			"content.list",
 			"content.publish"
@@ -274,28 +264,10 @@
 		"scopes": [
 			"content.status:write",
 			"content:read"
-		],
-		"catalog": {
-			"Column": [
-				"children"
-			],
-			"Table": [
-				"empty",
-				"fields",
-				"rowActions",
-				"rows"
-			],
-			"Text": [
-				"text",
-				"variant"
-			]
-		}
+		]
 	},
 	"provenance": {
-		"compiler": "graft-compiler/0.1.0",
-		"model": "claude-opus-5-5",
-		"promptHash": "sha256:953b7c79ab76f07033348092f4db34cc8918ba4bc144f2a5d6cdb23c2ec19706",
-		"strategy": "regenerated",
-		"replaces": "sha256:a4a23a474d5ef584dffe4477750c13f9905c49829deb32e606890222bab06169"
+		"compiler": "handwritten",
+		"strategy": "handwritten"
 	}
 }

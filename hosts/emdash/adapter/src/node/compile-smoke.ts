@@ -1,7 +1,6 @@
-import { readFile } from 'node:fs/promises';
-import { compileSpec, hashSpec, modelAnswers, type Build, type ModelClient } from '@graft/core';
+import { compileSpec, hashSpec, modelAnswers, type ModelClient } from '@graft/core';
 import { hostGuide } from '../host/guide.ts';
-import { loadExamples, ROOT } from './examples.ts';
+import { loadExamples } from './examples.ts';
 import { startSandbox, verifyInEmDash } from './sandbox.ts';
 
 /**
@@ -13,8 +12,7 @@ import { startSandbox, verifyInEmDash } from './sandbox.ts';
  */
 
 const example = (await loadExamples()).find((e) => e.name === 'publish-queue')!;
-const { source, spec, surface } = example;
-const handwritten = JSON.parse(await readFile(`${ROOT}examples/emdash/a2ui/builds/publish-queue.json`, 'utf8')) as Build;
+const { source, spec, build: handwritten, surface } = example;
 
 const answers = {
 	checks: [modelAnswers(handwritten).checks],

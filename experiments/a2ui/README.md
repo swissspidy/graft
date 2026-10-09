@@ -11,7 +11,7 @@ used to live here now lives in:
 | Core hooks | `packages/core/src/build/format.ts` |
 | WordPress | `hosts/wordpress/adapter/src/a2ui.ts`, `src/client/a2ui.tsx` (@swissspidy/a2ui-wp), `e2e/a2ui.spec.ts` |
 | EmDash | `hosts/emdash/adapter/src/host/a2ui.ts`, `src/node/a2ui-smoke.ts` |
-| Example builds | `examples/a2ui/builds` (WordPress), `examples/emdash/a2ui/builds` |
+| Example builds | `examples/builds` (WordPress), `examples/emdash/builds` |
 | Compiling | `graft compile --ui a2ui` |
 
 What stays here is evidence:
@@ -19,7 +19,8 @@ What stays here is evidence:
 - [`compiled/`](compiled/): the first compiles of the WordPress example
   specs against their frozen checks, with every attempt's output, and
   [`fresh/`](compiled/fresh/), the checks phase written for A2UI.
-  [`promote.ts`](promote.ts) turned them into `examples/a2ui/builds`.
+  [`promote.ts`](promote.ts) turned them into the example builds (then
+  in `examples/a2ui/builds`, now `examples/builds`).
 - [`emdash/`](emdash/): the EmDash examples compiled with `graft compile
   --ui a2ui`. `status-board.first-run.*` failed three attempts because of
   a verifier bug, since fixed: a local `set` wrote into the build's own
