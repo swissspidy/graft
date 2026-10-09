@@ -14,6 +14,8 @@ export default defineConfig({
 		baseURL: `http://127.0.0.1:${port}`,
 		trace: 'retain-on-failure',
 		viewport: { width: 1400, height: 1000 },
+		// A Chromium other than the one this Playwright version downloads, e.g. CHROMIUM=/opt/pw-browsers/chromium.
+		...(process.env.CHROMIUM ? { launchOptions: { executablePath: process.env.CHROMIUM } } : {}),
 	},
 	webServer: {
 		command: 'tsx hosts/emdash/e2e/server.ts',
