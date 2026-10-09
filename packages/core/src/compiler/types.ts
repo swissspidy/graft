@@ -38,6 +38,11 @@ export interface HostGuide {
 	notes?: string;
 	/** The same for building in another UI format, by format name (e.g. "A2UI"). */
 	formats?: Record<string, string>;
+	/**
+	 * The UI format new builds are compiled in, by name (e.g. "A2UI"),
+	 * when neither the caller nor a previous build decides. Default: a tree.
+	 */
+	ui?: string;
 }
 
 export interface CompileOptions {
@@ -56,8 +61,11 @@ export interface CompileOptions {
 	checks?: Check[];
 	/** The build being replaced, as a reference for layout and wording (regeneration). */
 	previous?: Build;
-	/** Build the UI in this format instead of as a tree. */
-	format?: UiFormat;
+	/**
+	 * Build the UI in this format, or as a tree ("tree"). Default: the
+	 * previous build's format, else the host's (`HostGuide.ui`), else a tree.
+	 */
+	format?: UiFormat | 'tree';
 	/** Attempts per phase. Default 3. */
 	maxAttempts?: number;
 	compilerVersion?: string;

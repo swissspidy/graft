@@ -7,6 +7,7 @@ import { readFile } from 'node:fs/promises';
 import { modelAnswers, type Build } from '../../../packages/core/src/index.ts';
 import { saveSettings, startModelStub } from '../adapter/src/node/model-stub.ts';
 import { pluginRoute } from '../adapter/src/node/server.ts';
+import '../adapter/src/host/a2ui.ts';
 import { authoredBuildFile } from './authoring.ts';
 
 /**

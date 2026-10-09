@@ -1,5 +1,6 @@
 import { readdirSync, readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
+import { answerA2UI, assembleA2UI, type A2UIBuild } from '@graft/a2ui';
 import { validateBuild, validateSpec, type Build, type Surface } from '@graft/core';
 import '../src/a2ui.ts';
 
@@ -14,5 +15,10 @@ describe('the A2UI example builds', () => {
 		const spec = validateSpec(read(`examples/specs/${build.spec.id}.md`), { surface }).spec!;
 		const errors = (await validateBuild(build, surface, { spec: { spec, hash: build.spec.hash } })).diagnostics.filter((d) => d.severity === 'error');
 		expect(errors).toEqual([]);
+	});
+
+	it.each(builds)('%s survives being written out as model output and assembled again', (file) => {
+		const build = JSON.parse(read(`examples/a2ui/builds/${file}`)) as A2UIBuild;
+		expect(assembleA2UI(answerA2UI(build), build.ui.catalogId)).toEqual({ value: { ui: build.ui, data: build.data, events: build.events }, problems: [] });
 	});
 });

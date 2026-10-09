@@ -8,14 +8,15 @@ import { verifyInWordPress } from './verify.ts';
 
 /**
  * Runs the whole compile pipeline against a real WordPress sandbox with a
- * scripted model (no API key needed): the model replays the hand-written
- * review-queue build as structured output, but its first tree omits the
- * status filter. The compiler must reject that candidate in verification,
- * feed the failure back, and accept the second.
+ * scripted model (no API key needed): the model replays the review-queue
+ * build (an A2UI surface, the host's format for new builds) as structured
+ * output, but its first answer omits the status filter. The compiler must
+ * reject that candidate in verification, feed the failure back, and accept
+ * the second.
  */
 
 const source = await readFile(`${examplesDir}/specs/review-queue.md`, 'utf8');
-const handwritten = JSON.parse(await readFile(`${examplesDir}/builds/review-queue.json`, 'utf8')) as Build;
+const handwritten = JSON.parse(await readFile(`${examplesDir}/a2ui/builds/review-queue.json`, 'utf8')) as Build;
 const surface = JSON.parse(await readFile(`${paths.surfaces}/7.1.json`, 'utf8'));
 const spec = validateSpec(source, { surface }).spec!;
 
@@ -44,17 +45,18 @@ try {
 	});
 	const failures: string[] = [];
 	if (!result.ok) failures.push('the compile did not succeed');
-	if (result.attempts.filter((a) => a.phase === 'tree').length !== 2) failures.push('expected exactly two tree attempts');
+	if (result.attempts.filter((a) => a.phase === 'tree').length !== 2) failures.push('expected exactly two UI attempts');
+	if (!result.build?.ui || result.build.tree) failures.push('the build is not an A2UI surface');
 	if (!prompts[2]?.includes('Check for "pending-only"')) failures.push('the verification failure was not fed back');
 	if (JSON.stringify(result.build?.data) !== JSON.stringify(handwritten.data)) failures.push('the accepted build is not the corrected one');
-	console.log(failures.length ? `✖ ${failures.join('; ')}` : '✔ compile pipeline: rejected the wrong tree in WordPress, accepted the fix');
+	console.log(failures.length ? `✖ ${failures.join('; ')}` : '✔ compile pipeline: rejected the wrong A2UI surface in WordPress, accepted the fix');
 
-	// With code: the first answer's function never returns. The sandbox stops
-	// it, verification fails, and the compiler asks again.
+	// A tree with code: the first answer's function never returns. The
+	// sandbox stops it, verification fails, and the compiler asks again.
 	const headlineSource = await readFile(`${examplesDir}/specs/headline-check.md`, 'utf8');
 	const headline = JSON.parse(await readFile(`${examplesDir}/builds/headline-check.json`, 'utf8')) as Build;
 	const headlineSpec = validateSpec(headlineSource, { surface }).spec!;
-	const looping = { ...modelAnswers(headline).tree, code: { source: 'function headlineVerdict(title) { for (;;) {} }', functions: ['headlineVerdict'] } };
+	const looping = { ...(modelAnswers(headline).tree as object), code: { source: 'function headlineVerdict(title) { for (;;) {} }', functions: ['headlineVerdict'] } };
 	const codeAnswers = { checks: [modelAnswers(headline).checks], tree: [looping, modelAnswers(headline).tree] };
 	const codePrompts: string[] = [];
 	const withCode = await compileSpec({
@@ -68,6 +70,7 @@ try {
 			},
 		},
 		host: hostGuide,
+		format: 'tree',
 		verify: async (build) => (await verifyInWordPress([{ build, spec: headlineSpec, surface }], { sandbox }))[0]!,
 		onEvent: (event) => console.log(JSON.stringify(event)),
 	});

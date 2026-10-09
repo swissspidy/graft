@@ -1,6 +1,7 @@
 import { mkdir, readdir, readFile, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { hashSpec, validateBuild, validateSpec, type Build, type Diagnostic, type Surface, type Verification } from '@graft/core';
+import { loadHostFormats } from './hosts.ts';
 import type { SiteVerifyResult } from './site.ts';
 
 /** An EmDash site with the Graft plugin, reached with an API token that has the "admin" scope. */
@@ -147,6 +148,7 @@ export async function emdashSiteInstall(
 	if (!parsed.spec) {
 		throw new Error(`${specFile} is not valid for this site:${parsed.diagnostics.map((d) => `\n  ${d.line ?? ''} ${d.message}`).join('')}`);
 	}
+	await loadHostFormats(surface.host);
 	const validation = await validateBuild(build, surface, { spec: { spec: parsed.spec, hash: await hashSpec(source) } });
 	if (!validation.ok) {
 		throw new Error(`${buildFile} is not valid for this spec and site:${validation.diagnostics.filter((d) => d.severity === 'error').map((d) => `\n  ${d.path ?? ''} ${d.message}`).join('')}`);

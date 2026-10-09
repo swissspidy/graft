@@ -14,57 +14,98 @@
 		"post_type": "event"
 	},
 	"data": {},
-	"tree": {
-		"type": "row-action",
-		"props": {
-			"id": "family-friendly",
-			"label": "Family friendly",
-			"visible": {
-				"$and": [
-					{
-						"$can": "posts.terms:write",
-						"on": {
-							"$slot": "post"
-						}
-					},
-					{
-						"$not": {
-							"$fn": "hasTerm",
-							"args": [
-								{
-									"$slot": "post.terms.event_type"
-								},
-								"family"
-							]
+	"ui": {
+		"protocol": "a2ui/v0.9",
+		"catalogId": "graft:wordpress",
+		"components": [
+			{
+				"id": "root",
+				"component": "Button",
+				"child": "root-label",
+				"variant": "default",
+				"actionId": "family-friendly",
+				"visible": {
+					"call": "and",
+					"args": {
+						"values": [
+							{
+								"call": "equals",
+								"args": {
+									"a": {
+										"path": "/slot/post/type"
+									},
+									"b": "event"
+								}
+							},
+							{
+								"call": "can",
+								"args": {
+									"scope": "posts.terms:write",
+									"on": {
+										"path": "/slot/post"
+									}
+								}
+							},
+							{
+								"call": "equals",
+								"args": {
+									"a": {
+										"call": "count",
+										"args": {
+											"value": {
+												"call": "filter",
+												"args": {
+													"items": {
+														"path": "/slot/post/terms/event_type"
+													},
+													"by": "slug",
+													"equals": "family"
+												}
+											}
+										}
+									},
+									"b": 0
+								}
+							}
+						]
+					}
+				},
+				"action": {
+					"event": {
+						"name": "mark-family-friendly",
+						"context": {
+							"id": {
+								"path": "/slot/post/id"
+							}
 						}
 					}
-				]
+				}
 			},
-			"onClick": {
-				"$call": "posts.set_terms",
-				"input": {
-					"id": {
-						"$slot": "post.id"
-					},
-					"taxonomy": "event_type",
-					"terms": [
-						"family"
-					],
-					"mode": "add"
-				},
-				"then": [
-					"reload:page"
-				],
-				"notice": "Marked as family friendly."
+			{
+				"id": "root-label",
+				"component": "Text",
+				"text": "Family friendly"
 			}
-		}
-	},
-	"code": {
-		"language": "javascript",
-		"source": "// Whether a list of terms has the one with this slug.\nfunction hasTerm(terms, slug) {\n\treturn Array.isArray(terms) && terms.some((term) => term && term.slug === slug);\n}\n",
-		"functions": [
-			"hasTerm"
 		]
+	},
+	"events": {
+		"mark-family-friendly": {
+			"call": "posts.set_terms",
+			"input": {
+				"id": {
+					"$context": "id"
+				},
+				"taxonomy": "event_type",
+				"terms": [
+					"family"
+				],
+				"mode": "add"
+			},
+			"then": [
+				"reload:page"
+			],
+			"notice": "Marked as family friendly."
+		}
 	},
 	"checks": [
 		{
@@ -331,23 +372,31 @@
 	],
 	"refs": {
 		"slot": "posts.list.row-actions",
-		"components": {
-			"row-action": [
-				"id",
-				"label",
-				"onClick",
-				"visible"
-			]
-		},
+		"components": {},
 		"capabilities": [
 			"posts.set_terms"
 		],
 		"scopes": [
 			"posts.terms:write"
-		]
+		],
+		"catalog": {
+			"Button": [
+				"action",
+				"actionId",
+				"child",
+				"variant",
+				"visible"
+			],
+			"Text": [
+				"text"
+			]
+		}
 	},
 	"provenance": {
-		"compiler": "handwritten",
-		"strategy": "handwritten"
+		"compiler": "graft-compiler/0.1.0",
+		"model": "claude-opus-5-5",
+		"promptHash": "sha256:37c758308bdcdf4976cd31300a2d5c4fd2b082eef7f2133b6deffdf404b81edd",
+		"strategy": "regenerated",
+		"replaces": "sha256:6379a7e854cbe69aabaa2a90cef3cd44bed8d7fb100438e49852348d0e7b0578"
 	}
 }

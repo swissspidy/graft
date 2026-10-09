@@ -1,7 +1,7 @@
 import { mkdir, readdir, readFile, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { hashSpec, validateBuild, validateSpec, type Build, type Spec, type Surface, type Verification } from '@graft/core';
-import { hostTools } from './hosts.ts';
+import { hostTools, loadHostFormats } from './hosts.ts';
 import { loadSurface } from './validate.ts';
 
 export interface VerifyCommandOptions {
@@ -45,6 +45,7 @@ export async function verifyFiles(files: string[], options: VerifyCommandOptions
 	const results: VerifyCommandResult[] = [];
 	const targets: Array<{ file: string; build: Build; spec: Spec }> = [];
 
+	await loadHostFormats(surface.host);
 	for (const file of files) {
 		const build = JSON.parse(await readFile(file, 'utf8')) as Build;
 		const spec = specs.get(build.spec?.id);

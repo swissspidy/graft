@@ -5,6 +5,7 @@ export {
 	a2uiPrompt,
 	a2uiRefs,
 	a2uiSystem,
+	answerA2UI,
 	assembleA2UI,
 	catalogGuide,
 	createA2UIFormat,

@@ -2,6 +2,7 @@ import { execFile } from 'node:child_process';
 import { existsSync, readFileSync } from 'node:fs';
 import { promisify } from 'node:util';
 import { expect, test, type Page } from '@playwright/test';
+import { login } from './login.ts';
 
 /**
  * Milestone 3: the plugin serves hand-written builds of the example specs
@@ -13,15 +14,6 @@ import { expect, test, type Page } from '@playwright/test';
  * Tests run in order because they publish posts.
  */
 test.describe.configure({ mode: 'serial' });
-
-async function login(page: Page, user: string) {
-	await page.goto('/wp-login.php');
-	await page.fill('#user_login', user);
-	await page.fill('#user_pass', 'password');
-	await page.click('#wp-submit');
-	// The admin page's DOM is enough: its images and feeds may be slow to finish loading.
-	await page.waitForURL(/wp-admin/, { waitUntil: 'domcontentloaded' });
-}
 
 const queue = (page: Page) => page.locator('.graft-page table');
 const queueRow = (page: Page, title: string) => queue(page).locator('tbody tr', { hasText: title });

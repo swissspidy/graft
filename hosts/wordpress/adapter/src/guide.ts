@@ -3,6 +3,8 @@ import { a2uiNotes } from './a2ui.ts';
 
 /** What the compiler needs to know about WordPress beyond the surface. */
 export const hostGuide: HostGuide = {
+	// New builds are A2UI surfaces; a previous build keeps its format.
+	ui: 'A2UI',
 	formats: { A2UI: a2uiNotes },
 	fixtures: `A JSON object:
 {"users": [{"as": "<alias>", "role": "administrator|editor|author|contributor|subscriber", "name": "<display name, optional; default the alias with its first letter capitalized>"}],

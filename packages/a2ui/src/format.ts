@@ -32,6 +32,7 @@ export function createA2UIFormat(host: A2UIFormatHost): UiFormat {
 			prompt: (spec, checks, previous, feedback) => a2uiPrompt(spec, checks, previous as unknown as A2UIBuild | undefined, feedback),
 			schema: (spec, surface) => a2uiOutputSchema(spec, surface, componentNames),
 			assemble: (output) => assembleA2UI(output, host.catalogId) as { value?: Partial<Build>; problems: string[] },
+			answer: (build, dataInput) => answerA2UI(build as unknown as A2UIBuild, dataInput),
 			content: (build) => ({ ui: (build as unknown as A2UIBuild).ui, events: (build as unknown as A2UIBuild).events }),
 			checksSystem: (base) =>
 				`${base.replace(/\nComponents \(props[\s\S]*?(?=\nCapabilities you may use)/, '')}\n\nThe customization's UI will be an A2UI surface:\n${catalogGuide(host)}\n\nIn checks, an action id is a button's action id or a table row action's id, and an input id is a text field's or checkbox's id.`,
@@ -225,6 +226,17 @@ function parse(text: unknown, what: string, problems: string[]): unknown {
 		problems.push(`${what} is not valid JSON: ${(error as Error).message}.`);
 		return undefined;
 	}
+}
+
+/** A build as the model's output for the UI phase: the inverse of `assembleA2UI`, for scripted models. */
+export function answerA2UI(build: A2UIBuild, dataInput?: Record<string, unknown>) {
+	return {
+		components: build.ui.components.map(({ id, component, ...props }) => ({ id, component, props_json: JSON.stringify(props) })),
+		initial_json: JSON.stringify(build.ui.initial ?? {}),
+		computed_json: JSON.stringify(build.ui.computed ?? {}),
+		data: Object.entries(build.data).map(([name, source]) => ({ name, call: source.call, input_json: JSON.stringify(dataInput?.[name] ?? source.input ?? null) })),
+		events: Object.entries(build.events).map(([name, e]) => ({ name, call: e.call, input_json: JSON.stringify(e.input ?? null), then: e.then ?? [], notice: e.notice ?? null })),
+	};
 }
 
 /** Turns the model's output into the build's `ui`, `data` and `events`. */

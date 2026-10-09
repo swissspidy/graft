@@ -1,4 +1,5 @@
 import { expect, test, type Page } from '@playwright/test';
+import { login } from './login.ts';
 
 /**
  * The agency angle, on the Riverside Arts Centre (playground/sites/riverside.php):
@@ -8,15 +9,6 @@ import { expect, test, type Page } from '@playwright/test';
  * Tests run in order.
  */
 test.describe.configure({ mode: 'serial' });
-
-async function login(page: Page, user: string) {
-	await page.goto('/wp-login.php');
-	await page.fill('#user_login', user);
-	await page.fill('#user_pass', 'password');
-	await page.click('#wp-submit');
-	// The admin page's DOM is enough: its images and feeds may be slow to finish loading.
-	await page.waitForURL(/wp-admin/, { waitUntil: 'domcontentloaded' });
-}
 
 const customizations = '/wp-admin/tools.php?page=graft-customizations';
 const listRow = (page: Page, title: string) => page.locator('#the-list tr', { hasText: title });
@@ -56,9 +48,9 @@ test('editors see upcoming events soonest first from custom fields, and mark one
 	const widget = page.locator('#graft-upcoming-events');
 	await expect(widget.locator('tbody tr [data-graft-field="title"]')).toHaveText(['Poetry slam', 'Open rehearsal', 'Jazz night', 'Puppet show']);
 	const cell = (title: string, field: string) => widget.locator('tbody tr', { hasText: title }).locator(`[data-graft-field="${field}"]`);
-	await expect(cell('Open rehearsal', 'meta.venue')).toHaveText('Venue missing');
-	await expect(cell('Jazz night', 'meta.venue')).toHaveText('Main hall');
-	await expect(cell('Jazz night', 'meta.capacity')).toHaveText('240');
+	await expect(cell('Open rehearsal', 'meta/venue')).toHaveText('Venue missing');
+	await expect(cell('Jazz night', 'meta/venue')).toHaveText('Main hall');
+	await expect(cell('Jazz night', 'meta/capacity')).toHaveText('240');
 	await widget.screenshot({ path: 'test-results/agency-upcoming-events.png' });
 
 	await widget.locator('tbody tr', { hasText: 'Jazz night' }).getByRole('button', { name: 'Mark sold out' }).click();

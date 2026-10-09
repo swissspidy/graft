@@ -1,6 +1,8 @@
 import { execFile } from 'node:child_process';
+import { readFile } from 'node:fs/promises';
 import { promisify } from 'node:util';
-import { modelAnswers } from '@graft/core';
+import { modelAnswers, type Build } from '@graft/core';
+import '../host/a2ui.ts';
 import { loadExamples, ROOT } from './examples.ts';
 import { saveSettings, startModelStub } from './model-stub.ts';
 import { asUser, login, pluginRoute, startEmDash } from './server.ts';
@@ -8,8 +10,9 @@ import { asUser, login, pluginRoute, startEmDash } from './server.ts';
 /**
  * Writing a customization in the EmDash admin, end to end, with the Claude
  * API stubbed (test-model.ts in the site routes the plugin's requests to
- * it). The stub replays the publish-queue build as the compiler's model
- * output, but its first tree asks for a status content.list does not have:
+ * it). The stub replays the publish-queue build (an A2UI surface, the
+ * host's format for new builds) as the compiler's model output, but its
+ * first answer asks for a status content.list does not have:
  * the compiler must reject it and try again, one model call per step.
  * Then graft site verify verifies the draft, the admin approves it and
  * editors get it.
@@ -25,8 +28,9 @@ type Block = Record<string, unknown> & { type: string };
 const texts = (blocks?: Block[]) => JSON.stringify(blocks ?? []);
 
 const example = (await loadExamples()).find((e) => e.name === 'publish-queue')!;
-const wrong = modelAnswers(example.build, { queue: { collection: 'posts', status: 'pending', order: 'asc' } }).tree;
-const outputs = [modelAnswers(example.build).checks, wrong, modelAnswers(example.build).tree];
+const target = JSON.parse(await readFile(`${ROOT}examples/emdash/a2ui/builds/publish-queue.json`, 'utf8')) as Build;
+const wrong = modelAnswers(target, { queue: { collection: 'posts', status: 'pending', order: 'asc' } }).tree;
+const outputs = [modelAnswers(target).checks, wrong, modelAnswers(target).tree];
 
 const stub = await startModelStub(outputs);
 const { requests } = stub;
@@ -61,10 +65,10 @@ try {
 	check('the job is shown as building', texts(first.data?.blocks).includes('Continue building'), first);
 
 	const second = await continueJob();
-	check('the next step builds a tree, which is rejected', requests.length === 2 && second.data?.toast?.message?.includes('Step 2 done') === true && texts(second.data?.blocks).includes('Retrying after'), { toast: second.data?.toast, calls: requests.length });
+	check('the next step builds the UI, which is rejected', requests.length === 2 && second.data?.toast?.message?.includes('Step 2 done') === true && texts(second.data?.blocks).includes('Retrying after'), { toast: second.data?.toast, calls: requests.length });
 
 	const third = await continueJob();
-	check('the corrected tree is built and stored as a draft', requests.length === 3 && third.data?.toast?.type === 'success' && texts(third.data?.blocks).includes('Built (not verified)'), { toast: third.data?.toast, calls: requests.length });
+	check('the corrected UI is built and stored as a draft', requests.length === 3 && third.data?.toast?.type === 'success' && texts(third.data?.blocks).includes('Built (not verified)'), { toast: third.data?.toast, calls: requests.length });
 
 	const request = requests[0]!;
 	const body = request.body as { model?: string; output_config?: { effort?: string; format?: { type?: string } }; system?: unknown };
@@ -73,9 +77,9 @@ try {
 	const retryPrompt = JSON.stringify((requests[2]!.body as { messages?: unknown }).messages);
 	check('the rejection is fed back to the model', retryPrompt.includes('must be one of') && !JSON.stringify((requests[1]!.body as { messages?: unknown }).messages).includes('must be one of'), retryPrompt.slice(0, 2000));
 
-	const { specs } = await pluginRoute<{ specs: Array<{ id: string; versions: Array<{ state: string; build?: { provenance?: { compiler?: string } } }> }> }>(site, 'specs');
+	const { specs } = await pluginRoute<{ specs: Array<{ id: string; versions: Array<{ state: string; build?: { tree?: unknown; ui?: { catalogId?: string } } }> }> }>(site, 'specs');
 	const draft = specs.find((s) => s.id === 'publish-queue')?.versions.at(-1);
-	check('the draft holds the compiled build', draft?.state === 'draft' && !!draft.build, draft);
+	check('the draft holds the compiled build, an A2UI surface', draft?.state === 'draft' && draft.build?.ui?.catalogId === 'graft:emdash' && draft.build.tree === undefined, draft);
 
 	const verified = await promisify(execFile)('pnpm', ['-s', 'graft', 'site', 'verify', '--site', site.url, '--token', site.token], { cwd: ROOT, maxBuffer: 1 << 24 }).then(
 		(r) => r.stdout,
