@@ -53,6 +53,18 @@ export interface HostToolOptions {
 	verbose?: boolean;
 }
 
+/**
+ * Loads a host's adapter, which registers the UI formats its builds may be
+ * in (A2UI), so validating a build on that host knows them.
+ */
+export async function loadHostFormats(host: string): Promise<void> {
+	if (host === 'wordpress') {
+		await import('@graft/wordpress-adapter');
+	} else if (host === 'emdash') {
+		await import('@graft/emdash/node');
+	}
+}
+
 export async function hostTools(surface: Surface, options: HostToolOptions = {}): Promise<HostTools> {
 	if (surface.host === 'wordpress') {
 		const wordpress = await import('@graft/wordpress-adapter');

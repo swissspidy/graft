@@ -56,9 +56,9 @@ test('editors see upcoming events soonest first from custom fields, and mark one
 	const widget = page.locator('#graft-upcoming-events');
 	await expect(widget.locator('tbody tr [data-graft-field="title"]')).toHaveText(['Poetry slam', 'Open rehearsal', 'Jazz night', 'Puppet show']);
 	const cell = (title: string, field: string) => widget.locator('tbody tr', { hasText: title }).locator(`[data-graft-field="${field}"]`);
-	await expect(cell('Open rehearsal', 'meta.venue')).toHaveText('Venue missing');
-	await expect(cell('Jazz night', 'meta.venue')).toHaveText('Main hall');
-	await expect(cell('Jazz night', 'meta.capacity')).toHaveText('240');
+	await expect(cell('Open rehearsal', 'meta/venue')).toHaveText('Venue missing');
+	await expect(cell('Jazz night', 'meta/venue')).toHaveText('Main hall');
+	await expect(cell('Jazz night', 'meta/capacity')).toHaveText('240');
 	await widget.screenshot({ path: 'test-results/agency-upcoming-events.png' });
 
 	await widget.locator('tbody tr', { hasText: 'Jazz night' }).getByRole('button', { name: 'Mark sold out' }).click();

@@ -1,6 +1,6 @@
 import { readFile, writeFile } from 'node:fs/promises';
 import { createBundle, hashSpec, validateBuild, validateSpec, type Build, type CustomizationBundle, type Surface, type Verification } from '@graft/core';
-import { hostTools } from './hosts.ts';
+import { hostTools, loadHostFormats } from './hosts.ts';
 import { loadSurface } from './validate.ts';
 
 export interface BundleOptions {
@@ -52,6 +52,7 @@ export async function bundleFiles(options: BundleOptions): Promise<BundleResult>
 			problems.push(`${file}: built from another version of the spec.`);
 			continue;
 		}
+		await loadHostFormats(surface.host);
 		const errors = (await validateBuild(build, surface, { spec: { spec, hash } })).diagnostics.filter((d) => d.severity === 'error');
 		if (errors.length > 0) {
 			problems.push(`${file}: ${errors.map((d) => `${d.path ?? ''} ${d.message}`).join('; ')}`);

@@ -1,5 +1,6 @@
 import { readFile, writeFile } from 'node:fs/promises';
 import { hashSpec, validateBuild, validateSpec, type Build, type Diagnostic } from '@graft/core';
+import { loadHostFormats } from './hosts.ts';
 import { loadSurface } from './validate.ts';
 
 export interface BuildCommandOptions {
@@ -22,6 +23,7 @@ export interface BuildCommandResult {
 export async function checkBuildFile(file: string, options: BuildCommandOptions): Promise<BuildCommandResult> {
 	const surface = await loadSurface(options.surface);
 	let build = JSON.parse(await readFile(file, 'utf8')) as Build;
+	await loadHostFormats(surface.host);
 
 	let spec: Parameters<typeof validateBuild>[2] = {};
 	if (options.spec) {

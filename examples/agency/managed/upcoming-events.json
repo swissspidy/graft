@@ -55,105 +55,134 @@
 						}
 					}
 				},
-				"tree": {
-					"type": "table",
-					"props": {
-						"rows": {
-							"$data": "events.items"
-						},
-						"fields": [
-							{
-								"id": "title",
-								"label": "Event",
-								"primary": true
+				"ui": {
+					"protocol": "a2ui/v0.9",
+					"catalogId": "graft:wordpress",
+					"components": [
+						{
+							"id": "root",
+							"component": "Table",
+							"rows": {
+								"path": "/events/items"
 							},
-							{
-								"id": "meta.event_date",
-								"label": "Date",
-								"type": "date"
-							},
-							{
-								"id": "meta.venue",
-								"label": "Venue",
-								"value": {
-									"$if": [
-										{
-											"$eq": [
-												{
-													"$field": "meta.venue"
-												},
-												null
-											]
-										},
-										"Venue missing",
-										{
-											"$field": "meta.venue"
-										}
-									]
+							"fields": [
+								{
+									"id": "title",
+									"label": "Event",
+									"type": "string",
+									"primary": true
 								},
-								"tone": {
-									"$if": [
-										{
-											"$eq": [
-												{
-													"$field": "meta.venue"
-												},
-												null
-											]
-										},
-										"error",
-										null
-									]
-								}
-							},
-							{
-								"id": "meta.capacity",
-								"label": "Seats",
-								"type": "integer"
-							}
-						],
-						"actions": [
-							{
-								"id": "sold-out",
-								"label": "Mark sold out",
-								"visible": {
-									"$and": [
-										{
-											"$can": "posts.meta:write",
-											"on": {
-												"$field": "id"
-											}
-										},
-										{
-											"$not": {
-												"$eq": [
-													{
-														"$field": "meta.sold_out"
-													},
-													true
-												]
-											}
-										}
-									]
+								{
+									"id": "meta/event_date",
+									"label": "Date",
+									"type": "date"
 								},
-								"onClick": {
-									"$call": "posts.update_meta",
-									"input": {
-										"id": {
-											"$field": "id"
-										},
-										"meta": {
-											"sold_out": true
+								{
+									"id": "meta/venue",
+									"label": "Venue",
+									"type": "string",
+									"value": {
+										"call": "if",
+										"args": {
+											"condition": {
+												"call": "required",
+												"args": {
+													"value": {
+														"path": "meta/venue"
+													}
+												}
+											},
+											"then": {
+												"path": "meta/venue"
+											},
+											"else": "Venue missing"
 										}
 									},
-									"then": [
-										"refresh:events"
-									],
-									"notice": "Marked sold out."
+									"tone": {
+										"call": "if",
+										"args": {
+											"condition": {
+												"call": "required",
+												"args": {
+													"value": {
+														"path": "meta/venue"
+													}
+												}
+											},
+											"then": "info",
+											"else": "error"
+										}
+									}
+								},
+								{
+									"id": "meta/capacity",
+									"label": "Seats",
+									"type": "integer"
 								}
+							],
+							"rowActions": [
+								{
+									"id": "sold-out",
+									"label": "Mark sold out",
+									"variant": "default",
+									"visible": {
+										"call": "and",
+										"args": {
+											"values": [
+												{
+													"call": "can",
+													"args": {
+														"scope": "posts.meta:write"
+													}
+												},
+												{
+													"call": "not",
+													"args": {
+														"value": {
+															"call": "equals",
+															"args": {
+																"a": {
+																	"path": "meta/sold_out"
+																},
+																"b": true
+															}
+														}
+													}
+												}
+											]
+										}
+									},
+									"action": {
+										"event": {
+											"name": "mark-sold-out",
+											"context": {
+												"id": {
+													"path": "id"
+												}
+											}
+										}
+									}
+								}
+							],
+							"empty": "No upcoming events"
+						}
+					]
+				},
+				"events": {
+					"mark-sold-out": {
+						"call": "posts.update_meta",
+						"input": {
+							"id": {
+								"$context": "id"
+							},
+							"meta": {
+								"sold_out": true
 							}
+						},
+						"then": [
+							"refresh:events"
 						],
-						"empty": "No upcoming events"
+						"notice": "Marked sold out."
 					}
 				},
 				"checks": [
@@ -388,14 +417,7 @@
 				],
 				"refs": {
 					"slot": "dashboard.widget",
-					"components": {
-						"table": [
-							"actions",
-							"empty",
-							"fields",
-							"rows"
-						]
-					},
+					"components": {},
 					"capabilities": [
 						"posts.list",
 						"posts.update_meta"
@@ -403,11 +425,22 @@
 					"scopes": [
 						"posts.meta:write",
 						"posts:read"
-					]
+					],
+					"catalog": {
+						"Table": [
+							"empty",
+							"fields",
+							"rowActions",
+							"rows"
+						]
+					}
 				},
 				"provenance": {
-					"compiler": "handwritten",
-					"strategy": "handwritten"
+					"compiler": "graft-compiler/0.1.0",
+					"model": "claude-opus-5-5",
+					"promptHash": "sha256:73fe7e2906ba8bfad6e8018d4e1a7d2d32bf4078828a478d202d20c3fcae73c5",
+					"strategy": "regenerated",
+					"replaces": "sha256:f1058e497075900fe63d76999537072fdfa2f847700699285a1be48319f4ce7e"
 				}
 			},
 			"verification": {
@@ -448,7 +481,7 @@
 					}
 				],
 				"unchecked": [],
-				"verifiedAt": "2026-09-30T18:36:25.986Z"
+				"verifiedAt": "2026-10-09T11:10:45.758Z"
 			}
 		}
 	]
