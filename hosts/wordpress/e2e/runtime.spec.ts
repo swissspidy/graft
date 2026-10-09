@@ -219,8 +219,10 @@ test('admins write a spec in wp-admin, see it validated, and build it', async ({
 	await page.getByRole('button', { name: 'Build it' }).click();
 	const card = page.locator('[data-graft-spec="waiting-copy"]');
 	if (browserVerify) {
-		// Checks ran in a private WordPress in this browser.
-		await expect(page.locator('.components-notice__content', { hasText: '"Waiting (copy)" was built and verified.' })).toBeVisible({ timeout: 180_000 });
+		// Checks ran in a private WordPress in this browser. The notice says why when they could not.
+		const notice = page.locator('.components-notice__content', { hasText: '"Waiting (copy)" was built' });
+		await expect(notice).toBeVisible({ timeout: 180_000 });
+		await expect(notice).toContainText('"Waiting (copy)" was built and verified.');
 		await expect(card.locator('[data-graft-state]').first()).toHaveText('Needs approval');
 		await expect(card).toContainText('verified');
 	} else {

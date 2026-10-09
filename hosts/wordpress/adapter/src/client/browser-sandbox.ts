@@ -33,12 +33,13 @@ function base64ToBytes(base64: string): Uint8Array {
 
 /**
  * Imports Playground's client, retrying when playground.wordpress.net does
- * not answer: a CDN hiccup otherwise fails the whole check. Retries add a
- * query so the browser fetches the module again instead of reusing the
- * failed import.
+ * not answer: a CDN hiccup otherwise fails the whole check. The retries
+ * span about a minute, since an outage of a few seconds is common. Retries
+ * add a query so the browser fetches the module again instead of reusing
+ * the failed import.
  */
 async function loadPlaygroundClient(): Promise<PlaygroundModule> {
-	const delays = [1_000, 3_000, 9_000];
+	const delays = [1_000, 3_000, 6_000, 10_000, 15_000, 25_000];
 	for (let attempt = 0; ; attempt++) {
 		try {
 			const url = `${PLAYGROUND}/client/index.js${attempt ? `?retry=${attempt}` : ''}`;
