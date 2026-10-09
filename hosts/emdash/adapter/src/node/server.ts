@@ -132,17 +132,24 @@ export async function startEmDash(options: StartOptions = {}): Promise<EmDashSer
 	try {
 		await waitFor(`${url}/`, child, () => output);
 		// The dev server can still be settling when it first answers (Vite optimizing
-		// dependencies), and setup then fails with a 500. Setup is idempotent: retry it.
+		// dependencies): setup then fails with a 500, or the connection drops. Setup is
+		// idempotent, so both are retried; a 4xx is an answer and is not.
 		let setup: Response;
 		let body: { data?: { token?: string } };
 		for (let attempt = 1; ; attempt++) {
-			setup = await fetch(`${url}/_emdash/api/setup/dev-bypass?token=1${options.content ? '' : '&content=0'}`, {
-				method: 'POST',
-				headers: { 'X-EmDash-Request': '1' },
-			});
-			body = (await setup.json().catch(() => ({}))) as { data?: { token?: string } };
-			if (setup.status < 500 || attempt === 5) {
-				break;
+			try {
+				setup = await fetch(`${url}/_emdash/api/setup/dev-bypass?token=1${options.content ? '' : '&content=0'}`, {
+					method: 'POST',
+					headers: { 'X-EmDash-Request': '1' },
+				});
+				body = (await setup.json().catch(() => ({}))) as { data?: { token?: string } };
+				if (setup.status < 500 || attempt === 5) {
+					break;
+				}
+			} catch (error) {
+				if (attempt === 5) {
+					throw new Error(`EmDash setup failed: ${error instanceof Error ? error.message : String(error)}\n${output.slice(-4000)}`);
+				}
 			}
 			await new Promise((resolve) => setTimeout(resolve, attempt * 1000));
 		}
