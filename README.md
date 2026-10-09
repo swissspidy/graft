@@ -30,8 +30,8 @@ excerpt there, watch the checklist follow as you type, save, and publish.
 The demo is rebuilt from `main` on every push
 (`pnpm demo:build`, `pnpm test:demo`).
 
-The example customizations in the demo are hand-written builds, so the
-tests run without a model. [Compiling with Claude](docs/compiling-with-claude.md)
+The example customizations in the demo are A2UI surfaces Claude compiled
+from the specs, checked in so the tests run without a model. [Compiling with Claude](docs/compiling-with-claude.md)
 shows a real run: Claude compiles all seven example specs into builds that
 pass their checks, and regenerates five customizations after a host change.
 
@@ -69,15 +69,18 @@ More in [`examples/specs`](examples/specs): an admin page, a row action on
 the existing Posts screen, Dashboard widgets, and a publish checklist in
 the block editor with fields to fix the headline and excerpt. The same ideas for
 EmDash are in [`examples/emdash`](examples/emdash): a publish queue, a
-panel in the entry editor, dashboard widgets, and a status board drawn by
-code that switches between drafts and published posts.
+panel in the entry editor, dashboard widgets, and a status board that
+switches between drafts and published posts.
 
 ## How it works
 
-**Build.** A build is data, not code: a tree of components the host
-declares (table, button, notice, ...), bindings into data sources, and
-actions that call the host's capabilities (WordPress abilities). A trusted
-renderer draws it with native wp-admin components. It also carries
+**Build.** A build is data, not code: an [A2UI](https://a2ui.org/) surface
+of components from Graft's catalog for the host (table, button, text,
+inputs, ...), bindings into data sources, and events bound to the host's
+capabilities (WordPress abilities). A trusted renderer draws it with native
+wp-admin components ([ADR 0009](docs/adr/0009-a2ui.md)). Older builds are
+trees of the host's components; they move to A2UI when they are
+regenerated. It also carries
 executable **checks**, one or more per acceptance criterion.
 
 **Serve.** The WordPress plugin mounts active builds in their slots. Every
@@ -92,7 +95,7 @@ state). No tenant data is ever touched.
 
 **Compile.** Claude writes the checks from the criteria first, without
 seeing any implementation, and those checks are frozen. It then builds the
-tree against them; each candidate is validated against the host's surface
+UI against them; each candidate is validated against the host's surface
 and verified, and failures go back to the model. The model never grades its
 own homework. Criteria that can't be checked objectively ("looks clean") are
 sent back to the author instead of getting a weak check.
@@ -195,20 +198,17 @@ pnpm graft site verify --site <url> --token <token>
 | `pnpm verify:examples` | The example builds' checks in a WordPress sandbox |
 | `pnpm verify:agency` | The agency example builds' checks, in a sandbox that reproduces the client site's content model |
 | `pnpm test:compile` | The compile pipeline with a scripted model against WordPress: an A2UI build, and a tree whose code loops |
-| `pnpm test:canary` | Eight synthetic host changes, each forcing one rung, against a five-tenant corpus (one with code and a widget) |
-| `pnpm test:e2e` | Playwright in wp-admin: serving, gateway and its audit log, build functions and their lazy loading, an interactive widget, the publish checklist in the block editor, approval, authoring, `graft site` |
-| `pnpm test:e2e:a2ui` | Playwright on the e2e site with the example specs built as A2UI surfaces: Dashboard widgets, local state, row actions, the review queue, approval and the block editor panel, with no code |
-| `pnpm test:canary:a2ui` | The same synthetic host changes against the example specs built as A2UI |
+| `pnpm test:canary` | Eight synthetic host changes, each forcing one rung, against a five-tenant corpus |
+| `pnpm test:e2e` | Playwright in wp-admin: serving, gateway and its audit log, Dashboard widgets with local state, row actions, the publish checklist in the block editor, approval, authoring, `graft site` |
 | `pnpm test:e2e:agency` | Playwright on a client site an agency built: custom post types, fields and terms, the agency's policy and managed customization, and upgrading after the agency changes the content model |
 | `pnpm verify:emdash` | The EmDash example builds' checks in a throwaway EmDash |
 | `pnpm test:compile:emdash` | The compile pipeline with a scripted model against EmDash, building an A2UI surface |
-| `pnpm test:canary:emdash` | Six synthetic EmDash changes, each forcing one rung, against a two-tenant corpus (one with code and a widget) |
+| `pnpm test:canary:emdash` | Six synthetic EmDash changes, each forcing one rung, against a two-tenant corpus |
 | `pnpm test:site:emdash` | `graft site` against a live EmDash: install with local verification, verify drafts, pull into the canary |
 | `pnpm test:emdash:sandboxed` | The same, with Graft in EmDash's plugin sandbox (workerd) |
 | `pnpm test:author:emdash` | Writing a customization (an A2UI surface) in the EmDash admin, with a stubbed Claude API, natively and sandboxed |
 | `pnpm test:cfworker` | The unit tests again on the schema engine used where code generation is forbidden |
-| `pnpm test:emdash:a2ui` | The EmDash examples built as A2UI: installed, approved and served as Block Kit, natively and sandboxed |
-| `pnpm test:emdash` | EmDash plugin smoke test: install, approve, serve per role, forged and refused actions, a widget's events and actions |
+| `pnpm test:emdash` | EmDash plugin smoke test: install, approve, serve per role, forged and refused actions, the status board's local state and actions |
 | `pnpm test:e2e:emdash` | Playwright in the EmDash admin: the page, the widget and the editor panel |
 
 CI runs all of them, plus a weekly canary against WordPress nightly. As of
@@ -255,7 +255,7 @@ Known limits:
 | `packages/cli` | The `graft` command |
 | `hosts/wordpress` | The WordPress adapter: plugin, components, surface generator, sandbox, tests ([README](hosts/wordpress/README.md)) |
 | `hosts/emdash` | The EmDash adapter: a native plugin that serves builds as Block Kit, surface, sandbox, test site, tests ([README](hosts/emdash/README.md)) |
-| `examples/` | Example specs and hand-written builds (WordPress; EmDash in `examples/emdash`; an agency-built client site in `examples/agency`) |
+| `examples/` | Example specs and their builds, A2UI surfaces (WordPress; EmDash in `examples/emdash`; an agency-built client site in `examples/agency`) |
 | `fixtures/canary` | A multi-tenant corpus for the canary |
 
 ## License

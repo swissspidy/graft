@@ -4,7 +4,8 @@ import { describe, expect, it } from 'vitest';
 import { allActions, snapshotTree, type Build } from '@graft/core';
 import { createCan, semantics } from '../src/index.ts';
 
-const builds = join(import.meta.dirname, '../../../../examples/builds');
+// Tree builds of the examples: these are the tree semantics.
+const builds = join(import.meta.dirname, '../../../../packages/core/test/fixtures/trees/wordpress');
 const load = (name: string) => JSON.parse(readFileSync(join(builds, `${name}.json`), 'utf8')) as Build;
 
 const post = (id: number, title: string, publish: boolean) => ({

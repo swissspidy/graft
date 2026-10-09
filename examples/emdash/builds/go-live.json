@@ -16,132 +16,188 @@
 		]
 	},
 	"data": {},
-	"tree": {
-		"type": "stack",
-		"children": [
+	"ui": {
+		"protocol": "a2ui/v0.9",
+		"catalogId": "graft:emdash",
+		"components": [
 			{
-				"type": "banner",
-				"props": {
-					"title": "Live",
-					"variant": "default",
-					"visible": {
-						"$eq": [
+				"id": "root",
+				"component": "Column",
+				"children": [
+					"live-text",
+					"not-live-text",
+					"actions"
+				]
+			},
+			{
+				"id": "live-text",
+				"component": "Text",
+				"text": "Live",
+				"variant": "h3",
+				"visible": {
+					"call": "equals",
+					"args": {
+						"a": {
+							"path": "/slot/entry/status"
+						},
+						"b": "published"
+					}
+				}
+			},
+			{
+				"id": "not-live-text",
+				"component": "Text",
+				"text": "Not live",
+				"variant": "h3",
+				"visible": {
+					"call": "notEquals",
+					"args": {
+						"a": {
+							"path": "/slot/entry/status"
+						},
+						"b": "published"
+					}
+				}
+			},
+			{
+				"id": "actions",
+				"component": "Row",
+				"children": [
+					"go-live",
+					"take-offline"
+				]
+			},
+			{
+				"id": "go-live-label",
+				"component": "Text",
+				"text": "Go live"
+			},
+			{
+				"id": "go-live",
+				"component": "Button",
+				"child": "go-live-label",
+				"variant": "primary",
+				"visible": {
+					"call": "and",
+					"args": {
+						"values": [
 							{
-								"$slot": "entry.status"
+								"call": "notEquals",
+								"args": {
+									"a": {
+										"path": "/slot/entry/status"
+									},
+									"b": "published"
+								}
 							},
-							"published"
+							{
+								"call": "can",
+								"args": {
+									"scope": "content.status:write",
+									"on": {
+										"path": "/slot/entry"
+									}
+								}
+							}
 						]
 					}
-				}
-			},
-			{
-				"type": "banner",
-				"props": {
-					"title": "Not live",
-					"variant": "alert",
-					"visible": {
-						"$not": {
-							"$eq": [
-								{
-									"$slot": "entry.status"
-								},
-								"published"
-							]
+				},
+				"action": {
+					"event": {
+						"name": "go-live",
+						"context": {
+							"collection": {
+								"path": "/slot/entry/collection"
+							},
+							"id": {
+								"path": "/slot/entry/id"
+							}
 						}
 					}
 				}
 			},
 			{
-				"type": "actions",
-				"children": [
-					{
-						"type": "button",
-						"props": {
-							"id": "go-live",
-							"label": "Go live",
-							"style": "primary",
-							"visible": {
-								"$and": [
-									{
-										"$not": {
-											"$eq": [
-												{
-													"$slot": "entry.status"
-												},
-												"published"
-											]
-										}
+				"id": "take-offline-label",
+				"component": "Text",
+				"text": "Take offline"
+			},
+			{
+				"id": "take-offline",
+				"component": "Button",
+				"child": "take-offline-label",
+				"variant": "default",
+				"visible": {
+					"call": "and",
+					"args": {
+						"values": [
+							{
+								"call": "equals",
+								"args": {
+									"a": {
+										"path": "/slot/entry/status"
 									},
-									{
-										"$can": "content.status:write",
-										"on": {
-											"$slot": "entry"
-										}
-									}
-								]
+									"b": "published"
+								}
 							},
-							"onClick": {
-								"$call": "content.publish",
-								"input": {
-									"collection": {
-										"$slot": "entry.collection"
-									},
-									"id": {
-										"$slot": "entry.id"
+							{
+								"call": "can",
+								"args": {
+									"scope": "content.status:write",
+									"on": {
+										"path": "/slot/entry"
 									}
-								},
-								"then": [
-									"reload:page"
-								],
-								"notice": "The post is live."
+								}
 							}
-						}
-					},
-					{
-						"type": "button",
-						"props": {
-							"id": "take-offline",
-							"label": "Take offline",
-							"style": "danger",
-							"confirm": "Take this post offline?",
-							"visible": {
-								"$and": [
-									{
-										"$eq": [
-											{
-												"$slot": "entry.status"
-											},
-											"published"
-										]
-									},
-									{
-										"$can": "content.status:write",
-										"on": {
-											"$slot": "entry"
-										}
-									}
-								]
+						]
+					}
+				},
+				"action": {
+					"event": {
+						"name": "take-offline",
+						"context": {
+							"collection": {
+								"path": "/slot/entry/collection"
 							},
-							"onClick": {
-								"$call": "content.unpublish",
-								"input": {
-									"collection": {
-										"$slot": "entry.collection"
-									},
-									"id": {
-										"$slot": "entry.id"
-									}
-								},
-								"then": [
-									"reload:page"
-								],
-								"notice": "The post is offline."
+							"id": {
+								"path": "/slot/entry/id"
 							}
 						}
 					}
-				]
+				}
 			}
 		]
+	},
+	"events": {
+		"go-live": {
+			"call": "content.publish",
+			"input": {
+				"collection": {
+					"$context": "collection"
+				},
+				"id": {
+					"$context": "id"
+				}
+			},
+			"then": [
+				"reload:page"
+			],
+			"notice": "The post is live."
+		},
+		"take-offline": {
+			"call": "content.unpublish",
+			"input": {
+				"collection": {
+					"$context": "collection"
+				},
+				"id": {
+					"$context": "id"
+				}
+			},
+			"then": [
+				"reload:page"
+			],
+			"notice": "The post is offline."
+		}
 	},
 	"checks": [
 		{
@@ -275,33 +331,39 @@
 	],
 	"refs": {
 		"slot": "content.editor.panel",
-		"components": {
-			"actions": [],
-			"banner": [
-				"title",
-				"variant",
-				"visible"
-			],
-			"button": [
-				"confirm",
-				"id",
-				"label",
-				"onClick",
-				"style",
-				"visible"
-			],
-			"stack": []
-		},
+		"components": {},
 		"capabilities": [
 			"content.publish",
 			"content.unpublish"
 		],
 		"scopes": [
 			"content.status:write"
-		]
+		],
+		"catalog": {
+			"Button": [
+				"action",
+				"child",
+				"variant",
+				"visible"
+			],
+			"Column": [
+				"children"
+			],
+			"Row": [
+				"children"
+			],
+			"Text": [
+				"text",
+				"variant",
+				"visible"
+			]
+		}
 	},
 	"provenance": {
-		"compiler": "handwritten",
-		"strategy": "handwritten"
+		"compiler": "graft-compiler/0.1.0",
+		"model": "claude-opus-5-5",
+		"promptHash": "sha256:60b8edf1be2fa7a19add5616cd2574cef940ccd0f0216eba3593157654f7404c",
+		"strategy": "regenerated",
+		"replaces": "sha256:c5df93eb03b18b5377de54124aa646c9c3e9debe880706feac6484af866ff0a0"
 	}
 }

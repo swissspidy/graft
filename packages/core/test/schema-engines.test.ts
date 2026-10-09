@@ -13,8 +13,9 @@ const root = join(import.meta.dirname, '../../..');
 const read = (path: string) => readFileSync(join(root, path), 'utf8');
 
 const hosts = [
-	{ surface: 'hosts/wordpress/plugin/surfaces/7.1.json', examples: ['review-queue', 'quick-approve', 'waiting-posts'], dir: 'examples' },
-	{ surface: 'hosts/emdash/adapter/surfaces/1.0.json', examples: ['publish-queue', 'go-live', 'drafts-glance'], dir: 'examples/emdash' },
+	// Tree builds of the examples (packages/core/test/fixtures/trees): the mutations below edit trees.
+	{ surface: 'hosts/wordpress/plugin/surfaces/7.1.json', examples: ['review-queue', 'quick-approve', 'waiting-posts'], dir: 'examples', builds: 'packages/core/test/fixtures/trees/wordpress' },
+	{ surface: 'hosts/emdash/adapter/surfaces/1.0.json', examples: ['publish-queue', 'go-live', 'drafts-glance'], dir: 'examples/emdash', builds: 'packages/core/test/fixtures/trees/emdash' },
 ];
 
 type Mutation = [string, (build: Build) => void];
@@ -42,7 +43,7 @@ async function run(engine: 'ajv' | 'cfworker') {
 		for (const name of host.examples) {
 			const source = read(`${host.dir}/specs/${name}.md`);
 			out[`${name}: spec`] = summarize(validateSpec(source, { surface }).diagnostics);
-			const build = JSON.parse(read(`${host.dir}/builds/${name}.json`)) as Build;
+			const build = JSON.parse(read(`${host.builds}/${name}.json`)) as Build;
 			out[`${name}: build`] = summarize((await validateBuild(build, surface)).diagnostics);
 			for (const [label, mutate] of mutations) {
 				const copy = structuredClone(build);
@@ -73,7 +74,7 @@ describe('schema engines', () => {
 
 	it('describe errors the same way', async () => {
 		const surface = JSON.parse(read('hosts/emdash/adapter/surfaces/1.0.json')) as Surface;
-		const build = JSON.parse(read('examples/emdash/builds/publish-queue.json')) as Build;
+		const build = JSON.parse(read('packages/core/test/fixtures/trees/emdash/publish-queue.json')) as Build;
 		(build.data.queue!.input as Record<string, unknown>).status = 'pending';
 		const messages = async (engine: 'ajv' | 'cfworker') => {
 			setSchemaEngine(engine === 'ajv' ? ajvEngine() : cfworkerEngine());
@@ -86,7 +87,7 @@ describe('schema engines', () => {
 		const surface = JSON.parse(read('hosts/emdash/adapter/surfaces/1.0.json')) as Surface;
 		const before = JSON.stringify(surface);
 		setSchemaEngine(cfworkerEngine());
-		await validateBuild(JSON.parse(read('examples/emdash/builds/go-live.json')) as Build, surface);
+		await validateBuild(JSON.parse(read('packages/core/test/fixtures/trees/emdash/go-live.json')) as Build, surface);
 		expect(JSON.stringify(surface)).toBe(before);
 	});
 });

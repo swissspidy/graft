@@ -4,6 +4,7 @@ import { describe, expect, it } from 'vitest';
 import { findAction, readValue, renderTree, withWidgetStates, type Block } from '../src/host/blocks.ts';
 import { createCan } from '../src/host/can.ts';
 import { semantics } from '../src/host/semantics.ts';
+import '../src/host/a2ui.ts';
 
 const entry = (id: string, title: string, publish: boolean) => ({ id, collection: 'posts', title, status: 'draft', author: { id: 'u1', name: 'Ada' }, can: { publish } });
 

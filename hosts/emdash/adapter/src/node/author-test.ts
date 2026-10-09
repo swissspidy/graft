@@ -1,8 +1,6 @@
 import { execFile } from 'node:child_process';
-import { readFile } from 'node:fs/promises';
 import { promisify } from 'node:util';
-import { modelAnswers, type Build } from '@graft/core';
-import '../host/a2ui.ts';
+import { modelAnswers } from '@graft/core';
 import { loadExamples, ROOT } from './examples.ts';
 import { saveSettings, startModelStub } from './model-stub.ts';
 import { asUser, login, pluginRoute, startEmDash } from './server.ts';
@@ -28,7 +26,7 @@ type Block = Record<string, unknown> & { type: string };
 const texts = (blocks?: Block[]) => JSON.stringify(blocks ?? []);
 
 const example = (await loadExamples()).find((e) => e.name === 'publish-queue')!;
-const target = JSON.parse(await readFile(`${ROOT}examples/emdash/a2ui/builds/publish-queue.json`, 'utf8')) as Build;
+const target = example.build;
 const wrong = modelAnswers(target, { queue: { collection: 'posts', status: 'pending', order: 'asc' } }).tree;
 const outputs = [modelAnswers(target).checks, wrong, modelAnswers(target).tree];
 
