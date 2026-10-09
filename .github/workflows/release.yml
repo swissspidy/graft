@@ -28,6 +28,8 @@ jobs:
         with:
           node-version: 24
           registry-url: https://registry.npmjs.org
+          # No dependency cache in a workflow that publishes: a poisoned cache would ship.
+          package-manager-cache: false
       - run: pnpm install --frozen-lockfile
       - run: pnpm typecheck
       - run: pnpm test
