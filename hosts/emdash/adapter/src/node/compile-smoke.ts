@@ -16,7 +16,7 @@ const { source, spec, build: handwritten, surface } = example;
 
 const answers = {
 	checks: [modelAnswers(handwritten).checks],
-	tree: [modelAnswers(handwritten, { queue: { collection: 'posts', order: 'asc' } }).tree, modelAnswers(handwritten).tree],
+	ui: [modelAnswers(handwritten, { queue: { collection: 'posts', order: 'asc' } }).ui, modelAnswers(handwritten).ui],
 };
 const prompts: string[] = [];
 const model: ModelClient = {
@@ -39,8 +39,8 @@ try {
 	});
 	const failures: string[] = [];
 	if (!result.ok) failures.push('the compile did not succeed');
-	if (result.attempts.filter((a) => a.phase === 'tree').length !== 2) failures.push('expected exactly two UI attempts');
-	if (!result.build?.ui || result.build.tree) failures.push('the build is not an A2UI surface');
+	if (result.attempts.filter((a) => a.phase === 'ui').length !== 2) failures.push('expected exactly two UI attempts');
+	if (!result.build?.ui) failures.push('the build is not an A2UI surface');
 	if (!prompts[2]?.includes('Check for "drafts-only"')) failures.push('the verification failure was not fed back');
 	if (JSON.stringify(result.build?.data) !== JSON.stringify(handwritten.data)) failures.push('the accepted build is not the corrected one');
 	console.log(failures.length ? `✖ ${failures.join('; ')}` : '✔ compile pipeline: rejected the wrong A2UI surface in EmDash, accepted the fix');

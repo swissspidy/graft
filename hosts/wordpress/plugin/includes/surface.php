@@ -127,7 +127,6 @@ function surface_slots(): array {
 				'required'             => array( 'post' ),
 				'additionalProperties' => false,
 			),
-			'accepts'     => array( 'row-action' ),
 		),
 		'post.editor.panel'      => array(
 			'kind'        => 'extension',

@@ -11,8 +11,7 @@ import { GraftRouteError, graftRoutes, type RouteRequest } from './routes.ts';
  * (graftSandboxed) and emdash-plugin.jsonc.
  *
  * The sandbox forbids generating code at runtime, so JSON Schema
- * validation runs on the cfworker engine instead of Ajv, and build
- * functions on QuickJS compiled to asm.js instead of WebAssembly.
+ * validation runs on the cfworker engine instead of Ajv.
  */
 
 setSchemaEngine(cfworkerEngine());
@@ -21,8 +20,6 @@ declare const __GRAFT_EMDASH_VERSION__: string;
 
 const routes = graftRoutes({
 	authoring: true,
-	// The sandbox compiles no WebAssembly at run time: QuickJS as asm.js.
-	loadFunctions: async (code, limits) => (await import('@graft/sandbox/asmjs')).loadFunctions(code, limits),
 	emdashVersion: typeof __GRAFT_EMDASH_VERSION__ === 'string' ? __GRAFT_EMDASH_VERSION__ : undefined,
 });
 

@@ -1,5 +1,5 @@
 import { readFile, writeFile } from 'node:fs/promises';
-import { compileSpec, hashSpec, uiFormatNamed, validateSpec, type Build, type CompileEvent, type CompileResult, type ModelClient, type UiFormat } from '@graft/core';
+import { compileSpec, hashSpec, validateSpec, type Build, type CompileEvent, type CompileResult, type ModelClient } from '@graft/core';
 import { hostTools } from './hosts.ts';
 import { loadSurface } from './validate.ts';
 
@@ -12,8 +12,6 @@ export interface CompileCommandOptions {
 	attempts?: number;
 	/** A previous build of the same spec version whose checks are reused (and layout referenced). */
 	previous?: string;
-	/** The UI format ("a2ui", or "tree"); default: the previous build's, else the host's. */
-	ui?: string;
 	log?(line: string): void;
 }
 
@@ -30,7 +28,7 @@ function describe(event: CompileEvent): string {
 
 /**
  * Compiles a spec file into a build: checks from the criteria, then the UI
- * (in the host's format unless told otherwise) verified against them in a sandbox of the host, with retries. Writes the
+ * (an A2UI surface) verified against them in a sandbox of the host, with retries. Writes the
  * build (accepted or last candidate) and, when verified, its verification.
  */
 export async function compileFile(specFile: string, options: CompileCommandOptions): Promise<CompileResult> {
@@ -45,13 +43,6 @@ export async function compileFile(specFile: string, options: CompileCommandOptio
 	const host = await hostTools(surface);
 
 	const previous = options.previous ? (JSON.parse(await readFile(options.previous, 'utf8')) as Build) : undefined;
-	let format: UiFormat | 'tree' | undefined;
-	if (options.ui) {
-		format = options.ui === 'tree' ? 'tree' : uiFormatNamed(options.ui, surface.host);
-		if (!format) {
-			throw new Error(`No UI format "${options.ui}" for ${surface.host}.`);
-		}
-	}
 	const sandbox = options.verify === false ? undefined : await host.startSandbox();
 	try {
 		const result = await compileSpec({
@@ -61,7 +52,6 @@ export async function compileFile(specFile: string, options: CompileCommandOptio
 			model: options.model,
 			host: host.guide,
 			maxAttempts: options.attempts ?? 3,
-			...(format ? { format } : {}),
 			...(previous ? { previous, checks: previous.checks } : {}),
 			...(sandbox
 				? { verify: async (build: Build) => (await host.verify([{ build, spec, surface }], sandbox))[0]! }

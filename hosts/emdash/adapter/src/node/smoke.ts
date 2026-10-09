@@ -156,7 +156,7 @@ async function main(): Promise<number> {
 		const authorPanel = await asUser<{ blocks: Block[] }>(server, author.cookie, panelPath, { type: 'panel_load' });
 		check('the panel is not shown outside its audience', authorPanel.status === 200 ? texts(authorPanel.data?.blocks).includes('No customizations for this entry.') : authorPanel.status === 403, authorPanel);
 
-		// A widget: its code draws on the server, and its state travels in the buttons.
+		// A board with local state: drawn on the server, its state travels in the buttons.
 		const board = example('status-board');
 		await pluginRoute(server, 'install', { source: board.source, build: board.build, verification: verification('status-board') });
 		await admin({ type: 'block_action', page: '/customizations', action_id: 'graft:approve', value: 'status-board' });

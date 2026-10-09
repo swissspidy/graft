@@ -49,7 +49,7 @@ const MAX_VERSIONS = 25;
 const key = (id: string) => `spec:${id}`;
 
 /** Scopes a build needs, from the capabilities it actually uses. */
-export function buildScopes(build: Pick<Build, 'mount' | 'tree' | 'data'>, surface: Surface): string[] {
+export function buildScopes(build: Build, surface: Surface): string[] {
 	const refs = extractRefs(build, surface);
 	return [...new Set(refs.capabilities.flatMap((name) => surface.capabilities[name]?.scopes ?? []))].sort();
 }

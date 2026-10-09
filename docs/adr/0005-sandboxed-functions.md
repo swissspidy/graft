@@ -1,6 +1,7 @@
 # ADR 0005: An escape hatch: pure functions in a WebAssembly sandbox
 
-- Status: Accepted (WordPress prototype)
+- Status: Superseded by [ADR 0009](0009-a2ui.md): A2UI's catalog functions and local state replaced
+  functions and widgets, and both were removed
 - Date: 2026-09-29
 - Builds on: [ADR 0001](0001-architecture.md), [ADR 0003](0003-emdash-host.md)
 

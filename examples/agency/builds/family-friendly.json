@@ -6,8 +6,8 @@
 	},
 	"surface": {
 		"host": "wordpress",
-		"hostVersion": "7.1.2",
-		"hash": "sha256:05a8b3caa16f7a75fea1d891bcd0acf7519150b14ee305e56faa120a61f1ae2b"
+		"hostVersion": "7.1.3",
+		"hash": "sha256:59cce98344410cb60ea8db8084c704fd7528ff2f1d44dd402673083d5f2d72df"
 	},
 	"mount": {
 		"slot": "posts.list.row-actions",
@@ -372,7 +372,6 @@
 	],
 	"refs": {
 		"slot": "posts.list.row-actions",
-		"components": {},
 		"capabilities": [
 			"posts.set_terms"
 		],

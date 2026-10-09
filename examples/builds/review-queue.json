@@ -6,8 +6,8 @@
 	},
 	"surface": {
 		"host": "wordpress",
-		"hostVersion": "7.1.2",
-		"hash": "sha256:6f170822cb71accfa0c59633044953ce846b218fbcbd1f6406323c4f38e17cdc"
+		"hostVersion": "7.1.3",
+		"hash": "sha256:f17c14d5321b5665453c48ff033adcbb190d249737e2cd5a2c96b2645aee3c88"
 	},
 	"mount": {
 		"slot": "admin.page",
@@ -267,7 +267,6 @@
 	],
 	"refs": {
 		"slot": "admin.page",
-		"components": {},
 		"capabilities": [
 			"posts.list",
 			"posts.update_status"

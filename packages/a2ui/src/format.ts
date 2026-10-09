@@ -35,7 +35,7 @@ export function createA2UIFormat(host: A2UIFormatHost): UiFormat {
 			answer: (build, dataInput) => answerA2UI(build as unknown as A2UIBuild, dataInput),
 			content: (build) => ({ ui: (build as unknown as A2UIBuild).ui, events: (build as unknown as A2UIBuild).events }),
 			checksSystem: (base) =>
-				`${base.replace(/\nComponents \(props[\s\S]*?(?=\nCapabilities you may use)/, '')}\n\nThe customization's UI will be an A2UI surface:\n${catalogGuide(host)}\n\nIn checks, an action id is a button's action id or a table row action's id, and an input id is a text field's or checkbox's id.`,
+				`${base}\n\nThe customization's UI will be an A2UI surface:\n${catalogGuide(host)}\n\nIn checks, an action id is a button's action id or a table row action's id, and an input id is a text field's or checkbox's id.`,
 		},
 	};
 }
@@ -76,9 +76,8 @@ function mapCan(value: unknown, rename: (scope: string) => string): unknown {
 /**
  * A host migration applied to the UI (core has already moved the mount and
  * data sources): capabilities in event bindings, scopes in `can` calls.
- * Component and prop migrations name the host's tree components, which an
- * A2UI surface does not use; its components belong to the catalog, which is
- * versioned on its own (a new catalog id). A removal is handled by core.
+ * Components belong to the catalog, which is versioned on its own (a new
+ * catalog id). A removal is handled by core.
  */
 export function migrateA2UI(build: A2UIBuild, migration: Migration): A2UIBuild | undefined {
 	if (migration.op !== 'rename') {
@@ -177,11 +176,6 @@ export function a2uiOutputSchema(spec: Spec, surface: Surface, components: strin
 	};
 }
 
-/** The surface as far as an A2UI build sees it: Graft's tree components are replaced by the catalog. */
-export function describeHost(spec: Spec, surface: Surface): string {
-	return describeSurface(spec, surface).replace(/\nComponents \(props[\s\S]*?(?=\nCapabilities you may use)/, '');
-}
-
 /** The catalog guide with the host's components; also what the checks phase is told the UI can be. */
 export function catalogGuide(host: A2UIFormatHost): string {
 	return host.guide ? `${CATALOG_GUIDE}\n\nThis host's own components:\n${host.guide}` : CATALOG_GUIDE;
@@ -192,7 +186,7 @@ export function a2uiSystem(spec: Spec, surface: Surface, host: A2UIFormatHost, n
 		"You build customizations of a web application as A2UI surfaces. The surface may only use the components and functions of the catalog below, the slot's data and the capabilities listed; it is drawn by a trusted renderer and every capability call is permission-checked. Keep it minimal: build what the spec asks, nothing it puts out of scope.",
 		catalogGuide(host),
 		notes ?? '',
-		describeHost(spec, surface),
+		describeSurface(spec, surface),
 	]
 		.filter(Boolean)
 		.join('\n\n');

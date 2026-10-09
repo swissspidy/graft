@@ -6,7 +6,7 @@ function fakeClient(message: Record<string, unknown>) {
 	return { client: { beta: { messages: { stream } } } as never, stream };
 }
 
-const request = { purpose: 'tree' as const, system: 'SYSTEM', prompt: 'PROMPT', schema: { type: 'object' } };
+const request = { purpose: 'ui' as const, system: 'SYSTEM', prompt: 'PROMPT', schema: { type: 'object' } };
 
 describe('anthropicModel', () => {
 	it('asks for structured output with a cached system prompt and fallbacks', async () => {

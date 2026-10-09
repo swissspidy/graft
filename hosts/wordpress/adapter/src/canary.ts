@@ -1,7 +1,6 @@
 import { readdir, readFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import {
-	hashSurface,
 	runCanary,
 	validateSpec,
 	verifyBuild,
@@ -16,8 +15,7 @@ import {
 import { createCan } from './can.ts';
 import { playgroundVersion } from './playground.ts';
 import { startSandbox, type WordPressSandbox } from './sandbox.ts';
-import { semantics } from './semantics.ts';
-import { loadFunctions } from '@graft/sandbox';
+import './a2ui.ts';
 import { assembleSurface } from './surface.ts';
 
 /**
@@ -31,8 +29,6 @@ export interface Scenario {
 	patch: Record<string, unknown>;
 	migrations: Migration[];
 	expect: Record<string, UpgradeOutcome>;
-	/** A change to the generated surface that no plugin filter can make. */
-	surface?(surface: Surface): Surface;
 }
 
 export const scenarios: Scenario[] = [
@@ -81,26 +77,6 @@ export const scenarios: Scenario[] = [
 		migrations: [],
 		expect: { 'review-queue': 'failed', 'quick-approve': 'failed', 'editorial-inbox': 'failed', 'headline-check': 'survived', 'pending-by-author': 'failed', 'publish-checklist': 'failed' },
 	},
-	{
-		name: 'no-functions',
-		description: 'The host stops running build functions.',
-		patch: {},
-		migrations: [],
-		surface: ({ functions: _, ...rest }) => rest,
-		// No build runs code: A2UI surfaces use catalog functions.
-		expect: { 'review-queue': 'survived', 'quick-approve': 'survived', 'editorial-inbox': 'survived', 'headline-check': 'survived', 'pending-by-author': 'survived', 'publish-checklist': 'survived' },
-	},
-	{
-		name: 'no-widgets',
-		description: 'The host still runs build functions, but no longer interactive widgets.',
-		patch: {},
-		migrations: [],
-		surface: (surface) => {
-			const { widgets: _, ...functions } = surface.functions!;
-			return { ...surface, functions };
-		},
-		expect: { 'review-queue': 'survived', 'quick-approve': 'survived', 'editorial-inbox': 'survived', 'headline-check': 'survived', 'pending-by-author': 'survived', 'publish-checklist': 'survived' },
-	},
 ];
 
 /**
@@ -131,11 +107,7 @@ export async function loadCorpus(dir: string): Promise<CorpusEntry[]> {
 /** Surface B for a scenario: patch the sandbox, then generate the surface from it. */
 export async function scenarioSurface(sandbox: WordPressSandbox, from: Surface, scenario: Scenario): Promise<Surface> {
 	await sandbox.patch(scenario.patch);
-	let surface = await assembleSurface(await sandbox.dump());
-	if (scenario.surface) {
-		surface = scenario.surface(surface);
-		surface.hash = await hashSurface(surface);
-	}
+	const surface = await assembleSurface(await sandbox.dump());
 	return { ...surface, hostVersion: `${surface.hostVersion}+${scenario.name}`, previous: from.hash!, migrations: scenario.migrations };
 }
 
@@ -169,7 +141,7 @@ export async function runWordPressCanary(options: WordPressCanaryOptions): Promi
 			corpus: options.corpus,
 			from,
 			to,
-			verify: (build, spec, grant) => verifyBuild({ build, spec, surface: to, sandbox, semantics, createCan, grant, loadFunctions }),
+			verify: (build, spec, grant) => verifyBuild({ build, spec, surface: to, sandbox, createCan, grant }),
 			...(options.regenerate ? { regenerate: options.regenerate } : {}),
 			...(options.chooseSlot ? { chooseSlot: options.chooseSlot } : {}),
 			...(options.onEntry ? { onEntry: options.onEntry } : {}),

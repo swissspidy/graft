@@ -1,6 +1,7 @@
 # ADR 0007: Inputs, the block editor, and editing post fields
 
-- Status: Accepted (WordPress)
+- Status: Accepted (WordPress); widget inputs superseded by [ADR 0009](0009-a2ui.md) (A2UI
+  TextField and CheckBox); the block editor panel and post field editing stand
 - Date: 2026-09-30
 - Builds on: [ADR 0006](0006-interactive-widgets.md)
 

@@ -1,11 +1,11 @@
 import { describe, expect, it } from 'vitest';
-import { extractRefs, FixtureError, validateSpec, verifyBuild, type Build } from '../src/index.ts';
-import { createCan, fakeSandbox, fixtures, pageBuild, semantics, spec, specSource, surface } from './fixtures/acme.ts';
+import { extractRefs, FixtureError, validateSpec, verifyBuild } from '../src/index.ts';
+import { createCan, fakeSandbox, fixtures, pageBuild, spec, specSource, surface } from './fixtures/acme.ts';
 
 describe('verifyBuild', () => {
 	it('passes a build that meets its criteria', async () => {
 		const sandbox = fakeSandbox();
-		const result = await verifyBuild({ build: await pageBuild(), spec, surface, sandbox, semantics, createCan });
+		const result = await verifyBuild({ build: await pageBuild(), spec, surface, sandbox, createCan });
 		expect(result.results.filter((r) => !r.passed)).toEqual([]);
 		expect(result.passed).toBe(true);
 		expect(result.unchecked).toEqual([]);
@@ -13,7 +13,7 @@ describe('verifyBuild', () => {
 	});
 
 	it('explains which criteria a wrong build breaks', async () => {
-		const result = await verifyBuild({ build: await pageBuild({}), spec, surface, sandbox: fakeSandbox(), semantics, createCan });
+		const result = await verifyBuild({ build: await pageBuild({}), spec, surface, sandbox: fakeSandbox(), createCan });
 		expect(result.passed).toBe(false);
 		const failed = Object.fromEntries(result.results.filter((r) => !r.passed).map((r) => [r.criterion, r.failures]));
 		expect(failed).toEqual({
@@ -30,10 +30,10 @@ describe('verifyBuild', () => {
 			{ criterion: 'clerks', fixtures, view_as: 'm', steps: [{ action: 'close', row: { title: 'Nope' } }], expect: [{ rows: [] }] },
 		];
 		// Make the action visible to everyone so the host has to refuse it.
-		const list = (build.tree!.children as Build['tree'][])[1]!;
-		(list.props!.actions as Array<Record<string, unknown>>)[0]!.visible = true;
+		const list = (build.ui.components as Array<Record<string, unknown>>)[2]!;
+		delete (list.rowActions as Array<Record<string, unknown>>)[0]!.visible;
 		build.refs = extractRefs(build, surface);
-		const result = await verifyBuild({ build, spec, surface, sandbox: fakeSandbox(), semantics, createCan });
+		const result = await verifyBuild({ build, spec, surface, sandbox: fakeSandbox(), createCan });
 		expect(result.results.map((r) => r.failures)).toEqual([
 			['Step 1: "close" was refused: Only managers may close items (forbidden).'],
 			['Step 1: no available "close" action for title "Nope".'],
@@ -52,7 +52,7 @@ describe('verifyBuild', () => {
 			}
 			return seed(f);
 		};
-		const result = await verifyBuild({ build, spec, surface, sandbox, semantics, createCan });
+		const result = await verifyBuild({ build, spec, surface, sandbox, createCan });
 		expect(result.results[0]!.failures).toEqual(['The check\'s fixtures cannot be created: Unknown collection "pages".']);
 		expect(result.results.slice(1).every((r) => r.passed)).toBe(true);
 	});
@@ -62,13 +62,13 @@ describe('verifyBuild', () => {
 		sandbox.seed = async () => {
 			throw new Error('sandbox: 500');
 		};
-		await expect(verifyBuild({ build: await pageBuild(), spec, surface, sandbox, semantics, createCan })).rejects.toThrow('sandbox: 500');
+		await expect(verifyBuild({ build: await pageBuild(), spec, surface, sandbox, createCan })).rejects.toThrow('sandbox: 500');
 	});
 
 	it('renders nothing for users outside the audience', async () => {
 		const build = await pageBuild();
 		build.checks = [{ criterion: 'open-only', fixtures, view_as: 'x', expect: [{ rows: [] }, { text: 'Open items' }] }];
-		const result = await verifyBuild({ build, spec, surface, sandbox: fakeSandbox(), semantics, createCan });
+		const result = await verifyBuild({ build, spec, surface, sandbox: fakeSandbox(), createCan });
 		expect(result.results[0]!.failures).toEqual(['Expected the text "Open items" to be shown.']);
 	});
 
@@ -76,15 +76,24 @@ describe('verifyBuild', () => {
 		const build = await pageBuild();
 		build.mount = { slot: 'item.actions' };
 		build.data = {};
-		build.tree = {
-			type: 'link',
-			props: {
-				id: 'close',
-				label: 'Close',
-				visible: { $and: [{ $eq: [{ $slot: 'item.status' }, 'open'] }, { $can: 'items:write' }] },
-				onClick: { $call: 'items.close', input: { id: { $slot: 'item.id' } }, then: ['reload:page'] },
-			},
+		build.ui = {
+			...build.ui,
+			components: [
+				{
+					id: 'root',
+					component: 'Button',
+					actionId: 'close',
+					child: 'close-label',
+					action: { event: { name: 'close', context: { id: { path: '/slot/item/id' } } } },
+					checks: [
+						{ condition: { call: 'equals', args: { a: { path: '/slot/item/status' }, b: 'open' } }, message: 'Only open items close.' },
+						{ condition: { call: 'can', args: { scope: 'items:write' } }, message: 'Only managers close items.' },
+					],
+				},
+				{ id: 'close-label', component: 'Text', text: 'Close' },
+			],
 		};
+		build.events = { close: { call: 'items.close', input: { id: { $context: 'id' } }, then: ['reload:page'] } };
 		build.checks = [
 			{
 				criterion: 'close',
@@ -104,7 +113,7 @@ describe('verifyBuild', () => {
 			},
 		];
 		build.refs = extractRefs(build, surface);
-		const result = await verifyBuild({ build, spec, surface, sandbox: fakeSandbox(), semantics, createCan });
+		const result = await verifyBuild({ build, spec, surface, sandbox: fakeSandbox(), createCan });
 		expect(result.results.flatMap((r) => r.failures)).toEqual([]);
 	});
 
@@ -112,7 +121,7 @@ describe('verifyBuild', () => {
 		const narrow = validateSpec(specSource.replace('[items:read, items:write]', '[items:read]')).spec!;
 		const build = await pageBuild();
 		build.checks = [build.checks[1]!];
-		const result = await verifyBuild({ build, spec: narrow, surface, sandbox: fakeSandbox(), semantics, createCan: () => () => true });
+		const result = await verifyBuild({ build, spec: narrow, surface, sandbox: fakeSandbox(), createCan: () => () => true });
 		expect(result.results[0]!.failures[0]).toContain('(graft_not_granted)');
 	});
 });

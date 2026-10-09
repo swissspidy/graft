@@ -3,10 +3,8 @@ import { createRoot } from 'react-dom/client';
 import apiFetch from '@wordpress/api-fetch';
 import { Notice as WPNotice } from '@wordpress/components';
 import { GraftRoot, type Gateway, type Notice, type UiRootProps } from '@graft/renderer-react';
-import type { AsyncFunctionRunner, Build, SurfaceFunctions } from '@graft/core/runtime';
-import { startFunctions } from '@graft/sandbox/client';
+import type { Build } from '@graft/core/runtime';
 import { createCan } from '../can.ts';
-import { components } from './components.tsx';
 
 export { createCan };
 
@@ -20,8 +18,6 @@ export interface RuntimeConfig {
 			scopes: Record<string, boolean>;
 		}
 	>;
-	/** Present when a build on this screen has code: where the functions worker is, and its limits. */
-	functions?: { worker: string; wasm: string; limits: SurfaceFunctions['limits']; widgets?: SurfaceFunctions['widgets'] };
 	/**
 	 * In the block editor: the panels to add to the sidebar, the slot (the
 	 * post being edited), and the capabilities that only read.
@@ -39,7 +35,7 @@ interface EditorGlobals {
 declare global {
 	interface Window {
 		graftRuntime?: RuntimeConfig;
-		/** Renderers for builds in other UI formats (build/a2ui.js adds A2UI). */
+		/** The A2UI renderer (build/a2ui.js adds it). */
 		graftUi?: { A2UI?: ComponentType<UiRootProps> };
 		wp?: EditorGlobals;
 	}
@@ -71,22 +67,7 @@ function Mounted({ spec, config, slot, inEditor = false }: { spec: string; confi
 	const [gateway] = useState(() => createGateway(spec, inEditor ? editorGuard : undefined));
 	const [can] = useState(() => createCan(config.scopes));
 	const inline = config.build.mount.slot === 'posts.list.row-actions';
-	// Started on the first $fn only: screens without code never load the worker or QuickJS.
-	const [functions] = useState(() => {
-		const code = config.build.code;
-		const host = window.graftRuntime?.functions;
-		if (!code || !host) {
-			return undefined;
-		}
-		return (): AsyncFunctionRunner =>
-			startFunctions({
-				workerUrl: host.worker,
-				wasmLocation: host.wasm,
-				code,
-				limits: host.limits,
-				onProblem: (message) => console.warn(`Graft: ${spec}: ${message}`),
-			});
-	});
+	const Ui = window.graftUi?.A2UI;
 	return (
 		<>
 			{notices.map((notice) =>
@@ -101,19 +82,7 @@ function Mounted({ spec, config, slot, inEditor = false }: { spec: string; confi
 					</WPNotice>
 				),
 			)}
-			<GraftRoot
-				build={config.build}
-				components={components}
-				gateway={gateway}
-				slot={slot}
-				can={can}
-				onNotice={onNotice}
-				onReload={() => window.location.reload()}
-				functions={functions}
-				// A build in another format is drawn by its renderer, loaded only on screens that serve one.
-				{...(window.graftUi?.A2UI ? { ui: window.graftUi.A2UI as never } : {})}
-				{...(window.graftRuntime?.functions?.widgets ? { widgets: window.graftRuntime.functions.widgets } : {})}
-			/>
+			{Ui ? <GraftRoot build={config.build} ui={Ui} gateway={gateway} slot={slot} can={can} onNotice={onNotice} onReload={() => window.location.reload()} /> : null}
 		</>
 	);
 }

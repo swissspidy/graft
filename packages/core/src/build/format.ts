@@ -6,15 +6,15 @@ import type { Snapshot } from '../verifier/snapshot.ts';
 import type { Build, Check, Refs } from './types.ts';
 
 /**
- * A UI format other than Graft's tree, e.g. A2UI. A build in such a format
- * has no `tree`; its UI is in fields the format owns (A2UI: `ui` and
- * `events`). The envelope (spec, mount, data sources, checks, refs,
- * provenance) and everything around it stay Graft's: the gateway, grants,
- * verification against frozen checks, the upgrade ladder.
+ * The format of a build's UI: A2UI, in a catalog per host. The UI is in
+ * fields the format owns (`ui` and `events`). The envelope (spec, mount,
+ * data sources, checks, refs, provenance) and everything around it are
+ * Graft's: the gateway, grants, verification against frozen checks, the
+ * upgrade ladder.
  *
  * Core does not depend on any format. A host or tool that supports one
  * registers it (`registerUiFormat`), and core hands it the build wherever
- * it would otherwise read the tree.
+ * it reads the UI.
  */
 export interface UiFormat {
 	/** Name for messages, e.g. "A2UI". */
@@ -29,12 +29,11 @@ export interface UiFormat {
 	 */
 	validate(build: Build, surface: Surface, spec?: Spec): Diagnostic[];
 	/**
-	 * What the UI uses: capabilities it calls, scopes it checks, and its own
+	 * What the UI uses: capabilities it calls, scopes it checks, and its
 	 * component usage (the `catalog` refs field). Data sources are added by
-	 * core. Host components (`refs.components`) stay empty unless the format
-	 * draws the host's components.
+	 * core.
 	 */
-	refs(build: Build, surface: Surface): Pick<Refs, 'capabilities' | 'scopes'> & { catalog?: Refs['catalog'] };
+	refs(build: Build, surface: Surface): Pick<Refs, 'capabilities' | 'scopes' | 'catalog'>;
 	/** Reads the UI into a semantic snapshot for one viewer, with what they entered so far. */
 	snapshot(build: Build, ctx: EvalContext, entered: Record<string, Record<string, unknown>>): Snapshot;
 	/**
@@ -61,7 +60,7 @@ export interface UiCompiler {
 	/**
 	 * The checks phase's system prompt for a build in this format: checks
 	 * name actions, inputs and columns, so the writer should know what the
-	 * UI is made of. Given the tree version; without it, that is used.
+	 * UI is made of. Given core's version; without it, that is used.
 	 */
 	checksSystem?(base: string, spec: Spec, surface: Surface): string;
 	/**
@@ -89,23 +88,16 @@ export function uiFormatNamed(name: string, host: string): UiFormat | undefined 
 	return formats.find((format) => format.name.toLowerCase() === name.toLowerCase() && format.host === host);
 }
 
-/** The format a build without a tree is in, if one is registered. */
+/** The registered format a build's UI is in, if any. */
 export function uiFormatOf(build: unknown): UiFormat | undefined {
-	if (isTreeBuild(build)) {
-		return undefined;
-	}
 	return formats.find((format) => format.handles(build));
 }
 
-export function isTreeBuild(build: unknown): build is Build & { tree: NonNullable<Build['tree']> } {
-	return typeof build === 'object' && build !== null && typeof (build as { tree?: unknown }).tree === 'object' && (build as { tree?: unknown }).tree !== null;
-}
-
-/** The format of a tree-less build, or an error naming what is missing. */
+/** The format of a build's UI, or an error naming what is missing. */
 export function requireUiFormat(build: Build): UiFormat {
 	const format = uiFormatOf(build);
 	if (!format) {
-		throw new Error('This build has no tree, and no registered UI format handles it.');
+		throw new Error(`No registered UI format handles this build's UI (${build.ui?.protocol ?? 'none'}, catalog ${build.ui?.catalogId ?? 'none'}).`);
 	}
 	return format;
 }

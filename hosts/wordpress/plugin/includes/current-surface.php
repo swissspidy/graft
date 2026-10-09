@@ -65,9 +65,8 @@ function surface_snapshots(): array {
  * administrator's browser from this host's dump (the same code that
  * generates the shipped snapshots), because only the TypeScript core
  * normalizes and hashes surfaces. It is accepted when it describes this
- * host (its fingerprint is the host's) and carries the plugin's own
- * components and function limits, so a site surface can only differ from
- * a shipped one in what the host itself exposes.
+ * host (its fingerprint is the host's), so a site surface can only differ
+ * from a shipped one in what the host itself exposes.
  *
  * @param mixed $surface Surface.
  * @return array<string, mixed>|\WP_Error The stored surface.
@@ -84,11 +83,6 @@ function store_site_surface( $surface ) {
 	}
 	if ( ( $surface['fingerprint'] ?? null ) !== host_fingerprint() ) {
 		return $invalid( __( 'The surface does not describe this site as it is now.', 'graft' ) );
-	}
-	$shipped = array_values( shipped_snapshots() );
-	$latest  = end( $shipped );
-	if ( ! $latest || ( $surface['components'] ?? null ) != $latest['components'] || ( $surface['functions'] ?? null ) != ( $latest['functions'] ?? null ) ) { // phpcs:ignore Universal.Operators.StrictComparisons.LooseNotEqual -- key order may differ.
-		return $invalid( __( "The surface's components are not this plugin's.", 'graft' ) );
 	}
 	if ( surface_snapshot( $surface['hash'] ) ) {
 		return $surface;

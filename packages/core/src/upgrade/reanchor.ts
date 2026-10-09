@@ -4,7 +4,6 @@ import { compileSchema } from '../schema.ts';
 import type { Slot, Surface } from '../surface/types.ts';
 import { slotPropsUsed } from './static-check.ts';
 
-
 /** Slots in `to` that could host this build instead of its current one. */
 export function reanchorCandidates(build: Build, from: Surface, to: Surface): string[] {
 	const current = build.mount.slot;
@@ -16,17 +15,13 @@ export function reanchorCandidates(build: Build, from: Surface, to: Surface): st
 	const needed = slotPropsUsed(build);
 	const { slot: _slot, ...options } = build.mount;
 	return Object.entries(to.slots)
-		.filter(([id, slot]) => id !== current && !slot.deprecated && fits(slot, before, build, needed, options))
+		.filter(([id, slot]) => id !== current && !slot.deprecated && fits(slot, before, needed, options))
 		.map(([id]) => id)
 		.sort();
 }
 
-function fits(slot: Slot, before: Slot | undefined, build: Build, needed: string[], options: Record<string, unknown>): boolean {
+function fits(slot: Slot, before: Slot | undefined, needed: string[], options: Record<string, unknown>): boolean {
 	if (before && slot.kind !== before.kind) {
-		return false;
-	}
-	// Only a tree's root is a host component; other formats draw from their catalog.
-	if (build.tree && slot.accepts && !slot.accepts.includes(build.tree.type)) {
 		return false;
 	}
 	const provides = typeof slot.provides === 'object' ? ((slot.provides.properties as Record<string, unknown> | undefined) ?? {}) : {};

@@ -26,7 +26,7 @@ const marker = await mkdtemp(join(tmpdir(), 'graft-e2e-'));
 const ready = join(marker, 'ready');
 // Writing a customization in the admin talks to this stand-in for the Claude API.
 const authored = modelAnswers(JSON.parse(await readFile(authoredBuildFile, 'utf8')) as Build);
-const stub = await startModelStub([authored.checks, authored.tree]);
+const stub = await startModelStub([authored.checks, authored.ui]);
 const sandbox = await startSandbox({
 	port,
 	testLogin: true,

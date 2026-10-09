@@ -1,5 +1,5 @@
 import { canonicalJson } from '../surface/hash.ts';
-import { compareOp, getPath, isAnd, isCall, isCan, isDataRef, isDaysSince, isEq, isFieldRef, isFn, isIf, isInputRef, isNot, isOr, isSlotRef } from './expressions.ts';
+import { compareOp, getPath, isAnd, isCan, isDataRef, isDaysSince, isEq, isIf, isNot, isOr, isSlotRef } from './expressions.ts';
 import type { Value } from './types.ts';
 
 export interface EvalContext {
@@ -7,52 +7,10 @@ export interface EvalContext {
 	data: Record<string, unknown>;
 	/** Props the slot provides. */
 	slot: Record<string, unknown>;
-	/** The current row, inside per-row props such as table actions. */
-	row?: unknown;
-	/** Host-specific permission check. `on` defaults to the current row. */
+	/** Host-specific permission check, on an object (e.g. a post) or none. */
 	can(scope: string, on: unknown): boolean;
 	/** The time `$daysSince` counts to, in ms since the epoch. Default: now. */
 	now?: number;
-	/**
-	 * Runs one of the build's pure functions (`$fn`) in the host's sandbox.
-	 * Returns undefined while a result is pending. Without it, `$fn` is null.
-	 */
-	fn?(name: string, args: unknown[]): unknown;
-	/**
-	 * Inside a widget: resolves a use of one of its declared actions to the
-	 * action for that row, or null when it is not offered.
-	 */
-	use?(use: { $use: string; row?: unknown }): unknown;
-	/** Inside a widget: what its input components show, by id (for `$input`). */
-	inputs?: Record<string, unknown>;
-}
-
-/**
- * What a function returned, as inert data: JSON values only, and no object
- * keys starting with "$", so a result can never become an expression or an
- * action. Anything else is null.
- */
-export function inert(value: unknown, depth = 0): unknown {
-	if (value === null || typeof value === 'string' || typeof value === 'boolean') {
-		return value;
-	}
-	if (typeof value === 'number') {
-		return Number.isFinite(value) ? value : null;
-	}
-	if (depth >= 8 || typeof value !== 'object') {
-		return null;
-	}
-	if (Array.isArray(value)) {
-		return value.map((item) => inert(item, depth + 1));
-	}
-	if (Object.getPrototypeOf(value) !== Object.prototype && Object.getPrototypeOf(value) !== null) {
-		return null;
-	}
-	const entries = Object.entries(value);
-	if (entries.some(([key]) => key.startsWith('$'))) {
-		return null;
-	}
-	return Object.fromEntries(entries.map(([key, item]) => [key, inert(item, depth + 1)]));
 }
 
 const DAY = 24 * 60 * 60 * 1000;
@@ -75,7 +33,7 @@ function compare(op: string, a: unknown, b: unknown): boolean {
 	}
 }
 
-/** A `$call` with its input resolved, ready for the renderer to invoke. */
+/** A capability call with its input resolved (an action event's binding), ready to invoke. */
 export interface Action {
 	$action: true;
 	capability: string;
@@ -91,10 +49,9 @@ export function isAction(value: unknown): value is Action {
 }
 
 /**
- * Resolves a prop value against a context: bindings become their values,
- * `$can` and the logic operators become booleans (only `true` counts as
- * true) and `$call` becomes an Action. Pure; the
- * renderer calls it again whenever data changes.
+ * Resolves a value (a data source's input) against a context: bindings
+ * become their values, `$can` and the logic operators become booleans
+ * (only `true` counts as true). Pure.
  */
 export function evaluate(value: Value | undefined, ctx: EvalContext): unknown {
 	if (value === null || value === undefined || typeof value !== 'object') {
@@ -106,18 +63,11 @@ export function evaluate(value: Value | undefined, ctx: EvalContext): unknown {
 	if (isDataRef(value)) {
 		return getPath(ctx.data, value.$data);
 	}
-	if (isFieldRef(value)) {
-		return getPath(ctx.row, value.$field);
-	}
 	if (isSlotRef(value)) {
 		return getPath(ctx.slot, value.$slot);
 	}
-	if (isInputRef(value)) {
-		return ctx.inputs && Object.hasOwn(ctx.inputs, value.$input) ? (ctx.inputs[value.$input] ?? null) : null;
-	}
 	if (isCan(value)) {
-		const on = value.on === undefined ? ctx.row : evaluate(value.on, ctx);
-		return ctx.can(value.$can, on);
+		return ctx.can(value.$can, value.on === undefined ? undefined : evaluate(value.on, ctx));
 	}
 	if (isEq(value)) {
 		const [a, b] = value.$eq.map((item) => evaluate(item, ctx));
@@ -137,13 +87,6 @@ export function evaluate(value: Value | undefined, ctx: EvalContext): unknown {
 		const time = typeof date === 'string' ? Date.parse(date) : Number.NaN;
 		return Number.isNaN(time) ? null : Math.floor(((ctx.now ?? Date.now()) - time) / DAY);
 	}
-	if (isFn(value)) {
-		if (!ctx.fn) {
-			return null;
-		}
-		const result = ctx.fn(value.$fn, (value.args ?? []).map((arg) => inert(evaluate(arg, ctx) ?? null)));
-		return result === undefined ? undefined : inert(result);
-	}
 	if (isAnd(value)) {
 		return value.$and.every((item) => evaluate(item, ctx) === true);
 	}
@@ -152,28 +95,6 @@ export function evaluate(value: Value | undefined, ctx: EvalContext): unknown {
 	}
 	if (isNot(value)) {
 		return evaluate(value.$not, ctx) !== true;
-	}
-	// A widget's use of a declared action, inside a row (a table's): it applies to that row.
-	if (typeof (value as { $use?: unknown }).$use === 'string') {
-		const marker = value as unknown as { $use: string; row?: unknown };
-		const use = marker.row === undefined && ctx.row !== undefined ? { ...marker, row: ctx.row } : marker;
-		// Resolve once there is a row: a table's props are evaluated first without one.
-		return ctx.use && use.row !== undefined ? ctx.use(use) : use;
-	}
-	if (isCall(value)) {
-		const action: Action = {
-			$action: true,
-			capability: value.$call,
-			input: evaluate(value.input, ctx),
-			then: value.then ?? [],
-		};
-		if (value.notice !== undefined) {
-			action.notice = value.notice;
-		}
-		if (ctx.row !== undefined) {
-			action.row = ctx.row;
-		}
-		return action;
 	}
 	return Object.fromEntries(Object.entries(value).map(([key, item]) => [key, evaluate(item as Value, ctx)]));
 }

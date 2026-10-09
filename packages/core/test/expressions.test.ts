@@ -1,9 +1,10 @@
 import { describe, expect, it } from 'vitest';
-import { describeCheck, evaluate, extractRefs, hashSurface, validateBuild, validateSpec, verifyBuild, type Build, type ComponentSemantics, type Sandbox, type Surface, type Value } from '../src/index.ts';
+import { describeCheck, evaluate, extractRefs, hashSurface, validateBuild, validateSpec, verifyBuild, type Build, type Sandbox, type Surface, type Value } from '../src/index.ts';
+import './fixtures/acme.ts';
 
 const DAY = 24 * 60 * 60 * 1000;
 const now = Date.parse('2026-09-29T12:00:00Z');
-const ctx = (row?: unknown) => ({ data: {}, slot: {}, row, can: () => true, now });
+const ctx = (slot: Record<string, unknown> = {}) => ({ data: {}, slot, can: () => true, now });
 
 describe('computed expressions', () => {
 	it('compare numbers and strings, and nothing else', () => {
@@ -16,40 +17,26 @@ describe('computed expressions', () => {
 	});
 
 	it('choose with $if, evaluating only the chosen branch', () => {
-		const tone: Value = { $if: [{ $lt: [{ $field: 'age' }, 7] }, 'success', { $if: [{ $lt: [{ $field: 'age' }, 30] }, 'warning', 'error'] }] };
+		const tone: Value = { $if: [{ $lt: [{ $slot: 'age' }, 7] }, 'success', { $if: [{ $lt: [{ $slot: 'age' }, 30] }, 'warning', 'error'] }] };
 		expect([3, 10, 40].map((age) => evaluate(tone, ctx({ age })))).toEqual(['success', 'warning', 'error']);
-		expect(evaluate({ $if: [true, { $field: 'a' }, { $call: 'x.y' }] }, ctx({ a: 1 }))).toBe(1);
+		expect(evaluate({ $if: [true, { $slot: 'a' }, { $daysSince: { $slot: 'missing' } }] }, ctx({ a: 1 }))).toBe(1);
 	});
 
 	it('count whole days since a date, against the context clock', () => {
 		expect(evaluate({ $daysSince: '2026-09-19T12:00:00Z' }, ctx())).toBe(10);
 		expect(evaluate({ $daysSince: '2026-09-29T00:00:00Z' }, ctx())).toBe(0);
-		expect(evaluate({ $daysSince: { $field: 'modified' } }, ctx({ modified: '2026-08-30T12:00:00Z' }))).toBe(30);
+		expect(evaluate({ $daysSince: { $slot: 'modified' } }, ctx({ modified: '2026-08-30T12:00:00Z' }))).toBe(30);
 		expect(evaluate({ $daysSince: 'not a date' }, ctx())).toBeNull();
 		expect(evaluate({ $daysSince: 42 }, ctx())).toBeNull();
 	});
 });
 
-// A tiny host with one component whose props are strictly typed, to see
-// validation treat computed values like bindings.
+// A tiny host listing items with when they were modified.
 const surface: Surface = {
 	graft: 1,
 	host: 'acme',
 	hostVersion: '1.0',
 	slots: { page: { kind: 'owned', title: 'Page' } },
-	components: {
-		grid: {
-			props: {
-				type: 'object',
-				properties: {
-					rows: { type: 'array' },
-					age: { description: 'Per row.', type: 'object' },
-					tone: { enum: ['success', 'warning', 'error'] },
-				},
-				additionalProperties: false,
-			},
-		},
-	},
 	capabilities: { 'items.list': { kind: 'read', input: {}, output: {}, scopes: ['items:read'] } },
 	scopes: { 'items:read': { title: 'See items' } },
 };
@@ -70,23 +57,39 @@ permissions: [items:read]
 - Old items are marked {#tone}
 `).spec!;
 
-function build(tone: Value, checks: Build['checks']): Build {
+function build(tone: unknown, checks: Build['checks']): Build {
 	const b: Build = {
 		graft: 1,
 		spec: { id: 'aging', hash: 'sha256:0' },
 		surface: { host: 'acme', hostVersion: '1.0', hash: 'sha256:0' },
 		mount: { slot: 'page' },
 		data: { items: { call: 'items.list', input: {} } },
-		tree: { type: 'grid', props: { rows: { $data: 'items' }, age: { $daysSince: { $field: 'modified' } }, tone } },
+		ui: {
+			protocol: 'a2ui/v0.9',
+			catalogId: 'graft:acme',
+			components: [
+				{
+					id: 'root',
+					component: 'Table',
+					rows: { path: '/items' },
+					fields: [
+						{ id: 'title', label: 'Title', primary: true },
+						{ id: 'age', label: 'Age', type: 'integer', value: { call: 'daysSince', args: { value: { path: 'modified' } } }, tone },
+					],
+					empty: 'No items.',
+				},
+			],
+		},
+		events: {},
 		checks,
-		refs: { slot: 'page', components: {}, capabilities: [], scopes: [] },
+		refs: { slot: 'page', capabilities: [], scopes: [], catalog: {} },
 		provenance: { compiler: 'handwritten', strategy: 'handwritten' },
 	};
 	b.refs = extractRefs(b, surface);
 	return b;
 }
 
-/** Items are "modified" when seeded; the grid shows their age and tone. */
+/** Items are "modified" when seeded; the table shows their age and tone. */
 function sandbox(): Sandbox {
 	let items: Array<{ title: string; modified: string }> = [];
 	return {
@@ -112,25 +115,10 @@ function sandbox(): Sandbox {
 	};
 }
 
-const semantics: ComponentSemantics = {
-	grid: ({ props, raw, evaluate: evalRow, emit }) => {
-		const rows = (props.rows as Array<{ title: string }>) ?? [];
-		emit.table({
-			columns: ['Title', 'Age'],
-			rows: rows.map((row) => ({
-				label: row.title,
-				record: row,
-				actions: [],
-				cells: { Age: { text: `${String(evalRow(raw.age, row))} days`, tone: evalRow(raw.tone, row) as string } },
-			})),
-		});
-	},
-};
-
-const tone: Value = { $if: [{ $gte: [{ $daysSince: { $field: 'modified' } }, 30] }, 'error', 'success'] };
+const tone = { call: 'if', args: { condition: { call: 'greaterThan', args: { a: { call: 'daysSince', args: { value: { path: 'modified' } } }, b: 29 } }, then: 'error', else: 'success' } };
 
 describe('computed values in builds', () => {
-	it('validate like bindings where a prop schema expects a literal', async () => {
+	it('validate', async () => {
 		const b = build(tone, [{ criterion: 'age', expect: [{ rows: [] }] }, { criterion: 'tone', expect: [{ rows: [] }] }]);
 		b.surface.hash = await hashSurface(surface);
 		const result = await validateBuild(b, surface);
@@ -139,13 +127,13 @@ describe('computed values in builds', () => {
 
 	it('are checked at a later clock, cell by cell', async () => {
 		const checks: Build['checks'] = [
-			{ criterion: 'age', fixtures: { items: ['A'] }, view_as: 'v', clock: { advanceDays: 12 }, expect: [{ cell: { row: { title: 'A' }, column: 'Age', text: '12 days' } }] },
+			{ criterion: 'age', fixtures: { items: ['A'] }, view_as: 'v', clock: { advanceDays: 12 }, expect: [{ cell: { row: { title: 'A' }, column: 'Age', text: '12' } }] },
 			{ criterion: 'tone', fixtures: { items: ['A'] }, view_as: 'v', clock: { advanceDays: 45 }, expect: [{ cell: { row: { title: 'A' }, column: 'Age', tone: 'error' } }] },
 		];
-		const pass = await verifyBuild({ build: build(tone, checks), spec, surface, sandbox: sandbox(), semantics, createCan: () => () => true });
+		const pass = await verifyBuild({ build: build(tone, checks), spec, surface, sandbox: sandbox(), createCan: () => () => true });
 		expect(pass.results.flatMap((r) => r.failures)).toEqual([]);
 
-		const wrong = await verifyBuild({ build: build('success', checks), spec, surface, sandbox: sandbox(), semantics, createCan: () => () => true });
+		const wrong = await verifyBuild({ build: build('success', checks), spec, surface, sandbox: sandbox(), createCan: () => () => true });
 		expect(wrong.results.flatMap((r) => r.failures)).toEqual(['Expected the "Age" cell for title "A" to be marked "error", found "success".']);
 	});
 

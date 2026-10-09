@@ -1,10 +1,9 @@
 import { readdir, readFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { runCanary, validateSpec, verifyBuild, type Build, type CanaryOptions, type CanaryReport, type CorpusEntry, type Migration, type Surface, type UpgradeOutcome } from '@graft/core';
-import { loadFunctions } from '@graft/sandbox';
 import { createCan } from '../host/can.ts';
 import type { HostPatch } from '../host/patch.ts';
-import { semantics } from '../host/semantics.ts';
+import '../host/a2ui.ts';
 import { startSandbox, type EmDashSandbox } from './sandbox.ts';
 
 /**
@@ -130,7 +129,7 @@ export async function runEmDashCanary(options: EmDashCanaryOptions): Promise<{ r
 			corpus: options.corpus,
 			from,
 			to,
-			verify: (build, spec, grant) => verifyBuild({ build, spec, surface: to, sandbox, semantics, createCan, grant, loadFunctions }),
+			verify: (build, spec, grant) => verifyBuild({ build, spec, surface: to, sandbox, createCan, grant }),
 			...(options.regenerate ? { regenerate: options.regenerate } : {}),
 			...(options.chooseSlot ? { chooseSlot: options.chooseSlot } : {}),
 			...(options.onEntry ? { onEntry: options.onEntry } : {}),

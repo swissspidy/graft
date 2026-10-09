@@ -32,7 +32,7 @@ function register_generate_route(): void {
 			'args'                => array(
 				'purpose' => array(
 					'type'     => 'string',
-					'enum'     => array( 'checks', 'tree' ),
+					'enum'     => array( 'checks', 'ui' ),
 					'required' => true,
 				),
 				'system'  => array(

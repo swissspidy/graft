@@ -14,8 +14,7 @@
   "dependencies": {
     "@graft/a2ui": "workspace:*",
     "@graft/core": "workspace:*",
-    "@graft/renderer-react": "workspace:*",
-    "@graft/sandbox": "workspace:*"
+    "@graft/renderer-react": "workspace:*"
   },
   "devDependencies": {
     "@a2ui/web_core": "0.12.0",

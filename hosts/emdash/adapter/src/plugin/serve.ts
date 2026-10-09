@@ -1,7 +1,7 @@
 import { hasPermission } from '../host/permissions.ts';
-import { compileSchema, evaluate, extractRefs, inert, updateArgs, validateSpec, validateWidgetTree, type Build, type BuildCode, type FunctionRunner, type Surface, type SurfaceFunctions } from '@graft/core';
-import { findAction, readValue, renderTree, withWidgetStates, type Block, type Rendered } from '../host/blocks.ts';
-import { A2UI_STATE, nextA2UIState, renderA2UI } from '../host/a2ui.ts';
+import { compileSchema, evaluate, extractRefs, validateSpec, type Build, type Surface } from '@graft/core';
+import { findAction, readValue, withState, type Block, type Rendered } from '../host/blocks.ts';
+import { nextA2UIState, renderA2UI } from '../host/a2ui.ts';
 import { createCan } from '../host/can.ts';
 import { roleName } from '../host/surface.ts';
 import { HostError, runCapability, usableScopes, type Viewer } from './host.ts';
@@ -18,9 +18,8 @@ import type { PluginContext } from 'emdash';
  * names a capability or its input. Each call then passes the gateway: the
  * build must use the capability, the grant must cover its scopes, the
  * input must match its schema, and the viewer's role must allow it.
- *
- * Build functions run here too, in QuickJS (see LoadFunctions), and so do
- * widgets: their states travel in the buttons' values (blocks.ts).
+ * What a surface's local actions set travels in the buttons' values
+ * (blocks.ts).
  */
 
 export interface Response {
@@ -37,40 +36,6 @@ export interface Served {
 }
 
 export type Call = (capability: string, input: unknown) => Promise<unknown>;
-
-/** Starts a sandbox for a build's code: @graft/sandbox, in the build the runtime can run. */
-export type LoadFunctions = (code: BuildCode, limits: SurfaceFunctions['limits']) => Promise<FunctionRunner>;
-
-/**
- * Sandboxes by code, at most MAX_RUNNERS: a site has few builds with code,
- * and the least recently used (an old version's, say) is freed first. A
- * load that fails is forgotten, so the next render tries again.
- */
-const runners = new Map<string, Promise<FunctionRunner>>();
-const MAX_RUNNERS = 16;
-
-function functionsFor(code: BuildCode, limits: SurfaceFunctions['limits'], load: LoadFunctions): Promise<FunctionRunner> {
-	const key = JSON.stringify([code.source, code.functions, limits]);
-	let runner = runners.get(key);
-	if (runner) {
-		// Most recently used last.
-		runners.delete(key);
-	} else {
-		runner = load(code, limits);
-		runner.catch(() => runners.get(key) === runner && runners.delete(key));
-	}
-	runners.set(key, runner);
-	for (const [oldKey, old] of runners) {
-		if (runners.size <= MAX_RUNNERS) {
-			break;
-		}
-		runners.delete(oldKey);
-		// Renders use a runner synchronously once it is loaded; freeing it in a later task never
-		// pulls it from under one.
-		old.then((evicted) => setTimeout(() => evicted.dispose?.(), 0)).catch(() => undefined);
-	}
-	return runner;
-}
 
 /** Active customizations whose build targets the current surface. */
 export async function servable(store: Store, surface: Surface): Promise<Served[]> {
@@ -117,18 +82,13 @@ interface Instance {
 	slot: Record<string, unknown>;
 }
 
-/** Widget states by customization (its spec id), then by node path. */
-export type WidgetStates = Record<string, Record<string, unknown>>;
+/** The state of each customization's surface (by spec id): what its local actions set. */
+export type States = Record<string, Record<string, unknown>>;
 
-type InstanceRender = Rendered & {
-	call: Call;
-	/** Runs one of the build's functions; a failure returns null and is added to `failures`. */
-	fn?: (name: string, args: unknown[]) => unknown;
-	failures: string[];
-};
+type InstanceRender = Rendered & { call: Call };
 
-/** Renders one customization in one place; data that fails to load and widgets that fail to draw are reported inline. */
-async function renderInstance(ctx: PluginContext, viewer: Viewer, instance: Instance, surface: Surface, load: LoadFunctions | undefined, states: Record<string, unknown> = {}): Promise<InstanceRender> {
+/** Renders one customization in one place; data that fails to load and parts that fail to draw are reported inline. */
+async function renderInstance(ctx: PluginContext, viewer: Viewer, instance: Instance, surface: Surface, state: Record<string, unknown> = {}): Promise<InstanceRender> {
 	const { served, slot } = instance;
 	const call = gateway(ctx, viewer, served, surface);
 	const usable = usableScopes(viewer, served.record.grant);
@@ -143,51 +103,21 @@ async function renderInstance(ctx: PluginContext, viewer: Viewer, instance: Inst
 			errors.push(error instanceof Error ? error.message : String(error));
 		}
 	}
-	const failures: string[] = [];
-	let functions: FunctionRunner | undefined;
-	const code = served.build.code;
-	if (code && surface.functions && load) {
-		try {
-			functions = await functionsFor(code, surface.functions.limits, load);
-		} catch (error) {
-			failures.push(`The customization's code does not load: ${error instanceof Error ? error.message : String(error)}.`);
-		}
-	}
-	const fn = functions
-		? (name: string, args: unknown[]): unknown => {
-				try {
-					return functions.call(name, args, now);
-				} catch (error) {
-					const failure = `Function "${name}" failed: ${error instanceof Error ? error.message : String(error)}.`;
-					if (!failures.includes(failure)) {
-						failures.push(failure);
-					}
-					return null;
-				}
-			}
-		: undefined;
-	const widgets = surface.functions?.widgets ? { limits: surface.functions.widgets, states, validate: (tree: NonNullable<Build['tree']>) => validateWidgetTree(tree, surface) } : undefined;
-	const at = { data, slot, can, now, ...(fn ? { fn } : {}) };
-	// A build in another UI format (A2UI) draws through its own renderer; its state rides like a widget's.
-	const drawn = served.build.tree
-		? renderTree(served.build.tree, at, served.record.id, widgets)
-		: renderA2UI(served.build, at, served.record.id, (states[A2UI_STATE] ?? {}) as Record<string, unknown>);
-	const rendered = withWidgetStates(drawn, served.record.id);
+	const rendered = withState(renderA2UI(served.build, { data, slot, can, now }, served.record.id, state), served.record.id);
 	if (errors.length > 0) {
 		rendered.blocks.unshift({ type: 'banner', variant: 'error', title: 'Some data could not be loaded', description: errors.join(' ') });
 	}
-	const problems = [...failures, ...rendered.problems];
-	if (problems.length > 0) {
-		rendered.blocks.unshift({ type: 'banner', variant: 'error', title: 'Some of this could not be drawn', description: problems.join(' ') });
+	if (rendered.problems.length > 0) {
+		rendered.blocks.unshift({ type: 'banner', variant: 'error', title: 'Some of this could not be drawn', description: rendered.problems.join(' ') });
 	}
-	return { ...rendered, call, failures, ...(fn ? { fn } : {}) };
+	return { ...rendered, call };
 }
 
-async function renderAll(ctx: PluginContext, viewer: Viewer, instances: Instance[], surface: Surface, load: LoadFunctions | undefined, titled: boolean, states: WidgetStates = {}) {
+async function renderAll(ctx: PluginContext, viewer: Viewer, instances: Instance[], surface: Surface, titled: boolean, states: States = {}) {
 	const blocks: Block[] = [];
 	const renders = [];
 	for (const instance of instances) {
-		const rendered = await renderInstance(ctx, viewer, instance, surface, load, states[instance.served.record.id]);
+		const rendered = await renderInstance(ctx, viewer, instance, surface, states[instance.served.record.id]);
 		renders.push({ instance, rendered });
 		if (titled) {
 			if (blocks.length > 0) {
@@ -201,10 +131,10 @@ async function renderAll(ctx: PluginContext, viewer: Viewer, instances: Instance
 }
 
 /**
- * Handles a click: finds the button in a fresh render (with the widget
- * states it carried) and either runs its action through the gateway, or,
- * for a widget's event, computes the widget's next state. Returns the
- * notice and the widget states to render with. Every `then` re-renders
+ * Handles a click: finds the button in a fresh render (with the state it
+ * carried) and either runs its action through the gateway, or, for a local
+ * action, computes the next state. Returns the notice and the states to
+ * render with. Every `then` re-renders
  * from fresh data (the server keeps no view state).
  */
 async function act(
@@ -212,31 +142,18 @@ async function act(
 	viewer: Viewer,
 	instances: Instance[],
 	surface: Surface,
-	load: LoadFunctions | undefined,
 	actionId: string,
 	sent: unknown,
-): Promise<{ toast?: Response['toast']; states: WidgetStates }> {
+): Promise<{ toast?: Response['toast']; states: States }> {
 	const specId = actionId.split(':')[0]!;
-	const { value, states } = readValue(sent);
-	const kept = { [specId]: states };
+	const { value, state } = readValue(sent);
+	const kept = { [specId]: state };
 	for (const instance of instances.filter((i) => i.served.record.id === specId)) {
-		const rendered = await renderInstance(ctx, viewer, instance, surface, load, states);
+		const rendered = await renderInstance(ctx, viewer, instance, surface, state);
 		const found = findAction(rendered, actionId, value);
-		if (found?.event && !instance.served.build.tree) {
-			// A local A2UI action: the next state, nothing called.
-			return { states: { [specId]: { ...states, [A2UI_STATE]: nextA2UIState((states[A2UI_STATE] ?? {}) as Record<string, unknown>, found.event) } } };
-		}
 		if (found?.event) {
-			const drawn = rendered.widgets[found.event.widget];
-			if (!drawn?.props.update || !rendered.fn) {
-				return { toast: { message: 'That button does nothing.', type: 'error' }, states: kept };
-			}
-			const failed = rendered.failures.length;
-			const next = rendered.fn(drawn.props.update, updateArgs(drawn.props, drawn.state, { $event: found.event.name, payload: found.event.payload }));
-			if (rendered.failures.length > failed) {
-				return { toast: { message: rendered.failures.at(-1)!, type: 'error' }, states: kept };
-			}
-			return { states: { [specId]: { ...states, [found.event.widget]: inert(next) } } };
+			// A local action: the next state, nothing called.
+			return { states: { [specId]: nextA2UIState(state, found.event) } };
 		}
 		if (!found?.action) {
 			continue;
@@ -292,22 +209,20 @@ export interface ServeOptions {
 	surface: Surface;
 	/** Writing customizations in the admin; absent where it is not offered. */
 	authoring?: Authoring;
-	/** Runs builds' functions and widgets; without it, they show as problems. */
-	loadFunctions?: LoadFunctions;
 }
 
 /** The admin route: plugin pages and the dashboard widget. */
-export async function serveAdmin({ ctx, viewer, store, surface, authoring, loadFunctions }: ServeOptions, interaction: Interaction, where: 'admin-page' | 'dashboard-widget'): Promise<Response> {
+export async function serveAdmin({ ctx, viewer, store, surface, authoring }: ServeOptions, interaction: Interaction, where: 'admin-page' | 'dashboard-widget'): Promise<Response> {
 	const served = await servable(store, surface);
 	let toast: Response['toast'];
-	let states: WidgetStates = {};
+	let states: States = {};
 
 	if (where === 'dashboard-widget') {
 		const instances = served.filter((s) => s.build.mount.slot === 'dashboard.widget' && inAudience(s, viewer)).map((s) => ({ served: s, slot: {} }));
 		if (interaction.type === 'block_action' && interaction.action_id) {
-			({ toast, states } = await act(ctx, viewer, instances, surface, loadFunctions, interaction.action_id, interaction.value));
+			({ toast, states } = await act(ctx, viewer, instances, surface, interaction.action_id, interaction.value));
 		}
-		const { blocks } = await renderAll(ctx, viewer, instances, surface, loadFunctions, true, states);
+		const { blocks } = await renderAll(ctx, viewer, instances, surface, true, states);
 		return withToast({ blocks: blocks.length > 0 ? blocks : [{ type: 'context', text: 'No customizations here yet.' }] }, toast);
 	}
 
@@ -335,12 +250,12 @@ export async function serveAdmin({ ctx, viewer, store, surface, authoring, loadF
 		instances = pageInstances(await servable(store, surface));
 		open = instances.length; // the Manage tab
 	} else if (interaction.type === 'block_action' && interaction.action_id) {
-		({ toast, states } = await act(ctx, viewer, instances, surface, loadFunctions, interaction.action_id, interaction.value));
+		({ toast, states } = await act(ctx, viewer, instances, surface, interaction.action_id, interaction.value));
 		open = Math.max(0, instances.findIndex((i) => i.served.record.id === interaction.action_id!.split(':')[0]));
 	}
 	const panels: Array<{ label: string; blocks: Block[] }> = [];
 	for (const instance of instances) {
-		const { blocks } = await renderAll(ctx, viewer, [instance], surface, loadFunctions, false, states);
+		const { blocks } = await renderAll(ctx, viewer, [instance], surface, false, states);
 		panels.push({ label: instance.served.title, blocks });
 	}
 	if (isAdmin(viewer)) {
@@ -355,7 +270,7 @@ export async function serveAdmin({ ctx, viewer, store, surface, authoring, loadF
 
 /** The editor panel route, for a saved entry. */
 export async function servePanel(
-	{ ctx, viewer, store, surface, loadFunctions }: ServeOptions,
+	{ ctx, viewer, store, surface }: ServeOptions,
 	interaction: Interaction,
 	entry: { collection: string; id: string },
 ): Promise<Response> {
@@ -374,15 +289,15 @@ export async function servePanel(
 	}
 	const instances = served.map((s) => ({ served: s, slot: { entry: slotEntry } }));
 	let toast: Response['toast'];
-	let states: WidgetStates = {};
+	let states: States = {};
 	if (interaction.type === 'block_action' && interaction.action_id) {
-		({ toast, states } = await act(ctx, viewer, instances, surface, loadFunctions, interaction.action_id, interaction.value));
+		({ toast, states } = await act(ctx, viewer, instances, surface, interaction.action_id, interaction.value));
 		if (toast?.type === 'success') {
 			const fresh = await runCapability(ctx, viewer, 'content.get', { collection: entry.collection, id: entry.id });
 			instances.forEach((i) => (i.slot = { entry: fresh }));
 		}
 	}
-	const { blocks } = await renderAll(ctx, viewer, instances, surface, loadFunctions, served.length > 1, states);
+	const { blocks } = await renderAll(ctx, viewer, instances, surface, served.length > 1, states);
 	return withToast({ blocks }, toast);
 }
 

@@ -22,12 +22,11 @@ export interface A2UISurface {
 }
 
 /**
- * A Graft build whose UI is an A2UI surface: the envelope (spec, mount, data
- * sources, checks, refs) is a tree build's; `ui` replaces `tree`, and
- * `events` binds each action event to a capability call. No agent runs: the
+ * A Graft build with its UI as an A2UI surface (`ui`), and `events`
+ * binding each action event to a capability call. No agent runs: the
  * Graft runtime plays the A2UI server.
  */
-export interface A2UIBuild extends Omit<Build, 'tree'> {
+export interface A2UIBuild extends Omit<Build, 'ui'> {
 	ui: A2UISurface;
 	events: Record<string, EventBinding>;
 }

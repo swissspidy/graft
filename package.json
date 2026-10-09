@@ -9,7 +9,7 @@
   },
   "scripts": {
     "graft": "tsx packages/cli/src/main.ts",
-    "typecheck": "tsc -p packages/core && tsc -p packages/a2ui && tsc -p packages/cli && tsc -p packages/renderer-react && tsc -p packages/sandbox && tsc -p hosts/wordpress/adapter && tsc -p hosts/wordpress/e2e && tsc -p hosts/emdash/adapter && tsc -p hosts/emdash/e2e",
+    "typecheck": "tsc -p packages/core && tsc -p packages/a2ui && tsc -p packages/cli && tsc -p packages/renderer-react && tsc -p hosts/wordpress/adapter && tsc -p hosts/wordpress/e2e && tsc -p hosts/emdash/adapter && tsc -p hosts/emdash/e2e",
     "test": "vitest run",
     "validate:examples": "tsx packages/cli/src/main.ts validate --surface hosts/wordpress/plugin/surfaces/7.1.json examples/specs && tsx packages/cli/src/main.ts validate --surface examples/agency/surface.json examples/agency/specs",
     "surface:generate": "tsx hosts/wordpress/adapter/src/cli.ts",

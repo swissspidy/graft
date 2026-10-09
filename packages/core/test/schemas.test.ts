@@ -21,26 +21,21 @@ describe('schemas', () => {
 			surface: { host: 'wordpress', hostVersion: '7.1', hash: 'sha256:surface' },
 			mount: { slot: 'admin.page' },
 			data: { queue: { call: 'posts.list', input: { status: 'pending' } } },
-			tree: {
-				type: 'table',
-				props: {
-					rows: { $data: 'queue.items' },
-					columns: ['title', 'author', 'date'],
-					empty: 'Nothing to review',
-					actions: [
-						{
-							id: 'approve',
-							label: 'Approve',
-							visible: { $can: 'posts.status:write', on: { $field: 'id' } },
-							onClick: {
-								$call: 'posts.update_status',
-								input: { id: { $field: 'id' }, status: 'publish' },
-								then: ['remove-row:queue'],
-							},
-						},
-					],
-				},
+			ui: {
+				protocol: 'a2ui/v0.9',
+				catalogId: 'graft:wordpress',
+				components: [
+					{
+						id: 'root',
+						component: 'Table',
+						rows: { path: '/queue/items' },
+						fields: [{ id: 'title', label: 'Title', primary: true }],
+						rowActions: [{ id: 'approve', label: 'Approve', action: { event: { name: 'approve', context: { id: { path: 'id' } } } } }],
+						empty: 'Nothing to review',
+					},
+				],
 			},
+			events: { approve: { call: 'posts.update_status', input: { id: { $context: 'id' }, status: 'publish' }, then: ['remove-row:queue'] } },
 			checks: [
 				{
 					criterion: 'contributors-no-approve',
@@ -51,14 +46,17 @@ describe('schemas', () => {
 			],
 			refs: {
 				slot: 'admin.page',
-				components: { table: ['rows', 'columns', 'empty', 'actions'] },
 				capabilities: ['posts.list', 'posts.update_status'],
 				scopes: ['posts:read', 'posts.status:write'],
+				catalog: { Table: ['empty', 'fields', 'rowActions', 'rows'] },
 			},
 			provenance: { compiler: 'handwritten', strategy: 'handwritten' },
 		};
 		expect(validate(build), JSON.stringify(validate.errors)).toBe(true);
 		// Unknown $-keys are rejected: there is no expression form beyond the declared ones.
-		expect(validate({ ...build, tree: { type: 'table', props: { x: { $eval: 'alert(1)', $data: 'a' } } } })).toBe(false);
+		expect(validate({ ...build, data: { queue: { call: 'posts.list', input: { x: { $eval: 'alert(1)', $data: 'a' } } } } })).toBe(false);
+		// A build has a UI.
+		const { ui: _ui, ...noUi } = build;
+		expect(validate(noUi)).toBe(false);
 	});
 });

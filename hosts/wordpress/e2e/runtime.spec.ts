@@ -36,9 +36,8 @@ test('Dashboard widgets need no code: headline verdicts and draft ages from cata
 	await expect(age('Draft B')).toHaveAttribute('data-graft-tone', 'success');
 	await expect(drafts.locator('tbody tr', { hasText: 'Draft A' })).toHaveCount(0);
 
-	// Drawn by the A2UI bundle; nothing ran in the functions sandbox.
+	// Drawn by the A2UI bundle.
 	expect(await loaded(page, /build\/a2ui\.js/)).toBe(true);
-	expect(await loaded(page, /functions-worker\.js|quickjs\.wasm/)).toBe(false);
 	await page.screenshot({ path: 'test-results/dashboard.png', fullPage: true });
 });
 
@@ -274,7 +273,7 @@ test('only administrators may use the model proxy', async ({ page }) => {
 	await login(page, 'editor');
 	const status = await page.evaluate(async () => {
 		try {
-			await window.wp.apiFetch({ path: '/graft/v1/generate', method: 'POST', data: { purpose: 'tree', system: '', prompt: '', schema: {} } });
+			await window.wp.apiFetch({ path: '/graft/v1/generate', method: 'POST', data: { purpose: 'ui', system: '', prompt: '', schema: {} } });
 			return 'allowed';
 		} catch (error) {
 			return (error as { code: string }).code;
@@ -336,7 +335,6 @@ test('the publish checklist in the block editor: no code, follows typing, saves,
 	await published;
 	await page.goto('/wp-admin/edit.php?post_status=publish&post_type=post');
 	await expect(page.locator('#the-list')).toContainText('Draft B gets a headline that fits');
-	expect(await loaded(page, /functions-worker\.js|quickjs\.wasm/)).toBe(false);
 });
 
 interface EditorData {

@@ -75,8 +75,6 @@ function servable_specs(): array {
 			$build  = $record['builds'][ $surface['hash'] ]['build'] ?? null;
 			// Never serve a build whose scopes the grant does not cover.
 			$covered = is_array( $build ) && grant_covers( $record['grant'], build_scopes( $build ) );
-			// Nor one with code where this surface runs none.
-			$covered = $covered && ( ! isset( $build['code'] ) || isset( $surface['functions'] ) );
 			if ( 'active' === $record['state'] && $covered && applies_to_user( $record, $user ) ) {
 				$servable[ $spec->post_name ] = array(
 					'record' => $record,
@@ -159,7 +157,6 @@ function enqueue_runtime(): void {
 
 	$specs     = array();
 	$servable  = servable_specs();
-	$with_code = false;
 	$with_a2ui = false;
 	foreach ( array_keys( $rendered ) as $spec_id ) {
 		if ( isset( $servable[ $spec_id ] ) ) {
@@ -167,7 +164,6 @@ function enqueue_runtime(): void {
 				'build'  => $servable[ $spec_id ]['build'],
 				'scopes' => (object) usable_scopes( $servable[ $spec_id ]['record'] ),
 			);
-			$with_code = $with_code || isset( $servable[ $spec_id ]['build']['code'] );
 			$with_a2ui = $with_a2ui || isset( $servable[ $spec_id ]['build']['ui'] );
 		}
 	}
@@ -175,7 +171,7 @@ function enqueue_runtime(): void {
 	$editor = editor_runtime_config();
 	// In the block editor, panels register with the editor's own plugin API.
 	$deps = $editor ? array_merge( $asset['dependencies'], array( 'wp-plugins', 'wp-editor', 'wp-data' ) ) : $asset['dependencies'];
-	// Builds whose UI is an A2UI surface are drawn by build/a2ui.js, loaded first and only where one is served.
+	// Builds are A2UI surfaces, drawn by build/a2ui.js, loaded first and only where one is served.
 	$a2ui_asset_file = dirname( __DIR__ ) . '/build/a2ui.asset.php';
 	if ( $with_a2ui && is_readable( $a2ui_asset_file ) ) {
 		$a2ui_asset = require $a2ui_asset_file;
@@ -198,18 +194,6 @@ function enqueue_runtime(): void {
 			)
 		);
 		$config['editor'] = $editor;
-	}
-	// Only screens with code learn where the functions worker is; the page
-	// starts it (and fetches QuickJS) on the first function call.
-	if ( $with_code && isset( $surface['functions']['limits'] ) ) {
-		$config['functions'] = array(
-			'worker' => plugins_url( 'build/functions-worker.js', __DIR__ ),
-			'wasm'   => plugins_url( 'build/quickjs.wasm', __DIR__ ),
-			'limits' => $surface['functions']['limits'],
-		);
-		if ( isset( $surface['functions']['widgets'] ) ) {
-			$config['functions']['widgets'] = $surface['functions']['widgets'];
-		}
 	}
 	wp_add_inline_script(
 		'graft-runtime',
@@ -331,8 +315,6 @@ function register_admin_screen(): void {
 						// The whole snapshot: the editor validates and compiles against it.
 						'surface'             => $surface,
 						'policy'              => admin_policy(),
-						// QuickJS, for verifying builds with code in the browser.
-						'quickjsWasm'         => plugins_url( 'build/quickjs.wasm', __DIR__ ),
 						/**
 						 * Filters whether wp-admin verifies builds in WordPress Playground
 						 * in the admin's browser (needs access to playground.wordpress.net).

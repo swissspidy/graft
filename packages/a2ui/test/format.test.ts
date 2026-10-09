@@ -1,35 +1,11 @@
 import { describe, expect, it } from 'vitest';
 import { applyMigrations, compileSpec, extractRefs, hashSurface, modelAnswers, registerUiFormat, validateBuild, verifyBuild, type Build, type CompileOptions } from '@graft/core';
-import { createCan, fakeSandbox, fixtures, pageBuild, semantics, spec, surface } from '../../core/test/fixtures/acme.ts';
+import { createCan, fakeSandbox, fixtures, format, pageBuild, spec, surface } from '../../core/test/fixtures/acme.ts';
 import { answerA2UI, assembleA2UI, createA2UIFormat, type A2UIBuild } from '../src/index.ts';
 
-registerUiFormat(createA2UIFormat({ host: 'acme', catalogId: 'graft:acme' }));
-
-/** The acme page build with its tree as an A2UI surface. */
+/** The acme page build (an A2UI surface), changed by `change`. */
 async function a2uiBuild(change?: (build: A2UIBuild) => void): Promise<Build> {
-	const { tree: _tree, ...envelope } = await pageBuild();
-	const build = {
-		...envelope,
-		ui: {
-			protocol: 'a2ui/v0.9',
-			catalogId: 'graft:acme',
-			components: [
-				{ id: 'root', component: 'Column', children: ['title', 'list'] },
-				{ id: 'title', component: 'Text', text: 'Open items', variant: 'h1' },
-				{
-					id: 'list',
-					component: 'Table',
-					rows: { path: '/open/items' },
-					fields: [{ id: 'title', label: 'Title', primary: true }],
-					rowActions: [
-						{ id: 'close', label: 'Close', visible: { call: 'can', args: { scope: 'items:write' } }, action: { event: { name: 'close', context: { id: { path: 'id' } } } } },
-					],
-					empty: 'All done',
-				},
-			],
-		},
-		events: { close: { call: 'items.close', input: { id: { $context: 'id' } }, then: ['remove-row:open'] } },
-	} as unknown as A2UIBuild;
+	const build = (await pageBuild()) as unknown as A2UIBuild;
 	change?.(build);
 	const result = build as unknown as Build;
 	result.refs = extractRefs(result, surface);
@@ -45,21 +21,20 @@ describe('A2UI builds', () => {
 		expect(validation.diagnostics.filter((d) => d.severity === 'error')).toEqual([]);
 		expect(build.refs).toEqual({
 			slot: 'page',
-			components: {},
 			capabilities: ['items.close', 'items.list'],
 			scopes: ['items:read', 'items:write'],
 			catalog: { Column: ['children'], Table: ['empty', 'fields', 'rowActions', 'rows'], Text: ['text', 'variant'] },
 		});
 	});
 
-	it('pass the frozen checks the tree build passes, and fail the one a mistake breaks', async () => {
-		const good = await verifyBuild({ build: await a2uiBuild(), spec, surface, sandbox: fakeSandbox(), semantics, createCan });
+	it('pass their frozen checks, and fail the one a mistake breaks', async () => {
+		const good = await verifyBuild({ build: await a2uiBuild(), spec, surface, sandbox: fakeSandbox(), createCan });
 		expect(good.results.filter((r) => !r.passed)).toEqual([]);
 
 		const everyone = await a2uiBuild((b) => {
 			delete ((b.ui.components[2]!.rowActions as Array<Record<string, unknown>>)[0]!).visible;
 		});
-		const broken = await verifyBuild({ build: everyone, spec, surface, sandbox: fakeSandbox(), semantics, createCan });
+		const broken = await verifyBuild({ build: everyone, spec, surface, sandbox: fakeSandbox(), createCan });
 		expect(broken.results.filter((r) => !r.passed).map((r) => [r.criterion, r.failures])).toEqual([
 			['clerks', ['Expected "close" not to be available for title "Open A", but it is.']],
 		]);
@@ -82,7 +57,7 @@ describe('A2UI builds', () => {
 			{ criterion: 'open-only', fixtures, view_as: 'm', expect: [{ rows: ['Open A'] }] },
 		];
 		expect((await validateBuild(build, surface)).diagnostics.filter((d) => d.severity === 'error')).toEqual([]);
-		const result = await verifyBuild({ build, spec, surface, sandbox: fakeSandbox(), semantics, createCan });
+		const result = await verifyBuild({ build, spec, surface, sandbox: fakeSandbox(), createCan });
 		expect(result.results.flatMap((r) => r.failures)).toEqual([]);
 		expect((build as unknown as A2UIBuild).ui.initial).toEqual({ form: { status: 'open' } });
 	});
@@ -135,9 +110,9 @@ describe('A2UI builds', () => {
 		expect(fresh.diagnostics.filter((d) => d.code === 'build-scope-not-requested').map((d) => d.severity)).toEqual(['error']);
 	});
 
-	it('are either a tree or a UI with events, never both', async () => {
-		const both = { ...(await a2uiBuild()), tree: (await pageBuild()).tree };
-		expect((await validateBuild(both, surface)).diagnostics.map((d) => d.code)).toContain('build-schema');
+	it('have a UI', async () => {
+		const { ui: _ui, ...rest } = await a2uiBuild();
+		expect((await validateBuild(rest, surface)).diagnostics.map((d) => d.code)).toContain('build-schema');
 	});
 
 	it('migrate: capability renames reach event bindings, scope renames reach can calls', async () => {
@@ -165,27 +140,25 @@ describe('compiling to A2UI', () => {
 		const outputs = [answer('/open.items'), answer('/open/items')];
 		const model = {
 			async generate({ purpose, prompt }: { purpose: string; prompt: string }) {
-				expect(purpose).toBe('tree');
+				expect(purpose).toBe('ui');
 				prompts.push(prompt);
 				return { output: outputs.shift(), model: 'scripted' };
 			},
 		};
-		const format = createA2UIFormat({ host: 'acme', catalogId: 'graft:acme' });
 		const result = await compileSpec({
 			spec,
 			specHash: target.spec.hash,
 			surface: { ...surface, hash: await hashSurface(surface) },
 			model,
-			host: { fixtures: '', assertions: '' },
+			host: { fixtures: '', assertions: '', ui: 'A2UI' },
 			checks: target.checks,
 			format,
-			verify: (build) => verifyBuild({ build, spec, surface, sandbox: fakeSandbox(), semantics, createCan }),
+			verify: (build) => verifyBuild({ build, spec, surface, sandbox: fakeSandbox(), createCan }),
 		});
 		expect(result.ok).toBe(true);
 		expect(prompts).toHaveLength(2);
 		expect(prompts[1]).toContain('"/open.items" is not a JSON Pointer');
 		expect((result.build as unknown as A2UIBuild).ui.catalogId).toBe('graft:acme');
-		expect(result.build!.tree).toBeUndefined();
 		expect(result.verification!.passed).toBe(true);
 	});
 });
@@ -199,7 +172,7 @@ describe('the format a build is compiled in', () => {
 			specHash: target.spec.hash,
 			surface: { ...surface, hash: await hashSurface(surface) },
 			model: { generate: async () => ({ output: answers.shift(), model: 'scripted' }) },
-			host: { fixtures: '', assertions: '' },
+			host: { fixtures: '', assertions: '', ui: 'A2UI' },
 			checks: target.checks,
 			...options,
 		});
@@ -207,31 +180,21 @@ describe('the format a build is compiled in', () => {
 	};
 
 	it("is the host's when nothing else decides", async () => {
-		const build = await compile([modelAnswers(await a2uiBuild()).tree], { host: { fixtures: '', assertions: '', ui: 'A2UI' } });
-		expect(build?.tree).toBeUndefined();
+		const build = await compile([modelAnswers(await a2uiBuild()).ui]);
 		expect((build as unknown as A2UIBuild).ui.catalogId).toBe('graft:acme');
 	});
 
-	it("is the previous build's when regenerating, and a tree when asked", async () => {
-		const host = { fixtures: '', assertions: '', ui: 'A2UI' };
-		const a2ui = await a2uiBuild();
-		expect((await compile([modelAnswers(a2ui).tree], { host, previous: a2ui }))?.tree).toBeUndefined();
-		const tree = await pageBuild();
-		expect((await compile([modelAnswers(tree).tree], { host, format: 'tree' }))?.tree).toBeDefined();
+	it("is the previous build's when regenerating, and the caller's when given", async () => {
+		const previous = await a2uiBuild();
+		const regenerated = await compile([modelAnswers(previous).ui], { previous, host: { fixtures: '', assertions: '', ui: 'Nope' } });
+		expect((regenerated as unknown as A2UIBuild).ui.catalogId).toBe('graft:acme');
+		expect(regenerated?.provenance.strategy).toBe('regenerated');
+		const asked = await compile([modelAnswers(previous).ui], { format, host: { fixtures: '', assertions: '', ui: 'Nope' } });
+		expect((asked as unknown as A2UIBuild).ui.catalogId).toBe('graft:acme');
 	});
 
-	it("moves a tree to the host's format when regenerating it", async () => {
-		const host = { fixtures: '', assertions: '', ui: 'A2UI' };
-		const build = await compile([modelAnswers(await a2uiBuild()).tree], { host, previous: await pageBuild() });
-		expect(build?.tree).toBeUndefined();
-		expect((build as unknown as A2UIBuild).ui.catalogId).toBe('graft:acme');
-		expect(build?.provenance.strategy).toBe('regenerated');
-		// Without a format of its own, a host regenerates trees as trees.
-		expect((await compile([modelAnswers(await pageBuild()).tree], { previous: await pageBuild() }))?.tree).toBeDefined();
-	});
-
-	it('is a tree for a host without one', async () => {
-		expect((await compile([modelAnswers(await pageBuild()).tree]))?.tree).toBeDefined();
+	it('must be registered', async () => {
+		await expect(compile([], { host: { fixtures: '', assertions: '', ui: 'Nope' } })).rejects.toThrow('No UI format "Nope" is registered for acme.');
 	});
 });
 

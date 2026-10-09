@@ -5,7 +5,7 @@ Everything Graft needs to target WordPress 7.1+.
 | Path          | What                                                                                  |
 | ------------- | ------------------------------------------------------------------------------------- |
 | `plugin/`     | The `graft` plugin: abilities, the host half of the surface, the spec store, lifecycle, REST API, capability gateway and slot mounting. |
-| `adapter/`    | TypeScript: component registry and their WordPress implementations (`src/client`), ability schema normalization, surface generator, Playground driver. |
+| `adapter/`    | TypeScript: the A2UI catalog for WordPress (`src/a2ui.ts`) and its renderer on a2ui-wp (`src/client`), ability schema normalization, surface generator, Playground driver. |
 | `e2e/`        | Playwright tests of the runtime in wp-admin, against a seeded Playground.            |
 | `plugin/surfaces/` | Generated surface snapshots, one per WordPress version. Checked in so host upgrades show up as diffs, and shipped with the plugin so it can tell which surface it runs on (by `fingerprint`). |
 | `playground/` | Blueprint and scripts run inside WordPress Playground (surface dump, smoke test, e2e seed), and `sandbox/`, the verification endpoint. |
@@ -15,10 +15,9 @@ Everything Graft needs to target WordPress 7.1+.
 - **Slots:** `admin.page` and `dashboard.widget` (owned), and
   `posts.list.row-actions` (extension slot on the Posts screen, anchored to
   the `post_row_actions` filter, provides the row's post).
-- **Components:** `stack`, `heading`, `text`, `button`, `notice`, `card`,
-  `empty-state`, `table` (DataViews) and `row-action`. Prop schemas
-  describe values after bindings resolve; actions (`$call`) and conditions
-  (`$can`) stay expressions for the renderer to evaluate.
+- **UI:** builds are A2UI surfaces in the `graft:wordpress` catalog
+  ([ADR 0009](../../docs/adr/0009-a2ui.md)); the catalog belongs to the
+  adapter, not the surface.
 - **Capabilities:** `posts.list` and `posts.update_status` (Graft
   abilities), `site.info` and `users.current` (core abilities). Builds only
   ever reference these names; the ability behind a name can change, and
@@ -51,8 +50,7 @@ typically in a must-use plugin), never wp-admin settings:
 
 A site whose surface no shipped snapshot describes records its own from
 Tools → Customizations: the admin's browser assembles it from the host
-dump, and the plugin keeps it once it matches the site's fingerprint and
-the plugin's components. The same screen upgrades customizations after a
+dump, and the plugin keeps it once it matches the site's fingerprint. The same screen upgrades customizations after a
 content model change, verified in Playground in the browser.
 
 The surface hash covers the contract only (not `hostVersion`, `previous`
@@ -84,11 +82,11 @@ a hash and need no rebuild.
   whose own permission check applies on top.
 - **Slots.** `admin.page` adds a menu page, `dashboard.widget` a widget,
   `posts.list.row-actions` a row action on the Posts screen with the row's
-  post as slot props. The client bundle (`plugin/build/runtime.js`, about
-  10 KB) uses React and `@wordpress/components` from WordPress. The
-  `table` component uses wp-admin list-table markup for now; its props are
-  DataViews-shaped, so moving it to DataViews is a change inside the
-  wrapper, not the surface.
+  post as slot props. The runtime (`plugin/build/runtime.js`) loads data
+  through the gateway and `plugin/build/a2ui.js` draws the A2UI surface
+  with a2ui-wp, using React and `@wordpress/components` from WordPress.
+  The catalog's Table uses wp-admin list-table markup
+  (`src/client/table.tsx`).
 - **Admin screen.** Tools → Customizations (administrators) lists every
   spec with its state, the permissions it requests in plain language
   (granted or not), and each check rendered as a sentence next to the
@@ -124,8 +122,9 @@ expectations over a semantic snapshot.
   `available`), and the host assertion `post` (`{ title, status }`).
 - **Slot instances:** owned slots render once; `posts.list.row-actions`
   renders once per post in the Posts screen's "All" view for that user.
-- **Semantics** (`adapter/src/semantics.ts`) say how each component reads in
-  a snapshot and must follow `src/client/components.tsx`.
+- **Snapshots** come from the A2UI format (`@graft/a2ui`), resolved with the
+  same web_core and catalog the browser uses; table cells read as
+  `adapter/src/cells.ts` formats them for both.
 
 The grant is simulated as the spec's requested permissions, and the
 gateway's checks (capability in the build, scopes granted) are applied as

@@ -7,7 +7,7 @@ sandboxed plugin and writing customizations in the admin,
 
 | Path | What |
 | --- | --- |
-| `adapter/src/host` | Pure, used by the plugin and by Node: surface, components, tree to Block Kit translation, verifier semantics, `$can`, check describers, compiler guide |
+| `adapter/src/host` | Pure, used by the plugin and by Node: surface, the A2UI catalog and its Block Kit translation, `$can`, check describers, compiler guide |
 | `adapter/src/plugin` | The plugin: routes shared by both formats, capabilities over EmDash content, gateway and serving, KV store, authoring (compile jobs, Claude API client), sandbox route. `index.ts` is the native entry, `standard.ts` the sandboxed one |
 | `adapter/src/index.ts` | The plugin descriptors for `astro.config`: `graft()` (native) and `graftSandboxed()` |
 | `adapter/emdash-plugin.jsonc` | The manifest for EmDash's plugin CLI and registry, generated from `src/plugin/manifest.ts` |
@@ -41,18 +41,14 @@ Customizations appear under **Plugins → Customizations** as tabs, in a
 **Customizations** widget on the dashboard, and in a **Customizations**
 panel in the entry editor.
 
-Builds with code ([ADR 0005](../../docs/adr/0005-sandboxed-functions.md))
-run it on the server, in QuickJS: compiled to WebAssembly in the native
-plugin, to asm.js in the plugin sandbox, which compiles no WebAssembly.
-Interactive widgets ([ADR 0006](../../docs/adr/0006-interactive-widgets.md))
-are drawn there too, as Block Kit; their state travels in the buttons.
+Builds are A2UI surfaces ([ADR 0009](../../docs/adr/0009-a2ui.md)),
+drawn on the server as Block Kit. What their local actions set travels in
+the buttons' values, since the admin keeps no state.
 
 On Cloudflare, sandboxed plugins get 50 ms of CPU per request (not
-enforced by workerd on Node, which the tests use). Starting QuickJS takes
-more than that, so a customization with code will likely fail its first
-render there after a cold start. This is untested on Cloudflare
-([ADR 0004](../../docs/adr/0004-emdash-sandbox-and-authoring.md)). The
-native plugin, and the sandbox on Node, have no such limit.
+enforced by workerd on Node, which the tests use). This is untested on
+Cloudflare ([ADR 0004](../../docs/adr/0004-emdash-sandbox-and-authoring.md)).
+The native plugin, and the sandbox on Node, have no such limit.
 
 ### Writing customizations in the admin
 

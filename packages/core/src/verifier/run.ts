@@ -1,22 +1,18 @@
 import { evaluate, isAction, type EvalContext } from '../build/evaluate.ts';
 import { removeRow } from '../build/rows.ts';
-import type { FunctionRunner } from '../build/functions.ts';
-import { validateWidgetTree } from '../build/validate.ts';
-import { inputEvent, updateArgs } from '../build/widgets.ts';
-import type { Build, BuildCode, Check } from '../build/types.ts';
+import type { Build, Check } from '../build/types.ts';
 import type { Spec } from '../spec/types.ts';
 import { canonicalJson } from '../surface/hash.ts';
 import type { Surface } from '../surface/types.ts';
 import { FixtureError, SandboxCallError, type Sandbox } from './sandbox.ts';
 import { requireUiFormat } from '../build/format.ts';
-import { allActions, snapshotTree, type ComponentSemantics, type Snapshot, type SnapshotAction, type SnapshotInput } from './snapshot.ts';
+import { allActions, type Snapshot, type SnapshotAction, type SnapshotInput } from './snapshot.ts';
 
 export interface VerifyOptions {
 	build: Build;
 	spec: Spec;
 	surface: Surface;
 	sandbox: Sandbox;
-	semantics: ComponentSemantics;
 	/**
 	 * Host permission check from the scopes the user can use, the same
 	 * function the host's renderer uses (with per-object refinement).
@@ -25,14 +21,11 @@ export interface VerifyOptions {
 	/** The grant to simulate. Default: the permissions the spec requests. */
 	grant?: string[];
 	/**
-	 * Reads the build's UI into a snapshot instead of walking `build.tree`
-	 * (or, for a build without a tree, asking its registered UI format).
-	 * `entered` is what the viewer typed so far: input group, then input id,
-	 * as the snapshot's `inputs` name them.
+	 * Reads the build's UI into a snapshot instead of asking its registered
+	 * UI format. `entered` is what the viewer typed so far: input group,
+	 * then input id, as the snapshot's `inputs` name them.
 	 */
 	snapshot?(build: Build, ctx: EvalContext, entered: Record<string, Record<string, unknown>>): Snapshot;
-	/** Starts the host's sandbox for a build with code. Required to verify such builds. */
-	loadFunctions?(code: BuildCode, limits: NonNullable<Surface['functions']>['limits']): Promise<FunctionRunner>;
 }
 
 export interface CheckResult {
@@ -58,9 +51,7 @@ export interface Verification {
 interface Instance {
 	slot: Record<string, unknown>;
 	data: Record<string, unknown>;
-	/** Widget states by node path; a widget without one is in its initial state. */
-	widgets: Record<string, unknown>;
-	/** What the viewer entered in widgets' inputs: widget path, then input id. */
+	/** What the viewer entered (and what local events set): input group, then id. */
 	entered: Record<string, Record<string, unknown>>;
 	snapshot: Snapshot;
 }
@@ -77,30 +68,9 @@ interface Instance {
 export async function verifyBuild(options: VerifyOptions): Promise<Verification> {
 	const { build, spec } = options;
 	const results: CheckResult[] = [];
-	let functions: FunctionRunner | undefined;
-	let unavailable: string | undefined;
-	if (build.code) {
-		if (!options.surface.functions) {
-			unavailable = `${options.surface.host} does not run build functions.`;
-		} else if (!options.loadFunctions) {
-			unavailable = 'The build has code, and this verifier has no sandbox to run it.';
-		} else {
-			try {
-				functions = await options.loadFunctions(build.code, options.surface.functions.limits);
-			} catch (error) {
-				unavailable = `The build's code does not load: ${describeError(error)}.`;
-			}
-		}
-	}
-	try {
-		if (!unavailable) {
-			await options.sandbox.prepare?.(options.surface);
-		}
-		for (const [index, check] of build.checks.entries()) {
-			results.push(unavailable ? { criterion: check.criterion, check: index, passed: false, failures: [unavailable] } : await runCheck(options, check, index, functions));
-		}
-	} finally {
-		functions?.dispose?.();
+	await options.sandbox.prepare?.(options.surface);
+	for (const [index, check] of build.checks.entries()) {
+		results.push(await runCheck(options, check, index));
 	}
 	const checked = new Set(build.checks.map((c) => c.criterion));
 	const unchecked = spec.criteria.map((c) => c.id).filter((id) => !checked.has(id));
@@ -114,8 +84,8 @@ export async function verifyBuild(options: VerifyOptions): Promise<Verification>
 	};
 }
 
-async function runCheck(options: VerifyOptions, check: Check, index: number, functions?: FunctionRunner): Promise<CheckResult> {
-	const { build, spec, sandbox, semantics } = options;
+async function runCheck(options: VerifyOptions, check: Check, index: number): Promise<CheckResult> {
+	const { build, spec, sandbox } = options;
 	const failures: string[] = [];
 	const result = (): CheckResult => ({ criterion: check.criterion, check: index, passed: failures.length === 0, failures });
 
@@ -142,22 +112,6 @@ async function runCheck(options: VerifyOptions, check: Check, index: number, fun
 	const can = options.createCan(await sandbox.scopes(viewer, permissions));
 	// The check's clock: now, or later than the fixtures by `clock.advanceDays`.
 	const now = Date.now() + (check.clock?.advanceDays ?? 0) * 24 * 60 * 60 * 1000;
-	// Functions run synchronously here; a failed call shows as null, as in the host, and fails the check.
-	const fn = functions
-		? (name: string, args: unknown[]): unknown => {
-				try {
-					// Code sees the check's clock, like $daysSince.
-					return functions.call(name, args, now);
-				} catch (error) {
-					const failure = `Function "${name}" failed: ${describeError(error)}.`;
-					if (!failures.includes(failure)) {
-						failures.push(failure);
-					}
-					return null;
-				}
-			}
-		: undefined;
-
 	const call = async (capability: string, input: unknown): Promise<unknown> => {
 		// The gateway's checks, as the host runtime applies them.
 		const declared = options.surface.capabilities[capability];
@@ -178,7 +132,7 @@ async function runCheck(options: VerifyOptions, check: Check, index: number, fun
 				continue;
 			}
 			try {
-				next[name] = await call(source.call, evaluate(source.input, { data: {}, slot, can, now, fn }) ?? null);
+				next[name] = await call(source.call, evaluate(source.input, { data: {}, slot, can, now }) ?? null);
 			} catch (error) {
 				delete next[name];
 				failures.push(`Loading "${name}" failed: ${describeError(error)}.`);
@@ -187,26 +141,9 @@ async function runCheck(options: VerifyOptions, check: Check, index: number, fun
 		return next;
 	};
 
-	const widgetLimits = options.surface.functions?.widgets;
 	const snap = (instance: Omit<Instance, 'snapshot'>): Instance => {
-		const ctx = { data: instance.data, slot: instance.slot, can, now, fn };
-		const snapshot = options.snapshot
-			? options.snapshot(build, ctx, instance.entered)
-			: !build.tree
-				? requireUiFormat(build).snapshot(build, ctx, instance.entered)
-				: snapshotTree(
-				build.tree,
-				{ data: instance.data, slot: instance.slot, can, now, fn },
-				semantics,
-				widgetLimits
-					? {
-							limits: widgetLimits,
-							state: (path) => (Object.hasOwn(instance.widgets, path) ? { has: true, value: instance.widgets[path] } : { has: false }),
-							validate: (tree) => validateWidgetTree(tree, options.surface),
-							entered: (path) => instance.entered[path] ?? {},
-						}
-					: undefined,
-			);
+		const ctx = { data: instance.data, slot: instance.slot, can, now };
+		const snapshot = options.snapshot ? options.snapshot(build, ctx, instance.entered) : requireUiFormat(build).snapshot(build, ctx, instance.entered);
 		for (const problem of snapshot.problems ?? []) {
 			if (!failures.includes(problem)) {
 				failures.push(problem);
@@ -227,7 +164,7 @@ async function runCheck(options: VerifyOptions, check: Check, index: number, fun
 		const instances: Instance[] = [];
 		const { slot: slotId, ...mountOptions } = build.mount;
 		for (const slot of await sandbox.slotInstances(viewer, slotId, mountOptions)) {
-			instances.push(snap({ slot, data: await loadData(slot), widgets: {}, entered: {} }));
+			instances.push(snap({ slot, data: await loadData(slot), entered: {} }));
 		}
 		return instances;
 	};
@@ -236,21 +173,15 @@ async function runCheck(options: VerifyOptions, check: Check, index: number, fun
 
 	for (const [i, step] of (check.steps ?? []).entries()) {
 		if ('fill' in step) {
-			// Typing into an input: it now shows the value, and its change event (if any) updates the widget.
+			// Typing into an input: it now shows the value.
 			const target = findInput(view, step.fill, step.row);
 			if (!target) {
 				failures.push(`Step ${i + 1}: no "${step.fill}" input${step.row ? ` for ${describeMatcher(step.row)}` : ''}.`);
 				return result();
 			}
 			const { instance, input } = target;
-			const entered = { ...instance.entered, [input.widget]: { ...instance.entered[input.widget], [input.id]: step.value } };
-			let widgets = instance.widgets;
-			const drawn = instance.snapshot.widgets?.[input.widget];
-			const event = drawn?.inputs[input.id] ? inputEvent(drawn.inputs[input.id]!, step.value) : undefined;
-			if (drawn && event && drawn.props.update && fn) {
-				widgets = { ...widgets, [input.widget]: fn(drawn.props.update, updateArgs(drawn.props, drawn.state, event)) };
-			}
-			view = view.map((item) => (item === instance ? snap({ slot: item.slot, data: item.data, widgets, entered }) : item));
+			const entered = { ...instance.entered, [input.group]: { ...instance.entered[input.group], [input.id]: step.value } };
+			view = view.map((item) => (item === instance ? snap({ slot: item.slot, data: item.data, entered }) : item));
 			continue;
 		}
 		const found = findAction(view, step.action, step.row);
@@ -259,25 +190,12 @@ async function runCheck(options: VerifyOptions, check: Check, index: number, fun
 			return result();
 		}
 		const { instance, action } = found;
-		if (action.event && (options.snapshot || !build.tree) && !instance.snapshot.widgets?.[action.event.widget]) {
-			// A local action in a custom snapshot's UI: what it sets is kept with what the viewer
-			// entered (latest last), and the snapshot draws it.
-			const { widget, name, payload } = action.event;
-			const { [name]: _previous, ...group } = instance.entered[widget] ?? {};
-			const entered = { ...instance.entered, [widget]: { ...group, [name]: payload } };
-			view = view.map((item) => (item === instance ? snap({ slot: item.slot, data: item.data, widgets: item.widgets, entered }) : item));
-			continue;
-		}
 		if (action.event) {
-			// A widget's button: its update function computes the widget's next state.
-			const drawn = instance.snapshot.widgets?.[action.event.widget];
-			if (!drawn?.props.update || !fn) {
-				failures.push(`Step ${i + 1}: "${step.action}" does nothing.`);
-				return result();
-			}
-			const next = fn(drawn.props.update, updateArgs(drawn.props, drawn.state, { $event: action.event.name, payload: action.event.payload }));
-			const widgets = { ...instance.widgets, [action.event.widget]: next };
-			view = view.map((item) => (item === instance ? snap({ slot: item.slot, data: item.data, widgets, entered: item.entered }) : item));
+			// A local action: what it sets is kept with what the viewer entered (latest last), and the snapshot draws it.
+			const { group, name, payload } = action.event;
+			const { [name]: _previous, ...rest } = instance.entered[group] ?? {};
+			const entered = { ...instance.entered, [group]: { ...rest, [name]: payload } };
+			view = view.map((item) => (item === instance ? snap({ slot: item.slot, data: item.data, entered }) : item));
 			continue;
 		}
 		if (!isAction(action.action)) {
@@ -302,7 +220,7 @@ async function runCheck(options: VerifyOptions, check: Check, index: number, fun
 				reload = true;
 			}
 		}
-		view = reload ? await render() : view.map((item) => (item === instance ? snap({ slot: item.slot, data, widgets: item.widgets, entered: item.entered }) : item));
+		view = reload ? await render() : view.map((item) => (item === instance ? snap({ slot: item.slot, data, entered: item.entered }) : item));
 	}
 
 	const merged: Snapshot = {

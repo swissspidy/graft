@@ -2,25 +2,14 @@
 export interface DataRef {
 	$data: string;
 }
-/** `{ $field: "author.name" }`: a path into the current row. */
-export interface FieldRef {
-	$field: string;
-}
 /** `{ $slot: "post.id" }`: a path into the props the slot provides. */
 export interface SlotRef {
 	$slot: string;
 }
-/** `{ $can: "posts.status:write", on }`: whether the viewer may use a scope, optionally on an object (default: the current row). */
+/** `{ $can: "posts.status:write", on }`: whether the viewer may use a scope, optionally on an object. */
 export interface CanExpr {
 	$can: string;
 	on?: Value;
-}
-/** `{ $call: "posts.update_status", input, then, notice }`: a capability call run on interaction. */
-export interface CallExpr {
-	$call: string;
-	input?: Value;
-	then?: string[];
-	notice?: string;
 }
 
 /** `{ $eq: [a, b] }`: strict JSON equality. */
@@ -49,39 +38,14 @@ export interface DaysSinceExpr {
 	$daysSince: Value;
 }
 
-/**
- * `{ $input: "title" }`: what the viewer sees in one of a widget's input
- * components, by its id. Only in a widget's declared actions, so an action
- * sends what is on screen, never a value the code keeps out of sight.
- */
-export interface InputRef {
-	$input: string;
-}
-
-export type Binding = DataRef | FieldRef | SlotRef;
+export type Binding = DataRef | SlotRef;
 export type Logic = EqExpr | AndExpr | OrExpr | NotExpr | CompareExpr;
-/** Expressions whose value is computed at render time from other values. */
-/**
- * A call to one of the build's own pure functions (see Build.code). It only
- * computes a value to show: code reads nothing and invokes nothing, and
- * what it returns is inert data.
- */
-export interface FnExpr {
-	$fn: string;
-	args?: Value[];
-}
-
-export type Computed = IfExpr | DaysSinceExpr | CompareExpr | FnExpr;
-export type Expression = Binding | InputRef | CanExpr | CallExpr | Logic | Computed;
+/** Expressions whose value is computed from other values. */
+export type Computed = IfExpr | DaysSinceExpr | CompareExpr;
+/** What a data source's input may compute from: the slot's props, the viewer's permissions, the clock. */
+export type Expression = Binding | CanExpr | Logic | Computed;
 
 export type Value = null | string | number | boolean | Value[] | Expression | { [key: string]: Value };
-
-export interface TreeNode {
-	type: string;
-	key?: string;
-	props?: Record<string, Value>;
-	children?: string | TreeNode[];
-}
 
 export interface DataSource {
 	call: string;
@@ -107,19 +71,13 @@ export interface Check {
 
 export interface Refs {
 	slot: string;
-	/** Component name to the sorted prop names the build uses. */
-	components: Record<string, string[]>;
 	capabilities: string[];
 	scopes: string[];
-	/**
-	 * A build in another UI format: component type to the sorted properties
-	 * it uses, in that format's catalog (`ui.catalogId`). Host components
-	 * (`components`) are then empty.
-	 */
-	catalog?: Record<string, string[]>;
+	/** Component type to the sorted properties the UI uses, in its format's catalog (`ui.catalogId`). */
+	catalog: Record<string, string[]>;
 }
 
-/** What an action event of a non-tree UI does: a capability call, as a tree's `$call`. */
+/** What an action event of the UI does: a capability call. */
 export interface EventBinding {
 	call: string;
 	/** The call's input; `{"$context": "<key>"}` stands for a value of the event's context. */
@@ -129,9 +87,8 @@ export interface EventBinding {
 }
 
 /**
- * A UI in another format than Graft's tree (A2UI): the protocol, the
- * catalog it draws from, and the format's own content. A registered
- * `UiFormat` reads it.
+ * A build's UI (an A2UI surface): the protocol, the catalog it draws from,
+ * and the format's own content. A registered `UiFormat` reads it.
  */
 export interface BuildUi {
 	protocol: string;
@@ -139,29 +96,17 @@ export interface BuildUi {
 	[key: string]: unknown;
 }
 
-export interface BuildCode {
-	language: 'javascript';
-	/** A script declaring each function at top level: `function name(a, b) { ... }`. */
-	source: string;
-	/** The functions `$fn` may call, declared in `source`. */
-	functions: string[];
-}
-
 export interface Build {
 	graft: 1;
 	spec: { id: string; hash: string };
 	surface: { host: string; hostVersion?: string; hash: string };
 	mount: { slot: string; [option: string]: unknown };
-	/** The UI as a Graft tree; absent when the UI is in another format (`ui`). */
-	tree?: TreeNode;
-	/** The UI in another format, e.g. an A2UI surface, with `events` binding its actions to capabilities. */
-	ui?: BuildUi;
-	events?: Record<string, EventBinding>;
+	/** The UI, an A2UI surface, with `events` binding its action events to capabilities. */
+	ui: BuildUi;
+	events: Record<string, EventBinding>;
 	data: Record<string, DataSource>;
 	checks: Check[];
 	refs: Refs;
-	/** Pure functions for `$fn`, run in the host's sandbox. Only on surfaces with `functions`. */
-	code?: BuildCode;
 	provenance: {
 		compiler: string;
 		model?: string;
