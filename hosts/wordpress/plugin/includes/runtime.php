@@ -301,7 +301,8 @@ function register_admin_screen(): void {
 			$asset = require $asset_file;
 			wp_enqueue_script( 'graft-admin', plugins_url( 'build/admin.js', __DIR__ ), $asset['dependencies'], $asset['version'], true );
 			wp_enqueue_style( 'wp-components' );
-			$surface = current_surface();
+			$surface           = current_surface();
+			$playground_client = require dirname( __DIR__ ) . '/build/playground-client.asset.php';
 			wp_add_inline_script(
 				'graft-admin',
 				'window.graftAdmin = ' . wp_json_encode(
@@ -317,12 +318,25 @@ function register_admin_screen(): void {
 						'policy'              => admin_policy(),
 						/**
 						 * Filters whether wp-admin verifies builds in WordPress Playground
-						 * in the admin's browser (needs access to playground.wordpress.net).
+						 * in the admin's browser (needs access to the Playground URL below).
 						 * GRAFT_BROWSER_VERIFICATION overrides the default.
 						 *
 						 * @param bool $enabled Default true.
 						 */
 						'browserVerification' => (bool) apply_filters( 'graft_browser_verification', defined( 'GRAFT_BROWSER_VERIFICATION' ) ? (bool) GRAFT_BROWSER_VERIFICATION : true ),
+						'playground'          => array(
+							// Playground's client, loaded only when the screen verifies.
+							'client' => add_query_arg( 'ver', $playground_client['version'], plugins_url( 'build/playground-client.js', __DIR__ ) ),
+							/**
+							 * Filters the WordPress Playground that verifies builds in the
+							 * admin's browser: its remote.html runs the throwaway WordPress.
+							 * Point it at a self-hosted Playground to keep verification off
+							 * playground.wordpress.net.
+							 *
+							 * @param string $url Default https://playground.wordpress.net.
+							 */
+							'url'    => esc_url_raw( (string) apply_filters( 'graft_playground_url', 'https://playground.wordpress.net' ) ),
+						),
 					),
 					JSON_HEX_TAG | JSON_HEX_AMP
 				) . ';',

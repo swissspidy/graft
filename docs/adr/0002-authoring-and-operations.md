@@ -44,9 +44,11 @@ a throwaway WordPress:
   bundles) and the sandbox endpoint, and runs each candidate's checks
   there. The sandbox protocol is transport-independent
   (`protocolSandbox`): the same operations go over HTTP to a Playground
-  server from Node, or through `client.request()` in the browser. It needs
-  access to playground.wordpress.net; the `graft_browser_verification`
-  filter turns it off.
+  server from Node, or through `client.request()` in the browser.
+  Playground's client ships with the plugin; the iframe loads remote.html
+  (and with it WordPress and PHP) from playground.wordpress.net, or the
+  Playground the `graft_playground_url` filter names. The
+  `graft_browser_verification` filter turns it off.
 - **From a terminal:** `graft site verify` fetches a site's unverified
   builds over REST (application password), runs their checks in a local
   Playground sandbox and posts the verification back. This covers sites

@@ -5,7 +5,9 @@ import { build, type Plugin } from 'esbuild';
 
 /**
  * Bundles the client into the plugin: build/runtime.js renders
- * customizations, build/admin.js is the Tools → Customizations screen.
+ * customizations, build/admin.js is the Tools → Customizations screen,
+ * build/playground-client.js is WordPress Playground's client, an ES
+ * module the admin screen imports only when it verifies in the browser.
  * React and @wordpress/* come from the globals WordPress already loads;
  * everything else (renderer, core runtime) is bundled.
  */
@@ -61,14 +63,28 @@ const options = {
 	logLevel: 'info' as const,
 };
 
+// Playground's client is over 1MB: its own module, so the admin screen loads it only to verify.
+const playgroundOptions = {
+	entryPoints: { 'playground-client': fileURLToPath(new URL('../src/client/playground-client.ts', import.meta.url)) },
+	outdir: outDir,
+	bundle: true,
+	format: 'esm' as const,
+	target: 'es2020',
+	minify: !watch,
+	legalComments: 'none' as const,
+	logLevel: 'info' as const,
+};
+
 await mkdir(outDir, { recursive: true });
 // The plugin reads the shared lifecycle table at runtime.
 await copyFile(fileURLToPath(new URL('../../../../schemas/spec-lifecycle.json', import.meta.url)), `${outDir}/spec-lifecycle.json`);
 if (watch) {
 	const { context } = await import('esbuild');
 	await (await context(options)).watch();
+	await (await context(playgroundOptions)).watch();
 } else {
-	const result = await build(options);
+	const [result, playground] = await Promise.all([build(options), build({ ...playgroundOptions, metafile: true })]);
+	Object.assign(result.metafile!.outputs, playground.metafile.outputs);
 	// One asset file per entry, with the WordPress scripts that entry uses.
 	for (const [output, meta] of Object.entries(result.metafile!.outputs)) {
 		const name = output.replace(/^.*\//, '').replace(/\.js$/, '');

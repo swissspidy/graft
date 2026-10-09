@@ -6,7 +6,7 @@ import { describeCheck, verifyBuild, type Build, type Surface } from '@swissspid
 import { createCan } from '../can.ts';
 import { playgroundVersion } from '../playground-version.ts';
 import '../a2ui.ts';
-import { browserSandbox } from './browser-sandbox.ts';
+import { browserSandbox, type PlaygroundOptions } from './browser-sandbox.ts';
 import { parseSpec } from '@swissspidy/graft-core/parse';
 import { describers } from '../describe.ts';
 import { Authoring } from './authoring.tsx';
@@ -21,6 +21,8 @@ import { RecordSurface, Upgrades, type UpgradeCandidate } from './site-surface.t
 interface AdminConfig {
 	scopes: Record<string, string>;
 	browserVerification: boolean;
+	/** Where the browser sandbox's Playground client and remote.html come from. */
+	playground: PlaygroundOptions;
 	surface: (Surface & { hash: string }) | null;
 	policy: {
 		managedBy: string | null;
@@ -172,7 +174,7 @@ function App({ config }: { config: AdminConfig }) {
 
 	// Starts Playground in this browser and returns a verifier for builds on this site's surface.
 	const startVerifier = async () => {
-		const sandbox = await browserSandbox(playgroundVersion(config.surface!.hostVersion));
+		const sandbox = await browserSandbox(playgroundVersion(config.surface!.hostVersion), config.playground);
 		return (build: Build, spec: Parameters<typeof verifyBuild>[0]['spec'], grant?: string[]) =>
 			verifyBuild({
 				build,

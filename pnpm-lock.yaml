@@ -109,6 +109,9 @@ importers:
       '@wordpress/icons':
         specifier: ^17.0.0
         version: 17.0.0(@types/react-dom@19.3.0(@types/react@19.3.0))(@types/react@19.3.0)(react-dom@19.3.0(react@19.3.0))(react@19.3.0)
+      '@wp-playground/client':
+        specifier: 3.1.56
+        version: 3.1.56
       esbuild:
         specifier: ^0.28.2
         version: 0.28.2
@@ -2479,6 +2482,10 @@ packages:
   '@wordpress/warning@3.57.0':
     resolution: {integrity: sha512-QZiohW7oPbHci796qcfz6i4jw1ybNwQqCaFk7/KigCUUjXMQv8WoKVX8IdoRF8MpelDmEUoZur6O+KXWPQ0bLw==}
     engines: {node: '>=18.12.0'}
+
+  '@wp-playground/client@3.1.56':
+    resolution: {integrity: sha512-6dcADmG4VDXjxl7lfhPAxuu7ukF3xDn+eUZ03/1v8AFQqj9eOAQSCOUtsmv45wvSLzXWycSF9JM+zS5a5E3W1A==}
+    engines: {node: '>=24.18.0', npm: '>=11.16.0'}
 
   accepts@2.0.0:
     resolution: {integrity: sha512-5cvg6CtKwfgdmVqY1WIiXKc3Q1bkRqGLi+2W/6ao+6Y7gu/RCwRuAhGEzh5B4KlszSuTLgZYuqFqo5bImjNKng==}
@@ -6822,6 +6829,8 @@ snapshots:
       '@wordpress/is-shallow-equal': 5.57.0
 
   '@wordpress/warning@3.57.0': {}
+
+  '@wp-playground/client@3.1.56': {}
 
   accepts@2.0.0:
     dependencies:
