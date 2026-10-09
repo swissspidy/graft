@@ -78,9 +78,7 @@ switches between drafts and published posts.
 of components from Graft's catalog for the host (table, button, text,
 inputs, ...), bindings into data sources, and events bound to the host's
 capabilities (WordPress abilities). A trusted renderer draws it with native
-wp-admin components ([ADR 0009](docs/adr/0009-a2ui.md)). Older builds are
-trees of the host's components; they move to A2UI when they are
-regenerated. It also carries
+wp-admin components ([ADR 0009](docs/adr/0009-a2ui.md)). It also carries
 executable **checks**, one or more per acceptance criterion.
 
 **Serve.** The WordPress plugin mounts active builds in their slots. Every
@@ -171,8 +169,7 @@ pnpm graft verify --surface hosts/emdash/adapter/surfaces/1.0.json --spec exampl
 pnpm graft bundle --spec examples/agency/specs/upcoming-events.md --surface examples/agency/surface.json \
   --out upcoming-events.bundle.json examples/agency/builds/upcoming-events.json   # a verified customization as one file
 
-# Compile with Claude (ANTHROPIC_API_KEY; default claude-opus-5-5). New builds are
-# A2UI surfaces on WordPress and EmDash; --ui tree builds a tree instead.
+# Compile with Claude (ANTHROPIC_API_KEY; default claude-opus-5-5): an A2UI surface.
 pnpm graft compile examples/specs/review-queue.md \
   --surface hosts/wordpress/plugin/surfaces/7.1.json --out review-queue.build.json
 
@@ -193,11 +190,11 @@ pnpm graft site verify --site <url> --token <token>
 
 | Command | What |
 | --- | --- |
-| `pnpm typecheck`, `pnpm test` | Types and unit tests (core, renderer, sandbox, CLI, adapter) |
+| `pnpm typecheck`, `pnpm test` | Types and unit tests (core, A2UI, renderer, CLI, adapters) |
 | `pnpm test:wp` | Plugin smoke test in Playground on PHP 7.4 and 8.4: abilities, store, lifecycle, gateway, host changes, security regressions |
 | `pnpm verify:examples` | The example builds' checks in a WordPress sandbox |
 | `pnpm verify:agency` | The agency example builds' checks, in a sandbox that reproduces the client site's content model |
-| `pnpm test:compile` | The compile pipeline with a scripted model against WordPress: an A2UI build, and a tree whose code loops |
+| `pnpm test:compile` | The compile pipeline with a scripted model against WordPress: a wrong A2UI build is rejected in verification, the fix accepted |
 | `pnpm test:canary` | Eight synthetic host changes, each forcing one rung, against a five-tenant corpus |
 | `pnpm test:e2e` | Playwright in wp-admin: serving, gateway and its audit log, Dashboard widgets with local state, row actions, the publish checklist in the block editor, approval, authoring, `graft site` |
 | `pnpm test:e2e:agency` | Playwright on a client site an agency built: custom post types, fields and terms, the agency's policy and managed customization, and upgrading after the agency changes the content model |
@@ -228,11 +225,11 @@ Later decisions each have their own record:
 | [0002](docs/adr/0002-authoring-and-operations.md) | Authoring in wp-admin, operating live sites, hardening |
 | [0003](docs/adr/0003-emdash-host.md) | [EmDash](hosts/emdash/README.md) as a second host |
 | [0004](docs/adr/0004-emdash-sandbox-and-authoring.md) | Graft in EmDash's plugin sandbox, and authoring in the EmDash admin |
-| [0005](docs/adr/0005-sandboxed-functions.md) | Pure functions in QuickJS/WebAssembly where the declarative language runs out |
-| [0006](docs/adr/0006-interactive-widgets.md) | Interactive widgets that keep state, drawn with the host's components |
+| [0005](docs/adr/0005-sandboxed-functions.md) | Pure functions in QuickJS/WebAssembly where the declarative language runs out (superseded by 0009) |
+| [0006](docs/adr/0006-interactive-widgets.md) | Interactive widgets that keep state, drawn with the host's components (superseded by 0009) |
 | [0007](docs/adr/0007-editorial-tools.md) | Widgets that take input, and a panel in the block editor |
 | [0008](docs/adr/0008-agency-sites.md) | Sites an agency builds: their own content model, policy and managed customizations |
-| [0009](docs/adr/0009-a2ui.md) | A2UI surfaces as a build's UI, next to trees (proposed) |
+| [0009](docs/adr/0009-a2ui.md) | A2UI surfaces as a build's UI, replacing trees |
 
 Known limits:
 
@@ -250,10 +247,10 @@ Known limits:
 | `docs/adr` | Architecture decision records |
 | `schemas/` | JSON Schemas for spec, surface and build, and the spec lifecycle table |
 | `packages/core` | Host-agnostic, no I/O: specs, surfaces, builds, expression evaluator, verifier, compiler, upgrade ladder, canary |
-| `packages/renderer-react` | Renders a build with a host's components and capability gateway |
-| `packages/sandbox` | Runs a build's pure functions (`$fn`, widgets) in QuickJS/WebAssembly (or asm.js, `@graft/sandbox/asmjs`, where WebAssembly cannot be compiled) with time, memory and output limits; a Web Worker for pages, in-process for the verifier and EmDash |
+| `packages/a2ui` | The A2UI format on `@a2ui/web_core`: the Graft catalog, validation, refs, snapshots, migrations and the compiler's UI phase |
+| `packages/renderer-react` | Loads a build's data through the capability gateway and runs its actions; the format's renderer draws it |
 | `packages/cli` | The `graft` command |
-| `hosts/wordpress` | The WordPress adapter: plugin, components, surface generator, sandbox, tests ([README](hosts/wordpress/README.md)) |
+| `hosts/wordpress` | The WordPress adapter: plugin, A2UI client, surface generator, sandbox, tests ([README](hosts/wordpress/README.md)) |
 | `hosts/emdash` | The EmDash adapter: a native plugin that serves builds as Block Kit, surface, sandbox, test site, tests ([README](hosts/emdash/README.md)) |
 | `examples/` | Example specs and their builds, A2UI surfaces (WordPress; EmDash in `examples/emdash`; an agency-built client site in `examples/agency`) |
 | `fixtures/canary` | A multi-tenant corpus for the canary |

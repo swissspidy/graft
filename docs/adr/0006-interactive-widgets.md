@@ -1,6 +1,7 @@
 # ADR 0006: Interactive widgets drawn by sandboxed code
 
-- Status: Accepted (WordPress prototype)
+- Status: Superseded by [ADR 0009](0009-a2ui.md): A2UI's catalog functions and local state replaced
+  functions and widgets, and both were removed
 - Date: 2026-09-29
 - Builds on: [ADR 0005](0005-sandboxed-functions.md)
 

@@ -7,8 +7,7 @@ result; `agency` runs its own variant (`editorial-inbox`).
 
 Every build is an A2UI surface. `editorial-inbox` was a tree: it was
 regenerated from its spec and frozen checks (`graft compile --previous`),
-which compiles a tree in the host's format, as the upgrade ladder's
-regenerate rung does.
+in the host's format, as the upgrade ladder's regenerate rung does.
 
 Used by `pnpm test:canary`, which runs every synthetic scenario in
 `hosts/wordpress/adapter/src/canary.ts` against this corpus.
