@@ -107,7 +107,7 @@ test('administrators write a customization in the admin', async ({ page }) => {
 	// One model call per step: the checks first...
 	await expect(page.getByText('Step 1 done. Continue to take the next step.')).toBeVisible();
 	await page.getByRole('button', { name: 'Continue building' }).click();
-	// ...then the tree, which is stored as a draft until it is verified.
+	// ...then the UI, which is stored as a draft until it is verified.
 	await expect(page.getByText('"Recent drafts" is built. Verify it, then approve it.')).toBeVisible();
 	await expect(page.getByText('Built (not verified)')).toBeVisible();
 	await expect(page.getByText('Draft (not verified)')).toBeVisible();
