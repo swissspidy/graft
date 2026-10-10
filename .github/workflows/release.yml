@@ -1,24 +1,35 @@
 name: Release
 
-# Publishes the npm packages (scripts/build-packages.ts) when a GitHub
-# release is published. The release tag must be v<version>, the version
-# every published package's package.json carries. npm authenticates the
-# workflow through trusted publishing (OIDC): no token is stored, and the
-# packages get provenance.
+# Stages the npm packages (scripts/build-packages.ts) when a GitHub release
+# is published. The release tag must be v<version>, the version every
+# published package's package.json carries. npm authenticates the workflow
+# through trusted publishing (OIDC): no token is stored, and the packages get
+# provenance.
+#
+# Two jobs, so that the job that can publish (id-token: write) installs and
+# runs nothing from the dependency tree:
+# 1. pack: installs, checks, builds and packs every package.
+# 2. stage: stages those tarballs on npm. A staged version goes public only
+#    once a maintainer approves it with 2FA, on npmjs.com (Staged Packages) or
+#    with `npm stage approve <stage-id>`.
 on:
   release:
     types: [published]
 
-permissions:
-  contents: read
+permissions: {}
+
+# Queue rather than cancel: interrupting a run halfway through staging would
+# leave some packages staged and others not.
+concurrency:
+  group: ${{ github.workflow }}
+  cancel-in-progress: false
 
 jobs:
-  publish:
+  pack:
+    name: Build and pack
     runs-on: ubuntu-latest
-    environment: npm
     permissions:
       contents: read
-      id-token: write
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -27,8 +38,7 @@ jobs:
       - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
           node-version: 24
-          registry-url: https://registry.npmjs.org
-          # No dependency cache in a workflow that publishes: a poisoned cache would ship.
+          # No dependency cache: a release builds from a clean install.
           package-manager-cache: false
       - run: pnpm install --frozen-lockfile
       - run: pnpm typecheck
@@ -46,11 +56,71 @@ jobs:
               exit 1
             fi
           done
-      - name: Publish
+      # pnpm pack builds (prepack) and rewrites workspace: ranges to the
+      # versions being released. Numbered, so the stage job keeps the order:
+      # core first, a2ui depends on it.
+      - name: Pack
         run: |
-          mkdir -p "$RUNNER_TEMP/packs"
-          # core first: a2ui depends on it.
+          mkdir release
+          i=0
           for dir in packages/core packages/a2ui; do
-            (cd "$dir" && pnpm pack --pack-destination "$RUNNER_TEMP/packs/$(basename "$dir")")
-            npm publish "$RUNNER_TEMP"/packs/"$(basename "$dir")"/*.tgz --access public --provenance
+            i=$((i + 1))
+            (cd "$dir" && pnpm pack --pack-destination "$GITHUB_WORKSPACE/release/$i")
+          done
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: packages
+          path: release/
+          if-no-files-found: error
+          retention-days: 7
+
+  stage:
+    name: Stage on npm
+    needs: pack
+    runs-on: ubuntu-latest
+    environment: npm
+    # The npm packages' trusted publisher names this workflow file, and only
+    # needs to allow staged publishes.
+    permissions:
+      id-token: write # npm trusted publishing and provenance
+    steps:
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: packages
+          path: release
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: 24
+          registry-url: https://registry.npmjs.org
+          package-manager-cache: false
+      - name: Check npm's version
+        run: |
+          # Staged publishing needs npm 11.15.0 or later.
+          npm_version="$(npm --version)"
+          node -e '
+            const [a, b] = process.argv[1].split(".").map(Number);
+            if (a < 11 || (a === 11 && b < 15)) throw new Error(`npm ${process.argv[1]} cannot stage publishes (11.15.0 or later)`);
+          ' "$npm_version"
+      # Tarballs: no checkout, no install, no lifecycle scripts. A version
+      # already on npm is skipped, so a run that failed partway can be re-run.
+      # Each stage ID goes in the job summary, for approving. A staged version
+      # is not on npm yet, and this job cannot list stages (that needs a
+      # maintainer's login), so approve or reject what a failed run staged
+      # before re-running it.
+      - name: Stage
+        run: |
+          for tarball in release/*/*.tgz; do
+            manifest="$(tar -xOzf "$tarball" package/package.json)"
+            name="$(node -p 'JSON.parse(process.argv[1]).name' "$manifest")"
+            version="$(node -p 'JSON.parse(process.argv[1]).version' "$manifest")"
+            if npm view "$name@$version" version >/dev/null 2>&1; then
+              echo "$name@$version is already on npm"
+              continue
+            fi
+            # A prerelease (1.2.0-beta.1) goes to next, not latest.
+            case "$version" in *-*) tag=next ;; *) tag=latest ;; esac
+            npm stage publish "./$tarball" --access public --tag "$tag" > stage.log
+            cat stage.log
+            stage_id="$(sed -n 's/.*(staged with id \(.*\))$/\1/p' stage.log)"
+            echo "Staged $name@$version ($tag): approve it under Staged Packages on npmjs.com, or with \`npm stage approve ${stage_id:-<stage-id>}\`." >> "$GITHUB_STEP_SUMMARY"
           done
