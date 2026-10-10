@@ -4,7 +4,7 @@ name: Release
 # is published. The release tag must be v<version>, the version every
 # published package's package.json carries. npm authenticates the workflow
 # through trusted publishing (OIDC): no token is stored, and the packages get
-# provenance (publishConfig.provenance).
+# provenance.
 #
 # Two jobs, so that the job that can publish (id-token: write) installs and
 # runs nothing from the dependency tree:
@@ -117,8 +117,10 @@ jobs:
               echo "$name@$version is already on npm"
               continue
             fi
-            npm stage publish "./$tarball" --access public > stage.log
+            # A prerelease (1.2.0-beta.1) goes to next, not latest.
+            case "$version" in *-*) tag=next ;; *) tag=latest ;; esac
+            npm stage publish "./$tarball" --access public --tag "$tag" > stage.log
             cat stage.log
             stage_id="$(sed -n 's/.*(staged with id \(.*\))$/\1/p' stage.log)"
-            echo "Staged $name@$version: approve it under Staged Packages on npmjs.com, or with \`npm stage approve ${stage_id:-<stage-id>}\`." >> "$GITHUB_STEP_SUMMARY"
+            echo "Staged $name@$version ($tag): approve it under Staged Packages on npmjs.com, or with \`npm stage approve ${stage_id:-<stage-id>}\`." >> "$GITHUB_STEP_SUMMARY"
           done
