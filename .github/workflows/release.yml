@@ -1,32 +1,78 @@
 name: Release
 
-# Stages the npm packages (scripts/build-packages.ts) when a GitHub release
-# is published. The release tag must be v<version>, the version every
-# published package's package.json carries. npm authenticates the workflow
-# through trusted publishing (OIDC): no token is stored, and the packages get
-# provenance.
-#
-# Two jobs, so that the job that can publish (id-token: write) installs and
-# runs nothing from the dependency tree:
-# 1. pack: installs, checks, builds and packs every package.
-# 2. stage: stages those tarballs on npm. A staged version goes public only
-#    once a maintainer approves it with 2FA, on npmjs.com (Staged Packages) or
-#    with `npm stage approve <stage-id>`.
 on:
-  release:
-    types: [published]
+  push:
+    branches: [main]
 
 permissions: {}
 
 # Queue rather than cancel: interrupting a run halfway through staging would
 # leave some packages staged and others not.
 concurrency:
-  group: ${{ github.workflow }}
+  group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: false
 
+# Three jobs, so that the job that can publish (id-token: write) installs and
+# runs nothing from the dependency tree (see .changeset/README.md):
+# 1. version: Changesets opens or updates the "Version packages" PR. When
+#    main's packages carry versions npm does not have yet (that PR was merged),
+#    this push is a release.
+# 2. pack (a release only): installs, checks, builds and packs every package.
+# 3. publish (a release only): stages those tarballs on npm, then tags each
+#    package's version and creates its GitHub release. A staged version goes
+#    public only once a maintainer approves it with 2FA, on npmjs.com (Staged
+#    Packages) or with `npm stage approve <stage-id>`.
+
 jobs:
+  version:
+    name: Version packages
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write # push the version branch
+      pull-requests: write # open and update the "Version packages" PR
+    outputs:
+      release: ${{ steps.release.outputs.release }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: pnpm/action-setup@ea17c68df8912ef543352723c149a84f56e3d413 # v6.1.0
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: 24
+          # No cache, and no install scripts next to the token this job holds:
+          # Changesets needs neither.
+          package-manager-cache: false
+      - run: pnpm install --frozen-lockfile --ignore-scripts
+      # Before changesets/action, which leaves the checkout on its version
+      # branch with the pending changesets applied: the check has to read
+      # main's manifests, not the next versions.
+      - name: Does npm lack any package's version?
+        id: release
+        run: |
+          release=false
+          for manifest in packages/*/package.json; do
+            spec="$(node -p 'const p = require("./" + process.argv[1]); p.private ? "" : `${p.name}@${p.version}`' "$manifest")"
+            [ -z "$spec" ] && continue
+            if ! npm view "$spec" version >/dev/null 2>&1; then
+              echo "$spec is not on npm"
+              release=true
+            fi
+          done
+          echo "release=$release" >> "$GITHUB_OUTPUT"
+      - name: Create or update the "Version packages" pull request
+        uses: changesets/action@ae32849d5ba541f9ae29e40e22a623bc13562f51 # v2.1.2
+        with:
+          # No publish-script: publishing is the publish job's, below.
+          version-script: pnpm run version-packages
+          commit-message: "Version packages"
+          pr-title: "Version packages"
+
   pack:
     name: Build and pack
+    needs: version
+    if: needs.version.outputs.release == 'true'
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -38,52 +84,44 @@ jobs:
       - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
           node-version: 24
-          # No dependency cache: a release builds from a clean install.
+          # No cache: a release builds from a clean install.
           package-manager-cache: false
       - run: pnpm install --frozen-lockfile
       - run: pnpm typecheck
       - run: pnpm test
       - name: The packages install and import outside the workspace
         run: pnpm test:packages
-      - name: The release tag matches the packages' version
-        env:
-          TAG: ${{ github.event.release.tag_name }}
-        run: |
-          for dir in packages/core packages/a2ui; do
-            version="v$(node -p "require('./$dir/package.json').version")"
-            if [ "$version" != "$TAG" ]; then
-              echo "::error::$dir is $version, the release is $TAG"
-              exit 1
-            fi
-          done
       # pnpm pack builds (prepack) and rewrites workspace: ranges to the
-      # versions being released. Numbered, so the stage job keeps the order:
-      # core first, a2ui depends on it.
+      # versions being released.
       - name: Pack
         run: |
           mkdir release
-          i=0
-          for dir in packages/core packages/a2ui; do
-            i=$((i + 1))
-            (cd "$dir" && pnpm pack --pack-destination "$GITHUB_WORKSPACE/release/$i")
+          for manifest in packages/*/package.json; do
+            if [ "$(node -p 'require("./" + process.argv[1]).private === true' "$manifest")" = true ]; then continue; fi
+            (cd "$(dirname "$manifest")" && pnpm pack --pack-destination "$GITHUB_WORKSPACE/release")
           done
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: packages
-          path: release/
+          path: release/*.tgz
           if-no-files-found: error
           retention-days: 7
 
-  stage:
+  publish:
     name: Stage on npm
     needs: pack
     runs-on: ubuntu-latest
     environment: npm
-    # The npm packages' trusted publisher names this workflow file, and only
-    # needs to allow staged publishes.
+    # The npm packages' trusted publisher names this workflow file and the npm
+    # environment, and only needs to allow staged publishes.
     permissions:
+      contents: write # each version's tag and GitHub release
       id-token: write # npm trusted publishing and provenance
     steps:
+      # For the CHANGELOG.md files only: nothing from the checkout is installed or run.
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
       - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:
           name: packages
@@ -101,26 +139,38 @@ jobs:
             const [a, b] = process.argv[1].split(".").map(Number);
             if (a < 11 || (a === 11 && b < 15)) throw new Error(`npm ${process.argv[1]} cannot stage publishes (11.15.0 or later)`);
           ' "$npm_version"
-      # Tarballs: no checkout, no install, no lifecycle scripts. A version
-      # already on npm is skipped, so a run that failed partway can be re-run.
-      # Each stage ID goes in the job summary, for approving. A staged version
-      # is not on npm yet, and this job cannot list stages (that needs a
-      # maintainer's login), so approve or reject what a failed run staged
-      # before re-running it.
-      - name: Stage
+      # Tarballs: no install, no lifecycle scripts. Trusted publishing adds
+      # provenance. A version already on npm is skipped, and an existing tag
+      # too, so a run that failed partway can be re-run. Each stage ID goes in
+      # the job summary, for approving. A staged version is not on npm yet, and
+      # this job cannot list stages (that needs a maintainer's login), so
+      # approve or reject what a failed run staged before re-running it.
+      - name: Stage, tag and create GitHub releases
+        env:
+          GH_TOKEN: ${{ github.token }}
         run: |
-          for tarball in release/*/*.tgz; do
+          for tarball in release/*.tgz; do
             manifest="$(tar -xOzf "$tarball" package/package.json)"
             name="$(node -p 'JSON.parse(process.argv[1]).name' "$manifest")"
             version="$(node -p 'JSON.parse(process.argv[1]).version' "$manifest")"
             if npm view "$name@$version" version >/dev/null 2>&1; then
               echo "$name@$version is already on npm"
+            else
+              # A prerelease (1.2.0-beta.1) goes to next, not latest.
+              case "$version" in *-*) tag=next ;; *) tag=latest ;; esac
+              npm stage publish "./$tarball" --access public --tag "$tag" > stage.log
+              cat stage.log
+              stage_id="$(sed -n 's/.*(staged with id \(.*\))$/\1/p' stage.log)"
+              echo "Staged $name@$version ($tag): approve it under Staged Packages on npmjs.com, or with \`npm stage approve ${stage_id:-<stage-id>}\`." >> "$GITHUB_STEP_SUMMARY"
+            fi
+            release_tag="$name@$version"
+            if git ls-remote --exit-code --tags origin "refs/tags/$release_tag" >/dev/null; then
+              echo "$release_tag is already tagged"
               continue
             fi
-            # A prerelease (1.2.0-beta.1) goes to next, not latest.
-            case "$version" in *-*) tag=next ;; *) tag=latest ;; esac
-            npm stage publish "./$tarball" --access public --tag "$tag" > stage.log
-            cat stage.log
-            stage_id="$(sed -n 's/.*(staged with id \(.*\))$/\1/p' stage.log)"
-            echo "Staged $name@$version ($tag): approve it under Staged Packages on npmjs.com, or with \`npm stage approve ${stage_id:-<stage-id>}\`." >> "$GITHUB_STEP_SUMMARY"
+            # The version's section of the package's CHANGELOG.md, or GitHub's generated notes.
+            dir="$(dirname "$(grep -l "\"name\": \"$name\"" packages/*/package.json)")"
+            awk -v v="$version" '$0 == "## " v { on = 1; next } on && /^## / { exit } on' "$dir/CHANGELOG.md" 2>/dev/null > notes.md || true
+            if [ -s notes.md ]; then notes=(--notes-file notes.md); else notes=(--generate-notes); fi
+            gh release create "$release_tag" --repo "$GITHUB_REPOSITORY" --target "$GITHUB_SHA" --title "$release_tag" "${notes[@]}"
           done

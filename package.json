@@ -38,6 +38,7 @@
     "test:emdash:sandboxed": "pnpm build:emdash && tsx hosts/emdash/adapter/src/node/smoke.ts --format sandboxed",
     "test:author:emdash": "pnpm build:emdash && tsx hosts/emdash/adapter/src/node/author-test.ts --format native && tsx hosts/emdash/adapter/src/node/author-test.ts --format sandboxed",
     "build:packages": "tsx scripts/build-packages.ts",
+    "version-packages": "changeset version && pnpm install --lockfile-only",
     "test:packages": "tsx scripts/test-packages.ts"
   },
   "pnpm": {
@@ -47,6 +48,8 @@
     ]
   },
   "devDependencies": {
+    "@changesets/changelog-github": "^1.0.1",
+    "@changesets/cli": "^3.0.3",
     "@playwright/test": "1.63.0",
     "@types/node": "^26.6.3",
     "esbuild": "^0.28.2",
