@@ -264,15 +264,14 @@ TypeScript sources; `pnpm build:packages` bundles each into `dist/` (ES
 modules and type declarations), which is what `publishConfig.exports`
 points the published packages at. The other packages stay private.
 
-To release, set the same `version` in both package.json files, merge, and
-publish a GitHub release tagged `v<version>`: the release workflow runs the
-tests, checks the tag against the versions and stages both on npm with
-provenance, authenticated by npm trusted publishing. A staged version goes
-public once a maintainer approves it with 2FA, under Staged Packages on
-npmjs.com or with `npm stage approve <stage-id>` (the run's summary lists
-the IDs). The first release of
-a new package is published by hand (`pnpm -r --filter "./packages/{core,a2ui}" publish --access public`),
-since npm configures trusted publishing per existing package.
+Releases use [changesets](.changeset/README.md): add one to a pull request
+that changes a published package (`pnpm changeset`; the two packages share
+a version, so one changeset covers both). On `main`, the release workflow
+opens a "Version packages" pull request; merging it stages the new versions
+on npm with provenance, authenticated by npm trusted publishing, and tags
+and creates their GitHub releases. A staged version goes public once a
+maintainer approves it with 2FA, under Staged Packages on npmjs.com or with
+`npm stage approve <stage-id>` (the run's summary lists the IDs).
 
 ## License
 
