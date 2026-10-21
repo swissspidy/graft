@@ -87,7 +87,7 @@ to sign in. Other roles: `role=20` contributor, `30` author, `50` admin.
 ## Commands
 
 ```sh
-pnpm surface:emdash [--check]   # regenerate or check surfaces/1.0.json
+pnpm surface:emdash [--check]   # regenerate or check surfaces/1.3.json
 pnpm verify:emdash              # verify examples/emdash builds in an EmDash sandbox
 pnpm test:emdash                # plugin smoke test
 pnpm test:emdash:sandboxed      # the same, with the plugin in EmDash's sandbox (workerd)
@@ -97,8 +97,8 @@ pnpm manifest:emdash [--check]  # regenerate or check emdash-plugin.jsonc
 pnpm test:compile:emdash        # compile pipeline with a scripted model
 pnpm test:canary:emdash         # synthetic EmDash changes against fixtures/canary/emdash
 pnpm test:site:emdash           # graft site against a live EmDash
-pnpm graft canary --corpus fixtures/canary/emdash --from hosts/emdash/adapter/surfaces/1.0.json --scenario move-editor-panel
+pnpm graft canary --corpus fixtures/canary/emdash --from hosts/emdash/adapter/surfaces/1.3.json --scenario move-editor-panel
 pnpm test:e2e:emdash            # Playwright in the EmDash admin
-pnpm graft verify --surface hosts/emdash/adapter/surfaces/1.0.json --spec examples/emdash/specs examples/emdash/builds/*.json
-pnpm graft compile examples/emdash/specs/publish-queue.md --surface hosts/emdash/adapter/surfaces/1.0.json --out publish-queue.build.json
+pnpm graft verify --surface hosts/emdash/adapter/surfaces/1.3.json --spec examples/emdash/specs examples/emdash/builds/*.json
+pnpm graft compile examples/emdash/specs/publish-queue.md --surface hosts/emdash/adapter/surfaces/1.3.json --out publish-queue.build.json
 ```

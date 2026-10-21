@@ -9,11 +9,11 @@
     "graft": "./bin/graft.js"
   },
   "dependencies": {
-    "@anthropic-ai/sdk": "^0.129.0",
-    "@swissspidy/graft-core": "workspace:*",
+    "@anthropic-ai/sdk": "^0.137.0",
     "@graft/chrome-extension": "workspace:*",
     "@graft/emdash": "workspace:*",
     "@graft/wordpress-adapter": "workspace:*",
-    "tsx": "^4.20.0"
+    "@swissspidy/graft-core": "workspace:*",
+    "tsx": "^4.23.15"
   }
 }

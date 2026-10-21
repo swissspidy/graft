@@ -5,7 +5,7 @@ import { hostSurface } from '../src/host/surface.ts';
 
 describe('the EmDash surface', () => {
 	it('is valid and matches the committed snapshot', async () => {
-		const committed = JSON.parse(await readFile(new URL('../surfaces/1.0.json', import.meta.url), 'utf8'));
+		const committed = JSON.parse(await readFile(new URL('../surfaces/1.3.json', import.meta.url), 'utf8'));
 		const surface = hostSurface(committed.hostVersion);
 		expect((await validateSurface(surface)).ok).toBe(true);
 		expect(await hashSurface(surface)).toBe(committed.hash);

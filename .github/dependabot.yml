@@ -14,9 +14,20 @@ updates:
       # a dependency joins the first group it matches.
       react:
         patterns: [react, react-dom, '@types/react', '@types/react-dom']
+      # graft-a2ui builds the catalog the WordPress renderer (@swissspidy/a2ui-wp)
+      # draws with, so both must resolve to the same @a2ui/web_core: a second
+      # copy breaks the Catalog and DataContext types. a2ui-wp pins a 0.x minor
+      # (^0.12.0), so web_core moves only after an a2ui-wp release that allows it.
+      a2ui:
+        patterns: ['@a2ui/*', '@swissspidy/a2ui-wp']
       # Minor and patch updates in one PR; majors stay separate.
       npm-minor-and-patch:
         update-types: [minor, patch]
+    ignore:
+      # Component and function schemas are handed to @a2ui/web_core, which is on
+      # zod 3; zod 4 schemas don't fit its types. Lift this once web_core moves.
+      - dependency-name: zod
+        update-types: ['version-update:semver-major']
     open-pull-requests-limit: 10
 
   - package-ecosystem: github-actions

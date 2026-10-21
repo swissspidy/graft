@@ -15,8 +15,8 @@
     "@swissspidy/graft-core": "workspace:*"
   },
   "devDependencies": {
-    "@playwright/test": "1.63.0",
-    "@types/chrome": "0.3.4",
+    "@playwright/test": "1.64.1",
+    "@types/chrome": "0.3.6",
     "esbuild": "^0.28.2"
   }
 }
