@@ -118,7 +118,7 @@
 										"value": {
 											"path": "/form/title"
 										},
-										"pattern": "^[^a-z]*[A-Z][^a-z]*$"
+										"pattern": "^[^a-zA-Z]*[A-Z][^a-z]*$"
 									}
 								}
 							}
@@ -295,7 +295,7 @@
 										"value": {
 											"path": "/form/title"
 										},
-										"pattern": "^[^a-z]*[A-Z][^a-z]*$"
+										"pattern": "^[^a-zA-Z]*[A-Z][^a-z]*$"
 									}
 								}
 							}
