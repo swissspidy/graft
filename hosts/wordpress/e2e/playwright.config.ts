@@ -18,7 +18,8 @@ export default defineConfig({
 		command: 'pnpm build && tsx hosts/wordpress/e2e/server.ts',
 		cwd: '../../..',
 		url: 'http://127.0.0.1:9400/wp-login.php',
-		timeout: 300_000,
+		// The server verifies every example build in a sandbox before WordPress starts.
+		timeout: 600_000,
 		reuseExistingServer: !process.env.CI,
 		stdout: 'pipe',
 	},
