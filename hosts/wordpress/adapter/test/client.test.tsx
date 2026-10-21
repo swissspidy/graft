@@ -18,6 +18,13 @@ describe('createCan', () => {
 		expect(can('posts.status:write', { id: 1 })).toBe(true);
 		expect(createCan({})('posts.status:write', { can: { publish: true } })).toBe(false);
 	});
+
+	it('refines the review scope with the post\'s edit flag', () => {
+		const contributor = createCan({ 'posts.review:write': true });
+		expect(contributor('posts.review:write', { id: 1, can: { publish: false, edit: true } })).toBe(true);
+		expect(contributor('posts.review:write', { id: 1, can: { publish: false, edit: false } })).toBe(false);
+		expect(contributor('posts.status:write', { id: 1, can: { publish: false, edit: true } })).toBe(false);
+	});
 });
 
 describe('formatValue', () => {

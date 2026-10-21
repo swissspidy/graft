@@ -170,6 +170,8 @@ async function runCheck(options: VerifyOptions, check: Check, index: number): Pr
 	};
 
 	let view = await render();
+	// Direct calls: whether each was refused, by action id and row.
+	const direct: Array<{ id: string; row: unknown; refused?: string }> = [];
 
 	for (const [i, step] of (check.steps ?? []).entries()) {
 		if ('fill' in step) {
@@ -184,12 +186,16 @@ async function runCheck(options: VerifyOptions, check: Check, index: number): Pr
 			view = view.map((item) => (item === instance ? snap({ slot: item.slot, data: item.data, entered }) : item));
 			continue;
 		}
-		const found = findAction(view, step.action, step.row);
+		const found = findAction(view, step.action, step.row, step.direct === true);
 		if (!found) {
-			failures.push(`Step ${i + 1}: no available "${step.action}" action${step.row ? ` for ${describeMatcher(step.row)}` : ''}.`);
+			failures.push(`Step ${i + 1}: no ${step.direct ? '' : 'available '}"${step.action}" action${step.row ? ` for ${describeMatcher(step.row)}` : ''}.`);
 			return result();
 		}
 		const { instance, action } = found;
+		if (step.direct && !isAction(action.action)) {
+			failures.push(`Step ${i + 1}: "${step.action}" calls no capability, so it cannot be called directly.`);
+			return result();
+		}
 		if (action.event) {
 			// A local action: what it sets is kept with what the viewer entered (latest last), and the snapshot draws it.
 			const { group, name, payload } = action.event;
@@ -204,9 +210,17 @@ async function runCheck(options: VerifyOptions, check: Check, index: number): Pr
 		}
 		try {
 			await call(action.action.capability, action.action.input ?? null);
+			if (step.direct) {
+				direct.push({ id: step.action, row: action.row });
+			}
 		} catch (error) {
-			failures.push(`Step ${i + 1}: "${step.action}" was refused: ${describeError(error)}.`);
-			return result();
+			if (!step.direct) {
+				failures.push(`Step ${i + 1}: "${step.action}" was refused: ${describeError(error)}.`);
+				return result();
+			}
+			// Refused: nothing changed, so nothing to refresh.
+			direct.push({ id: step.action, row: action.row, refused: describeError(error) });
+			continue;
 		}
 		let reload = false;
 		let data = instance.data;
@@ -230,7 +244,7 @@ async function runCheck(options: VerifyOptions, check: Check, index: number): Pr
 		inputs: view.flatMap((i) => i.snapshot.inputs ?? []),
 	};
 	for (const expectation of check.expect) {
-		const failure = await evaluateExpectation(expectation, merged, sandbox);
+		const failure = 'refused' in expectation ? refusedFailure(expectation, direct) : await evaluateExpectation(expectation, merged, sandbox);
 		if (failure) {
 			failures.push(failure);
 		}
@@ -249,10 +263,23 @@ function findInput(view: Instance[], id: string, matcher?: Record<string, unknow
 	return undefined;
 }
 
-function findAction(view: Instance[], id: string, matcher?: Record<string, unknown>): { instance: Instance; action: SnapshotAction } | undefined {
+/** {"refused": "<action id>", "row": {...}}: a direct call of that action (for that row) was refused. */
+function refusedFailure(expectation: Record<string, unknown>, direct: Array<{ id: string; row: unknown; refused?: string }>): string | undefined {
+	const id = String(expectation.refused);
+	const matcher = expectation.row as Record<string, unknown> | undefined;
+	const calls = direct.filter((call) => call.id === id && (!matcher || matchesRecord(matcher, call.row)));
+	const where = `"${id}"${matcher ? ` for ${describeMatcher(matcher)}` : ''}`;
+	if (calls.length === 0) {
+		return `Expected a direct call of ${where} to be refused, but the check makes none (a step {"action": "${id}", "direct": true}).`;
+	}
+	return calls.every((call) => call.refused !== undefined) ? undefined : `Expected a direct call of ${where} to be refused, but it went through.`;
+}
+
+/** An action by id (and row): one the viewer can use, or with `direct`, any that calls a capability. */
+function findAction(view: Instance[], id: string, matcher?: Record<string, unknown>, direct = false): { instance: Instance; action: SnapshotAction } | undefined {
 	for (const instance of view) {
 		for (const action of allActions(instance.snapshot)) {
-			if (action.id === id && action.available && (!matcher || matchesRecord(matcher, action.row))) {
+			if (action.id === id && (action.available || direct) && (!matcher || matchesRecord(matcher, action.row))) {
 				return { instance, action };
 			}
 		}

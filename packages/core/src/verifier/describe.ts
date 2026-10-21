@@ -39,7 +39,13 @@ export function describeCheck(check: Check, describers: CheckDescribers = {}): s
 	const later = check.clock?.advanceDays ? ` ${check.clock.advanceDays} day${check.clock.advanceDays === 1 ? '' : 's'} later` : '';
 	parts.push(`${parts.length ? 'when' : 'When'} ${check.view_as ? `"${check.view_as}"` : 'the viewer'} opens it${later}`);
 	for (const step of check.steps ?? []) {
-		parts.push('fill' in step ? `and types ${quote(step.value)} into "${step.fill}"${row(step.row)}` : `and uses "${step.action}"${row(step.row)}`);
+		parts.push(
+			'fill' in step
+				? `and types ${quote(step.value)} into "${step.fill}"${row(step.row)}`
+				: step.direct
+					? `and calls "${step.action}"${row(step.row)} directly, without the button`
+					: `and uses "${step.action}"${row(step.row)}`,
+		);
 	}
 	const outcomes = check.expect.map((e) => {
 		if ('rows' in e) {
@@ -59,6 +65,9 @@ export function describeCheck(check: Check, describers: CheckDescribers = {}): s
 		}
 		if ('input' in e) {
 			return `the "${String(e.input)}" field${row(e.row as Record<string, unknown> | undefined)} shows ${quote(e.value)}`;
+		}
+		if ('refused' in e) {
+			return `calling "${String(e.refused)}"${row(e.row)} is refused`;
 		}
 		if ('action' in e) {
 			return `"${String(e.action)}"${row(e.row)} is ${e.available === false ? 'not available' : 'available'}`;

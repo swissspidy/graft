@@ -1,5 +1,5 @@
 import { useEffect, useMemo } from 'react';
-import { createGraftCatalog, seed, tableField, withContext, type A2UIBuild } from '@swissspidy/graft-a2ui/client';
+import { BOARD_COMPONENT, createGraftCatalog, seed, tableField, withContext, type A2UIBuild } from '@swissspidy/graft-a2ui/client';
 import {
 	A2UIProcessor,
 	A2UIRenderer,
@@ -16,6 +16,7 @@ import {
 } from '@swissspidy/a2ui-wp';
 import type { UiRootProps } from '@graft/renderer-react';
 import type { Field } from '../cells.ts';
+import { Board } from './board.tsx';
 import { Table as GraftTable } from './table.tsx';
 
 /**
@@ -117,7 +118,7 @@ const withVisible = (catalog: ComponentCatalog): ComponentCatalog =>
 		]),
 	);
 
-const catalog = withVisible(createCatalog({ ...wordPressCatalog, Button, Table }));
+export const catalog = withVisible(createCatalog({ ...wordPressCatalog, Button, Table, Board }));
 
 /**
  * The A2UI processor for one mounted build, on the Graft catalog for this
@@ -125,7 +126,7 @@ const catalog = withVisible(createCatalog({ ...wordPressCatalog, Button, Table }
  * every change of the model.
  */
 export function createProcessor(build: A2UIBuild, slot: Record<string, unknown>, can: UiRootProps['can']): A2UIProcessor {
-	const processor = new A2UIProcessor({ locale: 'en-US', catalogs: [createGraftCatalog({ id: build.ui.catalogId, can, now: new Date() })] });
+	const processor = new A2UIProcessor({ locale: 'en-US', catalogs: [createGraftCatalog({ id: build.ui.catalogId, components: [BOARD_COMPONENT], can, now: new Date() })] });
 	processor.processMessages([
 		{ version: VERSION, createSurface: { surfaceId, catalogId: build.ui.catalogId } },
 		{ version: VERSION, updateComponents: { surfaceId, components: build.ui.components } },

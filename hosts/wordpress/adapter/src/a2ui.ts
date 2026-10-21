@@ -1,16 +1,18 @@
-import { createA2UIFormat, type A2UIFormatHost } from '@swissspidy/graft-a2ui';
+import { BOARD_COMPONENT, BOARD_GUIDE, createA2UIFormat, type A2UIFormatHost } from '@swissspidy/graft-a2ui';
 import { registerUiFormat } from '@swissspidy/graft-core';
 import { cell, type Field } from './cells.ts';
 
 /**
  * A2UI on WordPress: the Graft catalog as `graft:wordpress`, with tables
- * whose cells read as the WordPress table draws them. Registering the
- * format lets validation, verification, upgrades and the compiler take
- * A2UI builds next to trees.
+ * whose cells read as the WordPress table draws them, and the board
+ * (ADR 0012). Registering the format lets validation, verification,
+ * upgrades and the compiler take A2UI builds next to trees.
  */
 export const wordpressA2UI: A2UIFormatHost = {
 	host: 'wordpress',
 	catalogId: 'graft:wordpress',
+	components: [BOARD_COMPONENT],
+	guide: BOARD_GUIDE,
 	cell: (field, record, evaluate) => cell(field as Field, record, (value) => evaluate(value), 'en-US') as { text: string; tone?: string },
 };
 
@@ -26,5 +28,5 @@ export const a2uiNotes = `WordPress specifics:
 - The post.editor.panel slot renders in the block editor's sidebar for each saved post the viewer can edit, with /slot/post = {id, title, excerpt, status, type, meta, terms, can} (title and excerpt as saved). Events that change the post should end with "then": ["reload:page"], which reloads the editor (and with it the saved values and the form). Checks match its actions and inputs with "row": {"title": ...}, which refers to that post.
 - The posts.list.row-actions slot renders once per post on the posts list screen, with /slot/post = {id, title, status, type, meta, terms, can}; its root is the one Button for that post. WordPress draws that list, so its events end with "then": ["reload:page"].
 - The dashboard.widget slot is a Dashboard box with no slot data: draw from data sources.
-- posts.update_fields changes a post's title and/or excerpt (scope posts:write). posts.update_status changes its status (scope posts.status:write). posts.update_meta changes custom fields: {"id": ..., "meta": {"<field>": <value, or null to remove>}} (scope posts.meta:write). posts.set_terms changes a post's terms in one taxonomy by slug (scope posts.terms:write).
+- posts.update_fields changes a post's title and/or excerpt (scope posts:write). posts.update_status changes its status (scope posts.status:write; publishing or unpublishing needs the post's can/publish). posts.update_review_status only moves a draft or pending post between "draft" and "pending" (scope posts.review:write, which contributors have; in a row, can refines it on the post's can/edit). posts.update_meta changes custom fields: {"id": ..., "meta": {"<field>": <value, or null to remove>}} (scope posts.meta:write). posts.set_terms changes a post's terms in one taxonomy by slug (scope posts.terms:write).
 - Fixture posts are created within the last two hours, and modified when created.`;

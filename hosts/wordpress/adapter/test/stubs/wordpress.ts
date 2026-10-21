@@ -1,11 +1,19 @@
 // Test stand-ins for WordPress globals the client bundle maps to window.wp.*.
+import { createElement, type ReactNode } from 'react';
+
 export default function apiFetch(): Promise<never> {
 	return Promise.reject(new Error('apiFetch is not available in tests'));
 }
 const stub = () => null;
-export const Button = stub;
+/** Draws its children in a plain element, so tests can find and use them. */
+const element =
+	(tag: string) =>
+	({ children, onClick, disabled, ...props }: { children?: ReactNode; onClick?: () => void; disabled?: boolean; [prop: string]: unknown }) =>
+		createElement(tag, { onClick, disabled, ...Object.fromEntries(Object.entries(props).filter(([key]) => key.startsWith('data-') || key.startsWith('aria-'))) }, children);
+export const Button = element('button');
 export const Notice = stub;
-export const Card = stub;
-export const CardHeader = stub;
-export const CardBody = stub;
+export const Card = element('div');
+export const CardHeader = element('div');
+export const CardBody = element('div');
 export const Spinner = stub;
+export const __experimentalVStack = element('div');

@@ -105,6 +105,11 @@ try {
 	await page.goto(`http://127.0.0.1:${site}/wp-admin/admin.php?page=graft-review-queue`);
 	await check('the review queue lists pending posts for the editor', () => page.locator('.graft-page table tbody tr', { hasText: 'Library hours' }).waitFor({ timeout: 30_000 }));
 	await page.screenshot({ path: 'test-results/demo-review-queue.png' });
+	await page.goto(`http://127.0.0.1:${site}/wp-admin/admin.php?page=graft-kanban-board`);
+	await check('the board shows pending posts in their column, with Publish for the editor', () =>
+		page.locator('[data-graft-column="pending"] [data-graft-card="Library hours"] [data-graft-action="publish"]').waitFor({ timeout: 30_000 }),
+	);
+	await page.screenshot({ path: 'test-results/demo-board.png', fullPage: true });
 	await check('the publish checklist shows in the block editor', async () => {
 		const guide = page.getByRole('dialog', { name: /welcome/i });
 		await page.addLocatorHandler(guide, () => guide.getByRole('button', { name: /close/i }).click());

@@ -258,6 +258,41 @@ function register_abilities(): void {
 		)
 	);
 
+	wp_register_ability(
+		'graft/post-update-review-status',
+		array(
+			'label'               => __( 'Send a post for review, or back to draft', 'graft' ),
+			'description'         => __( 'Moves one draft or pending post between draft and pending review. It never publishes or unpublishes a post.', 'graft' ),
+			'category'            => ABILITY_CATEGORY,
+			'input_schema'        => array(
+				'type'                 => 'object',
+				'properties'           => array(
+					'id'     => array(
+						'type'    => 'integer',
+						'minimum' => 1,
+					),
+					'status' => array(
+						'type' => 'string',
+						'enum' => review_statuses(),
+					),
+				),
+				'required'             => array( 'id', 'status' ),
+				'additionalProperties' => false,
+			),
+			'output_schema'       => $post_item,
+			'execute_callback'    => __NAMESPACE__ . '\execute_post_update_status',
+			'permission_callback' => __NAMESPACE__ . '\can_update_post_review_status',
+			'meta'                => array(
+				'annotations'  => array(
+					'readonly'    => false,
+					'destructive' => false,
+					'idempotent'  => true,
+				),
+				'show_in_rest' => true,
+			),
+		)
+	);
+
 	register_content_abilities( $post_item );
 }
 
@@ -709,6 +744,34 @@ function can_update_post_status( $input = null ) {
 		return current_user_can( 'publish_post', $post->ID );
 	}
 	return true;
+}
+
+/**
+ * Statuses a post moves between before it is published.
+ *
+ * @return string[]
+ */
+function review_statuses(): array {
+	return array( 'draft', 'pending' );
+}
+
+/**
+ * Whether the current user may move the post between draft and pending
+ * review: they can edit it, and it is not published (or scheduled, or
+ * private) now, so this never takes a post off the site.
+ *
+ * @param array<string, mixed>|null $input Ability input.
+ * @return bool|WP_Error
+ */
+function can_update_post_review_status( $input = null ) {
+	$post = input_post( $input );
+	if ( is_wp_error( $post ) ) {
+		return $post;
+	}
+	if ( ! in_array( $post->post_status, array_merge( review_statuses(), array( 'auto-draft' ) ), true ) ) {
+		return false;
+	}
+	return current_user_can( 'edit_post', $post->ID );
 }
 
 /**

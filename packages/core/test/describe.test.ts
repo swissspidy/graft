@@ -17,6 +17,12 @@ describe('describeCheck', () => {
 		);
 	});
 
+	it('reads direct calls and refusals', () => {
+		expect(
+			describeCheck({ criterion: 'refused', view_as: 'c', steps: [{ action: 'approve', row: { title: 'Draft A' }, direct: true }], expect: [{ refused: 'approve', row: { title: 'Draft A' } }] }),
+		).toBe('When "c" opens it, and calls "approve" on "Draft A" directly, without the button, then calling "approve" on "Draft A" is refused.');
+	});
+
 	it('uses host describers for fixtures and assertions', () => {
 		const text = describeCheck(byCriterion.approve!, {
 			fixtures: () => 'an editor "e" and a pending post "Draft A"',

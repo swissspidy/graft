@@ -157,6 +157,7 @@ test('the served specs are verified, not flagged', async ({ page }) => {
 	}>;
 	expect(specs.filter((s) => s.spec_id !== 'waiting-copy').map((s) => [s.spec_id, s.versions[0]!.state]).sort()).toEqual([
 		['headline-check', 'active'],
+		['kanban-board', 'active'],
 		['pending-by-author', 'active'],
 		['publish-checklist', 'active'],
 		['quick-approve', 'active'],

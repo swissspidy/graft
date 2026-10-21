@@ -1,5 +1,6 @@
 import { DataContext, DataModel, SurfaceModel, type ComponentApi } from '@a2ui/web_core/v0_9';
 import type { Action, EvalContext } from '@swissspidy/graft-core';
+import { boardLanes, movesFrom, type BoardColumn, type BoardMove } from './board.ts';
 import { createGraftCatalog } from './catalog.ts';
 import { withContext } from './events.ts';
 import { tableField } from './table.ts';
@@ -52,6 +53,15 @@ export function seed(root: DataContext, values: Record<string, unknown> | undefi
 	for (const [key, value] of Object.entries(values ?? {})) {
 		root.dataModel.set(`/${key}`, structuredClone(root.resolveDynamicValue(value) ?? null));
 	}
+}
+
+/** A table's row action (a board's move is one, with its columns). */
+interface RowAction {
+	id: string;
+	label: string;
+	variant?: string;
+	visible?: unknown;
+	action: unknown;
 }
 
 /** A button as drawn: what it does, and whether the viewer can use it now. */
@@ -155,6 +165,27 @@ export function walkA2UI(build: A2UIBuild, ctx: EvalContext, entered: Record<str
 		return child?.component === 'Text' ? text(at.resolveDynamicValue(child.text)) : '';
 	};
 
+	/** Rows drawn as a table: each record's cells and actions resolved in its own scope. */
+	const rowsTable = (source: string, rows: Array<{ record: unknown; scope: DataContext }>, written: TableField[], actions: RowAction[], empty: string): DrawnTable => {
+		const fields = written.map(tableField);
+		const primary = fields.find((field) => field.primary) ?? fields[0];
+		return {
+			columns: fields.map((field) => field.label),
+			fields,
+			empty,
+			rows: rows.map(({ record, scope }) => ({
+				label: primary ? text(scope.resolveDynamicValue(primary.value)) : '',
+				record,
+				cells: Object.fromEntries(fields.map((field) => [field.label, cellOf(field, record, (value) => scope.resolveDynamicValue(value))])),
+				actions: actions.map((rowAction): DrawnButton => {
+					const visible = rowAction.visible === undefined || Boolean(scope.resolveDynamicValue(rowAction.visible));
+					const base = { id: rowAction.id, label: rowAction.label, ...(rowAction.variant ? { variant: rowAction.variant } : {}), row: record };
+					return press(`${source}/${rowAction.id}`, rowAction.action, scope, record, base, visible);
+				}),
+			})),
+		};
+	};
+
 	const seen = new Set<string>();
 	const visit = (id: string, at: DataContext, row: unknown): void => {
 		const component = components.get(id);
@@ -224,26 +255,37 @@ export function walkA2UI(build: A2UIBuild, ctx: EvalContext, entered: Record<str
 				const scope = at.nested(String((component.rows as { path?: string } | undefined)?.path ?? ''));
 				const rows = dataModel.get(scope.path);
 				const records = Array.isArray(rows) ? (rows as unknown[]) : [];
-				const fields = ((component.fields as TableField[] | undefined) ?? []).map(tableField);
-				const primary = fields.find((field) => field.primary) ?? fields[0];
-				const rowActions = (component.rowActions as Array<{ id: string; label: string; variant?: string; visible?: unknown; action: never }> | undefined) ?? [];
-				drawer.table({
-					columns: fields.map((field) => field.label),
-					fields,
-					empty: component.empty === undefined ? 'No items.' : text(at.resolveDynamicValue(component.empty)),
-					rows: records.map((record, i) => {
-						const rowScope = scope.nested(String(i));
-						return {
-							label: primary ? text(rowScope.resolveDynamicValue(primary.value)) : '',
-							record,
-							cells: Object.fromEntries(fields.map((field) => [field.label, cellOf(field, record, (value) => rowScope.resolveDynamicValue(value))])),
-							actions: rowActions.map((rowAction): DrawnButton => {
-								const visible = rowAction.visible === undefined || Boolean(rowScope.resolveDynamicValue(rowAction.visible));
-								const base = { id: rowAction.id, label: rowAction.label, ...(rowAction.variant ? { variant: rowAction.variant } : {}), row: record };
-								return press(`${id}/${rowAction.id}`, rowAction.action, rowScope, record, base, visible);
-							}),
-						};
-					}),
+				drawer.table(
+					rowsTable(
+						id,
+						records.map((record, i) => ({ record, scope: scope.nested(String(i)) })),
+						(component.fields as TableField[] | undefined) ?? [],
+						(component.rowActions as RowAction[] | undefined) ?? [],
+						component.empty === undefined ? 'No items.' : text(at.resolveDynamicValue(component.empty)),
+					),
+				);
+				return;
+			}
+			case 'Board': {
+				// Each column as a table of its cards, with the moves out of it as row actions.
+				const scope = at.nested(String((component.items as { path?: string } | undefined)?.path ?? ''));
+				const items = dataModel.get(scope.path);
+				const lanes = boardLanes(Array.isArray(items) ? (items as unknown[]) : [], String(component.columnBy ?? ''), (component.columns as BoardColumn[] | undefined) ?? []);
+				drawer.group('Row', () => {
+					for (const { column, cards } of lanes) {
+						drawer.group('Column', () => {
+							drawer.text(column.title, 'h3');
+							drawer.table(
+								rowsTable(
+									id,
+									cards.map(({ item, index }) => ({ record: item, scope: scope.nested(String(index)) })),
+									(component.fields as TableField[] | undefined) ?? [],
+									movesFrom(component.moves as BoardMove[] | undefined, column.id),
+									column.empty === undefined ? 'No items.' : text(at.resolveDynamicValue(column.empty)),
+								),
+							);
+						});
+					}
 				});
 				return;
 			}

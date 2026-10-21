@@ -4,6 +4,7 @@
  * model, table fields, event inputs and the build's types. Keeps a page
  * that draws A2UI builds small.
  */
+export { BOARD_COMPONENT, boardLanes, movesFrom, type BoardColumn, type BoardMove } from './board.ts';
 export { createGraftCatalog } from './catalog.ts';
 export { seed } from './walk.ts';
 export { tableField } from './table.ts';

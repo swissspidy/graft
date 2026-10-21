@@ -8,6 +8,7 @@
  */
 const objectChecks: Record<string, string> = {
 	'posts.status:write': 'publish',
+	'posts.review:write': 'edit',
 	'posts:write': 'edit',
 	'posts.meta:write': 'edit',
 	'posts.terms:write': 'edit',
