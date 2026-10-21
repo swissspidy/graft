@@ -266,7 +266,7 @@ test('graft site verify verifies the draft built in wp-admin, and the admin appr
 test('graft site pull exports the active customizations as a canary corpus', async () => {
 	const out = new URL('../../../test-results/pulled/e2e-site', import.meta.url).pathname;
 	const output = await graft('site', 'pull', '--out', out);
-	expect(output).toContain('Wrote 9 customization(s)');
+	expect(output).toContain('Wrote 10 customization(s)');
 	for (const spec of ['review-queue', 'quick-approve', 'stale-drafts', 'headline-check', 'pending-by-author', 'publish-checklist', 'kanban-board', 'waiting-posts', 'waiting-copy']) {
 		expect(existsSync(`${out}/${spec}.md`) && existsSync(`${out}/${spec}.json`) && existsSync(`${out}/${spec}.grant.json`)).toBe(true);
 	}
