@@ -57,11 +57,11 @@
   "devDependencies": {
     "@changesets/changelog-github": "^1.0.1",
     "@changesets/cli": "^3.0.3",
-    "@playwright/test": "1.63.0",
-    "@types/node": "^26.6.3",
+    "@playwright/test": "1.64.0",
+    "@types/node": "^26.6.5",
     "esbuild": "^0.28.2",
     "tsx": "^4.20.0",
     "typescript": "^7.0.2",
-    "vitest": "^5.0.3"
+    "vitest": "^5.0.4"
   }
 }

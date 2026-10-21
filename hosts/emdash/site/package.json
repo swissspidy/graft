@@ -12,12 +12,12 @@
     "dev": "astro dev"
   },
   "dependencies": {
-    "@astrojs/node": "^11.1.5",
-    "@astrojs/react": "^7.0.0",
-    "@emdash-cms/sandbox-workerd": "0.9.1",
+    "@astrojs/node": "^11.1.7",
+    "@astrojs/react": "^7.0.1",
+    "@emdash-cms/sandbox-workerd": "0.9.3",
     "@graft/emdash": "workspace:*",
-    "astro": "^7.3.2",
-    "emdash": "1.0.1",
+    "astro": "^7.3.8",
+    "emdash": "1.2.0",
     "react": "19.3.0",
     "react-dom": "19.3.0"
   }
