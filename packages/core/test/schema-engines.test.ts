@@ -1,7 +1,7 @@
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { afterAll, describe, expect, it } from 'vitest';
-import { ajvEngine, setSchemaEngine, validateBuild, validateSpec, type Build, type Surface } from '../src/index.ts';
+import { ajvEngine, compileSchema, setSchemaEngine, validateBuild, validateSpec, type Build, type Surface } from '../src/index.ts';
 import { cfworkerEngine } from '../src/schema-cfworker.ts';
 // The hosts' A2UI formats read the example builds.
 import '../../../hosts/wordpress/adapter/src/a2ui.ts';
@@ -83,6 +83,36 @@ describe('schema engines', () => {
 			return (await validateBuild(build, surface)).diagnostics.filter((d) => d.severity === 'error').map((d) => d.message);
 		};
 		expect(await messages('cfworker')).toEqual(await messages('ajv'));
+	});
+
+	it('report the same raw errors, messages included', () => {
+		// Hosts read errors directly too, not only through Graft's diagnostics.
+		const schema = {
+			type: 'object',
+			properties: {
+				tasks: {
+					type: 'array',
+					items: {
+						type: 'object',
+						properties: { id: { type: 'string' }, status: { enum: ['open', 'done'] }, kind: { const: 'task' }, code: { type: 'string', pattern: '^[a-z]+$' } },
+						required: ['id', 'due'],
+						additionalProperties: false,
+					},
+				},
+			},
+			required: ['tasks'],
+		};
+		const errors = (engine: 'ajv' | 'cfworker', data: unknown) => {
+			setSchemaEngine(engine === 'ajv' ? ajvEngine() : cfworkerEngine());
+			const validate = compileSchema(schema);
+			validate(data);
+			return (validate.errors ?? []).map(({ keyword, instancePath, params, message }) => ({ keyword, instancePath, params, message })).sort((a, b) => `${a.instancePath} ${a.keyword}`.localeCompare(`${b.instancePath} ${b.keyword}`));
+		};
+		for (const data of [{}, { tasks: [{ id: 1, status: 'later', kind: 'note', code: 'X1', extra: true }] }]) {
+			const ajv = errors('ajv', data);
+			expect(ajv.length).toBeGreaterThan(0);
+			expect(errors('cfworker', data)).toEqual(ajv);
+		}
 	});
 
 	it('leave the schemas they are given untouched', async () => {
