@@ -1,4 +1,4 @@
-import type { Catalog, ComponentApi } from '@a2ui/web_core/v0_9';
+import { isSafeRegex, type Catalog, type ComponentApi } from '@a2ui/web_core/v0_9';
 import { compileSchema, type Build, type Diagnostic, type Spec, type Surface } from '@swissspidy/graft-core';
 import type { z } from 'zod';
 import { createGraftCatalog, INPUT_COMPONENTS } from './catalog.ts';
@@ -154,6 +154,15 @@ export function validateA2UI(value: Build, surface: Surface, host: A2UIHost, spe
 			} else {
 				for (const problem of schemaProblems(fn.schema, item.args ?? {})) {
 					error('a2ui-function-args', `${path}/args${problem.path ? `/${problem.path}` : ''}`, `${item.call}: ${problem.message}.`);
+				}
+				// web_core refuses to run a pattern that can backtrack catastrophically; the call would have no value.
+				const pattern = item.args?.pattern;
+				if (item.call === 'regex' && typeof pattern === 'string' && !isSafeRegex(pattern)) {
+					error(
+						'a2ui-unsafe-pattern',
+						`${path}/args/pattern`,
+						`regex: "${pattern}" can backtrack catastrophically (ReDoS), so the renderer refuses to run it. Anchor it at the start (e.g. "^\\s*\\S+\\s+\\S" rather than "\\S+\\s+\\S") and avoid quantified parts that can match the same text.`,
+					);
 				}
 			}
 		}
