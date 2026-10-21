@@ -1,0 +1,389 @@
+{
+	"graft": 1,
+	"host": "browser",
+	"hostVersion": "observed-832cc479981a",
+	"fingerprint": "sha256:832cc479981ac95f9d72a2063db469f279153c3a91afe3a0792818dc2a2f600a",
+	"slots": {
+		"project.sidebar": {
+			"kind": "extension",
+			"title": "Project sidebar",
+			"description": "A section at the end of a project page's details sidebar.",
+			"screen": "project",
+			"options": {
+				"type": "object",
+				"properties": {
+					"title": {
+						"type": "string",
+						"minLength": 1,
+						"maxLength": 60
+					}
+				},
+				"required": [
+					"title"
+				],
+				"additionalProperties": false
+			},
+			"provides": {
+				"type": "object",
+				"properties": {
+					"project": {
+						"type": "object",
+						"properties": {
+							"id": {
+								"type": "string"
+							}
+						},
+						"required": [
+							"id"
+						],
+						"additionalProperties": false
+					}
+				},
+				"required": [
+					"project"
+				],
+				"additionalProperties": false
+			},
+			"anchor": "complementary \"Project details\""
+		},
+		"project.toolbar": {
+			"kind": "extension",
+			"title": "Project toolbar",
+			"description": "Buttons after the project's own actions, under its title.",
+			"screen": "project",
+			"options": {
+				"type": "object",
+				"properties": {},
+				"additionalProperties": false
+			},
+			"provides": {
+				"type": "object",
+				"properties": {
+					"project": {
+						"type": "object",
+						"properties": {
+							"id": {
+								"type": "string"
+							}
+						},
+						"required": [
+							"id"
+						],
+						"additionalProperties": false
+					}
+				},
+				"required": [
+					"project"
+				],
+				"additionalProperties": false
+			},
+			"anchor": "toolbar \"Project actions\""
+		}
+	},
+	"capabilities": {
+		"tasks.list": {
+			"kind": "read",
+			"description": "Tasks of a project, optionally only open or done ones, or only those assigned to the viewer (\"me\").",
+			"input": {
+				"type": "object",
+				"properties": {
+					"project": {
+						"type": "string",
+						"pattern": "^[A-Za-z0-9_-]{1,64}$"
+					},
+					"status": {
+						"enum": [
+							"open",
+							"done"
+						]
+					},
+					"assignee": {
+						"const": "me"
+					}
+				},
+				"required": [
+					"project"
+				],
+				"additionalProperties": false
+			},
+			"output": {
+				"type": "object",
+				"properties": {
+					"tasks": {
+						"type": "array",
+						"items": {
+							"type": "object",
+							"properties": {
+								"id": {
+									"type": "string"
+								},
+								"title": {
+									"type": "string"
+								},
+								"status": {
+									"enum": [
+										"open",
+										"done"
+									]
+								},
+								"due": {
+									"description": "Due date (YYYY-MM-DD), or null.",
+									"type": [
+										"string",
+										"null"
+									]
+								},
+								"assignee": {
+									"type": [
+										"object",
+										"null"
+									],
+									"properties": {
+										"id": {
+											"type": "string"
+										},
+										"name": {
+											"type": "string"
+										}
+									},
+									"required": [
+										"id",
+										"name"
+									],
+									"additionalProperties": false
+								}
+							},
+							"required": [
+								"id",
+								"title",
+								"status",
+								"due",
+								"assignee"
+							],
+							"additionalProperties": false
+						}
+					}
+				},
+				"required": [
+					"tasks"
+				],
+				"additionalProperties": false
+			},
+			"scopes": [
+				"tasks:read"
+			],
+			"binding": {
+				"method": "GET",
+				"path": "/api/projects/{project}/tasks",
+				"query": [
+					"status",
+					"assignee"
+				]
+			}
+		},
+		"tasks.complete": {
+			"kind": "write",
+			"description": "Marks a task done.",
+			"input": {
+				"type": "object",
+				"properties": {
+					"id": {
+						"type": "string",
+						"pattern": "^[A-Za-z0-9_-]{1,64}$"
+					}
+				},
+				"required": [
+					"id"
+				],
+				"additionalProperties": false
+			},
+			"output": {
+				"type": "object",
+				"properties": {
+					"id": {
+						"type": "string"
+					},
+					"title": {
+						"type": "string"
+					},
+					"status": {
+						"enum": [
+							"open",
+							"done"
+						]
+					},
+					"due": {
+						"description": "Due date (YYYY-MM-DD), or null.",
+						"type": [
+							"string",
+							"null"
+						]
+					},
+					"assignee": {
+						"type": [
+							"object",
+							"null"
+						],
+						"properties": {
+							"id": {
+								"type": "string"
+							},
+							"name": {
+								"type": "string"
+							}
+						},
+						"required": [
+							"id",
+							"name"
+						],
+						"additionalProperties": false
+					}
+				},
+				"required": [
+					"id",
+					"title",
+					"status",
+					"due",
+					"assignee"
+				],
+				"additionalProperties": false
+			},
+			"scopes": [
+				"tasks.status:write"
+			],
+			"binding": {
+				"method": "POST",
+				"path": "/api/tasks/{id}/complete",
+				"headers": {
+					"X-Requested-With": "tasklet"
+				}
+			}
+		},
+		"members.list": {
+			"kind": "read",
+			"description": "Everyone in the workspace, with their email address.",
+			"input": {
+				"type": "object",
+				"properties": {},
+				"additionalProperties": false
+			},
+			"output": {
+				"type": "object",
+				"properties": {
+					"members": {
+						"type": "array",
+						"items": {
+							"type": "object",
+							"properties": {
+								"id": {
+									"type": "string"
+								},
+								"name": {
+									"type": "string"
+								},
+								"role": {
+									"type": "string"
+								},
+								"email": {
+									"type": "string"
+								}
+							},
+							"required": [
+								"id",
+								"name",
+								"role",
+								"email"
+							],
+							"additionalProperties": false
+						}
+					}
+				},
+				"required": [
+					"members"
+				],
+				"additionalProperties": false
+			},
+			"scopes": [
+				"members:read"
+			],
+			"binding": {
+				"method": "GET",
+				"path": "/api/members"
+			}
+		}
+	},
+	"scopes": {
+		"tasks:read": {
+			"title": "See a project's tasks",
+			"host": [
+				"guest",
+				"member",
+				"owner"
+			]
+		},
+		"tasks.status:write": {
+			"title": "Mark tasks done",
+			"host": [
+				"member",
+				"owner"
+			]
+		},
+		"members:read": {
+			"title": "See everyone's name and email address",
+			"host": [
+				"member",
+				"owner"
+			]
+		}
+	},
+	"audiences": [
+		"guest",
+		"member",
+		"owner"
+	],
+	"model": {
+		"app": {
+			"id": "tasklet",
+			"title": "Tasklet",
+			"origins": [
+				"http://127.0.0.1/*"
+			]
+		},
+		"viewer": {
+			"binding": {
+				"method": "GET",
+				"path": "/api/me"
+			},
+			"role": "/role"
+		},
+		"anchors": {
+			"project.sidebar": {
+				"pages": [
+					"/projects/:project"
+				],
+				"selectors": [
+					"[data-testid=\"project-sidebar\"]"
+				],
+				"landmark": {
+					"role": "complementary",
+					"name": "Project details"
+				},
+				"insert": "append"
+			},
+			"project.toolbar": {
+				"pages": [
+					"/projects/:project"
+				],
+				"selectors": [
+					"[data-testid=\"project-toolbar\"]"
+				],
+				"landmark": {
+					"role": "toolbar",
+					"name": "Project actions"
+				},
+				"insert": "append"
+			}
+		}
+	},
+	"hash": "sha256:ce6a866ab3fdb2efafab2a7bcea1cf245ba81bc78e556e8fc24538e8dda9a987"
+}

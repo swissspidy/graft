@@ -1,0 +1,22 @@
+{
+  "name": "@graft/chrome-extension",
+  "version": "0.0.0",
+  "private": true,
+  "license": "Apache-2.0",
+  "description": "Graft host adapter for web apps without a plugin API, through a Manifest V3 browser extension: app surfaces from DOM anchors and the app's own API, a gateway in the service worker, a fixture sandbox and drift detection.",
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts",
+    "./host": "./src/host/index.ts",
+    "./node": "./src/node/index.ts"
+  },
+  "dependencies": {
+    "@swissspidy/graft-a2ui": "workspace:*",
+    "@swissspidy/graft-core": "workspace:*"
+  },
+  "devDependencies": {
+    "@playwright/test": "1.63.0",
+    "@types/chrome": "0.3.4",
+    "esbuild": "^0.28.2"
+  }
+}
