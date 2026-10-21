@@ -259,6 +259,47 @@ function validate_manifest( $manifest ) {
 			return $error( __( 'Unknown audience.', 'graft' ) );
 		}
 	}
+	return validate_manifest_triggers( $manifest['triggers'] ?? array(), $error );
+}
+
+/**
+ * Validates a manifest's triggers against what the site runs (ADR 0010).
+ *
+ * @param mixed    $triggers Triggers by id.
+ * @param callable $error    Makes the error.
+ * @return true|WP_Error
+ */
+function validate_manifest_triggers( $triggers, callable $error ) {
+	if ( array() === $triggers ) {
+		return true;
+	}
+	$host = surface_triggers();
+	if ( ! is_array( $triggers ) || null === $host ) {
+		return $error( __( 'This site runs no triggers.', 'graft' ) );
+	}
+	$scopes = surface_scopes();
+	foreach ( $triggers as $id => $trigger ) {
+		if ( ! preg_match( '/^[a-z][a-z0-9-]{0,40}$/', (string) $id ) || ! is_array( $trigger ) || isset( $trigger['schedule'] ) === isset( $trigger['event'] ) ) {
+			return $error( __( 'Invalid trigger.', 'graft' ) );
+		}
+		if ( isset( $trigger['event'] ) && ! isset( $host['events'][ $trigger['event'] ] ) ) {
+			return $error( __( 'Unknown trigger event.', 'graft' ) );
+		}
+		if ( isset( $trigger['schedule'] ) && schedule_seconds( (array) $trigger['schedule'] ) < $host['minInterval'] ) {
+			return $error( __( 'The trigger runs too often.', 'graft' ) );
+		}
+		if ( ! is_array( $trigger['permissions'] ?? null ) || array() === $trigger['permissions'] ) {
+			return $error( __( 'Missing trigger permissions.', 'graft' ) );
+		}
+		foreach ( $trigger['permissions'] as $scope ) {
+			if ( ! is_string( $scope ) || ! isset( $scopes[ $scope ] ) ) {
+				return $error( __( 'Unknown permission scope.', 'graft' ) );
+			}
+		}
+		if ( isset( $trigger['limit'] ) && ( ! is_int( $trigger['limit'] ) || $trigger['limit'] < 1 || $trigger['limit'] > $host['maxPerRun'] ) ) {
+			return $error( __( 'Invalid trigger limit.', 'graft' ) );
+		}
+	}
 	return true;
 }
 
@@ -458,6 +499,27 @@ function transition( WP_Post $version, string $event ) {
 }
 
 /**
+ * Whether a grant covers a build: what its viewers need, and what each of
+ * its triggers needs, in that trigger's own grant.
+ *
+ * @param array<string, mixed>|null $grant Grant.
+ * @param array<string, mixed>      $build Build.
+ * @return bool
+ */
+function grant_covers_build( ?array $grant, array $build ): bool {
+	if ( ! grant_covers( $grant, build_scopes( $build ) ) ) {
+		return false;
+	}
+	foreach ( (array) ( $build['triggers'] ?? array() ) as $id => $trigger ) {
+		$granted = (array) ( $grant['triggers'][ $id ] ?? array() );
+		if ( array() !== array_diff( trigger_scopes( (array) $trigger ), $granted ) ) {
+			return false;
+		}
+	}
+	return true;
+}
+
+/**
  * Whether a grant covers every scope in a list.
  *
  * @param array<string, mixed>|null $grant  Grant.
@@ -520,9 +582,21 @@ function attach_build( string $spec_id, int $version, $build, ?array $verificati
 	// An upgraded build may need scopes the spec never asked for (the host
 	// moved a capability behind a new permission). It is stored, but only
 	// served once an admin widens the grant.
-	$scopes = build_scopes( $build );
-	if ( array_diff( $scopes, $record['manifest']['permissions'] ) && 'active' !== $record['state'] && 'upgrading' !== $record['state'] ) {
+	$scopes    = build_scopes( $build );
+	$upgrading = 'active' === $record['state'] || 'upgrading' === $record['state'];
+	if ( array_diff( $scopes, $record['manifest']['permissions'] ) && ! $upgrading ) {
 		return new WP_Error( 'graft_build_scope', __( 'The build needs permissions the spec does not request.', 'graft' ), array( 'status' => 400 ) );
+	}
+	// Triggers: exactly the ones the spec declares, each within what the spec lists for it.
+	$declared = (array) ( $record['manifest']['triggers'] ?? array() );
+	$triggers = (array) ( $build['triggers'] ?? array() );
+	if ( array_keys( $declared ) != array_keys( $triggers ) ) { // phpcs:ignore Universal.Operators.StrictComparisons.LooseNotEqual -- same keys in any order.
+		return new WP_Error( 'graft_build_mismatch', __( "The build's triggers are not the ones the spec declares.", 'graft' ), array( 'status' => 400 ) );
+	}
+	foreach ( $triggers as $id => $trigger ) {
+		if ( array_diff( trigger_scopes( (array) $trigger ), (array) ( $declared[ $id ]['permissions'] ?? array() ) ) && ! $upgrading ) {
+			return new WP_Error( 'graft_build_scope', __( 'A trigger needs permissions the spec does not list for it.', 'graft' ), array( 'status' => 400 ) );
+		}
 	}
 
 	$verified = ! empty( $verification['passed'] );
@@ -552,7 +626,7 @@ function attach_build( string $spec_id, int $version, $build, ?array $verificati
 	if ( 'upgrading' === $record['state'] ) {
 		$current = current_surface();
 		if ( $current && $current['hash'] === $surface_hash ) {
-			return transition( $post, grant_covers( $record['grant'], $scopes ) ? 'upgraded' : 'upgrade_needs_grant' );
+			return transition( $post, grant_covers_build( $record['grant'], $build ) ? 'upgraded' : 'upgrade_needs_grant' );
 		}
 		return version_record( get_post( $post->ID ) );
 	}
@@ -565,7 +639,7 @@ function attach_build( string $spec_id, int $version, $build, ?array $verificati
 	if ( 'building' !== get_post_meta( $post->ID, '_graft_state', true ) ) {
 		return version_record( get_post( $post->ID ) );
 	}
-	return transition( $post, grant_covers( $record['grant'], $scopes ) ? 'verified_within_grant' : 'verified_needs_grant' );
+	return transition( $post, grant_covers_build( $record['grant'], $build ) ? 'verified_within_grant' : 'verified_needs_grant' );
 }
 
 /**
@@ -592,15 +666,17 @@ function approve_version( string $spec_id, int $version, $approver = null ) {
 	$current = current_surface();
 	$build   = $current ? ( $record['builds'][ $current['hash'] ]['build'] ?? null ) : null;
 	$needed  = is_array( $build ) ? build_scopes( $build ) : array();
-	set_json_meta(
-		$post->ID,
-		'_graft_grant',
-		array(
-			'scopes'      => array_values( array_unique( array_merge( $record['manifest']['permissions'], $needed ) ) ),
-			'approved_by' => $approver ?? get_current_user_id(),
-			'approved_at' => gmdate( 'c' ),
-		)
+	$grant   = array(
+		'scopes'      => array_values( array_unique( array_merge( $record['manifest']['permissions'], $needed ) ) ),
+		'approved_by' => $approver ?? get_current_user_id(),
+		'approved_at' => gmdate( 'c' ),
 	);
+	// Each trigger's automation gets what the spec lists for it (and what its build needs), nothing shared.
+	foreach ( (array) ( $record['manifest']['triggers'] ?? array() ) as $id => $trigger ) {
+		$uses                              = isset( $build['triggers'][ $id ] ) ? trigger_scopes( (array) $build['triggers'][ $id ] ) : array();
+		$grant['triggers'][ (string) $id ] = array_values( array_unique( array_merge( (array) $trigger['permissions'], $uses ) ) );
+	}
+	set_json_meta( $post->ID, '_graft_grant', $grant );
 	return transition( $post, 'approve' );
 }
 
@@ -692,7 +768,7 @@ function check_surface_change(): void {
 		$ready = $record['builds'][ $hash ] ?? null;
 		$ready = $ready && ! empty( $ready['verification']['passed'] ) ? $ready['build'] : null;
 		if ( 'active' === $record['state'] ) {
-			if ( $ready && grant_covers( $record['grant'], build_scopes( $ready ) ) ) {
+			if ( $ready && grant_covers_build( $record['grant'], $ready ) ) {
 				continue;
 			}
 			transition( $post, 'host_changed' );
@@ -700,7 +776,7 @@ function check_surface_change(): void {
 			transition( $post, 'host_changed' );
 		}
 		if ( $ready ) {
-			transition( $post, grant_covers( $record['grant'], build_scopes( $ready ) ) ? 'upgraded' : 'upgrade_needs_grant' );
+			transition( $post, grant_covers_build( $record['grant'], $ready ) ? 'upgraded' : 'upgrade_needs_grant' );
 		}
 	}
 }

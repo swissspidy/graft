@@ -31,6 +31,15 @@ export async function assembleSurface(dump: HostDump): Promise<Surface> {
 		scopes: mapSorted(dump.scopes, (s) => s),
 		audiences: [...dump.audiences],
 		...(dump.model ? { model: normalizeModel(dump.model) } : {}),
+		...(dump.triggers
+			? {
+					triggers: {
+						...dump.triggers,
+						capabilities: [...dump.triggers.capabilities].sort(),
+						events: mapSorted(dump.triggers.events, (event) => ({ ...event, provides: normalizeWordPressSchema(event.provides) })),
+					},
+				}
+			: {}),
 	};
 	const header = { graft: 1, host: dump.host, hostVersion: dump.hostVersion } as const;
 	const hash = await hashSurface({ ...header, ...contract });

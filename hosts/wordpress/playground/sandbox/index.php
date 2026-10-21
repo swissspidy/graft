@@ -15,6 +15,10 @@
  * - slot { as, slot, options }: slot props for every place the slot renders.
  * - assert { kind, expected }: host assertions (kind "post": title, and any of
  *   excerpt, status, type, meta { key: value }, terms { taxonomy: [slug] }).
+ * - fire { build, trigger, grant, limit, now, target }: run one of the build's triggers with the
+ *   plugin's runner, as the automation user with only `grant`, at `now` (ms). For an event trigger,
+ *   the event first happens to the post `target` picks ({ title }): it is published (post.published)
+ *   or submitted for review (post.submitted). What a trigger acted on is kept until the next reset.
  * - patch { patch }: store a synthetic host change for canary.php.
  * - dump: the host half of the surface and its fingerprint.
  */
@@ -98,6 +102,7 @@ switch ( $request['op'] ?? '' ) {
 				wp_delete_term( (int) $term->term_id, $term->taxonomy );
 			}
 		}
+		delete_option( 'graft_sandbox_handled' );
 		wp_cache_flush();
 		respond( array( 'ok' => true ) );
 
@@ -226,6 +231,68 @@ switch ( $request['op'] ?? '' ) {
 			respond( array( 'instances' => $instances ) );
 		}
 		respond( array( 'instances' => 'owned' === $slot['kind'] ? array( (object) array() ) : array() ) );
+
+	case 'fire':
+		$build   = $request['build'] ?? array();
+		$id      = (string) ( $request['trigger'] ?? '' );
+		$trigger = $build['triggers'][ $id ] ?? null;
+		if ( ! is_array( $trigger ) ) {
+			respond( array( 'error' => "No trigger $id" ), 400 );
+		}
+		$subject = null;
+		if ( isset( $trigger['event'] ) ) {
+			$title = (string) ( $request['target']['title'] ?? '' );
+			$found = get_posts(
+				array(
+					'post_type'   => 'any',
+					'post_status' => 'any',
+					'title'       => $title,
+					'numberposts' => 1,
+				)
+			);
+			if ( $found ) {
+				// The event happens the way it does on a site: someone changes the post.
+				wp_set_current_user( 1 );
+				$status = array(
+					'post.published' => 'publish',
+					'post.submitted' => 'pending',
+				)[ $trigger['event'] ] ?? null;
+				if ( $status ) {
+					wp_update_post(
+						array(
+							'ID'          => $found[0]->ID,
+							'post_status' => $status,
+						)
+					);
+				}
+				clean_post_cache( $found[0]->ID );
+				$subject = Graft\event_subject( get_post( $found[0]->ID ) );
+				wp_set_current_user( 0 );
+			}
+		}
+		$handled = get_option( 'graft_sandbox_handled', array() );
+		$grant   = array_values( (array) ( $request['grant'] ?? array() ) );
+		$run     = Graft\as_service_user(
+			$grant,
+			static function () use ( $build, $id, $grant, $request, $subject, $handled ) {
+				return Graft\execute_trigger(
+					$build,
+					$id,
+					array(
+						'grant'   => $grant,
+						'limit'   => (int) ( $request['limit'] ?? 1 ),
+						'now'     => (float) ( $request['now'] ?? time() * 1000 ) / 1000,
+						'subject' => $subject,
+						'handled' => $handled[ $id ] ?? array(),
+						'spec_id' => (string) ( $build['spec']['id'] ?? '' ),
+					)
+				);
+			}
+		);
+		$handled[ $id ] = $run['handled'];
+		update_option( 'graft_sandbox_handled', $handled, false );
+		unset( $run['handled'] );
+		respond( $run );
 
 	case 'patch':
 		update_option( 'graft_canary_patch', $request['patch'] ?? array() );

@@ -2,8 +2,8 @@
 	"graft": 1,
 	"host": "wordpress",
 	"hostVersion": "7.1.3",
-	"hash": "sha256:59cce98344410cb60ea8db8084c704fd7528ff2f1d44dd402673083d5f2d72df",
-	"fingerprint": "sha256:ef062899868e378f12a65e20e8cb67c076e43142263861378b4c2e2826604811",
+	"hash": "sha256:87689d916e3f8d1a3f86780dcd5becac92be6ac61a207179ab4612b0ccfb8602",
+	"fingerprint": "sha256:b8351fa40d1fb90e19c0b48a06d409c930b063a804e77a9f305bdbdd136e6ba8",
 	"slots": {
 		"admin.page": {
 			"kind": "owned",
@@ -2176,6 +2176,377 @@
 			"post_tag": {
 				"label": "Tags",
 				"hierarchical": false
+			}
+		}
+	},
+	"triggers": {
+		"minInterval": 3600,
+		"maxPerRun": 50,
+		"maxEventRunsPerHour": 60,
+		"capabilities": [
+			"posts.list",
+			"posts.set_terms",
+			"posts.update_fields",
+			"posts.update_meta",
+			"posts.update_status",
+			"terms.list"
+		],
+		"events": {
+			"post.published": {
+				"title": "A post is published",
+				"description": "A post of an exposed type changes to published (also when it is scheduled and its time comes).",
+				"provides": {
+					"type": "object",
+					"properties": {
+						"id": {
+							"type": "integer"
+						},
+						"title": {
+							"type": "string"
+						},
+						"status": {
+							"type": "string",
+							"enum": [
+								"publish",
+								"future",
+								"draft",
+								"pending",
+								"private"
+							]
+						},
+						"type": {
+							"type": "string"
+						},
+						"author": {
+							"type": "object",
+							"properties": {
+								"id": {
+									"type": "integer"
+								},
+								"name": {
+									"type": "string"
+								}
+							},
+							"required": [
+								"id",
+								"name"
+							],
+							"additionalProperties": false
+						},
+						"date": {
+							"type": "string",
+							"format": "date-time"
+						},
+						"modified": {
+							"type": "string",
+							"format": "date-time"
+						},
+						"meta": {
+							"description": "The post's custom fields that the site exposes, by meta key; null when it has no value.",
+							"type": "object",
+							"properties": {
+								"capacity": {
+									"type": [
+										"integer",
+										"null"
+									],
+									"description": "How many seats the event has.",
+									"minimum": 0
+								},
+								"event_date": {
+									"type": [
+										"string",
+										"null"
+									],
+									"description": "The day the event takes place (YYYY-MM-DD).",
+									"pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}$"
+								},
+								"sold_out": {
+									"type": [
+										"boolean",
+										"null"
+									],
+									"description": "Whether every seat is taken."
+								},
+								"venue": {
+									"type": [
+										"string",
+										"null"
+									],
+									"description": "Where the event takes place.",
+									"maxLength": 100
+								}
+							},
+							"additionalProperties": false
+						},
+						"terms": {
+							"description": "The post's terms in each exposed taxonomy, by taxonomy.",
+							"type": "object",
+							"properties": {
+								"category": {
+									"type": "array",
+									"items": {
+										"type": "object",
+										"properties": {
+											"id": {
+												"type": "integer"
+											},
+											"name": {
+												"type": "string"
+											},
+											"slug": {
+												"type": "string"
+											}
+										},
+										"required": [
+											"id",
+											"name",
+											"slug"
+										],
+										"additionalProperties": false
+									}
+								},
+								"event_type": {
+									"type": "array",
+									"items": {
+										"type": "object",
+										"properties": {
+											"id": {
+												"type": "integer"
+											},
+											"name": {
+												"type": "string"
+											},
+											"slug": {
+												"type": "string"
+											}
+										},
+										"required": [
+											"id",
+											"name",
+											"slug"
+										],
+										"additionalProperties": false
+									}
+								},
+								"post_tag": {
+									"type": "array",
+									"items": {
+										"type": "object",
+										"properties": {
+											"id": {
+												"type": "integer"
+											},
+											"name": {
+												"type": "string"
+											},
+											"slug": {
+												"type": "string"
+											}
+										},
+										"required": [
+											"id",
+											"name",
+											"slug"
+										],
+										"additionalProperties": false
+									}
+								}
+							},
+							"additionalProperties": false
+						}
+					},
+					"required": [
+						"id",
+						"title",
+						"status",
+						"type",
+						"author",
+						"date",
+						"modified",
+						"meta",
+						"terms"
+					],
+					"additionalProperties": false
+				}
+			},
+			"post.submitted": {
+				"title": "A post is submitted for review",
+				"description": "A post of an exposed type changes to pending.",
+				"provides": {
+					"type": "object",
+					"properties": {
+						"id": {
+							"type": "integer"
+						},
+						"title": {
+							"type": "string"
+						},
+						"status": {
+							"type": "string",
+							"enum": [
+								"publish",
+								"future",
+								"draft",
+								"pending",
+								"private"
+							]
+						},
+						"type": {
+							"type": "string"
+						},
+						"author": {
+							"type": "object",
+							"properties": {
+								"id": {
+									"type": "integer"
+								},
+								"name": {
+									"type": "string"
+								}
+							},
+							"required": [
+								"id",
+								"name"
+							],
+							"additionalProperties": false
+						},
+						"date": {
+							"type": "string",
+							"format": "date-time"
+						},
+						"modified": {
+							"type": "string",
+							"format": "date-time"
+						},
+						"meta": {
+							"description": "The post's custom fields that the site exposes, by meta key; null when it has no value.",
+							"type": "object",
+							"properties": {
+								"capacity": {
+									"type": [
+										"integer",
+										"null"
+									],
+									"description": "How many seats the event has.",
+									"minimum": 0
+								},
+								"event_date": {
+									"type": [
+										"string",
+										"null"
+									],
+									"description": "The day the event takes place (YYYY-MM-DD).",
+									"pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}$"
+								},
+								"sold_out": {
+									"type": [
+										"boolean",
+										"null"
+									],
+									"description": "Whether every seat is taken."
+								},
+								"venue": {
+									"type": [
+										"string",
+										"null"
+									],
+									"description": "Where the event takes place.",
+									"maxLength": 100
+								}
+							},
+							"additionalProperties": false
+						},
+						"terms": {
+							"description": "The post's terms in each exposed taxonomy, by taxonomy.",
+							"type": "object",
+							"properties": {
+								"category": {
+									"type": "array",
+									"items": {
+										"type": "object",
+										"properties": {
+											"id": {
+												"type": "integer"
+											},
+											"name": {
+												"type": "string"
+											},
+											"slug": {
+												"type": "string"
+											}
+										},
+										"required": [
+											"id",
+											"name",
+											"slug"
+										],
+										"additionalProperties": false
+									}
+								},
+								"event_type": {
+									"type": "array",
+									"items": {
+										"type": "object",
+										"properties": {
+											"id": {
+												"type": "integer"
+											},
+											"name": {
+												"type": "string"
+											},
+											"slug": {
+												"type": "string"
+											}
+										},
+										"required": [
+											"id",
+											"name",
+											"slug"
+										],
+										"additionalProperties": false
+									}
+								},
+								"post_tag": {
+									"type": "array",
+									"items": {
+										"type": "object",
+										"properties": {
+											"id": {
+												"type": "integer"
+											},
+											"name": {
+												"type": "string"
+											},
+											"slug": {
+												"type": "string"
+											}
+										},
+										"required": [
+											"id",
+											"name",
+											"slug"
+										],
+										"additionalProperties": false
+									}
+								}
+							},
+							"additionalProperties": false
+						}
+					},
+					"required": [
+						"id",
+						"title",
+						"status",
+						"type",
+						"author",
+						"date",
+						"modified",
+						"meta",
+						"terms"
+					],
+					"additionalProperties": false
+				}
 			}
 		}
 	},

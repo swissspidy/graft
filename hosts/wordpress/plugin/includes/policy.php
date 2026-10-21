@@ -18,7 +18,7 @@ use WP_Error;
 /**
  * The site's policy.
  *
- * @return array{managed_by: ?string, contact: ?string, authoring: bool, slots: ?string[], scopes: ?string[], managed: ?string}
+ * @return array{managed_by: ?string, contact: ?string, authoring: bool, slots: ?string[], scopes: ?string[], managed: ?string, triggers: bool|array}
  */
 function policy(): array {
 	$defaults = array(
@@ -28,6 +28,7 @@ function policy(): array {
 		'slots'      => null,
 		'scopes'     => null,
 		'managed'    => null,
+		'triggers'   => true,
 	);
 
 	/**
@@ -41,6 +42,10 @@ function policy(): array {
 	 *     @type string[]|null $scopes     Permission scopes their administrators may approve; null for all.
 	 *     @type string|null   $managed    Directory of customization bundles the maintainer ships and manages
 	 *                                     (graft bundle): installed, updated and removed with the code.
+	 *     @type bool|array    $triggers   Whether customizations may act on their own (ADR 0010). Default true;
+	 *                                     false forbids it; an array narrows it: `scopes` (what their automation
+	 *                                     may be granted), `events` (which events they may run on),
+	 *                                     `min_interval` (seconds between scheduled runs) and `max_per_run`.
 	 * }
 	 */
 	$policy = apply_filters( 'graft_policy', $defaults );
@@ -56,6 +61,14 @@ function policy(): array {
 		'slots'      => $list( $policy['slots'] ),
 		'scopes'     => $list( $policy['scopes'] ),
 		'managed'    => is_string( $policy['managed'] ) && '' !== $policy['managed'] ? $policy['managed'] : null,
+		'triggers'   => is_array( $policy['triggers'] )
+			? array(
+				'scopes'       => $list( $policy['triggers']['scopes'] ?? null ),
+				'events'       => $list( $policy['triggers']['events'] ?? null ),
+				'min_interval' => isset( $policy['triggers']['min_interval'] ) ? (int) $policy['triggers']['min_interval'] : null,
+				'max_per_run'  => isset( $policy['triggers']['max_per_run'] ) ? (int) $policy['triggers']['max_per_run'] : null,
+			)
+			: (bool) $policy['triggers'],
 	);
 }
 
@@ -103,7 +116,82 @@ function policy_allows_manifest( array $manifest ) {
 			array( 'status' => 403 )
 		);
 	}
-	return policy_allows_scopes( (array) ( $manifest['permissions'] ?? array() ) );
+	$allowed = policy_allows_scopes( (array) ( $manifest['permissions'] ?? array() ) );
+	if ( is_wp_error( $allowed ) ) {
+		return $allowed;
+	}
+	foreach ( (array) ( $manifest['triggers'] ?? array() ) as $trigger ) {
+		$allowed = policy_allows_trigger( (array) $trigger, (array) ( $trigger['permissions'] ?? array() ) );
+		if ( is_wp_error( $allowed ) ) {
+			return $allowed;
+		}
+	}
+	return true;
+}
+
+/**
+ * Whether the policy lets a trigger run when it runs, with these scopes
+ * granted to the automation user: triggers at all, its event or how often
+ * it runs, and what it may be granted. Checked when a spec is saved, when
+ * it is approved, and before every run.
+ *
+ * @param array<string, mixed> $trigger A trigger (the spec's or the build's).
+ * @param string[]             $scopes  Scopes granted (or requested) for it.
+ * @return true|WP_Error
+ */
+function policy_allows_trigger( array $trigger, array $scopes ) {
+	$policy = policy()['triggers'];
+	$refuse = static function ( string $what ): WP_Error {
+		/* translators: 1: who maintains the site, 2: what is not allowed. */
+		return new WP_Error( 'graft_policy_trigger', sprintf( __( '%1$s does not allow customizations to %2$s.', 'graft' ), maintainer(), $what ), array( 'status' => 403 ) );
+	};
+	if ( false === $policy ) {
+		return $refuse( __( 'act on their own', 'graft' ) );
+	}
+	if ( is_array( $policy ) ) {
+		if ( isset( $trigger['event'] ) && null !== $policy['events'] && ! in_array( $trigger['event'], $policy['events'], true ) ) {
+			$title = trigger_events()[ $trigger['event'] ]['title'] ?? $trigger['event'];
+			/* translators: %s: event, e.g. "a post is published". */
+			return $refuse( sprintf( __( 'act on their own when %s', 'graft' ), strtolower( $title ) ) );
+		}
+		if ( isset( $trigger['schedule'] ) && null !== $policy['min_interval'] && schedule_seconds( (array) $trigger['schedule'] ) < $policy['min_interval'] ) {
+			/* translators: %s: a duration, e.g. "1 day". */
+			return $refuse( sprintf( __( 'act on their own more often than every %s', 'graft' ), human_time_diff( 0, $policy['min_interval'] ) ) );
+		}
+	}
+	$allowed = policy_allows_scopes( $scopes );
+	return is_wp_error( $allowed ) ? $allowed : policy_allows_trigger_scopes( $scopes );
+}
+
+/**
+ * Whether the policy lets the automation user be granted these scopes.
+ *
+ * @param string[] $scopes Scopes.
+ * @return true|WP_Error
+ */
+function policy_allows_trigger_scopes( array $scopes ) {
+	$policy = policy()['triggers'];
+	if ( false === $policy ) {
+		/* translators: %s: who maintains the site. */
+		return new WP_Error( 'graft_policy_trigger', sprintf( __( '%s does not allow customizations to act on their own.', 'graft' ), maintainer() ), array( 'status' => 403 ) );
+	}
+	$allowed = is_array( $policy ) ? $policy['scopes'] : null;
+	$refused = null === $allowed ? array() : array_diff( $scopes, $allowed );
+	if ( array() === $refused ) {
+		return true;
+	}
+	$titles = array_map(
+		static function ( string $scope ): string {
+			return surface_scopes()[ $scope ]['title'] ?? $scope;
+		},
+		array_values( $refused )
+	);
+	return new WP_Error(
+		'graft_policy_trigger',
+		/* translators: 1: who maintains the site, 2: list of permissions. */
+		sprintf( __( '%1$s does not allow customizations acting on their own to: %2$s.', 'graft' ), maintainer(), implode( '; ', $titles ) ),
+		array( 'status' => 403 )
+	);
 }
 
 /**
@@ -154,6 +242,12 @@ function policy_allows_version( string $spec_id, int $version ) {
 	$allowed = policy_allows_manifest( (array) $record['manifest'] );
 	if ( is_wp_error( $allowed ) || ! is_array( $build ) ) {
 		return $allowed;
+	}
+	foreach ( (array) ( $build['triggers'] ?? array() ) as $trigger ) {
+		$allowed = policy_allows_trigger( (array) $trigger, trigger_scopes( (array) $trigger ) );
+		if ( is_wp_error( $allowed ) ) {
+			return $allowed;
+		}
 	}
 	return policy_allows_scopes( build_scopes( $build ) );
 }

@@ -340,7 +340,7 @@ function host_surface(): array {
 		);
 	}
 
-	return array(
+	$surface  = array(
 		'graft'        => 1,
 		'host'         => 'wordpress',
 		'hostVersion'  => $wp_version,
@@ -350,6 +350,13 @@ function host_surface(): array {
 		'audiences'    => array_keys( wp_roles()->roles ),
 		'model'        => content_model(),
 	);
+	$triggers = surface_triggers();
+	if ( null !== $triggers ) {
+		// Only capabilities this install has.
+		$triggers['capabilities'] = array_values( array_intersect( $triggers['capabilities'], array_keys( $capabilities ) ) );
+		$surface['triggers']      = $triggers;
+	}
+	return $surface;
 }
 
 /**

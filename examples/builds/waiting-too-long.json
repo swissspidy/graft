@@ -1,0 +1,732 @@
+{
+	"graft": 1,
+	"spec": {
+		"id": "waiting-too-long",
+		"hash": "sha256:f6f22825d1d979df776a6f50a96baa66c0f8218f17382ef198644cd721f4225b"
+	},
+	"surface": {
+		"host": "wordpress",
+		"hostVersion": "7.1.3",
+		"hash": "sha256:2088a34c3846200f24aedaffb104e7861dddfb143c035e016ee2c21b97e66620"
+	},
+	"mount": {
+		"slot": "dashboard.widget",
+		"title": "Waiting too long"
+	},
+	"ui": {
+		"protocol": "a2ui/v0.9",
+		"catalogId": "graft:wordpress",
+		"components": [
+			{
+				"id": "root",
+				"component": "Table",
+				"rows": {
+					"path": "/waiting/items"
+				},
+				"fields": [
+					{
+						"id": "title",
+						"label": "Title",
+						"type": "string",
+						"primary": true
+					},
+					{
+						"id": "author/name",
+						"label": "Author",
+						"type": "string"
+					},
+					{
+						"id": "days",
+						"label": "Waiting (days)",
+						"type": "integer",
+						"value": {
+							"call": "daysSince",
+							"args": {
+								"value": {
+									"path": "modified"
+								}
+							}
+						}
+					}
+				],
+				"empty": "Nothing is waiting too long"
+			}
+		]
+	},
+	"events": {},
+	"data": {
+		"waiting": {
+			"call": "posts.list",
+			"input": {
+				"post_type": "post",
+				"status": [
+					"pending"
+				],
+				"term": {
+					"taxonomy": "post_tag",
+					"slug": "waiting-too-long"
+				},
+				"orderby": "modified",
+				"order": "asc",
+				"per_page": 50
+			}
+		}
+	},
+	"triggers": {
+		"flag-stale": {
+			"schedule": {
+				"every": "1d",
+				"at": "09:00"
+			},
+			"targets": {
+				"call": "posts.list",
+				"input": {
+					"post_type": "post",
+					"status": [
+						"pending"
+					],
+					"orderby": "modified",
+					"order": "asc",
+					"per_page": 100
+				}
+			},
+			"where": {
+				"$gt": [
+					{
+						"$daysSince": {
+							"$target": "modified"
+						}
+					},
+					7
+				]
+			},
+			"call": "posts.set_terms",
+			"input": {
+				"id": {
+					"$target": "id"
+				},
+				"taxonomy": "post_tag",
+				"terms": [
+					"waiting-too-long"
+				],
+				"mode": "add"
+			},
+			"once": true
+		},
+		"clear-on-publish": {
+			"event": "post.published",
+			"where": {
+				"$eq": [
+					{
+						"$target": "type"
+					},
+					"post"
+				]
+			},
+			"call": "posts.set_terms",
+			"input": {
+				"id": {
+					"$target": "id"
+				},
+				"taxonomy": "post_tag",
+				"terms": [
+					"waiting-too-long"
+				],
+				"mode": "remove"
+			}
+		}
+	},
+	"checks": [
+		{
+			"criterion": "flag-stale",
+			"fixtures": {
+				"users": [
+					{
+						"as": "e",
+						"role": "editor"
+					}
+				],
+				"terms": {
+					"post_tag": [
+						{
+							"name": "Waiting too long",
+							"slug": "waiting-too-long"
+						}
+					]
+				},
+				"posts": [
+					{
+						"title": "Old pending",
+						"status": "pending"
+					}
+				]
+			},
+			"view_as": "e",
+			"clock": {
+				"advanceDays": 8
+			},
+			"steps": [
+				{
+					"trigger": "flag-stale"
+				}
+			],
+			"expect": [
+				{
+					"run": {
+						"trigger": "flag-stale",
+						"calls": 1,
+						"failed": 0
+					}
+				},
+				{
+					"post": {
+						"title": "Old pending",
+						"status": "pending",
+						"terms": {
+							"post_tag": [
+								"waiting-too-long"
+							]
+						}
+					}
+				}
+			]
+		},
+		{
+			"criterion": "leave-others",
+			"fixtures": {
+				"users": [
+					{
+						"as": "e",
+						"role": "editor"
+					}
+				],
+				"terms": {
+					"post_tag": [
+						{
+							"name": "Waiting too long",
+							"slug": "waiting-too-long"
+						}
+					]
+				},
+				"posts": [
+					{
+						"title": "Pending P",
+						"status": "pending"
+					},
+					{
+						"title": "Draft D",
+						"status": "draft"
+					},
+					{
+						"title": "Published X",
+						"status": "publish"
+					}
+				]
+			},
+			"view_as": "e",
+			"clock": {
+				"advanceDays": 8
+			},
+			"steps": [
+				{
+					"trigger": "flag-stale"
+				}
+			],
+			"expect": [
+				{
+					"run": {
+						"trigger": "flag-stale",
+						"calls": 1
+					}
+				},
+				{
+					"post": {
+						"title": "Draft D",
+						"terms": {
+							"post_tag": []
+						}
+					}
+				},
+				{
+					"post": {
+						"title": "Published X",
+						"terms": {
+							"post_tag": []
+						}
+					}
+				}
+			]
+		},
+		{
+			"criterion": "leave-others",
+			"fixtures": {
+				"users": [
+					{
+						"as": "e",
+						"role": "editor"
+					}
+				],
+				"terms": {
+					"post_tag": [
+						{
+							"name": "Waiting too long",
+							"slug": "waiting-too-long"
+						}
+					]
+				},
+				"posts": [
+					{
+						"title": "Pending P",
+						"status": "pending"
+					}
+				]
+			},
+			"view_as": "e",
+			"clock": {
+				"advanceDays": 7
+			},
+			"steps": [
+				{
+					"trigger": "flag-stale"
+				}
+			],
+			"expect": [
+				{
+					"run": {
+						"trigger": "flag-stale",
+						"calls": 0
+					}
+				},
+				{
+					"post": {
+						"title": "Pending P",
+						"terms": {
+							"post_tag": []
+						}
+					}
+				}
+			]
+		},
+		{
+			"criterion": "once",
+			"fixtures": {
+				"users": [
+					{
+						"as": "e",
+						"role": "editor"
+					}
+				],
+				"terms": {
+					"post_tag": [
+						{
+							"name": "Waiting too long",
+							"slug": "waiting-too-long"
+						}
+					]
+				},
+				"posts": [
+					{
+						"title": "Old pending",
+						"status": "pending"
+					}
+				]
+			},
+			"view_as": "e",
+			"clock": {
+				"advanceDays": 8
+			},
+			"steps": [
+				{
+					"trigger": "flag-stale"
+				},
+				{
+					"trigger": "flag-stale"
+				}
+			],
+			"expect": [
+				{
+					"run": {
+						"trigger": "flag-stale",
+						"calls": 0,
+						"matched": 0
+					}
+				},
+				{
+					"post": {
+						"title": "Old pending",
+						"terms": {
+							"post_tag": [
+								"waiting-too-long"
+							]
+						}
+					}
+				}
+			]
+		},
+		{
+			"criterion": "cap",
+			"fixtures": {
+				"users": [
+					{
+						"as": "e",
+						"role": "editor"
+					}
+				],
+				"terms": {
+					"post_tag": [
+						{
+							"name": "Waiting too long",
+							"slug": "waiting-too-long"
+						}
+					]
+				},
+				"posts": [
+					{
+						"title": "Waiting 01",
+						"status": "pending"
+					},
+					{
+						"title": "Waiting 02",
+						"status": "pending"
+					},
+					{
+						"title": "Waiting 03",
+						"status": "pending"
+					},
+					{
+						"title": "Waiting 04",
+						"status": "pending"
+					},
+					{
+						"title": "Waiting 05",
+						"status": "pending"
+					},
+					{
+						"title": "Waiting 06",
+						"status": "pending"
+					},
+					{
+						"title": "Waiting 07",
+						"status": "pending"
+					},
+					{
+						"title": "Waiting 08",
+						"status": "pending"
+					},
+					{
+						"title": "Waiting 09",
+						"status": "pending"
+					},
+					{
+						"title": "Waiting 10",
+						"status": "pending"
+					},
+					{
+						"title": "Waiting 11",
+						"status": "pending"
+					},
+					{
+						"title": "Waiting 12",
+						"status": "pending"
+					},
+					{
+						"title": "Waiting 13",
+						"status": "pending"
+					},
+					{
+						"title": "Waiting 14",
+						"status": "pending"
+					},
+					{
+						"title": "Waiting 15",
+						"status": "pending"
+					},
+					{
+						"title": "Waiting 16",
+						"status": "pending"
+					},
+					{
+						"title": "Waiting 17",
+						"status": "pending"
+					},
+					{
+						"title": "Waiting 18",
+						"status": "pending"
+					},
+					{
+						"title": "Waiting 19",
+						"status": "pending"
+					},
+					{
+						"title": "Waiting 20",
+						"status": "pending"
+					},
+					{
+						"title": "Waiting 21",
+						"status": "pending"
+					}
+				]
+			},
+			"view_as": "e",
+			"clock": {
+				"advanceDays": 8
+			},
+			"steps": [
+				{
+					"trigger": "flag-stale"
+				}
+			],
+			"expect": [
+				{
+					"run": {
+						"trigger": "flag-stale",
+						"calls": 20,
+						"skipped": 1
+					}
+				},
+				{
+					"post": {
+						"title": "Waiting 01",
+						"terms": {
+							"post_tag": [
+								"waiting-too-long"
+							]
+						}
+					}
+				},
+				{
+					"post": {
+						"title": "Waiting 21",
+						"terms": {
+							"post_tag": []
+						}
+					}
+				}
+			]
+		},
+		{
+			"criterion": "clear-on-publish",
+			"fixtures": {
+				"users": [
+					{
+						"as": "e",
+						"role": "editor"
+					}
+				],
+				"terms": {
+					"post_tag": [
+						{
+							"name": "Waiting too long",
+							"slug": "waiting-too-long"
+						}
+					]
+				},
+				"posts": [
+					{
+						"title": "Tagged",
+						"status": "pending",
+						"terms": {
+							"post_tag": [
+								"waiting-too-long"
+							]
+						}
+					}
+				]
+			},
+			"view_as": "e",
+			"steps": [
+				{
+					"trigger": "clear-on-publish",
+					"target": {
+						"title": "Tagged"
+					}
+				}
+			],
+			"expect": [
+				{
+					"run": {
+						"trigger": "clear-on-publish",
+						"calls": 1,
+						"failed": 0
+					}
+				},
+				{
+					"post": {
+						"title": "Tagged",
+						"status": "publish",
+						"terms": {
+							"post_tag": []
+						}
+					}
+				}
+			]
+		},
+		{
+			"criterion": "widget",
+			"fixtures": {
+				"users": [
+					{
+						"as": "e",
+						"role": "editor"
+					}
+				],
+				"terms": {
+					"post_tag": [
+						{
+							"name": "Waiting too long",
+							"slug": "waiting-too-long"
+						}
+					]
+				},
+				"posts": [
+					{
+						"title": "Old A",
+						"status": "pending"
+					},
+					{
+						"title": "Old B",
+						"status": "pending"
+					},
+					{
+						"title": "Draft C",
+						"status": "draft"
+					}
+				]
+			},
+			"view_as": "e",
+			"clock": {
+				"advanceDays": 8
+			},
+			"steps": [
+				{
+					"trigger": "flag-stale"
+				}
+			],
+			"expect": [
+				{
+					"rows": [
+						"Old A",
+						"Old B"
+					]
+				},
+				{
+					"columns": [
+						"Title",
+						"Author",
+						"Waiting (days)"
+					]
+				},
+				{
+					"cell": {
+						"row": {
+							"title": "Old A"
+						},
+						"column": "Waiting (days)",
+						"text": "8"
+					}
+				}
+			]
+		},
+		{
+			"criterion": "widget",
+			"fixtures": {
+				"users": [
+					{
+						"as": "e",
+						"role": "editor"
+					}
+				],
+				"terms": {
+					"post_tag": [
+						{
+							"name": "Waiting too long",
+							"slug": "waiting-too-long"
+						}
+					]
+				},
+				"posts": [
+					{
+						"title": "Old A",
+						"status": "pending"
+					}
+				]
+			},
+			"view_as": "e",
+			"clock": {
+				"advanceDays": 8
+			},
+			"expect": [
+				{
+					"rows": []
+				}
+			]
+		},
+		{
+			"criterion": "empty",
+			"fixtures": {
+				"users": [
+					{
+						"as": "e",
+						"role": "editor"
+					}
+				],
+				"terms": {
+					"post_tag": [
+						{
+							"name": "Waiting too long",
+							"slug": "waiting-too-long"
+						}
+					]
+				},
+				"posts": [
+					{
+						"title": "Fresh",
+						"status": "pending"
+					}
+				]
+			},
+			"view_as": "e",
+			"expect": [
+				{
+					"rows": []
+				},
+				{
+					"text": "Nothing is waiting too long"
+				}
+			]
+		}
+	],
+	"refs": {
+		"slot": "dashboard.widget",
+		"capabilities": [
+			"posts.list"
+		],
+		"scopes": [
+			"posts:read"
+		],
+		"catalog": {
+			"Table": [
+				"empty",
+				"fields",
+				"rows"
+			]
+		},
+		"triggers": {
+			"events": [
+				"post.published"
+			],
+			"capabilities": [
+				"posts.list",
+				"posts.set_terms"
+			],
+			"scopes": [
+				"posts.terms:write",
+				"posts:read"
+			]
+		}
+	},
+	"provenance": {
+		"compiler": "graft-compiler/0.1.0+a2ui",
+		"strategy": "handwritten"
+	}
+}

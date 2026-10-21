@@ -1,4 +1,4 @@
-import { SandboxCallError, type Sandbox } from '@swissspidy/graft-core';
+import { SandboxCallError, type Sandbox, type TriggerRun } from '@swissspidy/graft-core';
 import type { HostDump } from './surface-types.ts';
 
 /**
@@ -43,6 +43,9 @@ export function protocolSandbox(send: SandboxTransport): ProtocolSandbox {
 		},
 		async assert(kind, expected) {
 			return op<{ ok: boolean; actual: unknown }>({ op: 'assert', kind, expected });
+		},
+		async fire({ build, trigger, grant, limit, now, target }) {
+			return op<TriggerRun>({ op: 'fire', build, trigger, grant, limit, now, target: target ?? null });
 		},
 		async patch(patch) {
 			await op({ op: 'patch', patch });

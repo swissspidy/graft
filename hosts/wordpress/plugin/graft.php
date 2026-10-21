@@ -27,6 +27,7 @@ require_once __DIR__ . '/includes/current-surface.php';
 require_once __DIR__ . '/includes/lifecycle.php';
 require_once __DIR__ . '/includes/store.php';
 require_once __DIR__ . '/includes/policy.php';
+require_once __DIR__ . '/includes/triggers.php';
 require_once __DIR__ . '/includes/runtime.php';
 require_once __DIR__ . '/includes/slots.php';
 require_once __DIR__ . '/includes/rest.php';
@@ -52,3 +53,19 @@ add_action( 'admin_init', __NAMESPACE__ . '\maybe_sync_managed', 20 );
 add_action( 'rest_api_init', __NAMESPACE__ . '\maybe_sync_managed', 20 );
 add_action( 'admin_notices', __NAMESPACE__ . '\surface_change_notice' );
 add_action( 'admin_menu', __NAMESPACE__ . '\register_admin_screen' );
+
+// Triggers (ADR 0010): the hourly tick, event jobs, and the automation user.
+add_action( 'rest_api_init', __NAMESPACE__ . '\register_trigger_routes' );
+add_action( 'init', __NAMESPACE__ . '\schedule_trigger_tick' );
+add_action( 'graft_triggers_tick', __NAMESPACE__ . '\run_due_triggers', 10, 0 );
+add_action( 'graft_trigger_event', __NAMESPACE__ . '\run_event_trigger', 10, 4 );
+add_action( 'transition_post_status', __NAMESPACE__ . '\on_post_transition', 10, 3 );
+add_filter( 'authenticate', __NAMESPACE__ . '\refuse_service_login', 100 );
+add_filter( 'wp_is_application_passwords_available_for_user', __NAMESPACE__ . '\no_service_app_passwords', 10, 2 );
+add_filter( 'user_has_cap', __NAMESPACE__ . '\service_user_has_cap', 10, 4 );
+register_deactivation_hook(
+	__FILE__,
+	static function (): void {
+		wp_clear_scheduled_hook( 'graft_triggers_tick' );
+	}
+);
