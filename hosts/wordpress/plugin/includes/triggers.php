@@ -75,7 +75,7 @@ function surface_triggers(): ?array {
 			array_filter(
 				$unattended,
 				static function ( string $name ) use ( $map ): bool {
-					return isset( $map[ $name ] ) && wp_get_ability( $map[ $name ]['ability'] );
+					return isset( $map[ $name ] ) && wp_has_ability( $map[ $name ]['ability'] );
 				}
 			)
 		),

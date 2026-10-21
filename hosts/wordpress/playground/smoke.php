@@ -577,6 +577,180 @@ Graft\sync_managed( true );
 check( 'a managed customization whose bundle is gone is archived', 'archived' === Graft\version_record( Graft\get_version_post( 'stale-drafts', 1 ) )['state'] && null === Graft\managed_by( 'stale-drafts' ) );
 rmdir( $dir );
 
+// ---------------------------------------------------------------------------
+// Triggers (ADR 0010).
+// ---------------------------------------------------------------------------
+
+$policy = array();
+wp_set_current_user( $admin );
+
+// The runner evaluates like the TypeScript core.
+$conformance = json_decode( (string) file_get_contents( '/graft-fixtures/trigger-expressions.json' ), true );
+$disagree    = array();
+foreach ( $conformance['cases'] as $case ) {
+	$value = Graft\evaluate_trigger_value( $case['value'], $conformance['target'], (float) strtotime( $conformance['now'] ) );
+	if ( Graft\canonical_json( $value ) !== Graft\canonical_json( $case['expected'] ) ) {
+		$disagree[] = array( $case['value'], $value );
+	}
+}
+check( 'trigger expressions evaluate as in the core', array() === $disagree && count( $conformance['cases'] ) > 10, $disagree );
+
+$host_triggers = Graft\host_surface()['triggers'] ?? null;
+check( 'the surface declares events and the capabilities triggers may use', isset( $host_triggers['events']['post.published'] ) && in_array( 'posts.set_terms', $host_triggers['capabilities'] ?? array(), true ) && ! in_array( 'site.info', $host_triggers['capabilities'] ?? array(), true ), $host_triggers['capabilities'] ?? null );
+
+// The automation user.
+$service = Graft\service_user_id();
+check( 'the automation user exists and has no role', $service > 0 && array() === get_userdata( $service )->roles );
+check( 'nobody can sign in as the automation user', is_wp_error( wp_authenticate( Graft\SERVICE_LOGIN, 'anything' ) ) && is_wp_error( apply_filters( 'authenticate', get_userdata( $service ), Graft\SERVICE_LOGIN, '' ) ) );
+check( 'the automation user has no application passwords', false === wp_is_application_passwords_available_for_user( get_userdata( $service ) ) );
+check( 'outside a run it can do nothing', ! user_can( $service, 'read' ) && ! user_can( $service, 'edit_posts' ) );
+$inside = Graft\as_service_user(
+	array( 'posts:read' ),
+	static function () use ( $service ): array {
+		return array( get_current_user_id() === $service, current_user_can( 'edit_others_posts' ), current_user_can( 'manage_options' ), current_user_can( 'publish_posts' ) );
+	}
+);
+check( 'in a run it has what its grant maps to, and nothing that manages the site', array( true, true, false, false ) === $inside, $inside );
+check( 'after a run the previous user is back', get_current_user_id() === $admin && ! user_can( $service, 'edit_posts' ) );
+
+// A customization with triggers: attached, verified, approved. Earlier
+// checks changed the host's surface, so the build targets the current one.
+$wtl                            = $examples['waiting-too-long'];
+$wtl['build']['surface']['hash'] = Graft\current_surface( true )['hash'];
+$created = Graft\create_version(
+	array(
+		'source'   => $wtl['source'],
+		'manifest' => $wtl['manifest'],
+		'title'    => $wtl['title'],
+	)
+);
+$bad     = $wtl['build'];
+unset( $bad['triggers']['clear-on-publish'] );
+check( "a build without the spec's triggers is refused", is_wp_error( Graft\attach_build( 'waiting-too-long', $created['version'], $bad, array( 'passed' => true ) ) ) );
+$attached = Graft\attach_build( 'waiting-too-long', $created['version'], $wtl['build'], array( 'passed' => true ) );
+check( 'a build with triggers needs approval', 'needs_approval' === ( $attached['state'] ?? null ), $attached['state'] ?? $attached );
+$approved_t = Graft\approve_version( 'waiting-too-long', $created['version'] );
+check(
+	'approval grants each trigger only what the spec lists for it',
+	array(
+		'flag-stale'       => array( 'posts:read', 'posts.terms:write' ),
+		'clear-on-publish' => array( 'posts.terms:write' ),
+	) === ( $approved_t['grant']['triggers'] ?? null ) && array( 'posts:read' ) === $approved_t['grant']['scopes'],
+	$approved_t['grant'] ?? $approved_t
+);
+$bad_manifest                                   = $wtl['manifest'];
+$bad_manifest['triggers']['flag-stale']['schedule'] = array( 'every' => '1h' );
+$bad_manifest['triggers']['clear-on-publish']['event'] = 'post.deleted';
+check( 'manifests with unknown events are refused', is_wp_error( Graft\validate_manifest( $bad_manifest ) ) );
+
+wp_insert_term( 'Waiting too long', 'post_tag', array( 'slug' => 'waiting-too-long' ) );
+$old_date = static function ( int $days ): string {
+	return gmdate( 'Y-m-d H:i:s', time() - $days * DAY_IN_SECONDS );
+};
+$stale_post = wp_insert_post( array( 'post_title' => 'Stale story', 'post_status' => 'pending', 'post_author' => $contributor, 'post_date' => $old_date( 10 ) ) );
+$fresh_post = wp_insert_post( array( 'post_title' => 'Fresh story', 'post_status' => 'pending', 'post_author' => $contributor, 'post_date' => $old_date( 2 ) ) );
+$tags_of    = static function ( int $id ): array {
+	clean_post_cache( $id );
+	return wp_list_pluck( wp_get_post_terms( $id, 'post_tag' ), 'slug' );
+};
+
+// The schedule: the first tick only starts it; the next 09:00 runs it.
+$now  = time();
+$runs = Graft\run_due_triggers( $now );
+check( 'a new trigger waits for its first slot', array() === $runs && isset( Graft\trigger_states()['waiting-too-long/flag-stale']['since'] ) );
+$tick = Graft\latest_slot( '09:00', $now + DAY_IN_SECONDS ) + 5 * MINUTE_IN_SECONDS;
+$runs = Graft\run_due_triggers( $tick );
+check( 'the tick after 09:00 runs it as the automation user', 1 === count( $runs ) && 'ok' === $runs[0]['status'] && $service === $runs[0]['user'], $runs );
+check( 'it tags the post waiting too long, and not the fresh one', array( 'waiting-too-long' ) === $tags_of( $stale_post ) && array() === $tags_of( $fresh_post ) );
+check( 'tagging does not count as touching the post', strtotime( get_post( $stale_post )->post_modified_gmt . ' UTC' ) < $now - 9 * DAY_IN_SECONDS );
+check( 'it does not run twice for one slot', array() === Graft\run_due_triggers( $tick + HOUR_IN_SECONDS ) );
+$next = Graft\run_due_triggers( $tick + DAY_IN_SECONDS );
+check( 'the next morning it runs again and acts on nothing new (once)', 1 === count( $next ) && array() === $next[0]['calls'] && 0 === $next[0]['matched'], $next );
+$log_t = Graft\trigger_log();
+check( 'the run is in the log administrators see', 'flag-stale' === ( end( $log_t )['trigger'] ?? null ) );
+
+// Dry runs, pausing, the kill switch.
+$another = wp_insert_post( array( 'post_title' => 'Another stale story', 'post_status' => 'pending', 'post_date' => $old_date( 12 ) ) );
+$dry     = rest( 'POST', '/graft/v1/triggers/waiting-too-long/flag-stale/run', array( 'dry_run' => true ) );
+check( 'a dry run plans the calls and changes nothing', 200 === $dry['status'] && 'dry-run' === $dry['data']['status'] && 1 === count( $dry['data']['calls'] ) && array() === $tags_of( $another ), $dry );
+rest( 'POST', '/graft/v1/triggers/waiting-too-long/flag-stale/pause' );
+$paused = Graft\run_stored_trigger( 'waiting-too-long', 'flag-stale', 'manual' );
+check( 'a paused trigger does not run', 'refused' === $paused['status'] && array() === $tags_of( $another ), $paused );
+check( 'nor on its schedule', array() === Graft\run_due_triggers( $tick + 2 * DAY_IN_SECONDS ) );
+rest( 'POST', '/graft/v1/triggers/waiting-too-long/flag-stale/resume' );
+rest( 'POST', '/graft/v1/triggers/pause-all' );
+$killed = Graft\run_stored_trigger( 'waiting-too-long', 'flag-stale', 'manual' );
+check( 'pausing all triggers stops every one', 'refused' === $killed['status'] && null !== Graft\triggers_disabled() && array() === $tags_of( $another ), $killed );
+rest( 'POST', '/graft/v1/triggers/resume-all' );
+$manual = rest( 'POST', '/graft/v1/triggers/waiting-too-long/flag-stale/run' );
+check( 'an administrator can run it now', 'ok' === ( $manual['data']['status'] ?? null ) && array( 'waiting-too-long' ) === $tags_of( $another ), $manual );
+$listed_t = rest( 'GET', '/graft/v1/triggers' );
+$entry_t  = $listed_t['data']['triggers'][0] ?? array();
+check( 'administrators see each trigger with its grant, cap and next run', 200 === $listed_t['status'] && 2 === count( $listed_t['data']['triggers'] ) && 20 === ( $entry_t['limit'] ?? null ) && null !== ( $entry_t['nextRun'] ?? null ), $listed_t['data'] );
+wp_set_current_user( $editor );
+check( 'other people do not', 403 === rest( 'GET', '/graft/v1/triggers' )['status'] );
+wp_set_current_user( $admin );
+
+// The policy.
+$policy['triggers'] = false;
+$forbidden          = Graft\run_stored_trigger( 'waiting-too-long', 'flag-stale', 'manual' );
+check( 'a policy that forbids triggers stops them', 'refused' === $forbidden['status'] && null !== Graft\triggers_disabled(), $forbidden );
+$saved = rest( 'POST', '/graft/v1/specs', array( 'source' => $wtl['source'] . "\n", 'manifest' => $wtl['manifest'] ) );
+check( 'and refuses new specs with triggers', 403 === $saved['status'] && 'graft_policy_trigger' === $saved['code'], $saved );
+$policy['triggers'] = array( 'scopes' => array( 'posts:read' ) );
+$narrow             = Graft\run_stored_trigger( 'waiting-too-long', 'flag-stale', 'manual' );
+check( 'a policy can narrow what triggers may be granted', 'refused' === $narrow['status'] && false !== strpos( $narrow['error'], 'categories, tags' ), $narrow );
+$policy['triggers'] = array( 'events' => array( 'post.submitted' ) );
+check( 'and which events they may run on', is_wp_error( Graft\policy_allows_version( 'waiting-too-long', $created['version'] ) ) );
+$policy = array();
+
+// The gateway, for a trigger's calls.
+$refusals = count( Graft\audit_log() );
+$outside  = Graft\as_service_user(
+	array( 'posts:read', 'posts.status:write' ),
+	static function () use ( $wtl, $stale_post ) {
+		return Graft\trigger_call( 'waiting-too-long', 'flag-stale', $wtl['build']['triggers']['flag-stale'], 'posts.update_status', array( 'id' => $stale_post, 'status' => 'publish' ), array( 'posts:read', 'posts.status:write' ), false );
+	}
+);
+$audit_t  = Graft\audit_log();
+$logged   = end( $audit_t );
+check( "a trigger cannot call what it does not declare, and the refusal is logged with the trigger", is_wp_error( $outside ) && 'pending' === get_post_status( $stale_post ) && count( Graft\audit_log() ) > $refusals && 'flag-stale' === ( $logged['trigger'] ?? null ) && $service === $logged['user'], $logged );
+$ungranted = Graft\as_service_user(
+	array( 'posts:read' ),
+	static function () use ( $wtl, $stale_post ) {
+		return Graft\trigger_call( 'waiting-too-long', 'flag-stale', $wtl['build']['triggers']['flag-stale'], 'posts.set_terms', array( 'id' => $stale_post, 'taxonomy' => 'post_tag', 'terms' => array( 'waiting-too-long' ), 'mode' => 'remove' ), array( 'posts:read' ), false );
+	}
+);
+check( 'nor what its grant does not cover', is_wp_error( $ungranted ) && 'graft_not_granted' === $ungranted->get_error_code() && array( 'waiting-too-long' ) === $tags_of( $stale_post ) );
+
+// Events.
+wp_set_current_user( $editor );
+wp_update_post( array( 'ID' => $stale_post, 'post_status' => 'publish' ) );
+$job = wp_next_scheduled( 'graft_trigger_event', array( 'waiting-too-long', 'clear-on-publish', $stale_post, 'post.published' ) );
+check( 'publishing queues the event trigger instead of running it in the request', false !== $job && array( 'waiting-too-long' ) === $tags_of( $stale_post ) );
+wp_set_current_user( 0 );
+$event_run = Graft\run_event_trigger( 'waiting-too-long', 'clear-on-publish', $stale_post, 'post.published' );
+check( 'the event job takes the tag off as the automation user', 'ok' === ( $event_run['status'] ?? null ) && array() === $tags_of( $stale_post ), $event_run );
+Graft\as_service_user(
+	array( 'posts:read', 'posts.status:write' ),
+	static function () use ( $another ): void {
+		wp_update_post( array( 'ID' => $another, 'post_status' => 'publish' ) );
+	}
+);
+check( 'events a trigger run causes start no other trigger', false === wp_next_scheduled( 'graft_trigger_event', array( 'waiting-too-long', 'clear-on-publish', $another, 'post.published' ) ) );
+Graft\update_trigger_state( 'waiting-too-long/clear-on-publish', array( 'event_runs' => array_fill( 0, 60, time() ) ) );
+$limited = Graft\run_event_trigger( 'waiting-too-long', 'clear-on-publish', $another, 'post.published' );
+check( 'event triggers are rate-limited', 'rate-limited' === ( $limited['status'] ?? null ) && array( 'waiting-too-long' ) === $tags_of( $another ), $limited );
+
+// A trigger that keeps failing pauses itself.
+wp_delete_term( (int) get_term_by( 'slug', 'waiting-too-long', 'post_tag' )->term_id, 'post_tag' );
+foreach ( array( 1, 2, 3 ) as $day ) {
+	$failing = wp_insert_post( array( 'post_title' => "Failing $day", 'post_status' => 'pending', 'post_date' => $old_date( 20 ) ) );
+	$failed  = Graft\run_stored_trigger( 'waiting-too-long', 'flag-stale', 'manual' );
+}
+$state_t = Graft\trigger_states()['waiting-too-long/flag-stale'];
+check( 'three failed runs in a row pause the trigger', 'failed' === $failed['status'] && ! empty( $state_t['paused'] ) && 3 === $state_t['failures'], array( $failed, $state_t ) );
+
 global $wp_version;
 echo wp_json_encode(
 	array(

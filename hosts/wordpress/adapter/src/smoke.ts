@@ -1,6 +1,7 @@
-import { mkdtemp, rm, writeFile } from 'node:fs/promises';
+import { copyFile, mkdtemp, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { parseArgs } from 'node:util';
 import { exampleFixtures } from './fixtures.ts';
 import { lastJsonLine, runPhp } from './playground.ts';
@@ -25,6 +26,7 @@ async function main(argv: string[]): Promise<number> {
 	});
 	const fixtures = await mkdtemp(join(tmpdir(), 'graft-fixtures-'));
 	await writeFile(join(fixtures, 'examples.json'), JSON.stringify(await exampleFixtures()));
+	await copyFile(fileURLToPath(new URL('../../../../fixtures/triggers/expressions.json', import.meta.url)), join(fixtures, 'trigger-expressions.json'));
 	let failed = 0;
 	for (const wp of values.wp ?? ['7.1']) {
 		for (const php of values.php ?? ['7.4', '8.4']) {
