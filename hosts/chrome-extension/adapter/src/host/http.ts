@@ -36,7 +36,12 @@ export function buildRequest(binding: HttpBinding, input: unknown, origin: strin
 		if (value === undefined || value === null || value === '') {
 			throw new CallError('graft_invalid_input', `The input has no "${name}" for the request path.`);
 		}
-		return encodeURIComponent(text(value));
+		const segment = text(value);
+		// encodeURIComponent leaves dots alone, and URL resolves "." and "..": they would leave the binding's path.
+		if (segment === '.' || segment === '..') {
+			throw new CallError('graft_invalid_input', `"${name}" is not a valid path segment.`);
+		}
+		return encodeURIComponent(segment);
 	});
 	const url = new URL(path, origin);
 	if (url.origin !== new URL(origin).origin) {

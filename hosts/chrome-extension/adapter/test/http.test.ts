@@ -20,6 +20,11 @@ describe('HTTP bindings', () => {
 		expect(buildRequest(list.binding, { project: '../members' }, 'https://app.example.com').url).toBe('https://app.example.com/api/projects/..%2Fmembers/tasks');
 		expect(() => buildRequest({ method: 'GET', path: '//evil.example/x' }, {}, 'https://app.example.com')).toThrow(CallError);
 		expect(() => buildRequest(list.binding, {}, 'https://app.example.com')).toThrow(/no "project"/);
+		// Dots are not encoded, and URL would resolve them: /api/projects/../tasks is /api/tasks.
+		for (const project of ['.', '..']) {
+			expect(() => buildRequest(list.binding, { project }, 'https://app.example.com')).toThrow(/not a valid path segment/);
+		}
+		expect(buildRequest(list.binding, { project: '...' }, 'https://app.example.com').url).toBe('https://app.example.com/api/projects/.../tasks');
 	});
 
 	it('cuts answers down to the declared output', () => {

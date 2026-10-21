@@ -115,8 +115,12 @@ records that it moved.
 This is weaker than WordPress and EmDash in one way that matters: the
 ladder runs *after* the app changed, not ahead of it. There is no next
 version to canary against. The gap is as long as it takes the next probe
-or page view to notice, and what users see in it is a customization that
-says its data could not be loaded, never one that shows wrong data.
+or page view to notice. An answer that no longer matches its schema
+fails closed: users see a customization that says its data could not be
+loaded, not wrong data. A change that keeps the shape but changes the
+meaning (a field that now holds something else) passes the schema check
+and the fingerprint alike, and is not detected; only the checks in a
+faithful copy, or people, would notice it.
 
 ### The gateway lives in the service worker
 

@@ -62,6 +62,7 @@ await writeFile(`${out}/graft/surfaces.json`, JSON.stringify(loaded));
 await writeFile(`${out}/graft/customizations.json`, JSON.stringify(loadedBundles));
 const { version } = JSON.parse(await readFile(`${root}package.json`, 'utf8')) as { version: string };
 await writeFile(`${out}/manifest.json`, `${JSON.stringify(extensionManifest(loaded, version === '0.0.0' ? '0.0.1' : version), null, 2)}\n`);
+await mkdir(`${root}dist`, { recursive: true });
 await writeFile(`${root}dist/.gitignore`, '*\n');
 
 // Manifest V3 refuses generated code: make sure none slipped into a bundle through a dependency.

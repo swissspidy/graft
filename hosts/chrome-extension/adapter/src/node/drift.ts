@@ -197,7 +197,16 @@ export async function observe(surface: Surface, options: ObserveOptions): Promis
 				capabilities[id] = { status: 'broken', problems: [`The app answered ${response.status}.`] };
 				continue;
 			}
-			const body = (await response.json().catch(() => undefined)) as unknown;
+			const parsed = await response.json().then(
+				(value: unknown) => ({ ok: true as const, value }),
+				() => ({ ok: false as const }),
+			);
+			if (!parsed.ok) {
+				// A sign-in page after the session expired, say: broken, with no shape to replace the declared output.
+				capabilities[id] = { status: 'broken', problems: ['The app did not answer with JSON.'] };
+				continue;
+			}
+			const body = parsed.value;
 			// Positions in lists are data, not structure: "/tasks/3 …" and "/tasks/0 …" are the same problem.
 			const problems = [...new Set(checkOutput(capability, body).problems.map((p) => p.replace(/\/\d+(?=\/|\s|$)/g, '/[]')))].sort();
 			const undeclared = undeclaredKeys(capability.output, body);

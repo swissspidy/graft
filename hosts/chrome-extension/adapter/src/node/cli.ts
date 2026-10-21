@@ -3,7 +3,7 @@ import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { parseArgs } from 'node:util';
 import { canonicalJson, hashSurface, validateSpec, type Build, type Surface } from '@swissspidy/graft-core';
-import { startTasklet, type TaskletVersion } from '../../../fixtures/tasklet/server.ts';
+import { startTasklet } from '../../../fixtures/tasklet/server.ts';
 import { tasklet, taskletProbes } from '../apps/tasklet.ts';
 import { appSurface } from '../host/surface.ts';
 import { checkDrift, formatDriftReport, observe, observedVersion, type Probes } from './drift.ts';
@@ -82,13 +82,22 @@ if (command === 'surface') {
 	const surface = JSON.parse(await readFile(values.surface ?? SURFACE, 'utf8')) as Surface;
 	const builds = await Promise.all(positionals.map(async (file) => JSON.parse(await readFile(file, 'utf8')) as Build));
 	const probes = values.probes ? (JSON.parse(await readFile(values.probes, 'utf8')) as Probes) : taskletProbes;
-	const server = values.url ? undefined : await startTasklet({ version: Number(values['app-version'] ?? 1) as TaskletVersion });
+	const appVersion = Number(values['app-version'] ?? 1);
+	if (appVersion !== 1 && appVersion !== 2 && appVersion !== 3) {
+		console.error('--app-version must be 1, 2 or 3.');
+		process.exit(2);
+	}
+	const server = values.url ? undefined : await startTasklet({ version: appVersion });
 	try {
 		const report = await checkDrift(surface, builds, { url: values.url ?? server!.url, probes });
 		if (values.out) {
 			await writeFile(values.out, `${JSON.stringify(report.surface, null, '\t')}\n`);
 		}
-		console.log(values.json ? JSON.stringify(report, null, 2) : formatDriftReport(report));
+		// With --json, one document: the report, and the ladder's outcomes when it ran.
+		const upgrades: Array<{ spec: string; outcome: string; path?: unknown }> = [];
+		if (!values.json) {
+			console.log(formatDriftReport(report));
+		}
 		process.exitCode = report.drifted ? 1 : 0;
 		if (values.spec && builds.length > 0) {
 			if (values.url && !values.sandbox) {
@@ -100,21 +109,32 @@ if (command === 'surface') {
 				const source = await readFile(file, 'utf8');
 				sources.set(validateSpec(source).spec?.manifest.id ?? file, source);
 			}
-			const sandbox: FixtureSandbox = values.sandbox ? connectSandbox(values.sandbox) : await startTaskletSandbox({ version: Number(values['app-version'] ?? 1) as TaskletVersion });
+			const sandbox: FixtureSandbox = values.sandbox ? connectSandbox(values.sandbox) : await startTaskletSandbox({ version: appVersion });
 			try {
-				console.log(values.json ? '' : 'Upgrade ladder (no model: regeneration is not tried):');
+				if (!values.json) {
+					console.log('Upgrade ladder (no model: regeneration is not tried):');
+				}
 				for (const build of builds) {
 					const source = sources.get(build.spec.id);
 					if (!source) {
-						console.log(`  ${build.spec.id}: no spec`);
+						upgrades.push({ spec: build.spec.id, outcome: 'no_spec' });
 						continue;
 					}
 					const result = await upgradeAfterDrift({ report, from: surface, build, source, sandbox });
-					console.log(values.json ? JSON.stringify({ spec: build.spec.id, outcome: result.outcome, path: result.path }) : `  ${build.spec.id}: ${result.outcome} (${result.path.map((step) => step.state).join(' → ')})`);
+					upgrades.push({ spec: build.spec.id, outcome: result.outcome, path: result.path });
 				}
 			} finally {
 				await sandbox.close();
 			}
+			if (!values.json) {
+				for (const upgrade of upgrades) {
+					const path = upgrade.path as Array<{ state: string }> | undefined;
+					console.log(`  ${upgrade.spec}: ${upgrade.outcome === 'no_spec' ? 'no spec' : `${upgrade.outcome} (${path!.map((step) => step.state).join(' → ')})`}`);
+				}
+			}
+		}
+		if (values.json) {
+			console.log(JSON.stringify({ ...report, ...(upgrades.length ? { upgrades } : {}) }, null, 2));
 		}
 	} finally {
 		await server?.close();

@@ -1,6 +1,7 @@
 import { randomUUID } from 'node:crypto';
 import { createServer, type IncomingMessage, type ServerResponse } from 'node:http';
 import type { AddressInfo } from 'node:net';
+import { pathToFileURL } from 'node:url';
 
 /**
  * Tasklet: a tiny task tracker that stands in for a third-party web app
@@ -388,7 +389,7 @@ export async function startTasklet(options: TaskletOptions = {}): Promise<Taskle
 }
 
 // `tsx server.ts [--port 4490] [--version 1]`: the app on its own, with the demo data.
-if (import.meta.url === `file://${process.argv[1]}`) {
+if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
 	const arg = (name: string) => {
 		const i = process.argv.indexOf(`--${name}`);
 		return i >= 0 ? process.argv[i + 1] : undefined;
