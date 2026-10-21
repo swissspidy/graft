@@ -104,6 +104,11 @@ The snapshot gains two things, both generic:
   takes `"in": "<name>"`: `{"rows": ["Interview"], "in": "pending"}`.
   Without `in`, `rows` reads the first list, as before.
 
+- **A hidden Button is there, not available.** It is in the snapshot as
+  an action the viewer cannot use, as a hidden table row action always
+  was. So a direct call (below) can name the Publish button a contributor
+  never sees. Hosts draw nothing for it, as before.
+
 Checks can drag: the step `{"drop": {"title": "Outline"}, "on":
 "pending"}` presses the card's button for `pending`. The step fails when
 the viewer has no such button, so a drop is verified exactly as the

@@ -183,6 +183,10 @@ export function walkA2UI(build: A2UIBuild, ctx: EvalContext, entered: Record<str
 		}
 		seen.add(key);
 		if (component.visible !== undefined && !at.resolveDynamicValue(component.visible)) {
+			// A hidden button is there but not available, as a hidden row action is: a direct call can still name it.
+			if (component.component === 'Button') {
+				drawer.button(buttonOf(component, at, row, false));
+			}
 			return;
 		}
 		draw(component, at, row);
@@ -257,6 +261,20 @@ export function walkA2UI(build: A2UIBuild, ctx: EvalContext, entered: Record<str
 		}
 	};
 
+	/** A Button as drawn: usable when it is shown and its checks pass. */
+	const buttonOf = (component: A2UIComponent, at: DataContext, row: unknown, shown: boolean): DrawnButton => {
+		const checks = (component.checks as Array<{ condition: unknown }> | undefined) ?? [];
+		const passes = shown && checks.every((check) => Boolean(at.resolveDynamicValue(check.condition)));
+		const base = {
+			id: component.actionId === undefined ? component.id : text(at.resolveDynamicValue(component.actionId)),
+			label: label(component.child, at),
+			...(typeof component.variant === 'string' ? { variant: component.variant } : {}),
+			...(row !== undefined ? { row } : {}),
+			...(typeof component.dropTarget === 'string' ? { dropTarget: component.dropTarget } : {}),
+		};
+		return press(component.id, component.action, at, row, base, passes);
+	};
+
 	const draw = (component: A2UIComponent, at: DataContext, row: unknown): void => {
 		const id = component.id;
 		switch (component.component) {
@@ -273,19 +291,9 @@ export function walkA2UI(build: A2UIBuild, ctx: EvalContext, entered: Record<str
 			case 'Text':
 				drawer.text(text(at.resolveDynamicValue(component.text)), typeof component.variant === 'string' ? component.variant : undefined, id);
 				return;
-			case 'Button': {
-				const checks = (component.checks as Array<{ condition: unknown }> | undefined) ?? [];
-				const passes = checks.every((check) => Boolean(at.resolveDynamicValue(check.condition)));
-				const base = {
-					id: component.actionId === undefined ? id : text(at.resolveDynamicValue(component.actionId)),
-					label: label(component.child, at),
-					...(typeof component.variant === 'string' ? { variant: component.variant } : {}),
-					...(row !== undefined ? { row } : {}),
-					...(typeof component.dropTarget === 'string' ? { dropTarget: component.dropTarget } : {}),
-				};
-				drawer.button(press(id, component.action, at, row, base, passes));
+			case 'Button':
+				drawer.button(buttonOf(component, at, row, true));
 				return;
-			}
 			case 'TextField':
 			case 'CheckBox': {
 				const fallback = component.component === 'CheckBox' ? false : '';

@@ -44,6 +44,8 @@ async function boardBuild(change?: (build: A2UIBuild) => void): Promise<Build> {
 		{ criterion: 'open-only', fixtures, view_as: 'm', expect: [{ rows: ['Open A'], in: 'open' }, { rows: ['Done B'], in: 'done' }, { cell: { row: { title: 'Done B' }, column: 'card-status', text: 'done' } }] },
 		{ criterion: 'close', fixtures, view_as: 'm', steps: [{ drop: { title: 'Open A' }, on: 'done' }], expect: [{ rows: [], in: 'open' }, { rows: ['Open A', 'Done B'], in: 'done' }, { item: { title: 'Open A', status: 'done' } }] },
 		{ criterion: 'clerks', fixtures, view_as: 'c', expect: [{ action: 'close', row: { title: 'Open A' }, available: false }] },
+		// The button is hidden from a clerk, and the host refuses it when called anyway.
+		{ criterion: 'clerks', fixtures, view_as: 'c', steps: [{ action: 'close', row: { title: 'Open A' }, direct: true }], expect: [{ refused: 'close', row: { title: 'Open A' } }, { rows: ['Open A'], in: 'open' }] },
 		{ criterion: 'empty', fixtures: { ...fixtures, items: [] }, view_as: 'm', expect: [{ rows: [] }, { rows: [], in: 'done' }] },
 	];
 	change?.(build);
@@ -69,8 +71,8 @@ describe('cards and dragging', () => {
 		const [open, done] = snapshot.tables;
 		expect(open!.rows[0]!.cells).toEqual({ 'card-title': { text: 'Open A' }, 'card-status': { text: 'open' } });
 		expect(open!.rows[0]!.actions).toMatchObject([{ id: 'close', label: 'Done →', available: true, dropTarget: 'done', row: items[0], action: { capability: 'items.close', input: { id: 1 } } }]);
-		// The button is hidden on cards already done.
-		expect(done!.rows[0]!.actions).toEqual([]);
+		// Hidden on cards already done: there, but not available (a direct call can still name it).
+		expect(done!.rows[0]!.actions).toMatchObject([{ id: 'close', available: false }]);
 		// Headings are texts; card texts are the rows'.
 		expect(snapshot.texts).toEqual(['Open', 'Open A', 'open', 'Done →', 'Done', 'Done B', 'done']);
 	});
