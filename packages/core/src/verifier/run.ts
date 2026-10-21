@@ -4,6 +4,7 @@ import type { Build, Check } from '../build/types.ts';
 import type { Spec } from '../spec/types.ts';
 import { canonicalJson } from '../surface/hash.ts';
 import type { Surface } from '../surface/types.ts';
+import { triggerLimit, type TriggerRun } from '../build/triggers.ts';
 import { FixtureError, SandboxCallError, type Sandbox } from './sandbox.ts';
 import { requireUiFormat } from '../build/format.ts';
 import { allActions, type Snapshot, type SnapshotAction, type SnapshotInput } from './snapshot.ts';
@@ -20,6 +21,8 @@ export interface VerifyOptions {
 	createCan(usable: Record<string, boolean>): EvalContext['can'];
 	/** The grant to simulate. Default: the permissions the spec requests. */
 	grant?: string[];
+	/** The grant of each trigger's service identity to simulate. Default: the permissions the spec lists for it. */
+	triggerGrant?: Record<string, string[]>;
 	/**
 	 * Reads the build's UI into a snapshot instead of asking its registered
 	 * UI format. `entered` is what the viewer typed so far: input group,
@@ -170,8 +173,28 @@ async function runCheck(options: VerifyOptions, check: Check, index: number): Pr
 	};
 
 	let view = await render();
+	// What each trigger run did, latest last, for "run" expectations.
+	const runs: TriggerRun[] = [];
 
 	for (const [i, step] of (check.steps ?? []).entries()) {
+		if ('trigger' in step) {
+			const trigger = build.triggers?.[step.trigger];
+			if (!trigger) {
+				failures.push(`Step ${i + 1}: the build has no trigger "${step.trigger}".`);
+				return result();
+			}
+			if (!sandbox.fire) {
+				failures.push(`Step ${i + 1}: this host's sandbox cannot run triggers.`);
+				return result();
+			}
+			const declared = spec.manifest.triggers?.[step.trigger];
+			const grant = options.triggerGrant?.[step.trigger] ?? declared?.permissions ?? [];
+			const fire = { build, trigger: step.trigger, grant, limit: triggerLimit(declared, options.surface), now };
+			runs.push(await sandbox.fire(step.target ? { ...fire, target: step.target } : fire));
+			// What the viewer sees afterwards.
+			view = await render();
+			continue;
+		}
 		if ('fill' in step) {
 			// Typing into an input: it now shows the value.
 			const target = findInput(view, step.fill, step.row);
@@ -230,12 +253,39 @@ async function runCheck(options: VerifyOptions, check: Check, index: number): Pr
 		inputs: view.flatMap((i) => i.snapshot.inputs ?? []),
 	};
 	for (const expectation of check.expect) {
-		const failure = await evaluateExpectation(expectation, merged, sandbox);
+		const failure = 'run' in expectation ? expectRun(expectation.run, runs) : await evaluateExpectation(expectation, merged, sandbox);
 		if (failure) {
 			failures.push(failure);
 		}
 	}
 	return result();
+}
+
+/**
+ * A "run" expectation: what the latest run (of a trigger, when named) did.
+ * `calls` counts the calls that went through, `failed` those refused or
+ * failing, `skipped` matched targets over the cap.
+ */
+function expectRun(expected: unknown, runs: TriggerRun[]): string | undefined {
+	const want = (expected ?? {}) as { trigger?: string; calls?: number; failed?: number; skipped?: number; matched?: number; status?: string };
+	const run = runs.filter((r) => !want.trigger || r.trigger === want.trigger).at(-1);
+	const which = want.trigger ? `"${want.trigger}"` : 'a trigger';
+	if (!run) {
+		return `Expected ${which} to have run, but it did not.`;
+	}
+	const actual = {
+		calls: run.calls.filter((c) => c.ok).length,
+		failed: run.calls.filter((c) => !c.ok).length,
+		skipped: run.skipped,
+		matched: run.matched,
+		status: run.status,
+	};
+	const wrong = (['calls', 'failed', 'skipped', 'matched', 'status'] as const).filter((key) => want[key] !== undefined && want[key] !== actual[key]);
+	if (wrong.length === 0) {
+		return undefined;
+	}
+	const errors = [...new Set(run.calls.flatMap((c) => (c.error ? [c.error] : [])).concat(run.error ? [run.error] : []))];
+	return `Expected the run of ${which} to have ${wrong.map((key) => `${key} ${JSON.stringify(want[key])}`).join(', ')}, found ${wrong.map((key) => `${key} ${JSON.stringify(actual[key])}`).join(', ')}${errors.length ? ` (${errors.join('; ')})` : ''}.`;
 }
 
 function findInput(view: Instance[], id: string, matcher?: Record<string, unknown>): { instance: Instance; input: SnapshotInput } | undefined {

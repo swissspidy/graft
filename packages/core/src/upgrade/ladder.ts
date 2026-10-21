@@ -1,4 +1,5 @@
 import { extractRefs } from '../build/refs.ts';
+import { triggerScopes } from '../build/triggers.ts';
 import type { Build, Check } from '../build/types.ts';
 import { validateBuild } from '../build/validate.ts';
 import { buildHash } from '../compiler/compile.ts';
@@ -37,8 +38,10 @@ export interface UpgradeOptions {
 	grant: string[];
 	from: Surface;
 	to: Surface;
-	/** Runs a candidate's frozen checks on the new host, simulating `grant`. */
-	verify(build: Build, grant: string[]): Promise<Verification>;
+	/** Scopes currently granted to each trigger's service identity. Default: what the spec lists for each. */
+	triggerGrant?: Record<string, string[]>;
+	/** Runs a candidate's frozen checks on the new host, simulating `grant` (and `triggerGrant` for its triggers). */
+	verify(build: Build, grant: string[], triggerGrant?: Record<string, string[]>): Promise<Verification>;
 	/** Compiles the spec anew for `to`, reusing the frozen checks. Without it the rung does not apply. */
 	regenerate?(args: { previous: Build; checks: Check[]; surface: Surface }): Promise<Build | undefined>;
 	/** Picks a slot when re-anchoring has several candidates. */
@@ -53,6 +56,8 @@ export interface UpgradeResult {
 	changes: RefChange[];
 	/** Scopes the new build needs beyond the grant (needs_approval). */
 	extraScopes?: string[];
+	/** Scopes the new build's triggers need beyond their grants, by trigger (needs_approval). */
+	extraTriggerScopes?: Record<string, string[]>;
 	/** Every state the ladder went through, with what happened. */
 	path: UpgradeStep[];
 }
@@ -103,7 +108,7 @@ export async function upgradeBuild(options: UpgradeOptions): Promise<UpgradeResu
 		}
 
 		candidate = rebase(candidate, target, rung, replaces);
-		const key = canonicalJson({ ui: candidate.ui, events: candidate.events, data: candidate.data, mount: candidate.mount });
+		const key = canonicalJson({ ui: candidate.ui, events: candidate.events, data: candidate.data, mount: candidate.mount, triggers: candidate.triggers ?? null });
 		if (tried.has(key)) {
 			path.push({ state: rung, note: 'same candidate as before' });
 			continue;
@@ -121,15 +126,30 @@ export async function upgradeBuild(options: UpgradeOptions): Promise<UpgradeResu
 		}
 
 		const extraScopes = candidate.refs.scopes.filter((scope) => !grant.includes(scope));
-		const verification = await options.verify(candidate, [...grant, ...extraScopes]);
+		// Each trigger's grant is its own: widened only by the scopes that trigger needs.
+		const triggerGrant: Record<string, string[]> = {};
+		const extraTriggerScopes: Record<string, string[]> = {};
+		for (const [id, trigger] of Object.entries(candidate.triggers ?? {})) {
+			const granted = options.triggerGrant?.[id] ?? spec.manifest.triggers?.[id]?.permissions ?? [];
+			const extra = triggerScopes(trigger, target).filter((scope) => !granted.includes(scope));
+			triggerGrant[id] = [...granted, ...extra];
+			if (extra.length > 0) {
+				extraTriggerScopes[id] = extra;
+			}
+		}
+		const verification = await options.verify(candidate, [...grant, ...extraScopes], triggerGrant);
 		lastVerification = verification;
 		const failed = verification.results.filter((r) => !r.passed).map((r) => r.criterion);
 		path.push({ state: verify, note: verification.passed ? 'checks pass' : `checks fail: ${failed.join(', ') || 'unchecked criteria'}` });
 		if (!verification.passed) {
 			continue;
 		}
-		if (extraScopes.length > 0) {
-			return { outcome: 'needs_approval', build: candidate, verification, changes: check.changes, extraScopes, path };
+		if (extraScopes.length > 0 || Object.keys(extraTriggerScopes).length > 0) {
+			const result: UpgradeResult = { outcome: 'needs_approval', build: candidate, verification, changes: check.changes, extraScopes, path };
+			if (Object.keys(extraTriggerScopes).length > 0) {
+				result.extraTriggerScopes = extraTriggerScopes;
+			}
+			return result;
 		}
 		return { outcome, build: candidate, verification, changes: check.changes, path };
 	}

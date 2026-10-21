@@ -38,7 +38,12 @@ export interface DaysSinceExpr {
 	$daysSince: Value;
 }
 
-export type Binding = DataRef | SlotRef;
+/** `{ $target: "id" }`: a path into a trigger's current target. Only in a trigger's `where` and `input`. */
+export interface TargetRef {
+	$target: string;
+}
+
+export type Binding = DataRef | SlotRef | TargetRef;
 export type Logic = EqExpr | AndExpr | OrExpr | NotExpr | CompareExpr;
 /** Expressions whose value is computed from other values. */
 export type Computed = IfExpr | DaysSinceExpr | CompareExpr;
@@ -57,7 +62,11 @@ export interface DataSource {
  * row action), or type a value into an input component. `row` picks the
  * row (or slot instance, e.g. the post) the action or input belongs to.
  */
-export type CheckStep = { action: string; row?: Record<string, unknown> } | { fill: string; value: string | boolean; row?: Record<string, unknown> };
+export type CheckStep =
+	| { action: string; row?: Record<string, unknown> }
+	| { fill: string; value: string | boolean; row?: Record<string, unknown> }
+	/** Runs a trigger at the check's clock; `target` picks an event trigger's subject. */
+	| { trigger: string; target?: Record<string, unknown> };
 
 export interface Check {
 	criterion: string;
@@ -75,6 +84,38 @@ export interface Refs {
 	scopes: string[];
 	/** Component type to the sorted properties the UI uses, in its format's catalog (`ui.catalogId`). */
 	catalog: Record<string, string[]>;
+	/** What the triggers use, apart from what viewers use. Present only when the build has triggers. */
+	triggers?: TriggerRefs;
+}
+
+export interface TriggerRefs {
+	events: string[];
+	capabilities: string[];
+	scopes: string[];
+}
+
+/** When a scheduled trigger runs: every `n` hours or days (`"6h"`, `"1d"`), days optionally `at` a time of day (site time). */
+export interface Schedule {
+	every: string;
+	at?: string;
+}
+
+/**
+ * An action the build takes without a viewer (ADR 0010): on a schedule
+ * (with targets from a read capability) or on a host event (whose subject
+ * is the one target), one capability call per target for which `where`
+ * holds. It runs as the host's service identity, with only the scopes
+ * granted to it.
+ */
+export interface Trigger {
+	schedule?: Schedule;
+	event?: string;
+	targets?: { call: string; input?: Value; items?: string };
+	where?: Value;
+	call: string;
+	input?: Value;
+	/** Act on each target (by id) at most once. */
+	once?: boolean;
 }
 
 /** What an action event of the UI does: a capability call. */
@@ -105,6 +146,8 @@ export interface Build {
 	ui: BuildUi;
 	events: Record<string, EventBinding>;
 	data: Record<string, DataSource>;
+	/** Actions taken without a viewer, by trigger id (the spec declares them). */
+	triggers?: Record<string, Trigger>;
 	checks: Check[];
 	refs: Refs;
 	provenance: {

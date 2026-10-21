@@ -4,7 +4,7 @@ import type { Build } from '../build/types.ts';
 import { canonicalJson } from '../surface/hash.ts';
 import type { Migration, Surface } from '../surface/types.ts';
 
-export type RefKind = 'slot' | 'capability' | 'scope';
+export type RefKind = 'slot' | 'capability' | 'scope' | 'event';
 
 export interface RefChange {
 	kind: RefKind;
@@ -67,8 +67,9 @@ export function staticCheck(build: Build, from: Surface, to: Surface): StaticChe
 		add({ kind: 'slot', symbol: slotId, change: 'changed', ...(oldSlot && slotCompatible(oldSlot, newSlot) ? { compatible: true } : {}) });
 	}
 
-	// Capabilities.
-	for (const name of build.refs.capabilities) {
+	// Capabilities, the viewer's and the triggers'.
+	const triggers = build.refs.triggers;
+	for (const name of [...new Set([...build.refs.capabilities, ...(triggers?.capabilities ?? [])])].sort()) {
 		const before = from.capabilities[name];
 		const after = to.capabilities[name];
 		if (!after) {
@@ -86,6 +87,25 @@ export function staticCheck(build: Build, from: Surface, to: Surface): StaticChe
 	for (const scope of build.refs.scopes) {
 		if (!to.scopes[scope]) {
 			add({ kind: 'scope', symbol: scope, change: 'removed' });
+		}
+	}
+
+	// What triggers rely on: that the host still lets them use their capabilities, and their events.
+	if (triggers) {
+		const seen = new Set(changes.map((c) => `${c.kind} ${c.symbol}`));
+		for (const name of triggers.capabilities) {
+			if (to.capabilities[name] && !to.triggers?.capabilities.includes(name) && !seen.has(`capability ${name}`)) {
+				add({ kind: 'capability', symbol: name, change: 'changed' });
+			}
+		}
+		for (const event of triggers.events) {
+			const before = from.triggers?.events[event];
+			const after = to.triggers?.events[event];
+			if (!after) {
+				add({ kind: 'event', symbol: event, change: 'removed' });
+			} else if (before && canonicalJson(before.provides) !== canonicalJson(after.provides)) {
+				add({ kind: 'event', symbol: event, change: 'changed', ...(compatibleSchema(before.provides, after.provides, 'provides') ? { compatible: true } : {}) });
+			}
 		}
 	}
 

@@ -1,5 +1,5 @@
 import { canonicalJson } from '../surface/hash.ts';
-import { compareOp, getPath, isAnd, isCan, isDataRef, isDaysSince, isEq, isIf, isNot, isOr, isSlotRef } from './expressions.ts';
+import { compareOp, getPath, isAnd, isCan, isDataRef, isDaysSince, isEq, isIf, isNot, isOr, isSlotRef, isTargetRef } from './expressions.ts';
 import type { Value } from './types.ts';
 
 export interface EvalContext {
@@ -11,6 +11,8 @@ export interface EvalContext {
 	can(scope: string, on: unknown): boolean;
 	/** The time `$daysSince` counts to, in ms since the epoch. Default: now. */
 	now?: number;
+	/** A trigger's current target, which `$target` reads. */
+	target?: unknown;
 }
 
 const DAY = 24 * 60 * 60 * 1000;
@@ -65,6 +67,9 @@ export function evaluate(value: Value | undefined, ctx: EvalContext): unknown {
 	}
 	if (isSlotRef(value)) {
 		return getPath(ctx.slot, value.$slot);
+	}
+	if (isTargetRef(value)) {
+		return getPath(ctx.target, value.$target);
 	}
 	if (isCan(value)) {
 		return ctx.can(value.$can, value.on === undefined ? undefined : evaluate(value.on, ctx));

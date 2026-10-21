@@ -39,7 +39,11 @@ export function describeCheck(check: Check, describers: CheckDescribers = {}): s
 	const later = check.clock?.advanceDays ? ` ${check.clock.advanceDays} day${check.clock.advanceDays === 1 ? '' : 's'} later` : '';
 	parts.push(`${parts.length ? 'when' : 'When'} ${check.view_as ? `"${check.view_as}"` : 'the viewer'} opens it${later}`);
 	for (const step of check.steps ?? []) {
-		parts.push('fill' in step ? `and types ${quote(step.value)} into "${step.fill}"${row(step.row)}` : `and uses "${step.action}"${row(step.row)}`);
+		if ('trigger' in step) {
+			parts.push(`and "${step.trigger}" runs on its own${row(step.target)}`);
+		} else {
+			parts.push('fill' in step ? `and types ${quote(step.value)} into "${step.fill}"${row(step.row)}` : `and uses "${step.action}"${row(step.row)}`);
+		}
 	}
 	const outcomes = check.expect.map((e) => {
 		if ('rows' in e) {
@@ -59,6 +63,16 @@ export function describeCheck(check: Check, describers: CheckDescribers = {}): s
 		}
 		if ('input' in e) {
 			return `the "${String(e.input)}" field${row(e.row as Record<string, unknown> | undefined)} shows ${quote(e.value)}`;
+		}
+		if ('run' in e) {
+			const run = (e.run ?? {}) as Record<string, unknown>;
+			const counts = [
+				run.calls !== undefined ? `acts on ${run.calls} target${run.calls === 1 ? '' : 's'}` : '',
+				run.failed !== undefined ? `has ${run.failed} failed call${run.failed === 1 ? '' : 's'}` : '',
+				run.skipped !== undefined ? `leaves ${run.skipped} for the next run` : '',
+				run.status !== undefined ? `ends ${quote(run.status)}` : '',
+			].filter(Boolean);
+			return `${run.trigger ? `the run of "${String(run.trigger)}"` : 'the run'} ${list(counts) || 'happens'}`;
 		}
 		if ('action' in e) {
 			return `"${String(e.action)}"${row(e.row)} is ${e.available === false ? 'not available' : 'available'}`;

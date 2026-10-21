@@ -20,7 +20,7 @@ export interface CanaryOptions {
 	corpus: CorpusEntry[];
 	from: Surface;
 	to: Surface;
-	verify(build: Build, spec: Spec, grant: string[]): Promise<Verification>;
+	verify(build: Build, spec: Spec, grant: string[], triggerGrant?: Record<string, string[]>): Promise<Verification>;
 	regenerate?(args: { spec: Spec; specHash: string; previous: Build; checks: Check[]; surface: Surface }): Promise<Build | undefined>;
 	chooseSlot?(candidates: string[], build: Build): Promise<string | undefined>;
 	onEntry?(entry: CanaryEntry): void;
@@ -121,7 +121,7 @@ async function upgradeOne(item: CorpusEntry, specHash: string, from: Surface, to
 		grant: item.grant,
 		from,
 		to,
-		verify: (build, grant) => options.verify(build, spec, grant),
+		verify: (build, grant, triggerGrant) => options.verify(build, spec, grant, triggerGrant),
 		...(options.regenerate
 			? { regenerate: (args: { previous: Build; checks: Check[]; surface: Surface }) => options.regenerate!({ ...args, spec, specHash }) }
 			: {}),

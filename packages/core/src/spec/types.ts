@@ -7,7 +7,19 @@ export interface SpecManifest {
 	mount: { slot: string; [option: string]: unknown };
 	audience?: string[];
 	permissions: string[];
+	/** Actions taken without a viewer, by trigger id (ADR 0010). */
+	triggers?: Record<string, SpecTrigger>;
 	locale?: string;
+}
+
+/** A trigger as the spec declares it: when it runs, and what its service identity may do. */
+export interface SpecTrigger {
+	schedule?: { every: string; at?: string };
+	event?: string;
+	/** Scopes the service identity is granted for this trigger, and nothing else. */
+	permissions: string[];
+	/** Most calls one run makes. Default: the surface's `maxPerRun`. */
+	limit?: number;
 }
 
 export interface Criterion {

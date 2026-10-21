@@ -1,3 +1,5 @@
+import type { TriggerRun } from '../build/triggers.ts';
+import type { Build } from '../build/types.ts';
 import type { Surface } from '../surface/types.ts';
 
 /**
@@ -35,6 +37,28 @@ export interface Sandbox {
 	 * found.
 	 */
 	assert(kind: string, expected: unknown): Promise<{ ok: boolean; actual: unknown }>;
+	/**
+	 * Runs one of the build's triggers now, the way the host's runner does:
+	 * as its service identity, with only `grant`, through its gateway. For
+	 * an event trigger, the host first makes the event happen to the target
+	 * `target` picks (publishes that post, say). What a trigger acted on
+	 * (`once`) is remembered until the next reset. Hosts that cannot run
+	 * triggers leave it out, and checks that run one fail.
+	 */
+	fire?(options: FireOptions): Promise<TriggerRun>;
+}
+
+export interface FireOptions {
+	build: Build;
+	trigger: string;
+	/** The scopes granted to the trigger's service identity. */
+	grant: string[];
+	/** Most calls the run makes. */
+	limit: number;
+	/** The run's clock, in ms since the epoch. */
+	now: number;
+	/** Picks an event trigger's subject among the fixtures (e.g. `{ title }`). */
+	target?: Record<string, unknown>;
 }
 
 export class SandboxCallError extends Error {

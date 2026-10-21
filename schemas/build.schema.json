@@ -69,6 +69,12 @@
         }
       }
     },
+    "triggers": {
+      "description": "Actions the build takes without a viewer (ADR 0010), by the trigger ids the spec declares: when it runs (a schedule or a host event), which targets (a data source, or the event's subject), a condition per target, and one capability call per target. {\"$target\": \"<path>\"} in where and input reads the target.",
+      "type": "object",
+      "propertyNames": { "pattern": "^[a-z][a-z0-9-]{0,40}$" },
+      "additionalProperties": { "$ref": "#/$defs/trigger" }
+    },
     "checks": {
       "type": "array",
       "items": { "$ref": "#/$defs/check" }
@@ -86,6 +92,17 @@
           "type": "object",
           "description": "Component type to the properties the UI uses, in its catalog.",
           "additionalProperties": { "type": "array", "items": { "type": "string" } }
+        },
+        "triggers": {
+          "description": "What the build's triggers use, apart from what viewers use: host events, capabilities and the scopes they need. Present only when the build has triggers.",
+          "type": "object",
+          "required": ["events", "capabilities", "scopes"],
+          "additionalProperties": false,
+          "properties": {
+            "events": { "type": "array", "items": { "type": "string" }, "uniqueItems": true },
+            "capabilities": { "type": "array", "items": { "type": "string" }, "uniqueItems": true },
+            "scopes": { "type": "array", "items": { "type": "string" }, "uniqueItems": true }
+          }
         }
       }
     },
@@ -118,6 +135,7 @@
         { "$ref": "#/$defs/compare" },
         { "$ref": "#/$defs/if" },
         { "$ref": "#/$defs/daysSince" },
+        { "$ref": "#/$defs/target" },
         {
           "description": "A plain object. Keys starting with $ are reserved for expressions.",
           "type": "object",
@@ -192,6 +210,49 @@
       "additionalProperties": false,
       "properties": { "$if": { "type": "array", "minItems": 3, "maxItems": 3, "items": { "$ref": "#/$defs/value" } } }
     },
+    "target": {
+      "description": "Path into a trigger's current target, e.g. id. Only in a trigger's where and input.",
+      "type": "object",
+      "required": ["$target"],
+      "additionalProperties": false,
+      "properties": { "$target": { "type": "string" } }
+    },
+    "trigger": {
+      "type": "object",
+      "required": ["call"],
+      "additionalProperties": false,
+      "properties": {
+        "schedule": {
+          "type": "object",
+          "required": ["every"],
+          "additionalProperties": false,
+          "properties": {
+            "every": { "type": "string", "pattern": "^[1-9][0-9]{0,2}[hd]$" },
+            "at": { "type": "string", "pattern": "^([01][0-9]|2[0-3]):[0-5][0-9]$" }
+          }
+        },
+        "event": { "type": "string", "minLength": 1 },
+        "targets": {
+          "description": "A scheduled trigger's targets: a read capability call, and the path of the list in its result (default items).",
+          "type": "object",
+          "required": ["call"],
+          "additionalProperties": false,
+          "properties": {
+            "call": { "type": "string" },
+            "input": { "$ref": "#/$defs/value" },
+            "items": { "type": "string" }
+          }
+        },
+        "where": { "description": "Only targets for which this is true are acted on.", "$ref": "#/$defs/value" },
+        "call": { "description": "The capability called once per target.", "type": "string" },
+        "input": { "$ref": "#/$defs/value" },
+        "once": { "description": "Act on each target (by its id) at most once; a failed call is retried on the next run.", "type": "boolean" }
+      },
+      "oneOf": [
+        { "properties": { "schedule": true, "targets": true }, "required": ["schedule", "targets"] },
+        { "properties": { "event": true, "targets": false }, "required": ["event"] }
+      ]
+    },
     "daysSince": {
       "description": "Whole days from a date (ISO 8601) to now: {\"$daysSince\": date}. Null when it is not a date.",
       "type": "object",
@@ -230,6 +291,16 @@
                 "properties": {
                   "action": { "type": "string" },
                   "row": { "type": "object" }
+                }
+              },
+              {
+                "description": "Run a trigger now, at the check's clock, as the service identity with the permissions the spec lists for it. An event trigger runs on the event happening to the target the matcher picks.",
+                "type": "object",
+                "required": ["trigger"],
+                "additionalProperties": false,
+                "properties": {
+                  "trigger": { "type": "string" },
+                  "target": { "type": "object" }
                 }
               },
               {

@@ -7,3 +7,4 @@ export { getPath, isBinding, isCan, walkValue } from './build/expressions.ts';
 export { removeRow } from './build/rows.ts';
 export type { Build, DataSource, Value } from './build/types.ts';
 export { describeCheck, type CheckDescribers } from './verifier/describe.ts';
+export { describeWhen, intervalSeconds, triggerLimit, type TriggerRun } from './build/triggers.ts';

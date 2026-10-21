@@ -1,0 +1,36 @@
+{
+	"description": "What a trigger's where and input evaluate to, for a target at a time. The TypeScript core (packages/core/test/triggers.test.ts) and the WordPress runner (hosts/wordpress/playground/smoke.php) both run these, so the two implementations agree.",
+	"now": "2026-10-21T12:00:00Z",
+	"target": {
+		"id": 7,
+		"title": "Old pending",
+		"status": "pending",
+		"modified": "2026-10-11T09:00:00Z",
+		"author": { "id": 3, "name": "Ada" },
+		"terms": { "post_tag": [{ "id": 4, "name": "news", "slug": "news" }] },
+		"meta": { "seats": 0, "venue": null }
+	},
+	"cases": [
+		{ "value": { "$target": "id" }, "expected": 7 },
+		{ "value": { "$target": "author.name" }, "expected": "Ada" },
+		{ "value": { "$target": "terms.post_tag.0.slug" }, "expected": "news" },
+		{ "value": { "$target": "missing" }, "expected": null },
+		{ "value": { "$daysSince": { "$target": "modified" } }, "expected": 10 },
+		{ "value": { "$daysSince": "not a date" }, "expected": null },
+		{ "value": { "$gt": [{ "$daysSince": { "$target": "modified" } }, 7] }, "expected": true },
+		{ "value": { "$gt": [{ "$daysSince": { "$target": "modified" } }, 10] }, "expected": false },
+		{ "value": { "$gte": [{ "$daysSince": { "$target": "modified" } }, 10] }, "expected": true },
+		{ "value": { "$lt": ["a", "b"] }, "expected": true },
+		{ "value": { "$lte": [1, "1"] }, "expected": false },
+		{ "value": { "$eq": [{ "$target": "status" }, "pending"] }, "expected": true },
+		{ "value": { "$eq": [{ "$target": "meta.venue" }, null] }, "expected": true },
+		{ "value": { "$eq": [{ "$target": "author" }, { "name": "Ada", "id": 3 }] }, "expected": true },
+		{ "value": { "$eq": [{ "$target": "meta.seats" }, false] }, "expected": false },
+		{ "value": { "$and": [true, { "$eq": [{ "$target": "id" }, 7] }] }, "expected": true },
+		{ "value": { "$and": [true, 1] }, "expected": false },
+		{ "value": { "$or": [false, { "$target": "missing" }] }, "expected": false },
+		{ "value": { "$not": { "$target": "missing" } }, "expected": true },
+		{ "value": { "$if": [{ "$eq": [{ "$target": "status" }, "pending"] }, "late", "fine"] }, "expected": "late" },
+		{ "value": { "id": { "$target": "id" }, "taxonomy": "post_tag", "add": ["stale", { "$target": "status" }] }, "expected": { "id": 7, "taxonomy": "post_tag", "add": ["stale", "pending"] } }
+	]
+}

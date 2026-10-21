@@ -28,5 +28,7 @@ function formatAnswer(build: Build, dataInput?: Record<string, unknown>): unknow
 	if (!format.compiler?.answer) {
 		throw new Error(`The ${format.name} format cannot express a build as model output.`);
 	}
-	return format.compiler.answer(build, dataInput);
+	const answer = format.compiler.answer(build, dataInput);
+	// Triggers are core's, next to the format's output.
+	return build.triggers ? { ...(answer as object), triggers_json: JSON.stringify(build.triggers) } : answer;
 }
