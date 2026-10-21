@@ -86,7 +86,8 @@ test('editors switch the status board and take a post offline from it', async ({
 test('editors take a post live from the editor panel', async ({ page }) => {
 	await signIn(page, 'editor', '/_emdash/admin/content/posts');
 	await page.getByRole('link', { name: 'Draft ideas' }).first().click();
-	await expect(page.getByRole('heading', { name: 'Edit Post' })).toBeVisible();
+	// The editor's heading is the post's title (EmDash 1.3; "Edit Post" before).
+	await expect(page.getByRole('heading', { name: 'Draft ideas', level: 1 })).toBeVisible();
 
 	const panel = page.getByRole('button', { name: 'Customizations', exact: true });
 	await panel.click();

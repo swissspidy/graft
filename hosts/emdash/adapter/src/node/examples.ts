@@ -18,7 +18,7 @@ export interface Example {
 }
 
 export async function loadSurface(): Promise<Surface> {
-	return JSON.parse(await readFile(`${ROOT}hosts/emdash/adapter/surfaces/1.0.json`, 'utf8')) as Surface;
+	return JSON.parse(await readFile(`${ROOT}hosts/emdash/adapter/surfaces/1.3.json`, 'utf8')) as Surface;
 }
 
 export async function loadExamples(surface?: Surface): Promise<Example[]> {

@@ -11,7 +11,7 @@ export { playgroundVersion } from './playground-version.ts';
  * on demand rather than installed, because it is large and only the surface
  * generator and sandbox need it.
  */
-export const PLAYGROUND_CLI = '@wp-playground/cli@3.1.56';
+export const PLAYGROUND_CLI = '@wp-playground/cli@3.1.60';
 
 /** PHP version used when none is given; matches Playground CLI's default. */
 export const DEFAULT_PHP = '8.3';

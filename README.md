@@ -184,7 +184,7 @@ pnpm graft validate --surface hosts/wordpress/plugin/surfaces/7.1.json examples/
 pnpm graft build examples/builds/review-queue.json \
   --surface hosts/wordpress/plugin/surfaces/7.1.json --spec examples/specs/review-queue.md [--fix-refs]
 pnpm graft verify --surface hosts/wordpress/plugin/surfaces/7.1.json --spec examples/specs examples/builds/*.json
-pnpm graft verify --surface hosts/emdash/adapter/surfaces/1.0.json --spec examples/emdash/specs examples/emdash/builds/*.json
+pnpm graft verify --surface hosts/emdash/adapter/surfaces/1.3.json --spec examples/emdash/specs examples/emdash/builds/*.json
 pnpm graft bundle --spec examples/agency/specs/upcoming-events.md --surface examples/agency/surface.json \
   --out upcoming-events.bundle.json examples/agency/builds/upcoming-events.json   # a verified customization as one file
 

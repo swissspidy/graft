@@ -26,7 +26,7 @@
     "test:compile": "tsx hosts/wordpress/adapter/src/compile-smoke.ts",
     "test:canary": "tsx hosts/wordpress/adapter/src/canary-test.ts",
     "surface:emdash": "tsx hosts/emdash/adapter/src/node/surface-cli.ts",
-    "verify:emdash": "tsx packages/cli/src/main.ts verify --surface hosts/emdash/adapter/surfaces/1.0.json --spec examples/emdash/specs examples/emdash/builds/publish-queue.json examples/emdash/builds/go-live.json examples/emdash/builds/drafts-glance.json examples/emdash/builds/stale-drafts.json examples/emdash/builds/status-board.json",
+    "verify:emdash": "tsx packages/cli/src/main.ts verify --surface hosts/emdash/adapter/surfaces/1.3.json --spec examples/emdash/specs examples/emdash/builds/publish-queue.json examples/emdash/builds/go-live.json examples/emdash/builds/drafts-glance.json examples/emdash/builds/stale-drafts.json examples/emdash/builds/status-board.json",
     "test:emdash": "tsx hosts/emdash/adapter/src/node/smoke.ts",
     "test:e2e:emdash": "playwright test -c hosts/emdash/e2e/playwright.config.ts",
     "test:compile:emdash": "tsx hosts/emdash/adapter/src/node/compile-smoke.ts",
@@ -57,11 +57,11 @@
   "devDependencies": {
     "@changesets/changelog-github": "^1.0.1",
     "@changesets/cli": "^3.0.3",
-    "@playwright/test": "1.63.0",
-    "@types/node": "^26.6.3",
+    "@playwright/test": "1.64.1",
+    "@types/node": "^26.6.5",
     "esbuild": "^0.28.2",
-    "tsx": "^4.20.0",
+    "tsx": "^4.23.15",
     "typescript": "^7.0.2",
-    "vitest": "^5.0.3"
+    "vitest": "^5.0.5"
   }
 }

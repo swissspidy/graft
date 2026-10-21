@@ -63,7 +63,7 @@ try {
 	const grant = JSON.parse(await readFile(join(out, 'tenant', 'publish-queue.grant.json'), 'utf8')) as { scopes: string[] };
 	check('the pulled grant is what was approved', grant.scopes.join(',') === 'content.status:write,content:read', grant);
 
-	const canary = await run('pnpm', ['-s', 'graft', 'canary', '--corpus', out, '--from', 'hosts/emdash/adapter/surfaces/1.0.json', '--scenario', 'widen-publish-scope'], { cwd: ROOT, maxBuffer: 1 << 24 }).then(
+	const canary = await run('pnpm', ['-s', 'graft', 'canary', '--corpus', out, '--from', 'hosts/emdash/adapter/surfaces/1.3.json', '--scenario', 'widen-publish-scope'], { cwd: ROOT, maxBuffer: 1 << 24 }).then(
 		(r) => r.stdout,
 		(e: { stdout?: string }) => e.stdout ?? '',
 	);

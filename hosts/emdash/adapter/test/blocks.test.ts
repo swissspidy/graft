@@ -113,7 +113,7 @@ describe('local state', () => {
 
 describe('examples', () => {
 	it('are valid against the committed surface', async () => {
-		const surface = JSON.parse(await readFile(new URL('../surfaces/1.0.json', import.meta.url), 'utf8'));
+		const surface = JSON.parse(await readFile(new URL('../surfaces/1.3.json', import.meta.url), 'utf8'));
 		for (const name of ['publish-queue', 'go-live', 'drafts-glance', 'stale-drafts', 'status-board']) {
 			const build = JSON.parse(await readFile(new URL(`../../../../examples/emdash/builds/${name}.json`, import.meta.url), 'utf8')) as Build;
 			const result = await validateBuild(build, surface);

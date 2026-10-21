@@ -6,7 +6,7 @@ import '../src/host/a2ui.ts';
 
 // Tests run from the repository root.
 const read = (path: string) => readFileSync(`${process.cwd()}/${path}`, 'utf8');
-const surface = JSON.parse(read('hosts/emdash/adapter/surfaces/1.0.json')) as Surface;
+const surface = JSON.parse(read('hosts/emdash/adapter/surfaces/1.3.json')) as Surface;
 const builds = readdirSync(`${process.cwd()}/examples/emdash/builds`).filter((f) => f.endsWith('.json'));
 
 describe('the EmDash example builds', () => {

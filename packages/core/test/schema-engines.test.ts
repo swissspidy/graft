@@ -17,7 +17,7 @@ const read = (path: string) => readFileSync(join(root, path), 'utf8');
 
 const hosts = [
 	{ surface: 'hosts/wordpress/plugin/surfaces/7.1.json', examples: ['review-queue', 'quick-approve', 'waiting-posts'], dir: 'examples' },
-	{ surface: 'hosts/emdash/adapter/surfaces/1.0.json', examples: ['publish-queue', 'go-live', 'drafts-glance'], dir: 'examples/emdash' },
+	{ surface: 'hosts/emdash/adapter/surfaces/1.3.json', examples: ['publish-queue', 'go-live', 'drafts-glance'], dir: 'examples/emdash' },
 ];
 
 type Mutation = [string, (build: Build) => void];
@@ -75,7 +75,7 @@ describe('schema engines', () => {
 	});
 
 	it('describe errors the same way', async () => {
-		const surface = JSON.parse(read('hosts/emdash/adapter/surfaces/1.0.json')) as Surface;
+		const surface = JSON.parse(read('hosts/emdash/adapter/surfaces/1.3.json')) as Surface;
 		const build = JSON.parse(read('examples/emdash/builds/publish-queue.json')) as Build;
 		(build.data.queue!.input as Record<string, unknown>).status = 'pending';
 		const messages = async (engine: 'ajv' | 'cfworker') => {
@@ -116,7 +116,7 @@ describe('schema engines', () => {
 	});
 
 	it('leave the schemas they are given untouched', async () => {
-		const surface = JSON.parse(read('hosts/emdash/adapter/surfaces/1.0.json')) as Surface;
+		const surface = JSON.parse(read('hosts/emdash/adapter/surfaces/1.3.json')) as Surface;
 		const before = JSON.stringify(surface);
 		setSchemaEngine(cfworkerEngine());
 		await validateBuild(JSON.parse(read('examples/emdash/builds/go-live.json')) as Build, surface);
