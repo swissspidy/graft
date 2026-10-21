@@ -249,8 +249,8 @@
         "once": { "description": "Act on each target (by its id) at most once; a failed call is retried on the next run.", "type": "boolean" }
       },
       "oneOf": [
-        { "properties": { "schedule": true, "targets": true }, "required": ["schedule", "targets"] },
-        { "properties": { "event": true, "targets": false }, "required": ["event"] }
+        { "properties": { "schedule": true, "targets": true, "event": false }, "required": ["schedule", "targets"] },
+        { "properties": { "event": true, "targets": false, "schedule": false }, "required": ["event"] }
       ]
     },
     "daysSince": {

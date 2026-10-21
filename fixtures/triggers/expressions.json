@@ -26,6 +26,8 @@
 		{ "value": { "$eq": [{ "$target": "meta.venue" }, null] }, "expected": true },
 		{ "value": { "$eq": [{ "$target": "author" }, { "name": "Ada", "id": 3 }] }, "expected": true },
 		{ "value": { "$eq": [{ "$target": "meta.seats" }, false] }, "expected": false },
+		{ "value": { "$eq": [{ "$target": "author.id" }, 3.0] }, "expected": true },
+		{ "value": { "$eq": [{ "id": 5.0 }, { "id": 5 }] }, "expected": true },
 		{ "value": { "$and": [true, { "$eq": [{ "$target": "id" }, 7] }] }, "expected": true },
 		{ "value": { "$and": [true, 1] }, "expected": false },
 		{ "value": { "$or": [false, { "$target": "missing" }] }, "expected": false },

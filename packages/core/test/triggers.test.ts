@@ -434,6 +434,34 @@ describe('upgrading triggers', () => {
 		expect(applyMigrations(build, [{ op: 'remove', kind: 'event', symbol: 'item.reopened' }])).toBeUndefined();
 	});
 
+	it('lets an upgrade change the event only as the surface renames it', async () => {
+		const build = await triggerBuild();
+		build.triggers!['close-reopened']!.event = 'item.revived';
+		const renamed = to((s) => {
+			s.triggers!.events['item.revived'] = s.triggers!.events['item.reopened']!;
+			s.migrations = [{ op: 'rename', kind: 'event', from: 'item.reopened', to: 'item.revived' }];
+		});
+		renamed.hash = await hashSurface(renamed);
+		build.surface.hash = renamed.hash;
+		build.refs = extractRefs(build, renamed);
+		const severity = async (s: Surface) =>
+			(await validateBuild(build, s, { spec: { spec, hash: specHash }, upgrade: true })).diagnostics.find((d) => d.code === 'build-trigger-when-mismatch')?.severity;
+		expect(await severity(renamed)).toBe('warning');
+		// Another event the host offers, with no rename: running on it needs a new spec.
+		const other = { ...renamed, migrations: [] };
+		other.hash = await hashSurface(other);
+		build.surface.hash = other.hash;
+		expect(await severity(other)).toBe('error');
+	});
+
+	it('refuses a trigger that is both scheduled and on an event', async () => {
+		const build = await triggerBuild();
+		build.triggers!['close-stale']!.event = 'item.reopened';
+		const result = await validateBuild(build, surface);
+		expect(result.ok).toBe(false);
+		expect(new Set(result.diagnostics.map((d) => d.code))).toEqual(new Set(['build-schema']));
+	});
+
 	it("asks for approval when a trigger needs a scope beyond its grant", async () => {
 		const build = await triggerBuild();
 		const target = to((s) => {

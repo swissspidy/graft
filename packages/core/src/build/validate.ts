@@ -277,8 +277,13 @@ function validateTriggers(build: Build, surface: Surface, options: ValidateBuild
 			error('build-trigger-unknown-event', `${path}/event`, `Unknown event "${trigger.event}". Available: ${Object.keys(host.events).join(', ') || 'none'}.`);
 		}
 		if (spec && canonicalJson({ schedule: trigger.schedule ?? null, event: trigger.event ?? null }) !== canonicalJson({ schedule: spec.schedule ?? null, event: spec.event ?? null })) {
-			// An upgrade may follow the host renaming an event; the spec keeps its old name until it is edited.
-			const renamed = options.upgrade && trigger.event !== undefined && spec.event !== undefined;
+			// An upgrade may follow the host renaming the spec's event (a declared migration); the spec keeps
+			// the old name until it is edited. Running on any other event than the spec's needs a new spec.
+			const renamed =
+				options.upgrade === true &&
+				trigger.event !== undefined &&
+				spec.event !== undefined &&
+				(surface.migrations ?? []).some((m) => m.op === 'rename' && m.kind === 'event' && m.from === spec.event && m.to === trigger.event);
 			diagnostics.push({
 				severity: renamed ? 'warning' : 'error',
 				code: 'build-trigger-when-mismatch',

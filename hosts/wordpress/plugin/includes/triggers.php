@@ -481,7 +481,8 @@ function canonical_json( $value ): string {
 		}
 		return array_map( $sort, $item );
 	};
-	return (string) wp_json_encode( $sort( $value ), JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE | JSON_PRESERVE_ZERO_FRACTION );
+	// No JSON_PRESERVE_ZERO_FRACTION: 5.0 is 5, as in JavaScript.
+	return (string) wp_json_encode( $sort( $value ), JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE );
 }
 
 /*
@@ -726,18 +727,25 @@ function trigger_specs(): array {
 	if ( ! $current ) {
 		return $out;
 	}
-	foreach ( list_specs() as $spec ) {
-		if ( ! $spec['active_version'] ) {
-			continue;
-		}
-		$post   = get_version_post( $spec['spec_id'], (int) $spec['active_version'] );
+	// Runs on every post status change: only the active versions, as servable_specs() reads them.
+	$specs = get_posts(
+		array(
+			'post_type'        => SPEC_POST_TYPE,
+			'post_status'      => 'private',
+			'numberposts'      => -1,
+			'meta_key'         => '_graft_active_version', // phpcs:ignore WordPress.DB.SlowDBQuery.slow_db_query_meta_key
+			'suppress_filters' => true,
+		)
+	);
+	foreach ( $specs as $spec ) {
+		$post   = get_version_post( $spec->post_name, (int) get_post_meta( $spec->ID, '_graft_active_version', true ) );
 		$record = $post ? version_record( $post ) : null;
 		$build  = $record['builds'][ $current['hash'] ]['build'] ?? null;
 		if ( $record && 'active' === $record['state'] && is_array( $build ) && ! empty( $build['triggers'] ) ) {
-			$out[ $spec['spec_id'] ] = array(
+			$out[ $spec->post_name ] = array(
 				'record'  => $record,
 				'build'   => $build,
-				'managed' => null !== $spec['managed_by'],
+				'managed' => null !== managed_by( $spec->post_name ),
 			);
 		}
 	}
