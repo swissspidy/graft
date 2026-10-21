@@ -41,14 +41,23 @@ export function describeCheck(check: Check, describers: CheckDescribers = {}): s
 	for (const step of check.steps ?? []) {
 		if ('trigger' in step) {
 			parts.push(`and "${step.trigger}" runs on its own${row(step.target)}`);
-		} else {
-			parts.push('fill' in step ? `and types ${quote(step.value)} into "${step.fill}"${row(step.row)}` : `and uses "${step.action}"${row(step.row)}`);
+			continue;
 		}
+		parts.push(
+			'drop' in step
+				? `and drags${row(step.drop).replace(/^ on /, ' ')} onto "${step.on}"`
+				: 'fill' in step
+				? `and types ${quote(step.value)} into "${step.fill}"${row(step.row)}`
+				: step.direct
+					? `and calls "${step.action}"${row(step.row)} directly, without the button`
+					: `and uses "${step.action}"${row(step.row)}`,
+		);
 	}
 	const outcomes = check.expect.map((e) => {
 		if ('rows' in e) {
 			const rows = e.rows as string[];
-			return rows.length ? `the list shows exactly ${list(rows.map(quote))}` : 'the list is empty';
+			const which = typeof e.in === 'string' ? `the ${quote(e.in)} list` : 'the list';
+			return rows.length ? `${which} shows exactly ${list(rows.map(quote))}` : `${which} is empty`;
 		}
 		if ('columns' in e) {
 			return `the columns are ${list((e.columns as string[]).map(quote))}`;
@@ -63,6 +72,9 @@ export function describeCheck(check: Check, describers: CheckDescribers = {}): s
 		}
 		if ('input' in e) {
 			return `the "${String(e.input)}" field${row(e.row as Record<string, unknown> | undefined)} shows ${quote(e.value)}`;
+		}
+		if ('refused' in e) {
+			return `calling "${String(e.refused)}"${row(e.row)} is refused`;
 		}
 		if ('run' in e) {
 			const run = (e.run ?? {}) as Record<string, unknown>;

@@ -41,6 +41,28 @@ describe('verifyBuild', () => {
 		expect(result.unchecked).toEqual(['open-only', 'empty']);
 	});
 
+	it('calls hidden actions directly, and checks that the host refuses them', async () => {
+		const build = await pageBuild();
+		build.checks = [
+			// A clerk is not offered "close", and the host refuses it when called anyway.
+			{ criterion: 'clerks', fixtures, view_as: 'c', steps: [{ action: 'close', row: { title: 'Open A' }, direct: true }], expect: [{ refused: 'close', row: { title: 'Open A' } }, { rows: ['Open A'] }] },
+			// A manager's direct call goes through, so it was not refused.
+			{ criterion: 'close', fixtures, view_as: 'm', steps: [{ action: 'close', row: { title: 'Open A' }, direct: true }], expect: [{ refused: 'close' }, { item: { title: 'Open A', status: 'done' } }] },
+			// Without a direct step there is nothing to have been refused.
+			{ criterion: 'clerks', fixtures, view_as: 'c', expect: [{ refused: 'close' }] },
+			{ criterion: 'clerks', fixtures, view_as: 'c', steps: [{ action: 'nope', direct: true }], expect: [{ rows: [] }] },
+		];
+		const sandbox = fakeSandbox();
+		const result = await verifyBuild({ build, spec, surface, sandbox, createCan });
+		expect(result.results.map((r) => r.failures)).toEqual([
+			[],
+			['Expected a direct call of "close" to be refused, but it went through.'],
+			['Expected a direct call of "close" to be refused, but the check makes none (a step {"action": "close", "direct": true}).'],
+			['Step 1: no "nope" action.'],
+		]);
+		expect(sandbox.calls).toContain('c items.close');
+	});
+
 	it('fails a check whose fixtures the host cannot create, and runs the others', async () => {
 		const build = await pageBuild();
 		const sandbox = fakeSandbox();

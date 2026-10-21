@@ -12,7 +12,9 @@ export { readPointer } from './functions.ts';
  * - functions: comparisons, arithmetic, strings and lists; `if` (A2UI has
  *   no conditional); `can`, the host's permission check; `daysSince`;
  * - `set`, a local action that writes a value into the data model;
- * - `actionId` on Button, so buttons a template draws get ids checks name.
+ * - `actionId` on Button, so buttons a template draws get ids checks name;
+ * - dragging: a `draggable` Card is dropped on a container with a
+ *   `dropTarget`, which presses the Card's Button with that `dropTarget`.
  *
  * Hosts extend it with their own components and give it its id (e.g.
  * `graft:wordpress`). Functions and components carry zod schemas, so a
@@ -63,13 +65,16 @@ export const rowAction = z
 	.object({ id: z.string(), label: z.string(), variant: z.enum(['primary', 'default', 'secondary']).optional(), visible: dynamicBoolean.optional(), action })
 	.strict();
 
+/** A container a dragged Card can be dropped on, named for the Buttons it presses. */
+const dropTarget = z.string().min(1);
+
 export const BASE_COMPONENTS: ComponentApi[] = [
-	component('Column', { children: childList, align: z.string().optional(), justify: z.string().optional() }),
-	component('Row', { children: childList, align: z.string().optional(), justify: z.string().optional() }),
-	component('Card', { child: z.string() }),
+	component('Column', { children: childList, align: z.string().optional(), justify: z.string().optional(), dropTarget: dropTarget.optional() }),
+	component('Row', { children: childList, align: z.string().optional(), justify: z.string().optional(), dropTarget: dropTarget.optional() }),
+	component('Card', { child: z.string(), draggable: dynamicBoolean.optional(), dropTarget: dropTarget.optional() }),
 	component('Divider', { axis: z.enum(['horizontal', 'vertical']).optional() }),
 	component('Text', { text: dynamicString, variant: z.enum(['h1', 'h2', 'h3', 'h4', 'h5', 'body', 'caption']).optional() }),
-	component('Button', { child: z.string(), action, variant: z.enum(['primary', 'default', 'secondary', 'borderless']).optional(), checks: checks.optional(), actionId: dynamicString.optional() }),
+	component('Button', { child: z.string(), action, variant: z.enum(['primary', 'default', 'secondary', 'borderless']).optional(), checks: checks.optional(), actionId: dynamicString.optional(), dropTarget: dropTarget.optional() }),
 	component('TextField', { label: dynamicString, value: binding, variant: z.enum(['shortText', 'longText', 'number', 'obscured']).optional(), validationRegexp: z.string().optional(), checks: checks.optional() }),
 	component('CheckBox', { label: dynamicString, value: binding, checks: checks.optional() }),
 	component('Table', { rows: binding, fields: z.array(tableField), rowActions: z.array(rowAction).optional(), empty: dynamicString.optional() }),

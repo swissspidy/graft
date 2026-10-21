@@ -1,0 +1,487 @@
+{
+	"graft": 1,
+	"kind": "customization",
+	"title": "My open tasks",
+	"spec": {
+		"source": "---\ngraft: 1\nid: my-tasks\nhost: browser\nmount:\n  slot: project.sidebar\n  title: My open tasks\npermissions:\n  - tasks:read\n  - tasks.status:write\n---\n\n# My open tasks\n\nIn the sidebar of a Tasklet project, people see the open tasks of that\nproject assigned to them, with overdue ones marked, and members can mark\none done without leaving the page.\n\n## Acceptance criteria\n\n- Lists only open tasks assigned to me {#mine-open}\n- Lists only tasks of the project being viewed {#this-project}\n- Columns: Task, Due {#columns}\n- Overdue tasks are marked as errors {#overdue}\n- \"Done\" marks the task done and removes it from the list {#done}\n- Guests do not get the \"Done\" button {#guests-no-done}\n- When nothing is open, it says \"Nothing on your plate\" {#empty}\n\n## Out of scope\n\n- Reassigning tasks or changing due dates\n",
+		"manifest": {
+			"graft": 1,
+			"id": "my-tasks",
+			"host": "browser",
+			"mount": {
+				"slot": "project.sidebar",
+				"title": "My open tasks"
+			},
+			"permissions": [
+				"tasks:read",
+				"tasks.status:write"
+			]
+		},
+		"hash": "sha256:a99a811f6868d9da3c37cbba3ccfee336d04b2bbfcd08ca28bff550aabff03b5"
+	},
+	"builds": [
+		{
+			"build": {
+				"graft": 1,
+				"spec": {
+					"id": "my-tasks",
+					"hash": "sha256:a99a811f6868d9da3c37cbba3ccfee336d04b2bbfcd08ca28bff550aabff03b5"
+				},
+				"surface": {
+					"host": "browser",
+					"hostVersion": "observed-832cc479981a",
+					"hash": "sha256:ce6a866ab3fdb2efafab2a7bcea1cf245ba81bc78e556e8fc24538e8dda9a987"
+				},
+				"mount": {
+					"slot": "project.sidebar",
+					"title": "My open tasks"
+				},
+				"data": {
+					"mine": {
+						"call": "tasks.list",
+						"input": {
+							"project": {
+								"$slot": "project.id"
+							},
+							"status": "open",
+							"assignee": "me"
+						}
+					}
+				},
+				"ui": {
+					"protocol": "a2ui/v0.9",
+					"catalogId": "graft:browser",
+					"components": [
+						{
+							"id": "root",
+							"component": "Column",
+							"children": [
+								"tasks"
+							]
+						},
+						{
+							"id": "tasks",
+							"component": "Table",
+							"rows": {
+								"path": "/mine/tasks"
+							},
+							"fields": [
+								{
+									"id": "title",
+									"label": "Task",
+									"primary": true
+								},
+								{
+									"id": "due",
+									"label": "Due",
+									"value": {
+										"call": "if",
+										"args": {
+											"condition": {
+												"call": "equals",
+												"args": {
+													"a": {
+														"path": "due"
+													},
+													"b": null
+												}
+											},
+											"then": "—",
+											"else": {
+												"path": "due"
+											}
+										}
+									},
+									"tone": {
+										"call": "if",
+										"args": {
+											"condition": {
+												"call": "greaterThan",
+												"args": {
+													"a": {
+														"call": "daysSince",
+														"args": {
+															"value": {
+																"path": "due"
+															}
+														}
+													},
+													"b": 0
+												}
+											},
+											"then": "error",
+											"else": ""
+										}
+									}
+								}
+							],
+							"rowActions": [
+								{
+									"id": "done",
+									"label": "Done",
+									"variant": "primary",
+									"visible": {
+										"call": "can",
+										"args": {
+											"scope": "tasks.status:write"
+										}
+									},
+									"action": {
+										"event": {
+											"name": "complete",
+											"context": {
+												"id": {
+													"path": "id"
+												}
+											}
+										}
+									}
+								}
+							],
+							"empty": "Nothing on your plate"
+						}
+					]
+				},
+				"events": {
+					"complete": {
+						"call": "tasks.complete",
+						"input": {
+							"id": {
+								"$context": "id"
+							}
+						},
+						"then": [
+							"remove-row:mine"
+						],
+						"notice": "Marked done."
+					}
+				},
+				"checks": [
+					{
+						"criterion": "mine-open",
+						"fixtures": {
+							"users": [
+								{
+									"as": "a",
+									"role": "member"
+								},
+								{
+									"as": "b",
+									"role": "member"
+								}
+							],
+							"tasks": [
+								{
+									"title": "Mine, open",
+									"assignee": "a"
+								},
+								{
+									"title": "Mine, done",
+									"assignee": "a",
+									"status": "done"
+								},
+								{
+									"title": "Theirs",
+									"assignee": "b"
+								},
+								{
+									"title": "Nobody's"
+								}
+							]
+						},
+						"view_as": "a",
+						"expect": [
+							{
+								"rows": [
+									"Mine, open"
+								]
+							}
+						]
+					},
+					{
+						"criterion": "this-project",
+						"fixtures": {
+							"users": [
+								{
+									"as": "a",
+									"role": "member"
+								}
+							],
+							"projects": [
+								{
+									"id": "here",
+									"name": "Here"
+								},
+								{
+									"id": "elsewhere",
+									"name": "Elsewhere"
+								}
+							],
+							"tasks": [
+								{
+									"title": "Here's task",
+									"project": "here",
+									"assignee": "a"
+								},
+								{
+									"title": "Elsewhere's task",
+									"project": "elsewhere",
+									"assignee": "a"
+								}
+							]
+						},
+						"view_as": "a",
+						"expect": [
+							{
+								"rows": [
+									"Here's task"
+								]
+							}
+						]
+					},
+					{
+						"criterion": "columns",
+						"fixtures": {
+							"users": [
+								{
+									"as": "a",
+									"role": "member"
+								}
+							],
+							"tasks": [
+								{
+									"title": "One",
+									"assignee": "a"
+								}
+							]
+						},
+						"view_as": "a",
+						"expect": [
+							{
+								"columns": [
+									"Task",
+									"Due"
+								]
+							}
+						]
+					},
+					{
+						"criterion": "overdue",
+						"fixtures": {
+							"users": [
+								{
+									"as": "a",
+									"role": "member"
+								}
+							],
+							"tasks": [
+								{
+									"title": "Late",
+									"assignee": "a",
+									"due_in_days": -2
+								},
+								{
+									"title": "Soon",
+									"assignee": "a",
+									"due_in_days": 3
+								}
+							]
+						},
+						"view_as": "a",
+						"expect": [
+							{
+								"cell": {
+									"row": {
+										"title": "Late"
+									},
+									"column": "Due",
+									"tone": "error"
+								}
+							},
+							{
+								"rows": [
+									"Late",
+									"Soon"
+								]
+							}
+						]
+					},
+					{
+						"criterion": "done",
+						"fixtures": {
+							"users": [
+								{
+									"as": "a",
+									"role": "member"
+								}
+							],
+							"tasks": [
+								{
+									"title": "Ship it",
+									"assignee": "a"
+								},
+								{
+									"title": "Later",
+									"assignee": "a"
+								}
+							]
+						},
+						"view_as": "a",
+						"steps": [
+							{
+								"action": "done",
+								"row": {
+									"title": "Ship it"
+								}
+							}
+						],
+						"expect": [
+							{
+								"task": {
+									"title": "Ship it",
+									"status": "done"
+								}
+							},
+							{
+								"rows": [
+									"Later"
+								]
+							}
+						]
+					},
+					{
+						"criterion": "guests-no-done",
+						"fixtures": {
+							"users": [
+								{
+									"as": "g",
+									"role": "guest"
+								}
+							],
+							"tasks": [
+								{
+									"title": "Read me",
+									"assignee": "g"
+								}
+							]
+						},
+						"view_as": "g",
+						"expect": [
+							{
+								"rows": [
+									"Read me"
+								]
+							},
+							{
+								"action": "done",
+								"available": false
+							}
+						]
+					},
+					{
+						"criterion": "empty",
+						"fixtures": {
+							"users": [
+								{
+									"as": "a",
+									"role": "member"
+								}
+							],
+							"tasks": []
+						},
+						"view_as": "a",
+						"expect": [
+							{
+								"text": "Nothing on your plate"
+							}
+						]
+					}
+				],
+				"refs": {
+					"slot": "project.sidebar",
+					"capabilities": [
+						"tasks.complete",
+						"tasks.list"
+					],
+					"scopes": [
+						"tasks.status:write",
+						"tasks:read"
+					],
+					"catalog": {
+						"Column": [
+							"children"
+						],
+						"Table": [
+							"empty",
+							"fields",
+							"rowActions",
+							"rows"
+						]
+					}
+				},
+				"provenance": {
+					"compiler": "graft-compiler/0.1.0",
+					"strategy": "handwritten"
+				}
+			},
+			"verification": {
+				"passed": true,
+				"spec": {
+					"id": "my-tasks",
+					"hash": "sha256:a99a811f6868d9da3c37cbba3ccfee336d04b2bbfcd08ca28bff550aabff03b5"
+				},
+				"surface": {
+					"host": "browser",
+					"hostVersion": "observed-832cc479981a",
+					"hash": "sha256:ce6a866ab3fdb2efafab2a7bcea1cf245ba81bc78e556e8fc24538e8dda9a987"
+				},
+				"results": [
+					{
+						"criterion": "mine-open",
+						"check": 0,
+						"passed": true,
+						"failures": []
+					},
+					{
+						"criterion": "this-project",
+						"check": 1,
+						"passed": true,
+						"failures": []
+					},
+					{
+						"criterion": "columns",
+						"check": 2,
+						"passed": true,
+						"failures": []
+					},
+					{
+						"criterion": "overdue",
+						"check": 3,
+						"passed": true,
+						"failures": []
+					},
+					{
+						"criterion": "done",
+						"check": 4,
+						"passed": true,
+						"failures": []
+					},
+					{
+						"criterion": "guests-no-done",
+						"check": 5,
+						"passed": true,
+						"failures": []
+					},
+					{
+						"criterion": "empty",
+						"check": 6,
+						"passed": true,
+						"failures": []
+					}
+				],
+				"unchecked": [],
+				"verifiedAt": "2026-10-21T03:45:08.185Z"
+			}
+		}
+	]
+}

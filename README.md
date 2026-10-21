@@ -24,6 +24,9 @@ its checks in plain language, and "Waiting for review" is left for you to
 approve. Every account's password is `password`. Sign in as `edna` (editor)
 for the review queue under **Posts** and the quick-approve row action, or
 as `ada` (contributor) to see the same queue without the Approve button.
+**Posts → Board** shows posts as cards in Draft, Pending review and
+Published columns: drag a card, or use its buttons, to move it. `ada` can
+send their drafts for review but not publish them.
 Admins also find **Waiting too long** under "Running on their own":
 every morning it tags posts left in review for over a week, as Graft
 automation; try a dry run or run it now.
@@ -34,7 +37,8 @@ The demo is rebuilt from `main` on every push
 (`pnpm demo:build`, `pnpm test:demo`).
 
 The example customizations in the demo are A2UI surfaces Claude compiled
-from the specs, checked in so the tests run without a model. [Compiling with Claude](docs/compiling-with-claude.md)
+from the specs, checked in so the tests run without a model (the board,
+newer, was written by hand; [ADR 0012](docs/adr/0012-drag-and-drop.md)). [Compiling with Claude](docs/compiling-with-claude.md)
 shows a real run: Claude compiles all seven example specs into builds that
 pass their checks, and regenerates five customizations after a host change.
 
@@ -70,11 +74,14 @@ date, and can approve with one click.
 
 More in [`examples/specs`](examples/specs): an admin page, a row action on
 the existing Posts screen, Dashboard widgets, a publish checklist in
-the block editor with fields to fix the headline and excerpt, and a
-widget whose triggers tag posts left in review for over a week. The same ideas for
+the block editor with fields to fix the headline and excerpt, an
+editorial board whose cards move between statuses, and a widget whose
+triggers tag posts left in review for over a week. The same ideas for
 EmDash are in [`examples/emdash`](examples/emdash): a publish queue, a
 panel in the entry editor, dashboard widgets, and a status board that
-switches between drafts and published posts.
+switches between drafts and published posts. For a web app with no plugin
+API, [`examples/chrome-extension`](examples/chrome-extension) has a panel
+a browser extension draws into the app's own pages.
 
 ## How it works
 
@@ -158,7 +165,7 @@ pnpm exec tsx hosts/wordpress/e2e/server.ts   # a seeded WordPress on :9400
 
 Log in at http://127.0.0.1:9400/wp-login.php as `admin`, `editor`,
 `contributor` or `subscriber` (password `password`). Editors find **Posts →
-Review queue** and an **Approve** row action on pending posts. Admins find
+Review queue**, **Posts → Board** and an **Approve** row action on pending posts. Admins find
 **Tools → Customizations**, where "Waiting for review" waits for approval
 before it appears on the Dashboard.
 
@@ -219,6 +226,8 @@ pnpm graft site verify --site <url> --token <token>
 | `pnpm test:packages` | The npm packages, packed as published, installed outside the workspace and imported |
 | `pnpm test:emdash` | EmDash plugin smoke test: install, approve, serve per role, forged and refused actions, the status board's local state and actions |
 | `pnpm test:e2e:emdash` | Playwright in the EmDash admin: the page, the widget and the editor panel |
+| `pnpm verify:extension` | The browser extension example build's checks against a copy of the fixture app |
+| `pnpm test:e2e:extension` | Playwright with the unpacked extension in Chromium: approval, the injected panel under the app's CSP, the gateway's refusals, drift and the upgrade ladder after it |
 
 CI runs all of them, plus a weekly canary against WordPress nightly. As of
 7.2-alpha the surface is unchanged (same hash as 7.1) and every
@@ -243,6 +252,7 @@ Later decisions each have their own record:
 | [0008](docs/adr/0008-agency-sites.md) | Sites an agency builds: their own content model, policy and managed customizations |
 | [0009](docs/adr/0009-a2ui.md) | A2UI surfaces as a build's UI, replacing trees |
 | [0010](docs/adr/0010-scheduled-actions.md) | Triggers: customizations that act on a schedule or an event, as an automation user with its own grant (proposed; WordPress) |
+| [0011](docs/adr/0011-browser-extension-host.md) | A browser extension as the host for web apps without a plugin API (proposed; a [prototype](hosts/chrome-extension/README.md)) |
 
 Known limits:
 
@@ -265,7 +275,8 @@ Known limits:
 | `packages/cli` | The `graft` command |
 | `hosts/wordpress` | The WordPress adapter: plugin, A2UI client, surface generator, sandbox, tests ([README](hosts/wordpress/README.md)) |
 | `hosts/emdash` | The EmDash adapter: a native plugin that serves builds as Block Kit, surface, sandbox, test site, tests ([README](hosts/emdash/README.md)) |
-| `examples/` | Example specs and their builds, A2UI surfaces (WordPress; EmDash in `examples/emdash`; an agency-built client site in `examples/agency`) |
+| `hosts/chrome-extension` | A prototype host for third-party web apps: an MV3 extension with a gateway in its service worker, app surfaces from DOM anchors and API bindings, drift detection, a fixture app ([README](hosts/chrome-extension/README.md)) |
+| `examples/` | Example specs and their builds, A2UI surfaces (WordPress; EmDash in `examples/emdash`; an agency-built client site in `examples/agency`; a web app through a browser extension in `examples/chrome-extension`) |
 | `fixtures/canary` | A multi-tenant corpus for the canary |
 
 ## Packages on npm

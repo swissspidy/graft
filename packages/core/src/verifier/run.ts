@@ -1,6 +1,6 @@
 import { evaluate, isAction, type EvalContext } from '../build/evaluate.ts';
 import { removeRow } from '../build/rows.ts';
-import type { Build, Check } from '../build/types.ts';
+import type { Build, Check, CheckStep } from '../build/types.ts';
 import type { Spec } from '../spec/types.ts';
 import { canonicalJson } from '../surface/hash.ts';
 import type { Surface } from '../surface/types.ts';
@@ -173,10 +173,13 @@ async function runCheck(options: VerifyOptions, check: Check, index: number): Pr
 	};
 
 	let view = await render();
+	// Direct calls: whether each was refused, by action id and row.
+	const direct: Array<{ id: string; row: unknown; refused?: string }> = [];
 	// What each trigger run did, latest last, for "run" expectations.
 	const runs: TriggerRun[] = [];
 
-	for (const [i, step] of (check.steps ?? []).entries()) {
+	for (const [i, written] of (check.steps ?? []).entries()) {
+		let step: CheckStep = written;
 		if ('trigger' in step) {
 			const trigger = build.triggers?.[step.trigger];
 			if (!trigger) {
@@ -207,12 +210,25 @@ async function runCheck(options: VerifyOptions, check: Check, index: number): Pr
 			view = view.map((item) => (item === instance ? snap({ slot: item.slot, data: item.data, entered }) : item));
 			continue;
 		}
-		const found = findAction(view, step.action, step.row);
+		if ('drop' in step) {
+			// Dragging is pressing the action the record has for where it lands.
+			const dropped = findDrop(view, step.drop, step.on);
+			if (!dropped) {
+				failures.push(`Step ${i + 1}: ${describeMatcher(step.drop)} cannot be dropped on "${step.on}".`);
+				return result();
+			}
+			step = { action: dropped.action.id, row: step.drop };
+		}
+		const found = findAction(view, step.action, step.row, step.direct === true);
 		if (!found) {
-			failures.push(`Step ${i + 1}: no available "${step.action}" action${step.row ? ` for ${describeMatcher(step.row)}` : ''}.`);
+			failures.push(`Step ${i + 1}: no ${step.direct ? '' : 'available '}"${step.action}" action${step.row ? ` for ${describeMatcher(step.row)}` : ''}.`);
 			return result();
 		}
 		const { instance, action } = found;
+		if (step.direct && !isAction(action.action)) {
+			failures.push(`Step ${i + 1}: "${step.action}" calls no capability, so it cannot be called directly.`);
+			return result();
+		}
 		if (action.event) {
 			// A local action: what it sets is kept with what the viewer entered (latest last), and the snapshot draws it.
 			const { group, name, payload } = action.event;
@@ -227,9 +243,17 @@ async function runCheck(options: VerifyOptions, check: Check, index: number): Pr
 		}
 		try {
 			await call(action.action.capability, action.action.input ?? null);
+			if (step.direct) {
+				direct.push({ id: step.action, row: action.row });
+			}
 		} catch (error) {
-			failures.push(`Step ${i + 1}: "${step.action}" was refused: ${describeError(error)}.`);
-			return result();
+			if (!step.direct) {
+				failures.push(`Step ${i + 1}: "${step.action}" was refused: ${describeError(error)}.`);
+				return result();
+			}
+			// Refused: nothing changed, so nothing to refresh.
+			direct.push({ id: step.action, row: action.row, refused: describeError(error) });
+			continue;
 		}
 		let reload = false;
 		let data = instance.data;
@@ -253,7 +277,12 @@ async function runCheck(options: VerifyOptions, check: Check, index: number): Pr
 		inputs: view.flatMap((i) => i.snapshot.inputs ?? []),
 	};
 	for (const expectation of check.expect) {
-		const failure = 'run' in expectation ? expectRun(expectation.run, runs) : await evaluateExpectation(expectation, merged, sandbox);
+		const failure =
+			'run' in expectation
+				? expectRun(expectation.run, runs)
+				: 'refused' in expectation
+					? refusedFailure(expectation, direct)
+					: await evaluateExpectation(expectation, merged, sandbox);
 		if (failure) {
 			failures.push(failure);
 		}
@@ -299,10 +328,35 @@ function findInput(view: Instance[], id: string, matcher?: Record<string, unknow
 	return undefined;
 }
 
-function findAction(view: Instance[], id: string, matcher?: Record<string, unknown>): { instance: Instance; action: SnapshotAction } | undefined {
+/** {"refused": "<action id>", "row": {...}}: a direct call of that action (for that row) was refused. */
+function refusedFailure(expectation: Record<string, unknown>, direct: Array<{ id: string; row: unknown; refused?: string }>): string | undefined {
+	const id = String(expectation.refused);
+	const matcher = expectation.row as Record<string, unknown> | undefined;
+	const calls = direct.filter((call) => call.id === id && (!matcher || matchesRecord(matcher, call.row)));
+	const where = `"${id}"${matcher ? ` for ${describeMatcher(matcher)}` : ''}`;
+	if (calls.length === 0) {
+		return `Expected a direct call of ${where} to be refused, but the check makes none (a step {"action": "${id}", "direct": true}).`;
+	}
+	return calls.every((call) => call.refused !== undefined) ? undefined : `Expected a direct call of ${where} to be refused, but it went through.`;
+}
+
+/** The action a record uses when it is dropped on `zone`, if the viewer can use it. */
+function findDrop(view: Instance[], matcher: Record<string, unknown>, zone: string): { instance: Instance; action: SnapshotAction } | undefined {
 	for (const instance of view) {
 		for (const action of allActions(instance.snapshot)) {
-			if (action.id === id && action.available && (!matcher || matchesRecord(matcher, action.row))) {
+			if (action.dropTarget === zone && action.available && matchesRecord(matcher, action.row)) {
+				return { instance, action };
+			}
+		}
+	}
+	return undefined;
+}
+
+/** An action by id (and row): one the viewer can use, or with `direct`, any that calls a capability. */
+function findAction(view: Instance[], id: string, matcher?: Record<string, unknown>, direct = false): { instance: Instance; action: SnapshotAction } | undefined {
+	for (const instance of view) {
+		for (const action of allActions(instance.snapshot)) {
+			if (action.id === id && (action.available || direct) && (!matcher || matchesRecord(matcher, action.row))) {
 				return { instance, action };
 			}
 		}
@@ -316,13 +370,16 @@ function findAction(view: Instance[], id: string, matcher?: Record<string, unkno
  */
 async function evaluateExpectation(expectation: Record<string, unknown>, snapshot: Snapshot, sandbox: Sandbox): Promise<string | undefined> {
 	if ('rows' in expectation) {
+		// The first list, or with "in", the lists drawn in the place of that name (e.g. a column's drop target).
 		const expected = expectation.rows as string[];
-		const table = snapshot.tables[0];
-		const actual = table ? table.rows.map((row) => row.label) : [];
-		if (!table && expected.length > 0) {
-			return `Expected rows ${list(expected)}, but nothing lists rows.`;
+		const zone = typeof expectation.in === 'string' ? expectation.in : undefined;
+		const tables = zone === undefined ? snapshot.tables.slice(0, 1) : snapshot.tables.filter((t) => t.zone === zone);
+		const actual = tables.flatMap((table) => table.rows.map((row) => row.label));
+		const where = zone === undefined ? '' : ` in "${zone}"`;
+		if (tables.length === 0 && expected.length > 0) {
+			return `Expected rows ${list(expected)}${where}, but nothing${where} lists rows.`;
 		}
-		return sameSet(expected, actual) ? undefined : `Expected rows ${list(expected)}, found ${list(actual)}.`;
+		return sameSet(expected, actual) ? undefined : `Expected rows ${list(expected)}${where}, found ${list(actual)}.`;
 	}
 	if ('columns' in expectation) {
 		const expected = expectation.columns as string[];

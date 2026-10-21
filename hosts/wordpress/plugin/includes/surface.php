@@ -236,6 +236,10 @@ function surface_scopes(): array {
 			'title' => __( 'Change the categories, tags and other terms of posts you can edit', 'graft' ),
 			'host'  => array( 'edit_posts' ),
 		),
+		'posts.review:write'  => array(
+			'title' => __( 'Send posts you can edit for review, or back to draft', 'graft' ),
+			'host'  => array( 'edit_posts' ),
+		),
 		'posts.status:write'  => array(
 			'title' => __( 'Publish, unpublish or change the status of posts', 'graft' ),
 			'host'  => array( 'edit_posts', 'publish_posts' ),
@@ -269,35 +273,39 @@ function surface_scopes(): array {
  */
 function surface_capability_map(): array {
 	$map = array(
-		'posts.list'          => array(
+		'posts.list'                 => array(
 			'ability' => 'graft/posts-list',
 			'scopes'  => array( 'posts:read' ),
 		),
-		'posts.update_status' => array(
+		'posts.update_status'        => array(
 			'ability' => 'graft/post-update-status',
 			'scopes'  => array( 'posts.status:write' ),
 		),
-		'posts.update_fields' => array(
+		'posts.update_review_status' => array(
+			'ability' => 'graft/post-update-review-status',
+			'scopes'  => array( 'posts.review:write' ),
+		),
+		'posts.update_fields'        => array(
 			'ability' => 'graft/post-update-fields',
 			'scopes'  => array( 'posts:write' ),
 		),
-		'posts.update_meta'   => array(
+		'posts.update_meta'          => array(
 			'ability' => 'graft/post-update-meta',
 			'scopes'  => array( 'posts.meta:write' ),
 		),
-		'posts.set_terms'     => array(
+		'posts.set_terms'            => array(
 			'ability' => 'graft/post-set-terms',
 			'scopes'  => array( 'posts.terms:write' ),
 		),
-		'terms.list'          => array(
+		'terms.list'                 => array(
 			'ability' => 'graft/terms-list',
 			'scopes'  => array( 'posts:read' ),
 		),
-		'site.info'           => array(
+		'site.info'                  => array(
 			'ability' => 'core/get-site-info',
 			'scopes'  => array( 'site:read' ),
 		),
-		'users.current'       => array(
+		'users.current'              => array(
 			'ability' => 'core/get-user-info',
 			'scopes'  => array( 'users.current:read' ),
 		),

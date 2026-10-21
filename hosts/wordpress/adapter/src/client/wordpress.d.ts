@@ -12,6 +12,7 @@ declare module '@wordpress/components' {
 		size?: 'default' | 'compact' | 'small';
 		onClick?: () => void;
 		children?: ReactNode;
+		'aria-label'?: string;
 		[data: `data-${string}`]: string | undefined;
 	}>;
 	export const Notice: ComponentType<{
@@ -21,9 +22,9 @@ declare module '@wordpress/components' {
 		onRemove?: () => void;
 		children?: ReactNode;
 	}>;
-	export const Card: ComponentType<{ children?: ReactNode }>;
-	export const CardHeader: ComponentType<{ children?: ReactNode }>;
-	export const CardBody: ComponentType<{ children?: ReactNode }>;
+	export const Card: ComponentType<{ size?: 'xSmall' | 'small' | 'medium' | 'large'; children?: ReactNode }>;
+	export const CardHeader: ComponentType<{ size?: 'xSmall' | 'small' | 'medium' | 'large'; children?: ReactNode }>;
+	export const CardBody: ComponentType<{ size?: 'xSmall' | 'small' | 'medium' | 'large'; children?: ReactNode }>;
 	export const Spinner: ComponentType<Record<string, never>>;
 	interface ControlProps {
 		label?: string;

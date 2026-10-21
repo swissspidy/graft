@@ -74,8 +74,10 @@ function toSchemaError(unit: OutputUnit, schema: unknown): SchemaError {
 	const base = { keyword: unit.keyword, instancePath, schemaPath: unit.keywordLocation };
 	const lower = unit.error.replace(/\.$/, '');
 	switch (unit.keyword) {
-		case 'required':
-			return { ...base, params: { missingProperty: quoted(unit.error, /property "(.*)"/) ?? '' }, message: 'must have required property' };
+		case 'required': {
+			const missing = quoted(unit.error, /property "(.*)"/) ?? '';
+			return { ...base, params: { missingProperty: missing }, message: `must have required property '${missing}'` };
+		}
 		case 'additionalProperties':
 			return { ...base, params: { additionalProperty: quoted(unit.error, /Property "(.*)" does not match/) ?? '' }, message: 'must NOT have additional properties' };
 		case 'enum': {
@@ -86,8 +88,10 @@ function toSchemaError(unit: OutputUnit, schema: unknown): SchemaError {
 			const value = resolveKeyword(schema, unit.keywordLocation);
 			return { ...base, params: { allowedValue: value !== undefined ? value : parseJson(quoted(unit.error, /match (.*)\.$/)) }, message: 'must be equal to constant' };
 		}
-		case 'pattern':
-			return { ...base, params: { pattern: String(resolveKeyword(schema, unit.keywordLocation) ?? '') }, message: 'must match pattern' };
+		case 'pattern': {
+			const pattern = String(resolveKeyword(schema, unit.keywordLocation) ?? '');
+			return { ...base, params: { pattern }, message: `must match pattern "${pattern}"` };
+		}
 		case 'type': {
 			const expected = quoted(unit.error, /Expected "(.*)"/) ?? '';
 			return { ...base, params: { type: expected }, message: `must be ${expected.replace(/", "/g, ',')}` };

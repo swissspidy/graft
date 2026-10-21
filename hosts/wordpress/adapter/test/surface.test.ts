@@ -48,6 +48,9 @@ describe('checked-in surfaces', () => {
 		});
 		expect(surface.capabilities['posts.list']).toMatchObject({ kind: 'read', scopes: ['posts:read'], binding: { ability: 'graft/posts-list' } });
 		expect(surface.capabilities['posts.update_status']).toMatchObject({ kind: 'write', scopes: ['posts.status:write'] });
+		expect(surface.capabilities['posts.update_review_status']).toMatchObject({ kind: 'write', scopes: ['posts.review:write'], binding: { ability: 'graft/post-update-review-status' } });
+		expect((surface.capabilities['posts.update_review_status']!.input as { properties: { status: { enum: string[] } } }).properties.status.enum).toEqual(['draft', 'pending']);
+		expect(surface.scopes['posts.review:write']).toMatchObject({ host: ['edit_posts'] });
 	});
 });
 

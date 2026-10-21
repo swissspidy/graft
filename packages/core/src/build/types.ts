@@ -61,10 +61,15 @@ export interface DataSource {
  * What a check does before its expectations: use an action (a button, a
  * row action), or type a value into an input component. `row` picks the
  * row (or slot instance, e.g. the post) the action or input belongs to.
+ * A `direct` action is called even when it is hidden or disabled, as a
+ * viewer calling its capability through the gateway would: whether it is
+ * refused is for a `refused` expectation to say. `drop` drags the record
+ * it matches onto the place named `on`, which uses its action for there.
  */
 export type CheckStep =
-	| { action: string; row?: Record<string, unknown> }
+	| { action: string; row?: Record<string, unknown>; direct?: boolean }
 	| { fill: string; value: string | boolean; row?: Record<string, unknown> }
+	| { drop: Record<string, unknown>; on: string }
 	/** Runs a trigger at the check's clock; `target` picks an event trigger's subject. */
 	| { trigger: string; target?: Record<string, unknown> };
 

@@ -5,15 +5,16 @@ import { usableCapabilities } from './schemas.ts';
 import type { HostGuide } from './types.ts';
 
 const CHECK_VOCABULARY = `A check proves one acceptance criterion. It seeds its own fixtures, renders the customization for one fixture user (view_as), optionally performs steps, then evaluates expectations over what that user sees and can do.
-- steps: [{"action": "<action id>", "row": {<fields identifying the row, e.g. "title": "Draft A">}}], or, to type into an input, {"fill": "<input id>", "value": "<text>" (true/false for a checkbox), "row": {...}}
+- steps: [{"action": "<action id>", "row": {<fields identifying the row, e.g. "title": "Draft A">}}], or, to type into an input, {"fill": "<input id>", "value": "<text>" (true/false for a checkbox), "row": {...}}. With "direct": true an action is called even when the viewer is not offered it (hidden or disabled), as someone calling its capability directly would; use it with a "refused" expectation to prove the host refuses what the UI does not offer. {"drop": {<fields identifying the row>}, "on": "<drop target>"} drags a row's card onto a container with that dropTarget, which uses the card's button for that target (it fails when there is none the viewer can use).
 - expectations (each an object):
-  {"rows": ["label", ...]}: the labels (primary field) of the listed rows, in any order; [] for none.
+  {"rows": ["label", ...], "in": "<drop target>"}: the labels (primary field) of the listed rows, in any order; [] for none. Without "in", the first table or list of cards; with it, the ones inside the container with that dropTarget (e.g. a board's column).
   {"columns": ["Label", ...]}: every column label, in order (the whole list, not just the ones a criterion names; use "cell" to check one column).
   rows and columns read the first table shown, so a UI the checks list rows in shows that table first and draws choices such as filters as buttons, not as another table.
   {"text": "..."}: this text is shown somewhere: in text, a table cell, an input's label, or the label of a button or action the viewer can use (not of one that is hidden or disabled). It cannot say where: to check a value in a table use "cell" (which row and column), and to check a button use "action".
   {"action": "<action id>", "row": {...}, "available": true|false}: whether the action is available (for that row). Only a table row's actions have a row; a button outside a table has none, so give each such button its own action id (e.g. "author-alice") and leave "row" out.
   {"cell": {"row": {...}, "column": "Label", "text": "...", "tone": "..."}}: what a table cell shows for that row (text: contained; tone: the mark, when the column has one).
   {"input": "<input id>", "value": <value>, "row": {...}}: what an input shows.
+  {"refused": "<action id>", "row": {...}}: a "direct" step of that action (for that row) was refused.
   plus the host assertions below.
 Fixtures are created when the check starts. To test anything that depends on age ("older than 30 days"), set advance_days: the check then looks that many days later.
 Write checks that would fail for a wrong implementation: include fixtures that must NOT show up, users who must NOT be able to act, and the empty case when a criterion mentions one.

@@ -62,6 +62,8 @@ export async function loadHostFormats(host: string): Promise<void> {
 		await import('@graft/wordpress-adapter');
 	} else if (host === 'emdash') {
 		await import('@graft/emdash/node');
+	} else if (host === 'browser') {
+		await import('@graft/chrome-extension/node');
 	}
 }
 
@@ -94,6 +96,21 @@ export async function hostTools(surface: Surface, options: HostToolOptions = {})
 				const scenario = findScenario(emdash.scenarios, canary.scenario);
 				return (await emdash.runEmDashCanary({ ...canaryOptions(canary), ...(scenario ? { scenario } : {}) })).report;
 			},
+		};
+	}
+	if (surface.host === 'browser') {
+		// A web app customized from a browser extension; the sandbox is a fixture copy of the app (the Tasklet fixture for now).
+		const browser = await import('@graft/chrome-extension/node');
+		const unsupported = async (): Promise<never> => {
+			throw new Error('The browser host has no canary yet: its host changes come from drift checks (pnpm drift:extension).');
+		};
+		return {
+			guide: browser.hostGuide,
+			startSandbox: () => browser.startTaskletSandbox(),
+			verify: (targets, sandbox) => browser.verifyInBrowserHost(targets, sandbox ? { sandbox: sandbox as never } : {}),
+			scenarios: [],
+			loadCorpus: unsupported,
+			canary: unsupported,
 		};
 	}
 	throw new Error(`No host adapter for "${surface.host}".`);

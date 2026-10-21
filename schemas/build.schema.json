@@ -290,7 +290,21 @@
                 "additionalProperties": false,
                 "properties": {
                   "action": { "type": "string" },
-                  "row": { "type": "object" }
+                  "row": { "type": "object" },
+                  "direct": {
+                    "description": "Call the action's capability even if the viewer is not offered the action, as a direct call to the gateway would. A refusal does not fail the check; a \"refused\" expectation says whether it was refused.",
+                    "type": "boolean"
+                  }
+                }
+              },
+              {
+                "description": "Drag a record (its card) onto a drop target, which uses the record's action for that target.",
+                "type": "object",
+                "required": ["drop", "on"],
+                "additionalProperties": false,
+                "properties": {
+                  "drop": { "type": "object" },
+                  "on": { "type": "string" }
                 }
               },
               {

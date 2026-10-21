@@ -2,8 +2,8 @@
 	"graft": 1,
 	"host": "wordpress",
 	"hostVersion": "7.1.3",
-	"hash": "sha256:87689d916e3f8d1a3f86780dcd5becac92be6ac61a207179ab4612b0ccfb8602",
-	"fingerprint": "sha256:b8351fa40d1fb90e19c0b48a06d409c930b063a804e77a9f305bdbdd136e6ba8",
+	"hash": "sha256:e9d83d1f7acd2e3327eab924517c67a9a3ed894b05aa36837458120f1cd036b7",
+	"fingerprint": "sha256:d3055bb6b2cc6496cf8c8a6845e07047a41e457fa91b97e29efab3e2411dea4d",
 	"slots": {
 		"admin.page": {
 			"kind": "owned",
@@ -1557,6 +1557,238 @@
 				}
 			}
 		},
+		"posts.update_review_status": {
+			"kind": "write",
+			"description": "Moves one draft or pending post between draft and pending review. It never publishes or unpublishes a post.",
+			"input": {
+				"type": "object",
+				"properties": {
+					"id": {
+						"type": "integer",
+						"minimum": 1
+					},
+					"status": {
+						"type": "string",
+						"enum": [
+							"draft",
+							"pending"
+						]
+					}
+				},
+				"required": [
+					"id",
+					"status"
+				],
+				"additionalProperties": false
+			},
+			"output": {
+				"type": "object",
+				"properties": {
+					"id": {
+						"type": "integer"
+					},
+					"title": {
+						"type": "string"
+					},
+					"status": {
+						"type": "string",
+						"enum": [
+							"publish",
+							"future",
+							"draft",
+							"pending",
+							"private"
+						]
+					},
+					"type": {
+						"type": "string"
+					},
+					"author": {
+						"type": "object",
+						"properties": {
+							"id": {
+								"type": "integer"
+							},
+							"name": {
+								"type": "string"
+							}
+						},
+						"required": [
+							"id",
+							"name"
+						],
+						"additionalProperties": false
+					},
+					"date": {
+						"type": "string",
+						"format": "date-time"
+					},
+					"modified": {
+						"type": "string",
+						"format": "date-time"
+					},
+					"edit_url": {
+						"type": "string",
+						"format": "uri"
+					},
+					"meta": {
+						"description": "The post's custom fields that the site exposes, by meta key; null when it has no value.",
+						"type": "object",
+						"properties": {
+							"capacity": {
+								"type": [
+									"integer",
+									"null"
+								],
+								"description": "How many seats the event has.",
+								"minimum": 0
+							},
+							"event_date": {
+								"type": [
+									"string",
+									"null"
+								],
+								"description": "The day the event takes place (YYYY-MM-DD).",
+								"pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}$"
+							},
+							"sold_out": {
+								"type": [
+									"boolean",
+									"null"
+								],
+								"description": "Whether every seat is taken."
+							},
+							"venue": {
+								"type": [
+									"string",
+									"null"
+								],
+								"description": "Where the event takes place.",
+								"maxLength": 100
+							}
+						},
+						"additionalProperties": false
+					},
+					"terms": {
+						"description": "The post's terms in each exposed taxonomy, by taxonomy.",
+						"type": "object",
+						"properties": {
+							"category": {
+								"type": "array",
+								"items": {
+									"type": "object",
+									"properties": {
+										"id": {
+											"type": "integer"
+										},
+										"name": {
+											"type": "string"
+										},
+										"slug": {
+											"type": "string"
+										}
+									},
+									"required": [
+										"id",
+										"name",
+										"slug"
+									],
+									"additionalProperties": false
+								}
+							},
+							"event_type": {
+								"type": "array",
+								"items": {
+									"type": "object",
+									"properties": {
+										"id": {
+											"type": "integer"
+										},
+										"name": {
+											"type": "string"
+										},
+										"slug": {
+											"type": "string"
+										}
+									},
+									"required": [
+										"id",
+										"name",
+										"slug"
+									],
+									"additionalProperties": false
+								}
+							},
+							"post_tag": {
+								"type": "array",
+								"items": {
+									"type": "object",
+									"properties": {
+										"id": {
+											"type": "integer"
+										},
+										"name": {
+											"type": "string"
+										},
+										"slug": {
+											"type": "string"
+										}
+									},
+									"required": [
+										"id",
+										"name",
+										"slug"
+									],
+									"additionalProperties": false
+								}
+							}
+						},
+						"additionalProperties": false
+					},
+					"can": {
+						"description": "What the current user may do with this post.",
+						"type": "object",
+						"properties": {
+							"edit": {
+								"type": "boolean"
+							},
+							"publish": {
+								"type": "boolean"
+							}
+						},
+						"required": [
+							"edit",
+							"publish"
+						],
+						"additionalProperties": false
+					}
+				},
+				"required": [
+					"id",
+					"title",
+					"status",
+					"type",
+					"author",
+					"date",
+					"modified",
+					"meta",
+					"terms",
+					"can"
+				],
+				"additionalProperties": false
+			},
+			"scopes": [
+				"posts.review:write"
+			],
+			"binding": {
+				"ability": "graft/post-update-review-status",
+				"annotations": {
+					"readonly": false,
+					"destructive": false,
+					"idempotent": true
+				}
+			}
+		},
 		"posts.update_status": {
 			"kind": "write",
 			"description": "Changes the status of one post, for example to publish a pending post.",
@@ -2075,6 +2307,12 @@
 		},
 		"posts.meta:write": {
 			"title": "Change the custom fields of posts you can edit",
+			"host": [
+				"edit_posts"
+			]
+		},
+		"posts.review:write": {
+			"title": "Send posts you can edit for review, or back to draft",
 			"host": [
 				"edit_posts"
 			]

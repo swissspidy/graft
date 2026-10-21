@@ -1,0 +1,1128 @@
+{
+	"graft": 1,
+	"spec": {
+		"id": "kanban-board",
+		"hash": "sha256:b761970b238f98bc130d7439f30080a200e51fdc61bbab662f3dc1a75cfa91fb"
+	},
+	"surface": {
+		"host": "wordpress",
+		"hostVersion": "7.1.3",
+		"hash": "sha256:c59f39374f6968afbfb21f05ea1bd98c63b0d048d942bada6de39ed61463b193"
+	},
+	"mount": {
+		"slot": "admin.page",
+		"menu": {
+			"parent": "posts",
+			"title": "Board"
+		}
+	},
+	"ui": {
+		"protocol": "a2ui/v0.9",
+		"catalogId": "graft:wordpress",
+		"computed": {
+			"draft": {
+				"call": "filter",
+				"args": {
+					"items": {
+						"path": "/posts/items"
+					},
+					"by": "status",
+					"equals": "draft"
+				}
+			},
+			"pending": {
+				"call": "filter",
+				"args": {
+					"items": {
+						"path": "/posts/items"
+					},
+					"by": "status",
+					"equals": "pending"
+				}
+			},
+			"publish": {
+				"call": "filter",
+				"args": {
+					"items": {
+						"path": "/posts/items"
+					},
+					"by": "status",
+					"equals": "publish"
+				}
+			}
+		},
+		"components": [
+			{
+				"id": "root",
+				"component": "Row",
+				"children": [
+					"column-draft",
+					"column-pending",
+					"column-publish"
+				]
+			},
+			{
+				"id": "column-draft",
+				"component": "Column",
+				"children": [
+					"heading-draft",
+					"table-draft"
+				]
+			},
+			{
+				"id": "heading-draft",
+				"component": "Text",
+				"text": "Draft",
+				"variant": "h3"
+			},
+			{
+				"id": "table-draft",
+				"component": "Table",
+				"rows": {
+					"path": "/draft"
+				},
+				"fields": [
+					{
+						"id": "title",
+						"label": "Title",
+						"type": "string",
+						"primary": true
+					},
+					{
+						"id": "author/name",
+						"label": "Author",
+						"type": "user"
+					},
+					{
+						"id": "updated",
+						"label": "Updated",
+						"type": "string",
+						"value": {
+							"call": "if",
+							"args": {
+								"condition": {
+									"call": "lessThan",
+									"args": {
+										"a": {
+											"call": "daysSince",
+											"args": {
+												"value": {
+													"path": "modified"
+												}
+											}
+										},
+										"b": 1
+									}
+								},
+								"then": "today",
+								"else": {
+									"call": "if",
+									"args": {
+										"condition": {
+											"call": "equals",
+											"args": {
+												"a": {
+													"call": "daysSince",
+													"args": {
+														"value": {
+															"path": "modified"
+														}
+													}
+												},
+												"b": 1
+											}
+										},
+										"then": "1 day ago",
+										"else": {
+											"call": "formatString",
+											"args": {
+												"value": "${daysSince(value: ${modified})} days ago"
+											}
+										}
+									}
+								}
+							}
+						}
+					}
+				],
+				"rowActions": [
+					{
+						"id": "to-pending",
+						"label": "Pending review →",
+						"variant": "primary",
+						"visible": {
+							"call": "can",
+							"args": {
+								"scope": "posts.review:write"
+							}
+						},
+						"action": {
+							"event": {
+								"name": "send-for-review",
+								"context": {
+									"id": {
+										"path": "id"
+									}
+								}
+							}
+						}
+					}
+				],
+				"empty": "No drafts."
+			},
+			{
+				"id": "column-pending",
+				"component": "Column",
+				"children": [
+					"heading-pending",
+					"table-pending"
+				]
+			},
+			{
+				"id": "heading-pending",
+				"component": "Text",
+				"text": "Pending review",
+				"variant": "h3"
+			},
+			{
+				"id": "table-pending",
+				"component": "Table",
+				"rows": {
+					"path": "/pending"
+				},
+				"fields": [
+					{
+						"id": "title",
+						"label": "Title",
+						"type": "string",
+						"primary": true
+					},
+					{
+						"id": "author/name",
+						"label": "Author",
+						"type": "user"
+					},
+					{
+						"id": "updated",
+						"label": "Updated",
+						"type": "string",
+						"value": {
+							"call": "if",
+							"args": {
+								"condition": {
+									"call": "lessThan",
+									"args": {
+										"a": {
+											"call": "daysSince",
+											"args": {
+												"value": {
+													"path": "modified"
+												}
+											}
+										},
+										"b": 1
+									}
+								},
+								"then": "today",
+								"else": {
+									"call": "if",
+									"args": {
+										"condition": {
+											"call": "equals",
+											"args": {
+												"a": {
+													"call": "daysSince",
+													"args": {
+														"value": {
+															"path": "modified"
+														}
+													}
+												},
+												"b": 1
+											}
+										},
+										"then": "1 day ago",
+										"else": {
+											"call": "formatString",
+											"args": {
+												"value": "${daysSince(value: ${modified})} days ago"
+											}
+										}
+									}
+								}
+							}
+						}
+					}
+				],
+				"rowActions": [
+					{
+						"id": "to-draft",
+						"label": "← Draft",
+						"visible": {
+							"call": "can",
+							"args": {
+								"scope": "posts.review:write"
+							}
+						},
+						"action": {
+							"event": {
+								"name": "back-to-draft",
+								"context": {
+									"id": {
+										"path": "id"
+									}
+								}
+							}
+						}
+					},
+					{
+						"id": "publish",
+						"label": "Published →",
+						"variant": "primary",
+						"visible": {
+							"call": "can",
+							"args": {
+								"scope": "posts.status:write"
+							}
+						},
+						"action": {
+							"event": {
+								"name": "publish",
+								"context": {
+									"id": {
+										"path": "id"
+									}
+								}
+							}
+						}
+					}
+				],
+				"empty": "Nothing is waiting for review."
+			},
+			{
+				"id": "column-publish",
+				"component": "Column",
+				"children": [
+					"heading-publish",
+					"table-publish"
+				]
+			},
+			{
+				"id": "heading-publish",
+				"component": "Text",
+				"text": "Published",
+				"variant": "h3"
+			},
+			{
+				"id": "table-publish",
+				"component": "Table",
+				"rows": {
+					"path": "/publish"
+				},
+				"fields": [
+					{
+						"id": "title",
+						"label": "Title",
+						"type": "string",
+						"primary": true
+					},
+					{
+						"id": "author/name",
+						"label": "Author",
+						"type": "user"
+					},
+					{
+						"id": "updated",
+						"label": "Updated",
+						"type": "string",
+						"value": {
+							"call": "if",
+							"args": {
+								"condition": {
+									"call": "lessThan",
+									"args": {
+										"a": {
+											"call": "daysSince",
+											"args": {
+												"value": {
+													"path": "modified"
+												}
+											}
+										},
+										"b": 1
+									}
+								},
+								"then": "today",
+								"else": {
+									"call": "if",
+									"args": {
+										"condition": {
+											"call": "equals",
+											"args": {
+												"a": {
+													"call": "daysSince",
+													"args": {
+														"value": {
+															"path": "modified"
+														}
+													}
+												},
+												"b": 1
+											}
+										},
+										"then": "1 day ago",
+										"else": {
+											"call": "formatString",
+											"args": {
+												"value": "${daysSince(value: ${modified})} days ago"
+											}
+										}
+									}
+								}
+							}
+						}
+					}
+				],
+				"rowActions": [
+					{
+						"id": "unpublish",
+						"label": "← Pending review",
+						"visible": {
+							"call": "can",
+							"args": {
+								"scope": "posts.status:write"
+							}
+						},
+						"action": {
+							"event": {
+								"name": "unpublish",
+								"context": {
+									"id": {
+										"path": "id"
+									}
+								}
+							}
+						}
+					}
+				],
+				"empty": "Nothing published yet."
+			}
+		]
+	},
+	"events": {
+		"send-for-review": {
+			"call": "posts.update_review_status",
+			"input": {
+				"id": {
+					"$context": "id"
+				},
+				"status": "pending"
+			},
+			"then": [
+				"refresh:posts"
+			],
+			"notice": "Sent for review."
+		},
+		"back-to-draft": {
+			"call": "posts.update_review_status",
+			"input": {
+				"id": {
+					"$context": "id"
+				},
+				"status": "draft"
+			},
+			"then": [
+				"refresh:posts"
+			],
+			"notice": "Moved back to draft."
+		},
+		"publish": {
+			"call": "posts.update_status",
+			"input": {
+				"id": {
+					"$context": "id"
+				},
+				"status": "publish"
+			},
+			"then": [
+				"refresh:posts"
+			],
+			"notice": "Published."
+		},
+		"unpublish": {
+			"call": "posts.update_status",
+			"input": {
+				"id": {
+					"$context": "id"
+				},
+				"status": "pending"
+			},
+			"then": [
+				"refresh:posts"
+			],
+			"notice": "Unpublished and sent back for review."
+		}
+	},
+	"data": {
+		"posts": {
+			"call": "posts.list",
+			"input": {
+				"post_type": "post",
+				"status": [
+					"draft",
+					"pending",
+					"publish"
+				],
+				"orderby": "modified",
+				"order": "desc",
+				"per_page": 100
+			}
+		}
+	},
+	"checks": [
+		{
+			"criterion": "columns",
+			"fixtures": {
+				"users": [
+					{
+						"as": "edna",
+						"role": "editor",
+						"name": "Edna"
+					},
+					{
+						"as": "ada",
+						"role": "contributor",
+						"name": "Ada"
+					}
+				],
+				"posts": [
+					{
+						"title": "Outline",
+						"status": "draft",
+						"author": "ada"
+					},
+					{
+						"title": "Interview",
+						"status": "pending",
+						"author": "ada"
+					},
+					{
+						"title": "Launch",
+						"status": "publish",
+						"author": "edna"
+					}
+				]
+			},
+			"view_as": "edna",
+			"expect": [
+				{
+					"rows": [
+						"Outline"
+					]
+				},
+				{
+					"text": "Draft"
+				},
+				{
+					"text": "Pending review"
+				},
+				{
+					"text": "Published"
+				},
+				{
+					"action": "to-draft",
+					"row": {
+						"title": "Interview"
+					}
+				},
+				{
+					"action": "unpublish",
+					"row": {
+						"title": "Launch"
+					}
+				},
+				{
+					"action": "publish",
+					"row": {
+						"title": "Outline"
+					},
+					"available": false
+				}
+			]
+		},
+		{
+			"criterion": "card",
+			"fixtures": {
+				"users": [
+					{
+						"as": "edna",
+						"role": "editor",
+						"name": "Edna"
+					},
+					{
+						"as": "ada",
+						"role": "contributor",
+						"name": "Ada"
+					}
+				],
+				"posts": [
+					{
+						"title": "Outline",
+						"status": "draft",
+						"author": "ada"
+					},
+					{
+						"title": "Interview",
+						"status": "pending",
+						"author": "ada"
+					},
+					{
+						"title": "Launch",
+						"status": "publish",
+						"author": "edna"
+					}
+				]
+			},
+			"view_as": "edna",
+			"expect": [
+				{
+					"cell": {
+						"row": {
+							"title": "Interview"
+						},
+						"column": "Author",
+						"text": "Ada"
+					}
+				},
+				{
+					"cell": {
+						"row": {
+							"title": "Launch"
+						},
+						"column": "Author",
+						"text": "Edna"
+					}
+				},
+				{
+					"cell": {
+						"row": {
+							"title": "Outline"
+						},
+						"column": "Updated",
+						"text": "today"
+					}
+				}
+			]
+		},
+		{
+			"criterion": "card",
+			"fixtures": {
+				"users": [
+					{
+						"as": "edna",
+						"role": "editor",
+						"name": "Edna"
+					},
+					{
+						"as": "ada",
+						"role": "contributor",
+						"name": "Ada"
+					}
+				],
+				"posts": [
+					{
+						"title": "Outline",
+						"status": "draft",
+						"author": "ada"
+					},
+					{
+						"title": "Interview",
+						"status": "pending",
+						"author": "ada"
+					},
+					{
+						"title": "Launch",
+						"status": "publish",
+						"author": "edna"
+					}
+				]
+			},
+			"clock": {
+				"advanceDays": 3
+			},
+			"view_as": "edna",
+			"expect": [
+				{
+					"cell": {
+						"row": {
+							"title": "Interview"
+						},
+						"column": "Updated",
+						"text": "3 days ago"
+					}
+				}
+			]
+		},
+		{
+			"criterion": "review",
+			"fixtures": {
+				"users": [
+					{
+						"as": "edna",
+						"role": "editor",
+						"name": "Edna"
+					},
+					{
+						"as": "ada",
+						"role": "contributor",
+						"name": "Ada"
+					}
+				],
+				"posts": [
+					{
+						"title": "Outline",
+						"status": "draft",
+						"author": "ada"
+					},
+					{
+						"title": "Interview",
+						"status": "pending",
+						"author": "ada"
+					},
+					{
+						"title": "Launch",
+						"status": "publish",
+						"author": "edna"
+					}
+				]
+			},
+			"view_as": "ada",
+			"steps": [
+				{
+					"action": "to-pending",
+					"row": {
+						"title": "Outline"
+					}
+				}
+			],
+			"expect": [
+				{
+					"post": {
+						"title": "Outline",
+						"status": "pending"
+					}
+				},
+				{
+					"rows": []
+				},
+				{
+					"text": "No drafts"
+				},
+				{
+					"action": "to-draft",
+					"row": {
+						"title": "Outline"
+					}
+				}
+			]
+		},
+		{
+			"criterion": "review",
+			"fixtures": {
+				"users": [
+					{
+						"as": "edna",
+						"role": "editor",
+						"name": "Edna"
+					},
+					{
+						"as": "ada",
+						"role": "contributor",
+						"name": "Ada"
+					}
+				],
+				"posts": [
+					{
+						"title": "Outline",
+						"status": "draft",
+						"author": "ada"
+					},
+					{
+						"title": "Interview",
+						"status": "pending",
+						"author": "ada"
+					},
+					{
+						"title": "Launch",
+						"status": "publish",
+						"author": "edna"
+					}
+				]
+			},
+			"view_as": "ada",
+			"steps": [
+				{
+					"action": "to-draft",
+					"row": {
+						"title": "Interview"
+					}
+				}
+			],
+			"expect": [
+				{
+					"post": {
+						"title": "Interview",
+						"status": "draft"
+					}
+				},
+				{
+					"rows": [
+						"Outline",
+						"Interview"
+					]
+				}
+			]
+		},
+		{
+			"criterion": "publish",
+			"fixtures": {
+				"users": [
+					{
+						"as": "edna",
+						"role": "editor",
+						"name": "Edna"
+					},
+					{
+						"as": "ada",
+						"role": "contributor",
+						"name": "Ada"
+					}
+				],
+				"posts": [
+					{
+						"title": "Outline",
+						"status": "draft",
+						"author": "ada"
+					},
+					{
+						"title": "Interview",
+						"status": "pending",
+						"author": "ada"
+					},
+					{
+						"title": "Launch",
+						"status": "publish",
+						"author": "edna"
+					}
+				]
+			},
+			"view_as": "edna",
+			"steps": [
+				{
+					"action": "publish",
+					"row": {
+						"title": "Interview"
+					}
+				}
+			],
+			"expect": [
+				{
+					"post": {
+						"title": "Interview",
+						"status": "publish"
+					}
+				},
+				{
+					"action": "unpublish",
+					"row": {
+						"title": "Interview"
+					}
+				}
+			]
+		},
+		{
+			"criterion": "publish",
+			"fixtures": {
+				"users": [
+					{
+						"as": "edna",
+						"role": "editor",
+						"name": "Edna"
+					},
+					{
+						"as": "ada",
+						"role": "contributor",
+						"name": "Ada"
+					}
+				],
+				"posts": [
+					{
+						"title": "Outline",
+						"status": "draft",
+						"author": "ada"
+					},
+					{
+						"title": "Interview",
+						"status": "pending",
+						"author": "ada"
+					},
+					{
+						"title": "Launch",
+						"status": "publish",
+						"author": "edna"
+					}
+				]
+			},
+			"view_as": "edna",
+			"steps": [
+				{
+					"action": "unpublish",
+					"row": {
+						"title": "Launch"
+					}
+				}
+			],
+			"expect": [
+				{
+					"post": {
+						"title": "Launch",
+						"status": "pending"
+					}
+				},
+				{
+					"action": "publish",
+					"row": {
+						"title": "Launch"
+					}
+				}
+			]
+		},
+		{
+			"criterion": "not-offered",
+			"fixtures": {
+				"users": [
+					{
+						"as": "edna",
+						"role": "editor",
+						"name": "Edna"
+					},
+					{
+						"as": "ada",
+						"role": "contributor",
+						"name": "Ada"
+					}
+				],
+				"posts": [
+					{
+						"title": "Outline",
+						"status": "draft",
+						"author": "ada"
+					},
+					{
+						"title": "Interview",
+						"status": "pending",
+						"author": "ada"
+					},
+					{
+						"title": "Launch",
+						"status": "publish",
+						"author": "edna"
+					}
+				]
+			},
+			"view_as": "ada",
+			"expect": [
+				{
+					"action": "publish",
+					"row": {
+						"title": "Interview"
+					},
+					"available": false
+				},
+				{
+					"action": "to-draft",
+					"row": {
+						"title": "Interview"
+					}
+				},
+				{
+					"action": "to-pending",
+					"row": {
+						"title": "Outline"
+					}
+				}
+			]
+		},
+		{
+			"criterion": "refused",
+			"fixtures": {
+				"users": [
+					{
+						"as": "edna",
+						"role": "editor",
+						"name": "Edna"
+					},
+					{
+						"as": "ada",
+						"role": "contributor",
+						"name": "Ada"
+					}
+				],
+				"posts": [
+					{
+						"title": "Outline",
+						"status": "draft",
+						"author": "ada"
+					},
+					{
+						"title": "Interview",
+						"status": "pending",
+						"author": "ada"
+					},
+					{
+						"title": "Launch",
+						"status": "publish",
+						"author": "edna"
+					}
+				]
+			},
+			"view_as": "ada",
+			"steps": [
+				{
+					"action": "publish",
+					"row": {
+						"title": "Interview"
+					},
+					"direct": true
+				}
+			],
+			"expect": [
+				{
+					"refused": "publish",
+					"row": {
+						"title": "Interview"
+					}
+				},
+				{
+					"post": {
+						"title": "Interview",
+						"status": "pending"
+					}
+				}
+			]
+		},
+		{
+			"criterion": "empty-columns",
+			"fixtures": {
+				"users": [
+					{
+						"as": "edna",
+						"role": "editor",
+						"name": "Edna"
+					},
+					{
+						"as": "ada",
+						"role": "contributor",
+						"name": "Ada"
+					}
+				],
+				"posts": [
+					{
+						"title": "Launch",
+						"status": "publish",
+						"author": "edna"
+					}
+				]
+			},
+			"view_as": "edna",
+			"expect": [
+				{
+					"rows": []
+				},
+				{
+					"text": "No drafts"
+				},
+				{
+					"text": "Nothing is waiting for review"
+				},
+				{
+					"text": "Draft"
+				},
+				{
+					"text": "Pending review"
+				},
+				{
+					"action": "unpublish",
+					"row": {
+						"title": "Launch"
+					}
+				}
+			]
+		},
+		{
+			"criterion": "empty-columns",
+			"fixtures": {
+				"users": [
+					{
+						"as": "edna",
+						"role": "editor",
+						"name": "Edna"
+					},
+					{
+						"as": "ada",
+						"role": "contributor",
+						"name": "Ada"
+					}
+				],
+				"posts": []
+			},
+			"view_as": "edna",
+			"expect": [
+				{
+					"text": "No drafts"
+				},
+				{
+					"text": "Nothing is waiting for review"
+				},
+				{
+					"text": "Nothing published yet"
+				}
+			]
+		}
+	],
+	"refs": {
+		"slot": "admin.page",
+		"capabilities": [
+			"posts.list",
+			"posts.update_review_status",
+			"posts.update_status"
+		],
+		"scopes": [
+			"posts.review:write",
+			"posts.status:write",
+			"posts:read"
+		],
+		"catalog": {
+			"Column": [
+				"children"
+			],
+			"Row": [
+				"children"
+			],
+			"Table": [
+				"empty",
+				"fields",
+				"rowActions",
+				"rows"
+			],
+			"Text": [
+				"text",
+				"variant"
+			]
+		}
+	},
+	"provenance": {
+		"compiler": "handwritten",
+		"strategy": "handwritten"
+	}
+}

@@ -157,6 +157,7 @@ test('the served specs are verified, not flagged', async ({ page }) => {
 	}>;
 	expect(specs.filter((s) => s.spec_id !== 'waiting-copy').map((s) => [s.spec_id, s.versions[0]!.state]).sort()).toEqual([
 		['headline-check', 'active'],
+		['kanban-board', 'active'],
 		['pending-by-author', 'active'],
 		['publish-checklist', 'active'],
 		['quick-approve', 'active'],
@@ -266,7 +267,7 @@ test('graft site pull exports the active customizations as a canary corpus', asy
 	const out = new URL('../../../test-results/pulled/e2e-site', import.meta.url).pathname;
 	const output = await graft('site', 'pull', '--out', out);
 	expect(output).toContain('Wrote 9 customization(s)');
-	for (const spec of ['review-queue', 'quick-approve', 'stale-drafts', 'headline-check', 'pending-by-author', 'publish-checklist', 'waiting-posts', 'waiting-copy']) {
+	for (const spec of ['review-queue', 'quick-approve', 'stale-drafts', 'headline-check', 'pending-by-author', 'publish-checklist', 'kanban-board', 'waiting-posts', 'waiting-copy']) {
 		expect(existsSync(`${out}/${spec}.md`) && existsSync(`${out}/${spec}.json`) && existsSync(`${out}/${spec}.grant.json`)).toBe(true);
 	}
 	expect(JSON.parse(readFileSync(`${out}/review-queue.grant.json`, 'utf8'))).toEqual({ scopes: ['posts:read', 'posts.status:write'] });

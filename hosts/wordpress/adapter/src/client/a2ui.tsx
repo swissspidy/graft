@@ -16,6 +16,7 @@ import {
 } from '@swissspidy/a2ui-wp';
 import type { UiRootProps } from '@graft/renderer-react';
 import type { Field } from '../cells.ts';
+import { Card, Column, DragProvider, Row, useDropButton } from './drag.tsx';
 import { Table as GraftTable } from './table.tsx';
 
 /**
@@ -97,10 +98,12 @@ const BaseButton = wordPressCatalog.Button!;
 
 /**
  * a2ui-wp's Button, marked with its action id (`actionId`, else its
- * component id) as Graft's own buttons and row actions are.
+ * component id) as Graft's own buttons and row actions are. With a
+ * `dropTarget`, dropping its draggable Card there presses it (./drag.tsx).
  */
-function Button(props: A2UIComponentProps<{ actionId?: unknown }>) {
+function Button(props: A2UIComponentProps<{ actionId?: unknown; dropTarget?: string; action?: unknown; checks?: unknown }>) {
 	const actionId = useDynamicString(props.props.actionId ?? '') || props.id;
+	useDropButton(props.id, props.props);
 	return (
 		<span data-graft-action={actionId}>
 			<BaseButton {...props} />
@@ -117,7 +120,7 @@ const withVisible = (catalog: ComponentCatalog): ComponentCatalog =>
 		]),
 	);
 
-const catalog = withVisible(createCatalog({ ...wordPressCatalog, Button, Table }));
+export const catalog = withVisible(createCatalog({ ...wordPressCatalog, Button, Table, Card, Column, Row }));
 
 /**
  * The A2UI processor for one mounted build, on the Graft catalog for this
@@ -192,7 +195,11 @@ export function A2UIRoot({ build: raw, data, slot, can, invoke }: UiRootProps) {
 		});
 	};
 
-	return <A2UIRenderer processor={processor} catalog={catalog} onAction={onAction} />;
+	return (
+		<DragProvider>
+			<A2UIRenderer processor={processor} catalog={catalog} onAction={onAction} />
+		</DragProvider>
+	);
 }
 
 // The runtime (mount.tsx) draws A2UI builds with this.
