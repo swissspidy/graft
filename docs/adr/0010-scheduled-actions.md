@@ -425,6 +425,15 @@ Tests:
   once, and respect a person removing the tag. The cost is that
   clear-on-publish calls `set_terms` on every published post, whether or
   not it has the tag.
+- A trigger can depend on site state that its checks seed but the site
+  may lack. The example needs the "waiting-too-long" tag (`set_terms`
+  never creates terms). The e2e suite first ran without it: every post
+  published in the other tests failed its clear-on-publish run, and after
+  the third the trigger paused itself, as designed, so later publishes
+  queued nothing. The auto-pause did its job. The spec lists the tag as a
+  precondition, but nothing yet checks a site meets it before
+  activation. Showing the last failure next to the paused state (the
+  panel does) is the minimum.
 - `graft site pull` exports viewer grants only. A pulled tenant's
   triggers are upgraded in the canary with the permissions their spec
   lists.

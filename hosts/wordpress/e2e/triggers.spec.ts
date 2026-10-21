@@ -25,8 +25,7 @@ const tagsOf = async (page: Page) => (await api<{ tags: number[] }>(page, { path
 
 test('administrators see what runs on its own, as whom, and what it may do', async ({ page }) => {
 	await login(page, 'admin');
-	// The tag the customization uses, and a post that has waited ten days.
-	await api(page, { path: '/wp/v2/tags', method: 'POST', data: { name: 'Waiting too long', slug: 'waiting-too-long' } });
+	// A post that has waited ten days (the seed created the tag).
 	const date = new Date(Date.now() - 10 * DAY).toISOString().slice(0, 19);
 	postId = (await api<{ id: number }>(page, { path: '/wp/v2/posts', method: 'POST', data: { title: 'Stuck in review', status: 'pending', date } })).id;
 
@@ -82,17 +81,20 @@ test('publishing the post runs the event trigger from WP-Cron, which takes the t
 	await login(page, 'editor');
 	// The editor's request only queues the trigger; WP-Cron runs it (requested here until it has).
 	await api(page, { path: `/wp/v2/posts/${postId}`, method: 'POST', data: { status: 'publish' } });
-	await expect
-		.poll(
-			async () => {
-				await page.request.get('/wp-cron.php');
-				return (await tagsOf(page)).length;
-			},
-			{ timeout: 150_000, intervals: [1_000, 2_000, 5_000] },
-		)
-		.toBe(0);
-
 	await login(page, 'admin');
+	// What it found each time, so a failure shows whether the job ran and how.
+	const state = async () => {
+		await page.request.get('/wp-cron.php');
+		const { runs } = await api<{ runs: Array<{ trigger: string; status: string; error?: string; calls?: Array<{ target: { title?: string }; ok: boolean; error?: string }> }> }>(page, { path: '/graft/v1/triggers' });
+		return {
+			tags: (await tagsOf(page)).length,
+			runs: runs.filter((r) => r.trigger === 'clear-on-publish' && (r.error || r.calls?.some((c) => c.target.title === 'Stuck in review'))),
+		};
+	};
+	await expect.poll(async () => (await state()).tags, { timeout: 150_000, intervals: [1_000, 2_000, 5_000] }).toBe(0).catch(async (error: Error) => {
+		throw new Error(`${error.message}\nTrigger state: ${JSON.stringify(await state())}`);
+	});
+
 	await page.goto('/wp-admin/tools.php?page=graft-customizations');
 	const run = automation(page).locator('[data-graft-run="waiting-too-long/clear-on-publish"]').first();
 	await expect(run).toHaveAttribute('data-graft-run-status', 'ok');
