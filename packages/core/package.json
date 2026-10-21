@@ -1,6 +1,6 @@
 {
   "name": "@swissspidy/graft-core",
-  "version": "0.1.1",
+  "version": "0.2.0",
   "license": "Apache-2.0",
   "description": "Host-agnostic Graft core: spec parsing and validation, surfaces, builds, verifier and lifecycle. No I/O.",
   "keywords": [
