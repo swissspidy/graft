@@ -1077,9 +1077,10 @@ function on_post_transition( string $new_status, string $old_status, WP_Post $po
 	if ( null === $event || trigger_running() || ! is_exposed_post_type( $post->post_type ) || null !== triggers_disabled() ) {
 		return;
 	}
+	$states = trigger_states();
 	foreach ( trigger_specs() as $spec_id => $entry ) {
 		foreach ( $entry['build']['triggers'] as $id => $trigger ) {
-			if ( ( $trigger['event'] ?? null ) === $event ) {
+			if ( ( $trigger['event'] ?? null ) === $event && empty( $states[ $spec_id . '/' . $id ]['paused'] ) ) {
 				wp_schedule_single_event( time(), 'graft_trigger_event', array( $spec_id, (string) $id, $post->ID, $event ) );
 			}
 		}

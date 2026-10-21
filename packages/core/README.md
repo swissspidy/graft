@@ -22,8 +22,12 @@ No I/O: hosts and tools bring their own storage, sandboxes and models.
   with data sources, frozen checks and refs. Core reads the UI through a
   registered UI format (`registerUiFormat`); [`@swissspidy/graft-a2ui`](https://www.npmjs.com/package/@swissspidy/graft-a2ui)
   is the A2UI one.
+- **Triggers** (`runTrigger`, `triggerCallRefusal`, `describeWhen`): what a
+  build does without a viewer, on a schedule or a host event, as the
+  host's service identity with its own grant
+  ([ADR 0010](https://github.com/swissspidy/graft/blob/main/docs/adr/0010-scheduled-actions.md)).
 - **Verification** (`verifyBuild`): runs a build's checks against a host
-  sandbox you provide.
+  sandbox you provide (`Sandbox.fire` runs its triggers).
 - **Compiling** (`compileSpec`): checks, then the UI, from a model you
   provide, with retries fed by validation and verification.
 - **Upgrades** (`staticCheck`, `upgradeBuild`, `runCanary`): the upgrade

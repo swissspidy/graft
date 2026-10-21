@@ -590,7 +590,11 @@ function attach_build( string $spec_id, int $version, $build, ?array $verificati
 	// Triggers: exactly the ones the spec declares, each within what the spec lists for it.
 	$declared = (array) ( $record['manifest']['triggers'] ?? array() );
 	$triggers = (array) ( $build['triggers'] ?? array() );
-	if ( array_keys( $declared ) != array_keys( $triggers ) ) { // phpcs:ignore Universal.Operators.StrictComparisons.LooseNotEqual -- same keys in any order.
+	$declared_ids = array_map( 'strval', array_keys( $declared ) );
+	$trigger_ids  = array_map( 'strval', array_keys( $triggers ) );
+	sort( $declared_ids );
+	sort( $trigger_ids );
+	if ( $declared_ids !== $trigger_ids ) {
 		return new WP_Error( 'graft_build_mismatch', __( "The build's triggers are not the ones the spec declares.", 'graft' ), array( 'status' => 400 ) );
 	}
 	foreach ( $triggers as $id => $trigger ) {

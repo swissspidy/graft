@@ -100,6 +100,10 @@ try {
 	});
 	await page.goto(`http://127.0.0.1:${site}/wp-admin/tools.php?page=graft-customizations`);
 	await check('waiting-posts waits for approval', () => page.locator('[data-graft-spec="waiting-posts"] [data-graft-state]', { hasText: 'Needs approval' }).waitFor({ timeout: 30_000 }));
+	await check('a dry run of waiting-too-long finds the post left in review for nine days', async () => {
+		await page.locator('[data-graft-trigger="waiting-too-long/flag-stale"]').getByRole('button', { name: 'Dry run' }).click({ timeout: 30_000 });
+		await page.locator('[data-graft-trigger-message]', { hasText: 'Parking fees' }).waitFor({ timeout: 30_000 });
+	});
 	// The review queue is for editors and contributors.
 	await login('edna');
 	await page.goto(`http://127.0.0.1:${site}/wp-admin/admin.php?page=graft-review-queue`);

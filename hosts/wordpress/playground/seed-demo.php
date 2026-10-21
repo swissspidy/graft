@@ -44,6 +44,7 @@ $posts = array(
 	array( 'BUDGET SHOWDOWN TONIGHT', 'pending', 'ada', 2 ),
 	array( 'Library hours', 'pending', 'grace', 1 ),
 	array( 'A long look at how the harbor redevelopment changed three neighborhoods over ten years', 'pending', 'grace', 3 ),
+	array( 'Parking fees: what the new zones cost', 'pending', 'ada', 9 ),
 	array( 'Interview notes: the new school principal', 'draft', 'alan', 2 ),
 	array( 'Winter storm preparedness guide', 'draft', 'alan', 12 ),
 	array( 'Year in review (outline)', 'draft', 'edna', 45 ),
@@ -61,6 +62,9 @@ foreach ( $posts as list( $title, $status, $author, $days ) ) {
 		)
 	);
 }
+
+// The tag "Waiting too long" puts on posts left in review for over a week.
+wp_insert_term( 'Waiting too long', 'post_tag', array( 'slug' => 'waiting-too-long' ) );
 
 wp_set_current_user( 1 );
 $examples = json_decode( (string) file_get_contents( '/wordpress/graft-demo/demo.json' ), true );

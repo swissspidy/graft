@@ -46,7 +46,11 @@ typically in a must-use plugin), never wp-admin settings:
   (`slots`) and permission scopes (`scopes`) they may use, and a directory
   of customization bundles the maintainer ships (`managed`, written by
   `graft bundle`). Those are installed, updated and archived with the
-  code, and locked in wp-admin.
+  code, and locked in wp-admin. `triggers` forbids customizations that act
+  on their own (`false`) or narrows them (`scopes`, `events`,
+  `min_interval`, `max_per_run`); see below.
+- **`graft_surface_triggers`**: what triggers may do on the site (events,
+  capabilities, bounds); null for none.
 
 A site whose surface no shipped snapshot describes records its own from
 Tools → Customizations: the admin's browser assembles it from the host
@@ -101,10 +105,31 @@ a hash and need no rebuild.
   saved as drafts until they are verified, e.g. with `graft site verify`,
   which verifies them in a local sandbox and posts the result back. Needs a
   secure context (HTTPS or localhost) for hashing.
+- **Triggers** ([ADR 0010](../../docs/adr/0010-scheduled-actions.md)).
+  A build's triggers run on a schedule (an hourly WP-Cron tick,
+  `graft_triggers_tick`, starts those that are due) or on an event (a
+  post published or submitted for review queues a `graft_trigger_event`
+  job; events that a trigger run causes start nothing). They run as
+  `graft-automation`, a user with no role that cannot sign in and gets,
+  only while a run is in progress, the WordPress capabilities that
+  trigger's approved scopes map to. Each trigger has its own grant
+  (`grant.triggers.<id>`), and each call goes through the gateway's
+  checks for triggers (`includes/triggers.php`). Runs are capped (the
+  spec's `limit`, `maxPerRun`), event triggers rate-limited, and a trigger
+  that fails three runs in a row pauses itself. Tools → Customizations
+  shows each trigger with its grant, state, last and next run, with
+  pause, dry run and run now, a pause-all switch and the recent runs
+  (`graft_trigger_ran` fires for each). `GRAFT_DISABLE_TRIGGERS` turns
+  them off for good.
 - **REST.** `GET /graft/v1/surface` (the site's current surface),
   `GET/POST /graft/v1/specs`,
   `POST /graft/v1/specs/<id>/versions/<n>/builds|approve|decline|archive`
-  (administrators; users may create `user`-scoped specs).
+  (administrators; users may create `user`-scoped specs),
+  `GET /graft/v1/triggers` and
+  `POST /graft/v1/triggers/pause-all|resume-all`,
+  `POST /graft/v1/triggers/<spec>/<trigger>/pause|resume|run`
+  (administrators; `run` takes `dry_run`, and `post` for an event
+  trigger).
 
 ## Verification
 
@@ -119,7 +144,13 @@ expectations over a semantic snapshot.
   where `author` is a user alias.
 - **Expectations:** `rows` (primary labels of the table, any order),
   `columns`, `text`, `action` (with optional `row` matcher and
-  `available`), and the host assertion `post` (`{ title, status }`).
+  `available`), `run` (what the latest trigger run did), and the host
+  assertion `post` (`{ title, status }`).
+- **Triggers:** the step `{ trigger, target? }` runs one with the plugin's
+  own runner (the sandbox's `fire` operation), as the automation user with
+  the permissions the spec lists for it, at the check's clock. For an event
+  trigger the sandbox first publishes (or submits) the post `target`
+  names.
 - **Slot instances:** owned slots render once; `posts.list.row-actions`
   renders once per post in the Posts screen's "All" view for that user.
 - **Snapshots** come from the A2UI format (`@swissspidy/graft-a2ui`), resolved with the
