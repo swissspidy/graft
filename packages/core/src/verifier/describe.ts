@@ -39,12 +39,21 @@ export function describeCheck(check: Check, describers: CheckDescribers = {}): s
 	const later = check.clock?.advanceDays ? ` ${check.clock.advanceDays} day${check.clock.advanceDays === 1 ? '' : 's'} later` : '';
 	parts.push(`${parts.length ? 'when' : 'When'} ${check.view_as ? `"${check.view_as}"` : 'the viewer'} opens it${later}`);
 	for (const step of check.steps ?? []) {
-		parts.push('fill' in step ? `and types ${quote(step.value)} into "${step.fill}"${row(step.row)}` : `and uses "${step.action}"${row(step.row)}`);
+		parts.push(
+			'drop' in step
+				? `and drags${row(step.drop).replace(/^ on /, ' ')} onto "${step.on}"`
+				: 'fill' in step
+				? `and types ${quote(step.value)} into "${step.fill}"${row(step.row)}`
+				: step.direct
+					? `and calls "${step.action}"${row(step.row)} directly, without the button`
+					: `and uses "${step.action}"${row(step.row)}`,
+		);
 	}
 	const outcomes = check.expect.map((e) => {
 		if ('rows' in e) {
 			const rows = e.rows as string[];
-			return rows.length ? `the list shows exactly ${list(rows.map(quote))}` : 'the list is empty';
+			const which = typeof e.in === 'string' ? `the ${quote(e.in)} list` : 'the list';
+			return rows.length ? `${which} shows exactly ${list(rows.map(quote))}` : `${which} is empty`;
 		}
 		if ('columns' in e) {
 			return `the columns are ${list((e.columns as string[]).map(quote))}`;
@@ -59,6 +68,9 @@ export function describeCheck(check: Check, describers: CheckDescribers = {}): s
 		}
 		if ('input' in e) {
 			return `the "${String(e.input)}" field${row(e.row as Record<string, unknown> | undefined)} shows ${quote(e.value)}`;
+		}
+		if ('refused' in e) {
+			return `calling "${String(e.refused)}"${row(e.row)} is refused`;
 		}
 		if ('action' in e) {
 			return `"${String(e.action)}"${row(e.row)} is ${e.available === false ? 'not available' : 'available'}`;

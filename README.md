@@ -24,6 +24,9 @@ its checks in plain language, and "Waiting for review" is left for you to
 approve. Every account's password is `password`. Sign in as `edna` (editor)
 for the review queue under **Posts** and the quick-approve row action, or
 as `ada` (contributor) to see the same queue without the Approve button.
+**Posts → Board** shows posts as cards in Draft, Pending review and
+Published columns: drag a card, or use its buttons, to move it. `ada` can
+send their drafts for review but not publish them.
 Open any draft in the editor (as `edna`, try "Year in review (outline)")
 for the **Publish checklist** in the sidebar: fix the headline and
 excerpt there, watch the checklist follow as you type, save, and publish.
@@ -31,7 +34,8 @@ The demo is rebuilt from `main` on every push
 (`pnpm demo:build`, `pnpm test:demo`).
 
 The example customizations in the demo are A2UI surfaces Claude compiled
-from the specs, checked in so the tests run without a model. [Compiling with Claude](docs/compiling-with-claude.md)
+from the specs, checked in so the tests run without a model (the board,
+newer, was written by hand; [ADR 0012](docs/adr/0012-drag-and-drop.md)). [Compiling with Claude](docs/compiling-with-claude.md)
 shows a real run: Claude compiles all seven example specs into builds that
 pass their checks, and regenerates five customizations after a host change.
 
@@ -66,8 +70,9 @@ date, and can approve with one click.
 ```
 
 More in [`examples/specs`](examples/specs): an admin page, a row action on
-the existing Posts screen, Dashboard widgets, and a publish checklist in
-the block editor with fields to fix the headline and excerpt. The same ideas for
+the existing Posts screen, Dashboard widgets, a publish checklist in
+the block editor with fields to fix the headline and excerpt, and an
+editorial board whose cards move between statuses. The same ideas for
 EmDash are in [`examples/emdash`](examples/emdash): a publish queue, a
 panel in the entry editor, dashboard widgets, and a status board that
 switches between drafts and published posts.
@@ -147,7 +152,7 @@ pnpm exec tsx hosts/wordpress/e2e/server.ts   # a seeded WordPress on :9400
 
 Log in at http://127.0.0.1:9400/wp-login.php as `admin`, `editor`,
 `contributor` or `subscriber` (password `password`). Editors find **Posts →
-Review queue** and an **Approve** row action on pending posts. Admins find
+Review queue**, **Posts → Board** and an **Approve** row action on pending posts. Admins find
 **Tools → Customizations**, where "Waiting for review" waits for approval
 before it appears on the Dashboard.
 

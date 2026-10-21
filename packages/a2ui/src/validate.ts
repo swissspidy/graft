@@ -193,6 +193,8 @@ export function validateA2UI(value: Build, surface: Surface, host: A2UIHost, spe
 		scan(component, path);
 	});
 
+	diagnostics.push(...dragProblems(build.ui.components));
+
 	// The data model's top level: data sources, the slot, `initial` and `computed`.
 	for (const section of ['initial', 'computed'] as const) {
 		scan(build.ui[section] ?? {}, `/ui/${section}`);
@@ -290,4 +292,51 @@ function pointerIn(value: unknown, pointer: string): unknown {
 		.slice(1)
 		.map((part) => part.replace(/~1/g, '/').replace(/~0/g, '~'))
 		.reduce<unknown>((at, key) => (isObject(at) || Array.isArray(at) ? (at as Record<string, unknown>)[key] : undefined), value);
+}
+
+/**
+ * Dragging presses a Button: every Button with a `dropTarget` is inside a
+ * draggable Card and names a container that takes drops, and every
+ * draggable Card has a Button to press.
+ */
+function dragProblems(components: A2UIComponent[]): Diagnostic[] {
+	const diagnostics: Diagnostic[] = [];
+	const byId = new Map(components.map((component, i) => [component.id, { component, i }]));
+	const zones = new Set(components.filter((c) => c.component !== 'Button' && typeof c.dropTarget === 'string').map((c) => String(c.dropTarget)));
+	const error = (i: number, at: string, message: string) => diagnostics.push({ severity: 'error', code: 'a2ui-drag', path: `/ui/components/${i}${at}`, message });
+	const pressed = new Set<string>();
+	const seen = new Set<string>();
+	// From the root, with the draggable Card each component is inside, if any.
+	const walk = (id: string, card: string | undefined) => {
+		const entry = byId.get(id);
+		if (!entry || seen.has(`${id}@${card ?? ''}`)) {
+			return;
+		}
+		seen.add(`${id}@${card ?? ''}`);
+		const { component, i } = entry;
+		const inside = component.component === 'Card' && component.draggable !== undefined && component.draggable !== false ? id : card;
+		if (component.component === 'Button' && typeof component.dropTarget === 'string') {
+			if (!card) {
+				error(i, '/dropTarget', `The button "${id}" has a "dropTarget" but is not inside a Card with "draggable": nothing is dragged to press it.`);
+			} else {
+				pressed.add(card);
+			}
+			if (!zones.has(component.dropTarget)) {
+				error(i, '/dropTarget', `The button "${id}" is pressed by a drop on "${component.dropTarget}", but no Column, Row or Card has that "dropTarget"${zones.size ? ` (${[...zones].join(', ')})` : ''}.`);
+			}
+		}
+		const children = component.children;
+		const refs = Array.isArray(children) ? children.map(String) : isObject(children) && typeof children.componentId === 'string' ? [children.componentId] : [];
+		if (typeof component.child === 'string') {
+			refs.push(component.child);
+		}
+		refs.forEach((ref) => walk(ref, inside));
+	};
+	walk('root', undefined);
+	for (const { component, i } of byId.values()) {
+		if (component.component === 'Card' && component.draggable !== undefined && component.draggable !== false && !pressed.has(component.id)) {
+			error(i, '/draggable', `The card "${component.id}" is draggable but has no Button with a "dropTarget": dropping it would do nothing.`);
+		}
+	}
+	return diagnostics;
 }

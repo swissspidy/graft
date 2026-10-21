@@ -67,19 +67,29 @@ export interface DrawnButton {
 	set?: { target: string; value: unknown };
 	/** The table row or template item it belongs to. */
 	row?: unknown;
+	/** Dropping its Card on the container with this `dropTarget` presses it. */
+	dropTarget?: string;
 }
 
+/**
+ * A table, or a template of Cards read as one: each Card a row, its first
+ * text the label, its Texts the cells (by component id), its Buttons the
+ * row's actions.
+ */
 export interface DrawnTable {
 	columns: string[];
 	rows: Array<{ label: string; record: unknown; cells: Record<string, { text: string; tone?: string }>; actions: DrawnButton[] }>;
 	empty: string;
 	/** Fields as written, for hosts that format columns themselves. */
 	fields: TableField[];
+	/** The `dropTarget` of the container it is drawn in, if any. */
+	zone?: string;
 }
 
 /** What a host does with the surface as it is walked: a snapshot, Block Kit, … */
 export interface A2UIDrawer {
-	text(text: string, variant: string | undefined): void;
+	/** `id` is the Text's component id, when it is one. */
+	text(text: string, variant: string | undefined, id?: string): void;
 	button(button: DrawnButton): void;
 	input(input: { id: string; component: string; label: string; value: unknown }): void;
 	table(table: DrawnTable): void;
@@ -94,7 +104,11 @@ export interface A2UIDrawer {
  * every visible component resolved in its scope with the Graft catalog,
  * and handed to the drawer.
  */
-export function walkA2UI(build: A2UIBuild, ctx: EvalContext, entered: Record<string, Record<string, unknown>>, host: A2UIHost, drawer: A2UIDrawer): void {
+export function walkA2UI(build: A2UIBuild, ctx: EvalContext, entered: Record<string, Record<string, unknown>>, host: A2UIHost, out: A2UIDrawer): void {
+	// Cards a template draws are collected into rows by a drawer of their own (see cardRows).
+	let drawer = out;
+	// The `dropTarget` of the innermost container being drawn.
+	let zone: string | undefined;
 	if (build.ui.catalogId !== host.catalogId) {
 		drawer.problem(`The surface uses the catalog "${build.ui.catalogId}"; this host draws "${host.catalogId}".`);
 		return;
@@ -169,6 +183,10 @@ export function walkA2UI(build: A2UIBuild, ctx: EvalContext, entered: Record<str
 		}
 		seen.add(key);
 		if (component.visible !== undefined && !at.resolveDynamicValue(component.visible)) {
+			// A hidden button is there but not available, as a hidden row action is: a direct call can still name it.
+			if (component.component === 'Button') {
+				drawer.button(buttonOf(component, at, row, false));
+			}
 			return;
 		}
 		draw(component, at, row);
@@ -182,8 +200,79 @@ export function walkA2UI(build: A2UIBuild, ctx: EvalContext, entered: Record<str
 			const { componentId, path } = list as { componentId: string; path: string };
 			const scope = at.nested(path);
 			const items = dataModel.get(scope.path);
-			(Array.isArray(items) ? items : []).forEach((item, i) => visit(componentId, scope.nested(String(i)), item));
+			const entries = Array.isArray(items) ? items : [];
+			if (components.get(componentId)?.component === 'Card') {
+				drawer.table(cardRows(componentId, entries.map((item, i) => ({ item, at: scope.nested(String(i)) }))));
+			} else {
+				entries.forEach((item, i) => visit(componentId, scope.nested(String(i)), item));
+			}
 		}
+	};
+
+	/** A template of Cards as rows: what each Card shows and offers, drawn by a collecting drawer. */
+	const cardRows = (componentId: string, items: Array<{ item: unknown; at: DataContext }>): DrawnTable => {
+		const rows: DrawnTable['rows'] = [];
+		const outer = drawer;
+		for (const { item, at } of items) {
+			const texts: string[] = [];
+			const cells: Record<string, { text: string }> = {};
+			const actions: DrawnButton[] = [];
+			let drawn = false;
+			drawer = {
+				...outer,
+				text: (value, variant, id) => {
+					if (variant !== 'divider') {
+						texts.push(value);
+						if (id) {
+							cells[id] = { text: value };
+						}
+					}
+				},
+				button: (button) => actions.push(button),
+				group: (kind, draw) => {
+					drawn = true;
+					draw();
+				},
+			};
+			try {
+				visit(componentId, at, item);
+			} finally {
+				drawer = outer;
+			}
+			if (drawn) {
+				rows.push({ label: texts.find((value) => value.trim() !== '') ?? '', record: item, cells, actions });
+			}
+		}
+		// Its Texts as the fields, for hosts that draw any list as a table.
+		const fields = [...new Set(rows.flatMap((row) => Object.keys(row.cells)))].map((id) => ({ id, label: id }));
+		return { columns: [], fields, empty: '', rows, ...(zone !== undefined ? { zone } : {}) };
+	};
+
+	/** Draws a container, as the zone a dragged Card can be dropped on when it has a `dropTarget`. */
+	const container = (component: A2UIComponent, kind: 'Column' | 'Row' | 'Card', draw: () => void) => {
+		const outerZone = zone;
+		if (typeof component.dropTarget === 'string') {
+			zone = component.dropTarget;
+		}
+		try {
+			drawer.group(kind, draw);
+		} finally {
+			zone = outerZone;
+		}
+	};
+
+	/** A Button as drawn: usable when it is shown and its checks pass. */
+	const buttonOf = (component: A2UIComponent, at: DataContext, row: unknown, shown: boolean): DrawnButton => {
+		const checks = (component.checks as Array<{ condition: unknown }> | undefined) ?? [];
+		const passes = shown && checks.every((check) => Boolean(at.resolveDynamicValue(check.condition)));
+		const base = {
+			id: component.actionId === undefined ? component.id : text(at.resolveDynamicValue(component.actionId)),
+			label: label(component.child, at),
+			...(typeof component.variant === 'string' ? { variant: component.variant } : {}),
+			...(row !== undefined ? { row } : {}),
+			...(typeof component.dropTarget === 'string' ? { dropTarget: component.dropTarget } : {}),
+		};
+		return press(component.id, component.action, at, row, base, passes);
 	};
 
 	const draw = (component: A2UIComponent, at: DataContext, row: unknown): void => {
@@ -191,29 +280,20 @@ export function walkA2UI(build: A2UIBuild, ctx: EvalContext, entered: Record<str
 		switch (component.component) {
 			case 'Column':
 			case 'Row':
-				drawer.group(component.component, () => children(component.children, at, row));
+				container(component, component.component, () => children(component.children, at, row));
 				return;
 			case 'Card':
-				drawer.group('Card', () => children([component.child], at, row));
+				container(component, 'Card', () => children([component.child], at, row));
 				return;
 			case 'Divider':
 				drawer.text('', 'divider');
 				return;
 			case 'Text':
-				drawer.text(text(at.resolveDynamicValue(component.text)), typeof component.variant === 'string' ? component.variant : undefined);
+				drawer.text(text(at.resolveDynamicValue(component.text)), typeof component.variant === 'string' ? component.variant : undefined, id);
 				return;
-			case 'Button': {
-				const checks = (component.checks as Array<{ condition: unknown }> | undefined) ?? [];
-				const passes = checks.every((check) => Boolean(at.resolveDynamicValue(check.condition)));
-				const base = {
-					id: component.actionId === undefined ? id : text(at.resolveDynamicValue(component.actionId)),
-					label: label(component.child, at),
-					...(typeof component.variant === 'string' ? { variant: component.variant } : {}),
-					...(row !== undefined ? { row } : {}),
-				};
-				drawer.button(press(id, component.action, at, row, base, passes));
+			case 'Button':
+				drawer.button(buttonOf(component, at, row, true));
 				return;
-			}
 			case 'TextField':
 			case 'CheckBox': {
 				const fallback = component.component === 'CheckBox' ? false : '';
@@ -228,6 +308,7 @@ export function walkA2UI(build: A2UIBuild, ctx: EvalContext, entered: Record<str
 				const primary = fields.find((field) => field.primary) ?? fields[0];
 				const rowActions = (component.rowActions as Array<{ id: string; label: string; variant?: string; visible?: unknown; action: never }> | undefined) ?? [];
 				drawer.table({
+					...(zone !== undefined ? { zone } : {}),
 					columns: fields.map((field) => field.label),
 					fields,
 					empty: component.empty === undefined ? 'No items.' : text(at.resolveDynamicValue(component.empty)),

@@ -74,7 +74,7 @@ $draft   = wp_insert_post(
 );
 
 // The abilities are registered with the expected annotations.
-foreach ( array( 'graft/posts-list' => true, 'graft/post-update-status' => false ) as $name => $readonly ) {
+foreach ( array( 'graft/posts-list' => true, 'graft/post-update-status' => false, 'graft/post-update-review-status' => false ) as $name => $readonly ) {
 	$ability = wp_get_ability( $name );
 	check( "$name is registered", (bool) $ability );
 	check( "$name readonly annotation", $ability && $readonly === $ability->get_meta_item( 'annotations' )['readonly'] );
@@ -98,6 +98,24 @@ $denied = run( 'graft/post-update-status', array( 'id' => $pending, 'status' => 
 check( 'contributor cannot publish via ability', isset( $denied['error'] ), $denied );
 check( 'post is still pending', 'pending' === get_post_status( $pending ) );
 
+// Contributor moves their own post between draft and pending review, and no further.
+$own = wp_insert_post(
+	array(
+		'post_title'  => 'Draft F',
+		'post_status' => 'draft',
+		'post_author' => $contributor,
+	)
+);
+$moved = run( 'graft/post-update-review-status', array( 'id' => $own, 'status' => 'pending' ) );
+check( 'contributor sends own draft for review', ( $moved['status'] ?? null ) === 'pending', $moved );
+$moved = run( 'graft/post-update-review-status', array( 'id' => $own, 'status' => 'draft' ) );
+check( 'contributor takes it back to draft', ( $moved['status'] ?? null ) === 'draft', $moved );
+$denied = run( 'graft/post-update-review-status', array( 'id' => $own, 'status' => 'publish' ) );
+check( 'the review ability never publishes', isset( $denied['error'] ) && 'draft' === get_post_status( $own ), $denied );
+$denied = run( 'graft/post-update-review-status', array( 'id' => $draft, 'status' => 'pending' ) );
+check( "contributor cannot move someone else's draft", isset( $denied['error'] ) && 'draft' === get_post_status( $draft ), $denied );
+wp_delete_post( $own, true );
+
 // Subscriber.
 wp_set_current_user( $subscriber );
 $denied = run( 'graft/posts-list' );
@@ -112,6 +130,17 @@ check( 'pending queue is empty', ids( run( 'graft/posts-list', array( 'status' =
 
 $invalid = run( 'graft/post-update-status', array( 'id' => $draft, 'status' => 'trash' ) );
 check( 'invalid status is rejected by the input schema', isset( $invalid['error'] ), $invalid );
+
+$live = wp_insert_post(
+	array(
+		'post_title'  => 'Post G',
+		'post_status' => 'publish',
+		'post_author' => $editor,
+	)
+);
+$denied = run( 'graft/post-update-review-status', array( 'id' => $live, 'status' => 'pending' ) );
+check( 'the review ability does not unpublish, even for an editor', isset( $denied['error'] ) && 'publish' === get_post_status( $live ), $denied );
+wp_delete_post( $live, true );
 
 // The surface only lists capabilities whose ability exists.
 $surface = Graft\host_surface();

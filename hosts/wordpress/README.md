@@ -18,11 +18,11 @@ Everything Graft needs to target WordPress 7.1+.
 - **UI:** builds are A2UI surfaces in the `graft:wordpress` catalog
   ([ADR 0009](../../docs/adr/0009-a2ui.md)); the catalog belongs to the
   adapter, not the surface.
-- **Capabilities:** `posts.list` and `posts.update_status` (Graft
-  abilities), `site.info` and `users.current` (core abilities). Builds only
+- **Capabilities:** `posts.list`, `posts.update_status` and
+  `posts.update_review_status` (draft ↔ pending only) (Graft abilities), `site.info` and `users.current` (core abilities). Builds only
   ever reference these names; the ability behind a name can change, and
   that change is a surface migration.
-- **Scopes:** `posts:read`, `posts.status:write`, `site:read`,
+- **Scopes:** `posts:read`, `posts.review:write`, `posts.status:write`, `site:read`,
   `users.current:read`, each with the WordPress capabilities it maps to.
 - **Audiences:** the roles of a fresh install.
 
@@ -86,7 +86,9 @@ a hash and need no rebuild.
   through the gateway and `plugin/build/a2ui.js` draws the A2UI surface
   with a2ui-wp, using React and `@wordpress/components` from WordPress.
   The catalog's Table uses wp-admin list-table markup
-  (`src/client/table.tsx`).
+  (`src/client/table.tsx`). Draggable Cards drop on containers with a
+  `dropTarget`, pressing the card's button for it
+  (`src/client/drag.tsx`, [ADR 0012](../../docs/adr/0012-drag-and-drop.md)).
 - **Admin screen.** Tools → Customizations (administrators) lists every
   spec with its state, the permissions it requests in plain language
   (granted or not), and each check rendered as a sentence next to the

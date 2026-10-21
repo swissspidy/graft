@@ -29,6 +29,7 @@ export function snapshotA2UI(build: A2UIBuild, ctx: EvalContext, entered: Record
 		},
 		table: (table) => {
 			emit.table({
+				...(table.zone !== undefined ? { zone: table.zone } : {}),
 				columns: table.columns,
 				rows: table.rows.map((row) => ({ ...row, cells: row.cells as never, actions: row.actions.map(snapshotAction) })),
 			});
