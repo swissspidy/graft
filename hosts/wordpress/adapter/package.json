@@ -21,7 +21,7 @@
     "@swissspidy/a2ui-wp": "0.1.1",
     "@types/react": "^19.3.0",
     "@types/react-dom": "^19.3.0",
-    "@wordpress/element": "^8.7.0",
+    "@wordpress/element": "^9.0.0",
     "@wordpress/i18n": "^6.28.0",
     "@wordpress/icons": "^18.0.0",
     "@wp-playground/client": "3.1.56",
