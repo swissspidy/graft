@@ -27,6 +27,9 @@ as `ada` (contributor) to see the same queue without the Approve button.
 **Posts → Board** shows posts as cards in Draft, Pending review and
 Published columns: drag a card, or use its buttons, to move it. `ada` can
 send their drafts for review but not publish them.
+Admins also find **Waiting too long** under "Running on their own":
+every morning it tags posts left in review for over a week, as Graft
+automation; try a dry run or run it now.
 Open any draft in the editor (as `edna`, try "Year in review (outline)")
 for the **Publish checklist** in the sidebar: fix the headline and
 excerpt there, watch the checklist follow as you type, save, and publish.
@@ -34,8 +37,9 @@ The demo is rebuilt from `main` on every push
 (`pnpm demo:build`, `pnpm test:demo`).
 
 The example customizations in the demo are A2UI surfaces Claude compiled
-from the specs, checked in so the tests run without a model (the board,
-newer, was written by hand; [ADR 0012](docs/adr/0012-drag-and-drop.md)). [Compiling with Claude](docs/compiling-with-claude.md)
+from the specs, checked in so the tests run without a model (the board
+and "Waiting too long", newer, were written by hand;
+[ADR 0012](docs/adr/0012-drag-and-drop.md), [ADR 0010](docs/adr/0010-scheduled-actions.md)). [Compiling with Claude](docs/compiling-with-claude.md)
 shows a real run: Claude compiles all seven example specs into builds that
 pass their checks, and regenerates five customizations after a host change.
 
@@ -71,8 +75,9 @@ date, and can approve with one click.
 
 More in [`examples/specs`](examples/specs): an admin page, a row action on
 the existing Posts screen, Dashboard widgets, a publish checklist in
-the block editor with fields to fix the headline and excerpt, and an
-editorial board whose cards move between statuses. The same ideas for
+the block editor with fields to fix the headline and excerpt, an
+editorial board whose cards move between statuses, and a widget whose
+triggers tag posts left in review for over a week. The same ideas for
 EmDash are in [`examples/emdash`](examples/emdash): a publish queue, a
 panel in the entry editor, dashboard widgets, and a status board that
 switches between drafts and published posts. For a web app with no plugin
@@ -104,6 +109,13 @@ UI against them; each candidate is validated against the host's surface
 and verified, and failures go back to the model. The model never grades its
 own homework. Criteria that can't be checked objectively ("looks clean") are
 sent back to the author instead of getting a weak check.
+
+**Act on its own.** A build may also have **triggers**: on a schedule or
+when something happens on the site, one capability call per target, as
+an automation user that holds only the permissions an admin approved for
+that trigger, only while it runs. Every run is capped, logged and can be
+paused; checks run triggers in the sandbox like any other step
+([ADR 0010](docs/adr/0010-scheduled-actions.md)).
 
 **Upgrade.** Each host version publishes a **surface** (slots, components,
 capabilities, scopes) with a content hash. When it changes, every build goes
@@ -198,12 +210,12 @@ pnpm graft site verify --site <url> --token <token>
 | Command | What |
 | --- | --- |
 | `pnpm typecheck`, `pnpm test` | Types and unit tests (core, A2UI, renderer, CLI, adapters) |
-| `pnpm test:wp` | Plugin smoke test in Playground on PHP 7.4 and 8.4: abilities, store, lifecycle, gateway, host changes, security regressions |
+| `pnpm test:wp` | Plugin smoke test in Playground on PHP 7.4 and 8.4: abilities, store, lifecycle, gateway, host changes, security regressions, triggers (the automation user, schedule, events, bounds, policy) |
 | `pnpm verify:examples` | The example builds' checks in a WordPress sandbox |
 | `pnpm verify:agency` | The agency example builds' checks, in a sandbox that reproduces the client site's content model |
 | `pnpm test:compile` | The compile pipeline with a scripted model against WordPress: a wrong A2UI build is rejected in verification, the fix accepted |
 | `pnpm test:canary` | Eight synthetic host changes, each forcing one rung, against a five-tenant corpus |
-| `pnpm test:e2e` | Playwright in wp-admin: serving, gateway and its audit log, Dashboard widgets with local state, row actions, the publish checklist in the block editor, approval, authoring, `graft site` |
+| `pnpm test:e2e` | Playwright in wp-admin: serving, gateway and its audit log, Dashboard widgets with local state, row actions, the publish checklist in the block editor, approval, authoring, `graft site`, triggers (dry run, pause, run now, an event trigger from WP-Cron) |
 | `pnpm test:e2e:agency` | Playwright on a client site an agency built: custom post types, fields and terms, the agency's policy and managed customization, and upgrading after the agency changes the content model |
 | `pnpm verify:emdash` | The EmDash example builds' checks in a throwaway EmDash |
 | `pnpm test:compile:emdash` | The compile pipeline with a scripted model against EmDash, building an A2UI surface |
@@ -240,6 +252,7 @@ Later decisions each have their own record:
 | [0007](docs/adr/0007-editorial-tools.md) | Widgets that take input, and a panel in the block editor |
 | [0008](docs/adr/0008-agency-sites.md) | Sites an agency builds: their own content model, policy and managed customizations |
 | [0009](docs/adr/0009-a2ui.md) | A2UI surfaces as a build's UI, replacing trees |
+| [0010](docs/adr/0010-scheduled-actions.md) | Triggers: customizations that act on a schedule or an event, as an automation user with its own grant (proposed; WordPress) |
 | [0011](docs/adr/0011-browser-extension-host.md) | A browser extension as the host for web apps without a plugin API (proposed; a [prototype](hosts/chrome-extension/README.md)) |
 
 Known limits:

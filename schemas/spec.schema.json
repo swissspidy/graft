@@ -54,10 +54,45 @@
       },
       "uniqueItems": true
     },
+    "triggers": {
+      "description": "Actions the customization takes on its own, without a viewer (ADR 0010), by trigger id. Each runs as the host's service identity with only the permissions listed here, once an administrator approves them.",
+      "type": "object",
+      "propertyNames": { "pattern": "^[a-z][a-z0-9-]{0,40}$" },
+      "additionalProperties": {
+        "type": "object",
+        "required": ["permissions"],
+        "additionalProperties": false,
+        "properties": {
+          "schedule": { "$ref": "#/$defs/schedule" },
+          "event": { "description": "Host event the trigger runs on, from the surface.", "type": "string", "minLength": 1 },
+          "permissions": {
+            "description": "Permission scopes the service identity is granted for this trigger, and nothing else.",
+            "type": "array",
+            "items": { "type": "string", "pattern": "^[a-z][a-z0-9_.]*:(read|write)$" },
+            "minItems": 1,
+            "uniqueItems": true
+          },
+          "limit": { "description": "Most capability calls one run makes; the rest wait for the next run.", "type": "integer", "minimum": 1 }
+        },
+        "oneOf": [{ "properties": { "schedule": true }, "required": ["schedule"] }, { "properties": { "event": true }, "required": ["event"] }]
+      }
+    },
     "locale": {
       "description": "Language of the spec body, BCP 47.",
       "type": "string",
       "pattern": "^[A-Za-z]{2,3}(-[A-Za-z0-9]{2,8})*$"
+    }
+  },
+  "$defs": {
+    "schedule": {
+      "description": "When a scheduled trigger runs: every so many hours (\"6h\") or days (\"1d\"), days optionally at a time of day in the site's time zone.",
+      "type": "object",
+      "required": ["every"],
+      "additionalProperties": false,
+      "properties": {
+        "every": { "type": "string", "pattern": "^[1-9][0-9]{0,2}[hd]$" },
+        "at": { "type": "string", "pattern": "^([01][0-9]|2[0-3]):[0-5][0-9]$" }
+      }
     }
   }
 }

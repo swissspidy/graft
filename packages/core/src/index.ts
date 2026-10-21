@@ -6,20 +6,35 @@ export { parseSpec, type ParsedSpec } from './spec/parse.ts';
 export { validateSpec, type SpecValidation, type ValidateSpecOptions } from './spec/validate.ts';
 export { checkManifestAgainstSurface } from './spec/surface.ts';
 export { deriveCriterionId } from './spec/criteria.ts';
-export type { Criterion, Section, Spec, SpecManifest } from './spec/types.ts';
+export type { Criterion, Section, Spec, SpecManifest, SpecTrigger } from './spec/types.ts';
 export { createBundle, type CustomizationBundle } from './bundle.ts';
 export { validateSurface, type SurfaceValidation } from './surface/validate.ts';
 export { canonicalJson, hashSurface, sha256 } from './surface/hash.ts';
-export type { Capability, JsonSchema, Migration, Scope, Slot, Surface } from './surface/types.ts';
+export type { Capability, JsonSchema, Migration, Scope, Slot, Surface, SurfaceTriggers, TriggerEvent } from './surface/types.ts';
 export { hashSpec, normalizeSpecSource } from './spec/hash.ts';
-export type { AndExpr, Binding, Build, BuildUi, CanExpr, Check, CheckStep, CompareExpr, Computed, DataRef, DataSource, DaysSinceExpr, EqExpr, EventBinding, Expression, IfExpr, Logic, NotExpr, OrExpr, Refs, SlotRef, Value } from './build/types.ts';
-export { getPath, isAnd, isBinding, isCan, isDataRef, isEq, isExpression, isNot, isOr, isSlotRef, walkValue } from './build/expressions.ts';
+export type { AndExpr, Binding, Build, BuildUi, CanExpr, Check, CheckStep, CompareExpr, Computed, DataRef, DataSource, DaysSinceExpr, EqExpr, EventBinding, Expression, IfExpr, Logic, NotExpr, OrExpr, Refs, Schedule, SlotRef, TargetRef, Trigger, TriggerRefs, Value } from './build/types.ts';
+export { getPath, isAnd, isBinding, isCan, isDataRef, isEq, isExpression, isNot, isOr, isSlotRef, isTargetRef, walkValue } from './build/expressions.ts';
+export {
+	describeWhen,
+	intervalSeconds,
+	runTrigger,
+	targetKey,
+	triggerCallRefusal,
+	triggerCapabilities,
+	triggerLimit,
+	triggerRefs,
+	triggerScopes,
+	type RunTarget,
+	type RunTriggerOptions,
+	type TriggerCall,
+	type TriggerRun,
+} from './build/triggers.ts';
 export { evaluate, isAction, type Action, type EvalContext } from './build/evaluate.ts';
 export { extractRefs } from './build/refs.ts';
 export { validateBuild, type BuildValidation, type ValidateBuildOptions } from './build/validate.ts';
 export { nextSpecState, specEvents, specLifecycle, type SpecEvent, type SpecState } from './lifecycle/spec.ts';
 export { removeRow } from './build/rows.ts';
-export { FixtureError, SandboxCallError, type Sandbox } from './verifier/sandbox.ts';
+export { FixtureError, SandboxCallError, type FireOptions, type Sandbox } from './verifier/sandbox.ts';
 export {
 	allActions,
 	createSnapshotEmitter,

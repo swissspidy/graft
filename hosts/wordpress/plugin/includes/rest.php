@@ -314,18 +314,24 @@ function rest_call( WP_REST_Request $request ) {
  * administrators (GET graft/v1/audit) and fires graft_gateway_refused for
  * site logging.
  *
- * @param string   $spec_id    Spec the call named.
- * @param string   $capability Capability it asked for.
- * @param WP_Error $error      The refusal.
+ * Triggers' refusals are logged here too, with the trigger (ADR 0010).
+ *
+ * @param string               $spec_id    Spec the call named.
+ * @param string               $capability Capability it asked for.
+ * @param WP_Error             $error      The refusal.
+ * @param array<string, mixed> $context    More about the call, e.g. the trigger that made it.
  * @return WP_Error The same refusal.
  */
-function audit_refusal( string $spec_id, string $capability, WP_Error $error ): WP_Error {
-	$entry   = array(
-		'time'       => gmdate( 'c' ),
-		'user'       => get_current_user_id(),
-		'spec'       => $spec_id,
-		'capability' => $capability,
-		'code'       => $error->get_error_code(),
+function audit_refusal( string $spec_id, string $capability, WP_Error $error, array $context = array() ): WP_Error {
+	$entry   = array_merge(
+		array(
+			'time'       => gmdate( 'c' ),
+			'user'       => get_current_user_id(),
+			'spec'       => $spec_id,
+			'capability' => $capability,
+			'code'       => $error->get_error_code(),
+		),
+		$context
 	);
 	$log     = audit_log();
 	$log[]   = $entry;
@@ -334,7 +340,7 @@ function audit_refusal( string $spec_id, string $capability, WP_Error $error ): 
 	/**
 	 * Fires when the capability gateway refuses a call.
 	 *
-	 * @param array<string, mixed> $entry The refusal: time, user, spec, capability, code.
+	 * @param array<string, mixed> $entry The refusal: time, user, spec, capability, code, and trigger for a trigger's call.
 	 */
 	do_action( 'graft_gateway_refused', $entry );
 	return $error;

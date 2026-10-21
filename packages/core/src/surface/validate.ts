@@ -60,10 +60,22 @@ export async function validateSurface(value: unknown): Promise<SurfaceValidation
 		checkEmbedded(capability.output, `${path}/output`, diagnostics);
 	}
 
+	if (surface.triggers) {
+		surface.triggers.capabilities.forEach((name, i) => {
+			if (!surface.capabilities[name]) {
+				error('surface-unknown-capability', `/triggers/capabilities/${i}`, `Triggers may use "${name}", which the surface does not declare.`);
+			}
+		});
+		for (const [name, event] of Object.entries(surface.triggers.events)) {
+			checkEmbedded(event.provides, `/triggers/events/${escape(name)}/provides`, diagnostics);
+		}
+	}
+
 	const collections = {
 		slot: surface.slots,
 		capability: surface.capabilities,
 		scope: surface.scopes,
+		event: surface.triggers?.events ?? {},
 	};
 	surface.migrations?.forEach((migration, i) => {
 		if (migration.op === 'rename' && !collections[migration.kind][migration.to]) {

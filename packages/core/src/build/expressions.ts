@@ -1,4 +1,4 @@
-import type { AndExpr, Binding, CanExpr, CompareExpr, CompareOp, DataRef, DaysSinceExpr, EqExpr, Expression, IfExpr, NotExpr, OrExpr, SlotRef, Value } from './types.ts';
+import type { AndExpr, Binding, CanExpr, CompareExpr, CompareOp, DataRef, DaysSinceExpr, EqExpr, Expression, IfExpr, NotExpr, OrExpr, SlotRef, TargetRef, Value } from './types.ts';
 
 function isRecord(value: unknown): value is Record<string, unknown> {
 	return typeof value === 'object' && value !== null && !Array.isArray(value);
@@ -6,6 +6,7 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 
 export const isDataRef = (v: unknown): v is DataRef => isRecord(v) && typeof v.$data === 'string';
 export const isSlotRef = (v: unknown): v is SlotRef => isRecord(v) && typeof v.$slot === 'string';
+export const isTargetRef = (v: unknown): v is TargetRef => isRecord(v) && typeof v.$target === 'string';
 export const isCan = (v: unknown): v is CanExpr => isRecord(v) && typeof v.$can === 'string';
 export const isEq = (v: unknown): v is EqExpr => isRecord(v) && Array.isArray(v.$eq);
 export const isAnd = (v: unknown): v is AndExpr => isRecord(v) && Array.isArray(v.$and);
@@ -17,7 +18,7 @@ export const compareOp = (v: unknown): CompareOp | undefined =>
 export const isCompare = (v: unknown): v is CompareExpr => compareOp(v) !== undefined;
 export const isIf = (v: unknown): v is IfExpr => isRecord(v) && Array.isArray(v.$if) && v.$if.length === 3;
 export const isDaysSince = (v: unknown): v is DaysSinceExpr => isRecord(v) && Object.hasOwn(v, '$daysSince');
-export const isBinding = (v: unknown): v is Binding => isDataRef(v) || isSlotRef(v);
+export const isBinding = (v: unknown): v is Binding => isDataRef(v) || isSlotRef(v) || isTargetRef(v);
 /** Values only known when evaluated: bindings and the expressions computed from them. */
 export const isDynamic = (v: unknown): boolean => isBinding(v) || isIf(v) || isDaysSince(v) || isCompare(v);
 export const isExpression = (v: unknown): v is Expression =>

@@ -141,7 +141,7 @@ export async function runWordPressCanary(options: WordPressCanaryOptions): Promi
 			corpus: options.corpus,
 			from,
 			to,
-			verify: (build, spec, grant) => verifyBuild({ build, spec, surface: to, sandbox, createCan, grant }),
+			verify: (build, spec, grant, triggerGrant) => verifyBuild({ build, spec, surface: to, sandbox, createCan, grant, ...(triggerGrant ? { triggerGrant } : {}) }),
 			...(options.regenerate ? { regenerate: options.regenerate } : {}),
 			...(options.chooseSlot ? { chooseSlot: options.chooseSlot } : {}),
 			...(options.onEntry ? { onEntry: options.onEntry } : {}),

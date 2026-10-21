@@ -39,6 +39,10 @@ export function describeCheck(check: Check, describers: CheckDescribers = {}): s
 	const later = check.clock?.advanceDays ? ` ${check.clock.advanceDays} day${check.clock.advanceDays === 1 ? '' : 's'} later` : '';
 	parts.push(`${parts.length ? 'when' : 'When'} ${check.view_as ? `"${check.view_as}"` : 'the viewer'} opens it${later}`);
 	for (const step of check.steps ?? []) {
+		if ('trigger' in step) {
+			parts.push(`and "${step.trigger}" runs on its own${row(step.target)}`);
+			continue;
+		}
 		parts.push(
 			'drop' in step
 				? `and drags${row(step.drop).replace(/^ on /, ' ')} onto "${step.on}"`
@@ -71,6 +75,16 @@ export function describeCheck(check: Check, describers: CheckDescribers = {}): s
 		}
 		if ('refused' in e) {
 			return `calling "${String(e.refused)}"${row(e.row)} is refused`;
+		}
+		if ('run' in e) {
+			const run = (e.run ?? {}) as Record<string, unknown>;
+			const counts = [
+				run.calls !== undefined ? `acts on ${run.calls} target${run.calls === 1 ? '' : 's'}` : '',
+				run.failed !== undefined ? `has ${run.failed} failed call${run.failed === 1 ? '' : 's'}` : '',
+				run.skipped !== undefined ? `leaves ${run.skipped} for the next run` : '',
+				run.status !== undefined ? `ends ${quote(run.status)}` : '',
+			].filter(Boolean);
+			return `${run.trigger ? `the run of "${String(run.trigger)}"` : 'the run'} ${list(counts) || 'happens'}`;
 		}
 		if ('action' in e) {
 			return `"${String(e.action)}"${row(e.row)} is ${e.available === false ? 'not available' : 'available'}`;

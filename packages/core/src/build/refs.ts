@@ -1,6 +1,7 @@
 import type { Surface } from '../surface/types.ts';
 import { isCan, walkValue } from './expressions.ts';
 import { requireUiFormat } from './format.ts';
+import { triggerRefs } from './triggers.ts';
 import type { Build, Refs } from './types.ts';
 
 /**
@@ -27,10 +28,16 @@ export function extractRefs(build: Build, surface: Surface): Refs {
 		}
 	}
 
-	return {
+	const refs: Refs = {
 		slot: build.mount.slot,
 		capabilities: [...capabilities].sort(),
 		scopes: [...scopes].sort(),
 		catalog: used.catalog,
 	};
+	// Kept apart: viewers never get what triggers use, and the reverse.
+	const triggers = triggerRefs(build, surface);
+	if (triggers) {
+		refs.triggers = triggers;
+	}
+	return refs;
 }

@@ -2,7 +2,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { createRoot } from 'react-dom/client';
 import apiFetch from '@wordpress/api-fetch';
 import { Button, Card, CardBody, CardHeader, Notice, Spinner } from '@wordpress/components';
-import { describeCheck, verifyBuild, type Build, type Surface } from '@swissspidy/graft-core';
+import { describeCheck, describeWhen, triggerLimit, verifyBuild, type Build, type SpecTrigger, type Surface } from '@swissspidy/graft-core';
 import { createCan } from '../can.ts';
 import { playgroundVersion } from '../playground-version.ts';
 import '../a2ui.ts';
@@ -11,6 +11,7 @@ import { parseSpec } from '@swissspidy/graft-core/parse';
 import { describers } from '../describe.ts';
 import { Authoring } from './authoring.tsx';
 import { RecordSurface, Upgrades, type UpgradeCandidate } from './site-surface.tsx';
+import { Automation } from './automation.tsx';
 
 /**
  * Tools → Customizations: every spec on the site with its state, the
@@ -32,7 +33,11 @@ interface AdminConfig {
 		slots: string[] | null;
 		/** What administrators may allow; null for everything. */
 		scopes: string[] | null;
+		/** Whether customizations may act on their own: false, null (as far as the rest allows), or what they may do. */
+		triggers: string[] | null | false;
 	};
+	/** Who triggers run as; null when the site runs none. */
+	triggers: { identity: string } | null;
 }
 
 interface VersionRecord {
@@ -42,8 +47,8 @@ interface VersionRecord {
 	state: string;
 	unverified: boolean;
 	source: string;
-	manifest: { permissions: string[]; audience?: string[]; mount: { slot: string } };
-	grant: { scopes: string[] } | null;
+	manifest: { permissions: string[]; audience?: string[]; mount: { slot: string }; triggers?: Record<string, SpecTrigger> };
+	grant: { scopes: string[]; triggers?: Record<string, string[]> } | null;
 	hash: string;
 	builds: Record<string, { build: Build; verification: { passed: boolean } | null; attached: string }>;
 }
@@ -115,6 +120,37 @@ function Version({ version, config, onEvent, busy, managed }: { version: Version
 					</li>
 				))}
 			</ul>
+
+			{version.manifest.triggers && Object.keys(version.manifest.triggers).length > 0 ? (
+				<>
+					<h4>Runs on its own</h4>
+					<p className="description">
+						Without anyone viewing it, as {config.triggers?.identity ?? 'the site\'s automation'}: a user with no role of its own that gets only the
+						permissions below, only while it runs. You can pause it at any time.
+					</p>
+					<ul className="graft-trigger-grants">
+						{Object.entries(version.manifest.triggers).map(([id, trigger]) => {
+							const grantedTo = version.grant?.triggers?.[id] ?? [];
+							const limit = config.surface ? triggerLimit(trigger, config.surface) : trigger.limit;
+							return (
+								<li key={id} data-graft-trigger-grant={id}>
+									<strong>{describeWhen(trigger, config.surface ?? undefined)}</strong>
+									{limit ? `, at most ${limit} at a time` : ''}
+									{' (' + id + '), may:'}
+									<ul>
+										{trigger.permissions.map((scope) => (
+											<li key={scope}>
+												{config.scopes[scope] ?? scope}
+												{grantedTo.includes(scope) ? ' (granted)' : ' (not granted yet)'}
+											</li>
+										))}
+									</ul>
+								</li>
+							);
+						})}
+					</ul>
+				</>
+			) : null}
 
 			{current ? (
 				<>
@@ -201,8 +237,9 @@ function App({ config }: { config: AdminConfig }) {
 
 	return (
 		<div className="graft-admin" style={{ display: 'flex', flexDirection: 'column', gap: 16, maxWidth: 960 }}>
-			{config.policy.managedBy || config.policy.slots || config.policy.scopes || !config.policy.authoring ? <PolicyNotice policy={config.policy} /> : null}
+			{config.policy.managedBy || config.policy.slots || config.policy.scopes || config.policy.triggers !== null || !config.policy.authoring ? <PolicyNotice policy={config.policy} /> : null}
 			{config.surface ? null : <RecordSurface />}
+			{config.surface && config.triggers ? <Automation surface={config.surface} scopes={config.scopes} /> : null}
 			{config.surface && config.browserVerification && specs ? (
 				<Upgrades
 					candidates={upgradeCandidates(specs, config.surface.hash)}
@@ -311,6 +348,8 @@ function PolicyNotice({ policy }: { policy: AdminConfig['policy'] }) {
 				</p>
 				{policy.authoring && policy.slots ? <p>Customizations can go in: {policy.slots.join(', ')}.</p> : null}
 				{policy.authoring && policy.scopes ? <p>Customizations may: {policy.scopes.map((s) => s.charAt(0).toLowerCase() + s.slice(1)).join('; ')}.</p> : null}
+				{policy.triggers === false ? <p>Customizations may not act on their own.</p> : null}
+				{policy.triggers ? <p>On their own, customizations may only: {policy.triggers.map((s) => s.charAt(0).toLowerCase() + s.slice(1)).join('; ')}.</p> : null}
 				{policy.contact ? (
 					<p>
 						For anything else, ask {policy.managedBy ?? 'them'}:{' '}

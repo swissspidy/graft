@@ -2,8 +2,8 @@
 	"graft": 1,
 	"host": "wordpress",
 	"hostVersion": "7.1.3",
-	"hash": "sha256:23f7adf2048fdfcde868243c14b897e4faceb7c093b9ca6b38f5db07c1116506",
-	"fingerprint": "sha256:acc13756bd3eb5fc5ec5c67bcc50b8a7f1803fc53570f4ac2e4fd05d61e3f952",
+	"hash": "sha256:c59f39374f6968afbfb21f05ea1bd98c63b0d048d942bada6de39ed61463b193",
+	"fingerprint": "sha256:0ef992d048bca0a8a2e6b58d4f8349d1098fc8a2557ded63558af517d7cf0696",
 	"slots": {
 		"admin.page": {
 			"kind": "owned",
@@ -1722,6 +1722,266 @@
 			"post_tag": {
 				"label": "Tags",
 				"hierarchical": false
+			}
+		}
+	},
+	"triggers": {
+		"minInterval": 3600,
+		"maxPerRun": 50,
+		"maxEventRunsPerHour": 60,
+		"capabilities": [
+			"posts.list",
+			"posts.set_terms",
+			"posts.update_fields",
+			"posts.update_status",
+			"terms.list"
+		],
+		"events": {
+			"post.published": {
+				"title": "A post is published",
+				"description": "A post of an exposed type changes to published (also when it is scheduled and its time comes).",
+				"provides": {
+					"type": "object",
+					"properties": {
+						"id": {
+							"type": "integer"
+						},
+						"title": {
+							"type": "string"
+						},
+						"status": {
+							"type": "string",
+							"enum": [
+								"publish",
+								"future",
+								"draft",
+								"pending",
+								"private"
+							]
+						},
+						"type": {
+							"type": "string"
+						},
+						"author": {
+							"type": "object",
+							"properties": {
+								"id": {
+									"type": "integer"
+								},
+								"name": {
+									"type": "string"
+								}
+							},
+							"required": [
+								"id",
+								"name"
+							],
+							"additionalProperties": false
+						},
+						"date": {
+							"type": "string",
+							"format": "date-time"
+						},
+						"modified": {
+							"type": "string",
+							"format": "date-time"
+						},
+						"meta": {
+							"description": "The post's custom fields that the site exposes, by meta key; null when it has no value.",
+							"type": "object",
+							"properties": {},
+							"additionalProperties": false
+						},
+						"terms": {
+							"description": "The post's terms in each exposed taxonomy, by taxonomy.",
+							"type": "object",
+							"properties": {
+								"category": {
+									"type": "array",
+									"items": {
+										"type": "object",
+										"properties": {
+											"id": {
+												"type": "integer"
+											},
+											"name": {
+												"type": "string"
+											},
+											"slug": {
+												"type": "string"
+											}
+										},
+										"required": [
+											"id",
+											"name",
+											"slug"
+										],
+										"additionalProperties": false
+									}
+								},
+								"post_tag": {
+									"type": "array",
+									"items": {
+										"type": "object",
+										"properties": {
+											"id": {
+												"type": "integer"
+											},
+											"name": {
+												"type": "string"
+											},
+											"slug": {
+												"type": "string"
+											}
+										},
+										"required": [
+											"id",
+											"name",
+											"slug"
+										],
+										"additionalProperties": false
+									}
+								}
+							},
+							"additionalProperties": false
+						}
+					},
+					"required": [
+						"id",
+						"title",
+						"status",
+						"type",
+						"author",
+						"date",
+						"modified",
+						"meta",
+						"terms"
+					],
+					"additionalProperties": false
+				}
+			},
+			"post.submitted": {
+				"title": "A post is submitted for review",
+				"description": "A post of an exposed type changes to pending.",
+				"provides": {
+					"type": "object",
+					"properties": {
+						"id": {
+							"type": "integer"
+						},
+						"title": {
+							"type": "string"
+						},
+						"status": {
+							"type": "string",
+							"enum": [
+								"publish",
+								"future",
+								"draft",
+								"pending",
+								"private"
+							]
+						},
+						"type": {
+							"type": "string"
+						},
+						"author": {
+							"type": "object",
+							"properties": {
+								"id": {
+									"type": "integer"
+								},
+								"name": {
+									"type": "string"
+								}
+							},
+							"required": [
+								"id",
+								"name"
+							],
+							"additionalProperties": false
+						},
+						"date": {
+							"type": "string",
+							"format": "date-time"
+						},
+						"modified": {
+							"type": "string",
+							"format": "date-time"
+						},
+						"meta": {
+							"description": "The post's custom fields that the site exposes, by meta key; null when it has no value.",
+							"type": "object",
+							"properties": {},
+							"additionalProperties": false
+						},
+						"terms": {
+							"description": "The post's terms in each exposed taxonomy, by taxonomy.",
+							"type": "object",
+							"properties": {
+								"category": {
+									"type": "array",
+									"items": {
+										"type": "object",
+										"properties": {
+											"id": {
+												"type": "integer"
+											},
+											"name": {
+												"type": "string"
+											},
+											"slug": {
+												"type": "string"
+											}
+										},
+										"required": [
+											"id",
+											"name",
+											"slug"
+										],
+										"additionalProperties": false
+									}
+								},
+								"post_tag": {
+									"type": "array",
+									"items": {
+										"type": "object",
+										"properties": {
+											"id": {
+												"type": "integer"
+											},
+											"name": {
+												"type": "string"
+											},
+											"slug": {
+												"type": "string"
+											}
+										},
+										"required": [
+											"id",
+											"name",
+											"slug"
+										],
+										"additionalProperties": false
+									}
+								}
+							},
+							"additionalProperties": false
+						}
+					},
+					"required": [
+						"id",
+						"title",
+						"status",
+						"type",
+						"author",
+						"date",
+						"modified",
+						"meta",
+						"terms"
+					],
+					"additionalProperties": false
+				}
 			}
 		}
 	},

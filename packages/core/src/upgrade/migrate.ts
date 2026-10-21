@@ -37,19 +37,45 @@ function applyOne(build: Build, migration: Migration): Build | undefined {
 	if (migration.op === 'remove') {
 		const used =
 			(migration.kind === 'slot' && build.mount.slot === migration.symbol) ||
-			(migration.kind === 'capability' && build.refs.capabilities.includes(migration.symbol)) ||
-			(migration.kind === 'scope' && build.refs.scopes.includes(migration.symbol));
+			(migration.kind === 'capability' && (build.refs.capabilities.includes(migration.symbol) || build.refs.triggers?.capabilities.includes(migration.symbol) === true)) ||
+			(migration.kind === 'scope' && (build.refs.scopes.includes(migration.symbol) || build.refs.triggers?.scopes.includes(migration.symbol) === true)) ||
+			(migration.kind === 'event' && build.refs.triggers?.events.includes(migration.symbol) === true);
 		return used ? undefined : build;
 	}
 
-	// Core moves the mount and data sources, the UI format its UI.
-	let base = build;
+	// Core moves the mount, data sources and triggers, the UI format its UI.
+	let base = build.triggers ? { ...build, triggers: renameInTriggers(build.triggers, migration) } : build;
+	if (migration.kind === 'event') {
+		return base;
+	}
 	if (migration.kind === 'slot' && build.mount.slot === migration.from) {
-		base = { ...build, mount: { ...build.mount, slot: migration.to } };
+		base = { ...base, mount: { ...build.mount, slot: migration.to } };
 	} else if (migration.kind === 'capability' || migration.kind === 'scope') {
-		base = { ...build, data: renameInData(build.data, migration.kind, migration.from, migration.to) };
+		base = { ...base, data: renameInData(build.data, migration.kind, migration.from, migration.to) };
 	}
 	return requireUiFormat(build).migrate(base, migration);
+}
+
+/** Renames a capability or event in triggers: what they read and call, and what they run on. */
+function renameInTriggers(triggers: NonNullable<Build['triggers']>, migration: Extract<Migration, { op: 'rename' }>): NonNullable<Build['triggers']> {
+	const { kind, from, to } = migration;
+	return Object.fromEntries(
+		Object.entries(triggers).map(([id, trigger]) => {
+			const next = { ...trigger };
+			if (kind === 'capability') {
+				if (next.call === from) {
+					next.call = to;
+				}
+				if (next.targets?.call === from) {
+					next.targets = { ...next.targets, call: to };
+				}
+			}
+			if (kind === 'event' && next.event === from) {
+				next.event = to;
+			}
+			return [id, next];
+		}),
+	);
 }
 
 /** Renames a scope's `$can`s in a value. */

@@ -272,6 +272,17 @@ function admin_policy(): array {
 				$policy['scopes']
 			)
 		),
+		// Whether customizations may act on their own: false, null (as far as the rest allows) or what their automation may do.
+		'triggers'  => is_array( $policy['triggers'] )
+			? ( null === $policy['triggers']['scopes'] ? null : array_values(
+				array_map(
+					static function ( string $scope ) use ( $scopes ): string {
+						return (string) ( $scopes[ $scope ]['title'] ?? $scope );
+					},
+					$policy['triggers']['scopes']
+				)
+			) )
+			: ( $policy['triggers'] ? null : false ),
 	);
 }
 
@@ -316,6 +327,8 @@ function register_admin_screen(): void {
 						// The whole snapshot: the editor validates and compiles against it.
 						'surface'             => $surface,
 						'policy'              => admin_policy(),
+						// Who triggers run as; null when the site runs none (ADR 0010).
+						'triggers'            => null === surface_triggers() ? null : array( 'identity' => __( 'Graft automation', 'graft' ) ),
 						/**
 						 * Filters whether wp-admin verifies builds in WordPress Playground
 						 * in the admin's browser (needs access to the Playground URL below).

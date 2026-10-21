@@ -52,6 +52,11 @@ wp_insert_post(
 	)
 );
 
+// The tag waiting-too-long's triggers add and remove. Without it, each
+// post published in the tests would fail its clear-on-publish run, and
+// after three the trigger would pause itself.
+wp_insert_term( 'Waiting too long', 'post_tag', array( 'slug' => 'waiting-too-long' ) );
+
 wp_set_current_user( 1 );
 $examples = json_decode( (string) file_get_contents( '/graft-fixtures/examples.json' ), true );
 // The builds decoded as objects, so they are stored exactly as written (empty objects stay objects).

@@ -49,6 +49,10 @@
       "description": "The host's content model the surface was generated from, in a host-defined shape (for WordPress: the exposed post types with their fields and taxonomies). Verification sandboxes use it to reproduce the site. Part of the contract, so it is hashed.",
       "type": "object"
     },
+    "triggers": {
+      "description": "What builds may do without a viewer (ADR 0010): the host events and capabilities triggers may use, and the bounds every trigger runs within. Absent when the host runs no triggers.",
+      "$ref": "#/$defs/triggers"
+    },
     "migrations": {
       "type": "array",
       "items": { "$ref": "#/$defs/migration" }
@@ -119,6 +123,38 @@
         }
       }
     },
+    "triggers": {
+      "type": "object",
+      "required": ["minInterval", "maxPerRun", "capabilities", "events"],
+      "additionalProperties": false,
+      "properties": {
+        "identity": { "description": "Plain-language name of the identity triggers run as, shown to the admin who approves them.", "type": "string" },
+        "minInterval": { "description": "Shortest schedule, in seconds.", "type": "integer", "minimum": 60 },
+        "maxPerRun": { "description": "Most capability calls one run may make; also the default per-run cap.", "type": "integer", "minimum": 1 },
+        "maxEventRunsPerHour": { "description": "Most runs one event trigger may start in an hour; later events are dropped and logged.", "type": "integer", "minimum": 1 },
+        "capabilities": {
+          "description": "Capabilities a trigger may call, to select targets or act on them. Anything else is refused unattended.",
+          "type": "array",
+          "items": { "$ref": "#/$defs/symbol" },
+          "uniqueItems": true
+        },
+        "events": {
+          "description": "Host events a trigger may run on, each with the subject it passes as the trigger's target.",
+          "type": "object",
+          "propertyNames": { "$ref": "#/$defs/symbol" },
+          "additionalProperties": {
+            "type": "object",
+            "required": ["title", "provides"],
+            "additionalProperties": false,
+            "properties": {
+              "title": { "type": "string" },
+              "description": { "type": "string" },
+              "provides": { "description": "Schema of the event's subject: the target.", "$ref": "#/$defs/jsonSchema" }
+            }
+          }
+        }
+      }
+    },
     "migration": {
       "type": "object",
       "required": ["op"],
@@ -126,7 +162,7 @@
         {
           "properties": {
             "op": { "const": "rename" },
-            "kind": { "enum": ["slot", "capability", "scope"] },
+            "kind": { "enum": ["slot", "capability", "scope", "event"] },
             "from": { "type": "string" },
             "to": { "type": "string" }
           },
@@ -135,7 +171,7 @@
         {
           "properties": {
             "op": { "const": "remove" },
-            "kind": { "enum": ["slot", "capability", "scope"] },
+            "kind": { "enum": ["slot", "capability", "scope", "event"] },
             "symbol": { "type": "string" }
           },
           "required": ["op", "kind", "symbol"]

@@ -1,4 +1,4 @@
-import type { Slot, Surface } from '@swissspidy/graft-core';
+import type { Slot, Surface, SurfaceTriggers, TriggerEvent } from '@swissspidy/graft-core';
 
 /** The host half of the surface as printed by the plugin (see dump-surface.php). */
 export interface HostDump {
@@ -11,6 +11,8 @@ export interface HostDump {
 	audiences: string[];
 	/** The exposed content model (see includes/content-model.php). */
 	model?: WordPressModel;
+	/** What builds may do without a viewer (see includes/triggers.php); absent when the site runs no triggers. */
+	triggers?: Omit<SurfaceTriggers, 'events'> & { events: Record<string, TriggerEvent> | [] };
 	fingerprint: string;
 }
 

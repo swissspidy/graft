@@ -36,8 +36,31 @@ export interface Scope {
 }
 
 export type Migration =
-	| { op: 'rename'; kind: 'slot' | 'capability' | 'scope'; from: string; to: string }
-	| { op: 'remove'; kind: 'slot' | 'capability' | 'scope'; symbol: string };
+	| { op: 'rename'; kind: 'slot' | 'capability' | 'scope' | 'event'; from: string; to: string }
+	| { op: 'remove'; kind: 'slot' | 'capability' | 'scope' | 'event'; symbol: string };
+
+/** A host event triggers may run on. */
+export interface TriggerEvent {
+	title: string;
+	description?: string;
+	/** Schema of the event's subject, which is the trigger's one target. */
+	provides: JsonSchema;
+}
+
+/** What builds may do without a viewer, and the bounds every trigger runs within (ADR 0010). */
+export interface SurfaceTriggers {
+	/** Plain-language name of the identity triggers run as. */
+	identity?: string;
+	/** Shortest schedule, in seconds. */
+	minInterval: number;
+	/** Most calls one run may make; the default per-run cap. */
+	maxPerRun: number;
+	/** Most runs an event trigger may start in an hour. */
+	maxEventRunsPerHour?: number;
+	/** Capabilities a trigger may call. */
+	capabilities: string[];
+	events: Record<string, TriggerEvent>;
+}
 
 export interface Surface {
 	graft: 1;
@@ -59,4 +82,6 @@ export interface Surface {
 	 * taxonomies). Sandboxes use it to reproduce the site; it is hashed.
 	 */
 	model?: Record<string, unknown>;
+	/** What builds may do without a viewer; absent when the host runs no triggers. */
+	triggers?: SurfaceTriggers;
 }

@@ -8,7 +8,7 @@ import type { Build, Check } from '../build/types.ts';
 import { validateBuild } from '../build/validate.ts';
 import { canonicalJson, sha256 } from '../surface/hash.ts';
 import { assembleChecks, assembleUnverifiable } from './assemble.ts';
-import { checksPrompt, checksSystem } from './prompt.ts';
+import { checksPrompt, checksSystem, describeTriggers, TRIGGER_VOCABULARY } from './prompt.ts';
 import { checksOutputSchema } from './schemas.ts';
 import type { CompileAttempt, CompileOptions, CompileResult } from './types.ts';
 
@@ -84,16 +84,28 @@ export async function compileSpec(options: CompileOptions): Promise<CompileResul
 
 	// Phase 2: the UI and data against the frozen checks.
 	const ui = compileFormat(options).compiler!;
-	const system = ui.system(spec, surface, host.notes);
-	const schema = ui.schema(spec, surface);
+	// Triggers belong to the envelope, like data sources: core asks for them next to the format's UI.
+	const triggers = Object.keys(spec.manifest.triggers ?? {}).length > 0;
+	const system = triggers ? [ui.system(spec, surface, host.notes), TRIGGER_VOCABULARY, describeTriggers(spec, surface)].join('\n\n') : ui.system(spec, surface, host.notes);
+	const schema = triggers ? withTriggers(ui.schema(spec, surface)) : ui.schema(spec, surface);
 	const surfaceHash = surface.hash ?? '';
 	let feedback: string[] = [];
 	let candidate: Build | undefined;
 	for (let attempt = 1; attempt <= maxAttempts; attempt++) {
 		options.onEvent?.({ type: 'request', purpose: 'ui', attempt });
-		const prompt = ui.prompt(spec, checks, options.previous, feedback);
+		const previousTriggers = triggers && options.previous?.triggers ? `\n\nThe triggers of the build being replaced:\n${JSON.stringify(options.previous.triggers)}` : '';
+		const prompt = ui.prompt(spec, checks, options.previous, feedback) + previousTriggers;
 		const response = await model.generate({ purpose: 'ui', system, prompt, schema });
 		const assembled = ui.assemble(response.output, surface);
+		if (triggers && assembled.value) {
+			const parsed = assembleTriggers(response.output);
+			if (parsed.value) {
+				assembled.value = { ...assembled.value, triggers: parsed.value };
+			} else {
+				assembled.problems.push(...parsed.problems);
+				delete assembled.value;
+			}
+		}
 		if (!assembled.value) {
 			attempts.push({ phase: 'ui', problems: assembled.problems, diagnostics: [] });
 			options.onEvent?.({ type: 'rejected', purpose: 'ui', attempt, problems: assembled.problems });
@@ -162,6 +174,30 @@ export async function compileSpec(options: CompileOptions): Promise<CompileResul
 		result.verification = last;
 	}
 	return result;
+}
+
+/** The format's output schema with the triggers next to it, as a JSON string (expressions are recursive). */
+function withTriggers(schema: Record<string, unknown>): Record<string, unknown> {
+	const properties = (schema.properties as Record<string, unknown> | undefined) ?? {};
+	const required = (schema.required as string[] | undefined) ?? [];
+	return {
+		...schema,
+		properties: { ...properties, triggers_json: { type: 'string', description: 'JSON object: the triggers, by trigger id.' } },
+		required: [...required, 'triggers_json'],
+	};
+}
+
+function assembleTriggers(output: unknown): { value?: NonNullable<Build['triggers']>; problems: string[] } {
+	const text = (output as { triggers_json?: unknown } | null)?.triggers_json;
+	try {
+		const value = JSON.parse(typeof text === 'string' ? text : '') as unknown;
+		if (typeof value === 'object' && value !== null && !Array.isArray(value)) {
+			return { value: value as NonNullable<Build['triggers']>, problems: [] };
+		}
+		return { problems: ['triggers_json must be a JSON object keyed by trigger id.'] };
+	} catch (error) {
+		return { problems: [`triggers_json is not valid JSON: ${error instanceof Error ? error.message : String(error)}.`] };
+	}
 }
 
 function checkProblems(checks: Check[], criteria: string[]): string[] {
