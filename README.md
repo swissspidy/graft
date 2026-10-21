@@ -35,7 +35,7 @@ The demo is rebuilt from `main` on every push
 
 The example customizations in the demo are A2UI surfaces Claude compiled
 from the specs, checked in so the tests run without a model (the board,
-newer, was written by hand; [ADR 0012](docs/adr/0012-kanban-board-component.md)). [Compiling with Claude](docs/compiling-with-claude.md)
+newer, was written by hand; [ADR 0012](docs/adr/0012-drag-and-drop.md)). [Compiling with Claude](docs/compiling-with-claude.md)
 shows a real run: Claude compiles all seven example specs into builds that
 pass their checks, and regenerates five customizations after a host change.
 

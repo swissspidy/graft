@@ -1,5 +1,5 @@
 import { useEffect, useMemo } from 'react';
-import { BOARD_COMPONENT, createGraftCatalog, seed, tableField, withContext, type A2UIBuild } from '@swissspidy/graft-a2ui/client';
+import { createGraftCatalog, seed, tableField, withContext, type A2UIBuild } from '@swissspidy/graft-a2ui/client';
 import {
 	A2UIProcessor,
 	A2UIRenderer,
@@ -16,7 +16,7 @@ import {
 } from '@swissspidy/a2ui-wp';
 import type { UiRootProps } from '@graft/renderer-react';
 import type { Field } from '../cells.ts';
-import { Board } from './board.tsx';
+import { Card, Column, DragProvider, Row, useDropButton } from './drag.tsx';
 import { Table as GraftTable } from './table.tsx';
 
 /**
@@ -98,10 +98,12 @@ const BaseButton = wordPressCatalog.Button!;
 
 /**
  * a2ui-wp's Button, marked with its action id (`actionId`, else its
- * component id) as Graft's own buttons and row actions are.
+ * component id) as Graft's own buttons and row actions are. With a
+ * `dropTarget`, dropping its draggable Card there presses it (./drag.tsx).
  */
-function Button(props: A2UIComponentProps<{ actionId?: unknown }>) {
+function Button(props: A2UIComponentProps<{ actionId?: unknown; dropTarget?: string; action?: unknown; checks?: unknown }>) {
 	const actionId = useDynamicString(props.props.actionId ?? '') || props.id;
+	useDropButton(props.id, props.props);
 	return (
 		<span data-graft-action={actionId}>
 			<BaseButton {...props} />
@@ -118,7 +120,7 @@ const withVisible = (catalog: ComponentCatalog): ComponentCatalog =>
 		]),
 	);
 
-export const catalog = withVisible(createCatalog({ ...wordPressCatalog, Button, Table, Board }));
+export const catalog = withVisible(createCatalog({ ...wordPressCatalog, Button, Table, Card, Column, Row }));
 
 /**
  * The A2UI processor for one mounted build, on the Graft catalog for this
@@ -126,7 +128,7 @@ export const catalog = withVisible(createCatalog({ ...wordPressCatalog, Button, 
  * every change of the model.
  */
 export function createProcessor(build: A2UIBuild, slot: Record<string, unknown>, can: UiRootProps['can']): A2UIProcessor {
-	const processor = new A2UIProcessor({ locale: 'en-US', catalogs: [createGraftCatalog({ id: build.ui.catalogId, components: [BOARD_COMPONENT], can, now: new Date() })] });
+	const processor = new A2UIProcessor({ locale: 'en-US', catalogs: [createGraftCatalog({ id: build.ui.catalogId, can, now: new Date() })] });
 	processor.processMessages([
 		{ version: VERSION, createSurface: { surfaceId, catalogId: build.ui.catalogId } },
 		{ version: VERSION, updateComponents: { surfaceId, components: build.ui.components } },
@@ -193,7 +195,11 @@ export function A2UIRoot({ build: raw, data, slot, can, invoke }: UiRootProps) {
 		});
 	};
 
-	return <A2UIRenderer processor={processor} catalog={catalog} onAction={onAction} />;
+	return (
+		<DragProvider>
+			<A2UIRenderer processor={processor} catalog={catalog} onAction={onAction} />
+		</DragProvider>
+	);
 }
 
 // The runtime (mount.tsx) draws A2UI builds with this.

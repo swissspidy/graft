@@ -1,6 +1,6 @@
 import { evaluate, isAction, type EvalContext } from '../build/evaluate.ts';
 import { removeRow } from '../build/rows.ts';
-import type { Build, Check } from '../build/types.ts';
+import type { Build, Check, CheckStep } from '../build/types.ts';
 import type { Spec } from '../spec/types.ts';
 import { canonicalJson } from '../surface/hash.ts';
 import type { Surface } from '../surface/types.ts';
@@ -173,7 +173,8 @@ async function runCheck(options: VerifyOptions, check: Check, index: number): Pr
 	// Direct calls: whether each was refused, by action id and row.
 	const direct: Array<{ id: string; row: unknown; refused?: string }> = [];
 
-	for (const [i, step] of (check.steps ?? []).entries()) {
+	for (const [i, written] of (check.steps ?? []).entries()) {
+		let step: CheckStep = written;
 		if ('fill' in step) {
 			// Typing into an input: it now shows the value.
 			const target = findInput(view, step.fill, step.row);
@@ -185,6 +186,15 @@ async function runCheck(options: VerifyOptions, check: Check, index: number): Pr
 			const entered = { ...instance.entered, [input.group]: { ...instance.entered[input.group], [input.id]: step.value } };
 			view = view.map((item) => (item === instance ? snap({ slot: item.slot, data: item.data, entered }) : item));
 			continue;
+		}
+		if ('drop' in step) {
+			// Dragging is pressing the action the record has for where it lands.
+			const dropped = findDrop(view, step.drop, step.on);
+			if (!dropped) {
+				failures.push(`Step ${i + 1}: ${describeMatcher(step.drop)} cannot be dropped on "${step.on}".`);
+				return result();
+			}
+			step = { action: dropped.action.id, row: step.drop };
 		}
 		const found = findAction(view, step.action, step.row, step.direct === true);
 		if (!found) {
@@ -275,6 +285,18 @@ function refusedFailure(expectation: Record<string, unknown>, direct: Array<{ id
 	return calls.every((call) => call.refused !== undefined) ? undefined : `Expected a direct call of ${where} to be refused, but it went through.`;
 }
 
+/** The action a record uses when it is dropped on `zone`, if the viewer can use it. */
+function findDrop(view: Instance[], matcher: Record<string, unknown>, zone: string): { instance: Instance; action: SnapshotAction } | undefined {
+	for (const instance of view) {
+		for (const action of allActions(instance.snapshot)) {
+			if (action.dropTarget === zone && action.available && matchesRecord(matcher, action.row)) {
+				return { instance, action };
+			}
+		}
+	}
+	return undefined;
+}
+
 /** An action by id (and row): one the viewer can use, or with `direct`, any that calls a capability. */
 function findAction(view: Instance[], id: string, matcher?: Record<string, unknown>, direct = false): { instance: Instance; action: SnapshotAction } | undefined {
 	for (const instance of view) {
@@ -293,13 +315,16 @@ function findAction(view: Instance[], id: string, matcher?: Record<string, unkno
  */
 async function evaluateExpectation(expectation: Record<string, unknown>, snapshot: Snapshot, sandbox: Sandbox): Promise<string | undefined> {
 	if ('rows' in expectation) {
+		// The first list, or with "in", the lists drawn in the place of that name (e.g. a column's drop target).
 		const expected = expectation.rows as string[];
-		const table = snapshot.tables[0];
-		const actual = table ? table.rows.map((row) => row.label) : [];
-		if (!table && expected.length > 0) {
-			return `Expected rows ${list(expected)}, but nothing lists rows.`;
+		const zone = typeof expectation.in === 'string' ? expectation.in : undefined;
+		const tables = zone === undefined ? snapshot.tables.slice(0, 1) : snapshot.tables.filter((t) => t.zone === zone);
+		const actual = tables.flatMap((table) => table.rows.map((row) => row.label));
+		const where = zone === undefined ? '' : ` in "${zone}"`;
+		if (tables.length === 0 && expected.length > 0) {
+			return `Expected rows ${list(expected)}${where}, but nothing${where} lists rows.`;
 		}
-		return sameSet(expected, actual) ? undefined : `Expected rows ${list(expected)}, found ${list(actual)}.`;
+		return sameSet(expected, actual) ? undefined : `Expected rows ${list(expected)}${where}, found ${list(actual)}.`;
 	}
 	if ('columns' in expectation) {
 		const expected = expectation.columns as string[];

@@ -17,3 +17,7 @@ export const CardHeader = element('div');
 export const CardBody = element('div');
 export const Spinner = stub;
 export const __experimentalVStack = element('div');
+export const __experimentalHStack = element('div');
+export const __experimentalHeading = element('h3');
+export const __experimentalText = element('span');
+export const __experimentalDivider = element('hr');

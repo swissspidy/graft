@@ -3,4 +3,4 @@
 "@swissspidy/graft-a2ui": minor
 ---
 
-A Board component for hosts that can draw one (`BOARD_COMPONENT`, `BOARD_GUIDE`): a list's items as cards in columns by the value of one field, with moves between columns bound to events like row actions. The verifier reads each column as a table of its cards, with the moves out of it as row actions. Checks can also call an action the viewer is not offered (a step with `"direct": true`) and expect the host to refuse it (`{"refused": "<action id>"}`).
+Dragging in the Graft catalog: a Card with `draggable` can be dropped on a Column, Row or Card with a `dropTarget`, which presses the Card's Button with that `dropTarget`. The verifier reads a template of Cards as a list of rows and records which drop target each list is in. Checks can drag (`{"drop": {...}, "on": "<target>"}`), read the rows in one place (`{"rows": [...], "in": "<target>"}`), call an action the viewer is not offered (`"direct": true`), and expect the host to refuse it (`{"refused": "<action id>"}`).

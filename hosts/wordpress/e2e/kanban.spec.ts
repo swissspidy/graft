@@ -2,10 +2,11 @@ import { expect, test, type Locator, type Page } from '@playwright/test';
 import { login } from './login.ts';
 
 /**
- * The editorial board (examples/specs/kanban-board.md), served from its
- * Board build: a card moves by its buttons (the keyboard way) and by
- * dragging, each move goes through the gateway as the viewer, and what a
- * contributor may not do is neither offered nor let through.
+ * The editorial board (examples/specs/kanban-board.md), built from catalog
+ * primitives: columns that take drops, draggable cards and their move
+ * buttons. A card moves by its buttons (the keyboard way) and by dragging,
+ * each move goes through the gateway as the viewer, and what a contributor
+ * may not do is neither offered nor let through.
  *
  * The test writes its own post ("Board story") and deletes it at the end,
  * so the seeded posts other tests count stay as they are.
@@ -13,8 +14,8 @@ import { login } from './login.ts';
 test.describe.configure({ mode: 'serial' });
 
 const story = 'Board story';
-const column = (page: Page, id: string) => page.locator(`[data-graft-column="${id}"]`);
-const card = (scope: Page | Locator, title: string) => scope.locator(`[data-graft-card="${title}"]`);
+const column = (page: Page, id: string) => page.locator(`[data-graft-drop-target="${id}"]`);
+const card = (scope: Page | Locator, title: string) => scope.locator('[data-graft-draggable]', { hasText: title });
 
 /** The REST API, as the logged-in user. */
 const rest = (page: Page, path: string, method = 'GET', data?: unknown) =>
@@ -52,9 +53,9 @@ test('contributors move their own cards between Draft and Pending review, and no
 
 	await page.goto('/wp-admin/edit.php');
 	await page.locator('#adminmenu').getByRole('link', { name: 'Board', exact: true }).click();
-	await expect(page.getByRole('heading', { name: /^Draft/ })).toBeVisible();
-	await expect(page.getByRole('heading', { name: /^Pending review/ })).toBeVisible();
-	await expect(page.getByRole('heading', { name: /^Published/ })).toBeVisible();
+	await expect(page.getByRole('heading', { name: 'Draft', exact: true })).toBeVisible();
+	await expect(page.getByRole('heading', { name: 'Pending review', exact: true })).toBeVisible();
+	await expect(page.getByRole('heading', { name: 'Published', exact: true })).toBeVisible();
 
 	// Only the posts a contributor can edit: their own, never Post C (the editor's, published).
 	await expect(card(column(page, 'draft'), story)).toBeVisible();
@@ -71,7 +72,7 @@ test('contributors move their own cards between Draft and Pending review, and no
 	await page.screenshot({ path: 'test-results/kanban-contributor.png', fullPage: true });
 
 	// The keyboard way: the card's own button, with Enter.
-	await card(page, story).getByRole('button', { name: `Pending review →: ${story}` }).focus();
+	await card(page, story).getByRole('button', { name: `Move “${story}” to Pending review` }).focus();
 	await page.keyboard.press('Enter');
 	await expect(page.locator('.components-notice__content', { hasText: 'Sent for review.' })).toBeVisible();
 	await expect(card(column(page, 'pending'), story)).toBeVisible();
@@ -113,7 +114,7 @@ test('editors drag a card to Published, and move it back with its button', async
 
 	// A published post goes back to review, not straight to Draft.
 	await expect(card(page, story).locator('[data-graft-action="to-draft"]')).toHaveCount(0);
-	await card(page, story).getByRole('button', { name: `← Pending review: ${story}` }).click();
+	await card(page, story).getByRole('button', { name: `Move “${story}” to Pending review` }).click();
 	await expect(card(column(page, 'pending'), story)).toBeVisible();
 	expect(await statusOf(page, id)).toBe('pending');
 

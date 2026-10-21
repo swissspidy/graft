@@ -23,6 +23,12 @@ describe('describeCheck', () => {
 		).toBe('When "c" opens it, and calls "approve" on "Draft A" directly, without the button, then calling "approve" on "Draft A" is refused.');
 	});
 
+	it('reads drops and named lists', () => {
+		expect(describeCheck({ criterion: 'move', view_as: 'e', steps: [{ drop: { title: 'Draft A' }, on: 'pending' }], expect: [{ rows: ['Draft A'], in: 'pending' }, { rows: [], in: 'draft' }] })).toBe(
+			'When "e" opens it, and drags "Draft A" onto "pending", then the "pending" list shows exactly "Draft A" and the "draft" list is empty.',
+		);
+	});
+
 	it('uses host describers for fixtures and assertions', () => {
 		const text = describeCheck(byCriterion.approve!, {
 			fixtures: () => 'an editor "e" and a pending post "Draft A"',

@@ -86,9 +86,9 @@ a hash and need no rebuild.
   through the gateway and `plugin/build/a2ui.js` draws the A2UI surface
   with a2ui-wp, using React and `@wordpress/components` from WordPress.
   The catalog's Table uses wp-admin list-table markup
-  (`src/client/table.tsx`); its Board draws cards with
-  `@wordpress/components`, moved by buttons or by dragging
-  (`src/client/board.tsx`, [ADR 0012](../../docs/adr/0012-kanban-board-component.md)).
+  (`src/client/table.tsx`). Draggable Cards drop on containers with a
+  `dropTarget`, pressing the card's button for it
+  (`src/client/drag.tsx`, [ADR 0012](../../docs/adr/0012-drag-and-drop.md)).
 - **Admin screen.** Tools → Customizations (administrators) lists every
   spec with its state, the permissions it requests in plain language
   (granted or not), and each check rendered as a sentence next to the

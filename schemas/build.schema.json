@@ -237,6 +237,16 @@
                 }
               },
               {
+                "description": "Drag a record (its card) onto a drop target, which uses the record's action for that target.",
+                "type": "object",
+                "required": ["drop", "on"],
+                "additionalProperties": false,
+                "properties": {
+                  "drop": { "type": "object" },
+                  "on": { "type": "string" }
+                }
+              },
+              {
                 "description": "Type a value into an input field (a checkbox takes true or false).",
                 "type": "object",
                 "required": ["fill", "value"],

@@ -107,7 +107,7 @@ try {
 	await page.screenshot({ path: 'test-results/demo-review-queue.png' });
 	await page.goto(`http://127.0.0.1:${site}/wp-admin/admin.php?page=graft-kanban-board`);
 	await check('the board shows pending posts in their column, with Publish for the editor', () =>
-		page.locator('[data-graft-column="pending"] [data-graft-card="Library hours"] [data-graft-action="publish"]').waitFor({ timeout: 30_000 }),
+		page.locator('[data-graft-drop-target="pending"] [data-graft-draggable]', { hasText: 'Library hours' }).locator('[data-graft-action="publish"]').waitFor({ timeout: 30_000 }),
 	);
 	await page.screenshot({ path: 'test-results/demo-board.png', fullPage: true });
 	await check('the publish checklist shows in the block editor', async () => {

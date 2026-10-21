@@ -1,4 +1,3 @@
-export { BOARD_COMPONENT, BOARD_GUIDE, boardLanes, movesFrom, type BoardColumn, type BoardLane, type BoardMove } from './board.ts';
 export { BASE_COMPONENTS, createGraftCatalog, graftFunctions, INPUT_COMPONENTS, PROTOCOL, readPointer, type CatalogContext, type CatalogOptions } from './catalog.ts';
 export { withContext } from './events.ts';
 export {

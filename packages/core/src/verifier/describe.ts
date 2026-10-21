@@ -40,7 +40,9 @@ export function describeCheck(check: Check, describers: CheckDescribers = {}): s
 	parts.push(`${parts.length ? 'when' : 'When'} ${check.view_as ? `"${check.view_as}"` : 'the viewer'} opens it${later}`);
 	for (const step of check.steps ?? []) {
 		parts.push(
-			'fill' in step
+			'drop' in step
+				? `and drags${row(step.drop).replace(/^ on /, ' ')} onto "${step.on}"`
+				: 'fill' in step
 				? `and types ${quote(step.value)} into "${step.fill}"${row(step.row)}`
 				: step.direct
 					? `and calls "${step.action}"${row(step.row)} directly, without the button`
@@ -50,7 +52,8 @@ export function describeCheck(check: Check, describers: CheckDescribers = {}): s
 	const outcomes = check.expect.map((e) => {
 		if ('rows' in e) {
 			const rows = e.rows as string[];
-			return rows.length ? `the list shows exactly ${list(rows.map(quote))}` : 'the list is empty';
+			const which = typeof e.in === 'string' ? `the ${quote(e.in)} list` : 'the list';
+			return rows.length ? `${which} shows exactly ${list(rows.map(quote))}` : `${which} is empty`;
 		}
 		if ('columns' in e) {
 			return `the columns are ${list((e.columns as string[]).map(quote))}`;

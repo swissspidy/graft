@@ -183,10 +183,7 @@ export function validateA2UI(value: Build, surface: Surface, host: A2UIHost, spe
 		if (INPUT_COMPONENTS.has(component.component) && !(isBinding(component.value) && component.value.path.startsWith('/'))) {
 			error('a2ui-input-binding', `${path}/value`, `The input "${component.id}" must bind "value" to an absolute pointer, e.g. {"path": "/form/${component.id}"}.`);
 		}
-		if (component.component === 'Board') {
-			boardProblems(component).forEach(([at, message]) => error('a2ui-board', `${path}${at}`, `Board "${component.id}": ${message}`));
-		}
-		if (component.component === 'Table' || component.component === 'Board') {
+		if (component.component === 'Table') {
 			((component.fields as Array<{ id?: unknown }> | undefined) ?? []).forEach((field, f) => {
 				if (typeof field.id === 'string' && dotted(field.id)) {
 					error('a2ui-dotted-pointer', `${path}/fields/${f}/id`, `Field "${field.id}" is not a JSON Pointer into the row: use "${field.id.replace(/\./g, '/')}".`);
@@ -195,6 +192,8 @@ export function validateA2UI(value: Build, surface: Surface, host: A2UIHost, spe
 		}
 		scan(component, path);
 	});
+
+	diagnostics.push(...dragProblems(build.ui.components));
 
 	// The data model's top level: data sources, the slot, `initial` and `computed`.
 	for (const section of ['initial', 'computed'] as const) {
@@ -295,31 +294,49 @@ function pointerIn(value: unknown, pointer: string): unknown {
 		.reduce<unknown>((at, key) => (isObject(at) || Array.isArray(at) ? (at as Record<string, unknown>)[key] : undefined), value);
 }
 
-/** A board's columns are distinct, its moves go between two of them, and its pointers are JSON Pointers. */
-function boardProblems(component: A2UIComponent): Array<[string, string]> {
-	const problems: Array<[string, string]> = [];
-	if (typeof component.columnBy === 'string' && dotted(component.columnBy)) {
-		problems.push(['/columnBy', `"${component.columnBy}" is not a JSON Pointer into the item: use "${component.columnBy.replace(/\./g, '/')}".`]);
-	}
-	const columns = Array.isArray(component.columns) ? (component.columns as Array<{ id?: unknown }>).map((column) => String(column.id)) : [];
-	columns.forEach((id, i) => {
-		if (columns.indexOf(id) !== i) {
-			problems.push([`/columns/${i}/id`, `the column "${id}" is there twice.`]);
+/**
+ * Dragging presses a Button: every Button with a `dropTarget` is inside a
+ * draggable Card and names a container that takes drops, and every
+ * draggable Card has a Button to press.
+ */
+function dragProblems(components: A2UIComponent[]): Diagnostic[] {
+	const diagnostics: Diagnostic[] = [];
+	const byId = new Map(components.map((component, i) => [component.id, { component, i }]));
+	const zones = new Set(components.filter((c) => c.component !== 'Button' && typeof c.dropTarget === 'string').map((c) => String(c.dropTarget)));
+	const error = (i: number, at: string, message: string) => diagnostics.push({ severity: 'error', code: 'a2ui-drag', path: `/ui/components/${i}${at}`, message });
+	const pressed = new Set<string>();
+	const seen = new Set<string>();
+	// From the root, with the draggable Card each component is inside, if any.
+	const walk = (id: string, card: string | undefined) => {
+		const entry = byId.get(id);
+		if (!entry || seen.has(`${id}@${card ?? ''}`)) {
+			return;
 		}
-	});
-	const moves = Array.isArray(component.moves) ? (component.moves as Array<{ id?: unknown; from?: unknown; to?: unknown }>) : [];
-	moves.forEach((move, i) => {
-		for (const end of ['from', 'to'] as const) {
-			if (typeof move[end] === 'string' && !columns.includes(move[end])) {
-				problems.push([`/moves/${i}/${end}`, `the move "${String(move.id)}" goes ${end} "${move[end]}", which is not a column (${columns.join(', ')}).`]);
+		seen.add(`${id}@${card ?? ''}`);
+		const { component, i } = entry;
+		const inside = component.component === 'Card' && component.draggable !== undefined && component.draggable !== false ? id : card;
+		if (component.component === 'Button' && typeof component.dropTarget === 'string') {
+			if (!card) {
+				error(i, '/dropTarget', `The button "${id}" has a "dropTarget" but is not inside a Card with "draggable": nothing is dragged to press it.`);
+			} else {
+				pressed.add(card);
+			}
+			if (!zones.has(component.dropTarget)) {
+				error(i, '/dropTarget', `The button "${id}" is pressed by a drop on "${component.dropTarget}", but no Column, Row or Card has that "dropTarget"${zones.size ? ` (${[...zones].join(', ')})` : ''}.`);
 			}
 		}
-		if (move.from === move.to) {
-			problems.push([`/moves/${i}`, `the move "${String(move.id)}" goes from a column to itself.`]);
+		const children = component.children;
+		const refs = Array.isArray(children) ? children.map(String) : isObject(children) && typeof children.componentId === 'string' ? [children.componentId] : [];
+		if (typeof component.child === 'string') {
+			refs.push(component.child);
 		}
-		if (moves.some((other, j) => j < i && other.from === move.from && other.to === move.to)) {
-			problems.push([`/moves/${i}`, `two moves go from "${String(move.from)}" to "${String(move.to)}": dragging a card there would be ambiguous.`]);
+		refs.forEach((ref) => walk(ref, inside));
+	};
+	walk('root', undefined);
+	for (const { component, i } of byId.values()) {
+		if (component.component === 'Card' && component.draggable !== undefined && component.draggable !== false && !pressed.has(component.id)) {
+			error(i, '/draggable', `The card "${component.id}" is draggable but has no Button with a "dropTarget": dropping it would do nothing.`);
 		}
-	});
-	return problems;
+	}
+	return diagnostics;
 }

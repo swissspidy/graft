@@ -58,9 +58,13 @@ export interface DataSource {
  * row (or slot instance, e.g. the post) the action or input belongs to.
  * A `direct` action is called even when it is hidden or disabled, as a
  * viewer calling its capability through the gateway would: whether it is
- * refused is for a `refused` expectation to say.
+ * refused is for a `refused` expectation to say. `drop` drags the record
+ * it matches onto the place named `on`, which uses its action for there.
  */
-export type CheckStep = { action: string; row?: Record<string, unknown>; direct?: boolean } | { fill: string; value: string | boolean; row?: Record<string, unknown> };
+export type CheckStep =
+	| { action: string; row?: Record<string, unknown>; direct?: boolean }
+	| { fill: string; value: string | boolean; row?: Record<string, unknown> }
+	| { drop: Record<string, unknown>; on: string };
 
 export interface Check {
 	criterion: string;

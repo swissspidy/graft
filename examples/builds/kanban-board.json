@@ -19,52 +19,238 @@
 	"ui": {
 		"protocol": "a2ui/v0.9",
 		"catalogId": "graft:wordpress",
+		"computed": {
+			"draft": {
+				"call": "filter",
+				"args": {
+					"items": {
+						"path": "/posts/items"
+					},
+					"by": "status",
+					"equals": "draft"
+				}
+			},
+			"pending": {
+				"call": "filter",
+				"args": {
+					"items": {
+						"path": "/posts/items"
+					},
+					"by": "status",
+					"equals": "pending"
+				}
+			},
+			"publish": {
+				"call": "filter",
+				"args": {
+					"items": {
+						"path": "/posts/items"
+					},
+					"by": "status",
+					"equals": "publish"
+				}
+			}
+		},
 		"components": [
 			{
 				"id": "root",
-				"component": "Board",
-				"items": {
-					"path": "/posts/items"
-				},
-				"columnBy": "status",
-				"columns": [
-					{
-						"id": "draft",
-						"title": "Draft",
-						"empty": "No drafts."
-					},
-					{
-						"id": "pending",
-						"title": "Pending review",
-						"empty": "Nothing is waiting for review."
-					},
-					{
-						"id": "publish",
-						"title": "Published",
-						"empty": "Nothing published yet."
+				"component": "Row",
+				"children": [
+					"lane-draft",
+					"lane-pending",
+					"lane-publish"
+				]
+			},
+			{
+				"id": "lane-draft",
+				"component": "Column",
+				"dropTarget": "draft",
+				"children": [
+					"heading-draft",
+					"empty-draft",
+					"cards-draft"
+				]
+			},
+			{
+				"id": "heading-draft",
+				"component": "Text",
+				"text": "Draft",
+				"variant": "h3"
+			},
+			{
+				"id": "empty-draft",
+				"component": "Text",
+				"text": "No drafts.",
+				"variant": "caption",
+				"visible": {
+					"call": "equals",
+					"args": {
+						"a": {
+							"call": "count",
+							"args": {
+								"value": {
+									"path": "/draft"
+								}
+							}
+						},
+						"b": 0
 					}
-				],
-				"fields": [
-					{
-						"id": "title",
-						"label": "Title",
-						"type": "string",
-						"primary": true
-					},
-					{
-						"id": "author/name",
-						"label": "Author",
-						"type": "user"
-					},
-					{
-						"id": "updated",
-						"label": "Updated",
-						"type": "string",
-						"value": {
+				}
+			},
+			{
+				"id": "cards-draft",
+				"component": "Column",
+				"children": {
+					"componentId": "card",
+					"path": "/draft"
+				}
+			},
+			{
+				"id": "lane-pending",
+				"component": "Column",
+				"dropTarget": "pending",
+				"children": [
+					"heading-pending",
+					"empty-pending",
+					"cards-pending"
+				]
+			},
+			{
+				"id": "heading-pending",
+				"component": "Text",
+				"text": "Pending review",
+				"variant": "h3"
+			},
+			{
+				"id": "empty-pending",
+				"component": "Text",
+				"text": "Nothing is waiting for review.",
+				"variant": "caption",
+				"visible": {
+					"call": "equals",
+					"args": {
+						"a": {
+							"call": "count",
+							"args": {
+								"value": {
+									"path": "/pending"
+								}
+							}
+						},
+						"b": 0
+					}
+				}
+			},
+			{
+				"id": "cards-pending",
+				"component": "Column",
+				"children": {
+					"componentId": "card",
+					"path": "/pending"
+				}
+			},
+			{
+				"id": "lane-publish",
+				"component": "Column",
+				"dropTarget": "publish",
+				"children": [
+					"heading-publish",
+					"empty-publish",
+					"cards-publish"
+				]
+			},
+			{
+				"id": "heading-publish",
+				"component": "Text",
+				"text": "Published",
+				"variant": "h3"
+			},
+			{
+				"id": "empty-publish",
+				"component": "Text",
+				"text": "Nothing published yet.",
+				"variant": "caption",
+				"visible": {
+					"call": "equals",
+					"args": {
+						"a": {
+							"call": "count",
+							"args": {
+								"value": {
+									"path": "/publish"
+								}
+							}
+						},
+						"b": 0
+					}
+				}
+			},
+			{
+				"id": "cards-publish",
+				"component": "Column",
+				"children": {
+					"componentId": "card",
+					"path": "/publish"
+				}
+			},
+			{
+				"id": "card",
+				"component": "Card",
+				"draggable": true,
+				"child": "card-body"
+			},
+			{
+				"id": "card-body",
+				"component": "Column",
+				"children": [
+					"title",
+					"author",
+					"updated",
+					"moves"
+				]
+			},
+			{
+				"id": "title",
+				"component": "Text",
+				"text": {
+					"path": "title"
+				},
+				"variant": "h4"
+			},
+			{
+				"id": "author",
+				"component": "Text",
+				"text": {
+					"path": "author/name"
+				},
+				"variant": "caption"
+			},
+			{
+				"id": "updated",
+				"component": "Text",
+				"text": {
+					"call": "if",
+					"args": {
+						"condition": {
+							"call": "lessThan",
+							"args": {
+								"a": {
+									"call": "daysSince",
+									"args": {
+										"value": {
+											"path": "modified"
+										}
+									}
+								},
+								"b": 1
+							}
+						},
+						"then": "today",
+						"else": {
 							"call": "if",
 							"args": {
 								"condition": {
-									"call": "lessThan",
+									"call": "equals",
 									"args": {
 										"a": {
 											"call": "daysSince",
@@ -77,129 +263,236 @@
 										"b": 1
 									}
 								},
-								"then": "today",
+								"then": "1 day ago",
 								"else": {
-									"call": "if",
+									"call": "formatString",
 									"args": {
-										"condition": {
-											"call": "equals",
-											"args": {
-												"a": {
-													"call": "daysSince",
-													"args": {
-														"value": {
-															"path": "modified"
-														}
-													}
-												},
-												"b": 1
-											}
-										},
-										"then": "1 day ago",
-										"else": {
-											"call": "formatString",
-											"args": {
-												"value": "${daysSince(value: ${modified})} days ago"
-											}
-										}
+										"value": "${daysSince(value: ${modified})} days ago"
 									}
 								}
 							}
 						}
 					}
-				],
-				"moves": [
-					{
-						"id": "to-pending",
-						"label": "Pending review →",
-						"from": "draft",
-						"to": "pending",
-						"variant": "primary",
-						"visible": {
-							"call": "can",
-							"args": {
-								"scope": "posts.review:write"
-							}
-						},
-						"action": {
-							"event": {
-								"name": "send-for-review",
-								"context": {
-									"id": {
-										"path": "id"
-									}
-								}
-							}
-						}
-					},
-					{
-						"id": "to-draft",
-						"label": "← Draft",
-						"from": "pending",
-						"to": "draft",
-						"visible": {
-							"call": "can",
-							"args": {
-								"scope": "posts.review:write"
-							}
-						},
-						"action": {
-							"event": {
-								"name": "back-to-draft",
-								"context": {
-									"id": {
-										"path": "id"
-									}
-								}
-							}
-						}
-					},
-					{
-						"id": "publish",
-						"label": "Published →",
-						"from": "pending",
-						"to": "publish",
-						"variant": "primary",
-						"visible": {
-							"call": "can",
-							"args": {
-								"scope": "posts.status:write"
-							}
-						},
-						"action": {
-							"event": {
-								"name": "publish",
-								"context": {
-									"id": {
-										"path": "id"
-									}
-								}
-							}
-						}
-					},
-					{
-						"id": "unpublish",
-						"label": "← Pending review",
-						"from": "publish",
-						"to": "pending",
-						"visible": {
-							"call": "can",
-							"args": {
-								"scope": "posts.status:write"
-							}
-						},
-						"action": {
-							"event": {
-								"name": "unpublish",
-								"context": {
-									"id": {
-										"path": "id"
-									}
-								}
-							}
-						}
-					}
+				},
+				"variant": "caption"
+			},
+			{
+				"id": "moves",
+				"component": "Row",
+				"children": [
+					"to-pending",
+					"to-draft",
+					"publish",
+					"unpublish"
 				]
+			},
+			{
+				"id": "to-pending",
+				"component": "Button",
+				"child": "to-pending-label",
+				"variant": "primary",
+				"dropTarget": "pending",
+				"visible": {
+					"call": "and",
+					"args": {
+						"values": [
+							{
+								"call": "equals",
+								"args": {
+									"a": {
+										"path": "status"
+									},
+									"b": "draft"
+								}
+							},
+							{
+								"call": "can",
+								"args": {
+									"scope": "posts.review:write"
+								}
+							}
+						]
+					}
+				},
+				"accessibility": {
+					"label": {
+						"call": "formatString",
+						"args": {
+							"value": "Move “${title}” to Pending review"
+						}
+					}
+				},
+				"action": {
+					"event": {
+						"name": "send-for-review",
+						"context": {
+							"id": {
+								"path": "id"
+							}
+						}
+					}
+				}
+			},
+			{
+				"id": "to-pending-label",
+				"component": "Text",
+				"text": "Pending review →"
+			},
+			{
+				"id": "to-draft",
+				"component": "Button",
+				"child": "to-draft-label",
+				"variant": "default",
+				"dropTarget": "draft",
+				"visible": {
+					"call": "and",
+					"args": {
+						"values": [
+							{
+								"call": "equals",
+								"args": {
+									"a": {
+										"path": "status"
+									},
+									"b": "pending"
+								}
+							},
+							{
+								"call": "can",
+								"args": {
+									"scope": "posts.review:write"
+								}
+							}
+						]
+					}
+				},
+				"accessibility": {
+					"label": {
+						"call": "formatString",
+						"args": {
+							"value": "Move “${title}” to Draft"
+						}
+					}
+				},
+				"action": {
+					"event": {
+						"name": "back-to-draft",
+						"context": {
+							"id": {
+								"path": "id"
+							}
+						}
+					}
+				}
+			},
+			{
+				"id": "to-draft-label",
+				"component": "Text",
+				"text": "← Draft"
+			},
+			{
+				"id": "publish",
+				"component": "Button",
+				"child": "publish-label",
+				"variant": "primary",
+				"dropTarget": "publish",
+				"visible": {
+					"call": "and",
+					"args": {
+						"values": [
+							{
+								"call": "equals",
+								"args": {
+									"a": {
+										"path": "status"
+									},
+									"b": "pending"
+								}
+							},
+							{
+								"call": "can",
+								"args": {
+									"scope": "posts.status:write"
+								}
+							}
+						]
+					}
+				},
+				"accessibility": {
+					"label": {
+						"call": "formatString",
+						"args": {
+							"value": "Move “${title}” to Published"
+						}
+					}
+				},
+				"action": {
+					"event": {
+						"name": "publish",
+						"context": {
+							"id": {
+								"path": "id"
+							}
+						}
+					}
+				}
+			},
+			{
+				"id": "publish-label",
+				"component": "Text",
+				"text": "Published →"
+			},
+			{
+				"id": "unpublish",
+				"component": "Button",
+				"child": "unpublish-label",
+				"variant": "default",
+				"dropTarget": "pending",
+				"visible": {
+					"call": "and",
+					"args": {
+						"values": [
+							{
+								"call": "equals",
+								"args": {
+									"a": {
+										"path": "status"
+									},
+									"b": "publish"
+								}
+							},
+							{
+								"call": "can",
+								"args": {
+									"scope": "posts.status:write"
+								}
+							}
+						]
+					}
+				},
+				"accessibility": {
+					"label": {
+						"call": "formatString",
+						"args": {
+							"value": "Move “${title}” to Pending review"
+						}
+					}
+				},
+				"action": {
+					"event": {
+						"name": "unpublish",
+						"context": {
+							"id": {
+								"path": "id"
+							}
+						}
+					}
+				}
+			},
+			{
+				"id": "unpublish-label",
+				"component": "Text",
+				"text": "← Pending review"
 			}
 		]
 	},
@@ -312,7 +605,20 @@
 				{
 					"rows": [
 						"Outline"
-					]
+					],
+					"in": "draft"
+				},
+				{
+					"rows": [
+						"Interview"
+					],
+					"in": "pending"
+				},
+				{
+					"rows": [
+						"Launch"
+					],
+					"in": "publish"
 				},
 				{
 					"text": "Draft"
@@ -322,25 +628,6 @@
 				},
 				{
 					"text": "Published"
-				},
-				{
-					"action": "to-draft",
-					"row": {
-						"title": "Interview"
-					}
-				},
-				{
-					"action": "unpublish",
-					"row": {
-						"title": "Launch"
-					}
-				},
-				{
-					"action": "publish",
-					"row": {
-						"title": "Outline"
-					},
-					"available": false
 				}
 			]
 		},
@@ -384,7 +671,7 @@
 						"row": {
 							"title": "Interview"
 						},
-						"column": "Author",
+						"column": "author",
 						"text": "Ada"
 					}
 				},
@@ -393,7 +680,7 @@
 						"row": {
 							"title": "Launch"
 						},
-						"column": "Author",
+						"column": "author",
 						"text": "Edna"
 					}
 				},
@@ -402,7 +689,7 @@
 						"row": {
 							"title": "Outline"
 						},
-						"column": "Updated",
+						"column": "updated",
 						"text": "today"
 					}
 				}
@@ -451,7 +738,7 @@
 						"row": {
 							"title": "Interview"
 						},
-						"column": "Updated",
+						"column": "updated",
 						"text": "3 days ago"
 					}
 				}
@@ -493,10 +780,10 @@
 			"view_as": "ada",
 			"steps": [
 				{
-					"action": "to-pending",
-					"row": {
+					"drop": {
 						"title": "Outline"
-					}
+					},
+					"on": "pending"
 				}
 			],
 			"expect": [
@@ -507,16 +794,15 @@
 					}
 				},
 				{
-					"rows": []
+					"rows": [],
+					"in": "draft"
 				},
 				{
-					"text": "No drafts"
-				},
-				{
-					"action": "to-draft",
-					"row": {
-						"title": "Outline"
-					}
+					"rows": [
+						"Outline",
+						"Interview"
+					],
+					"in": "pending"
 				}
 			]
 		},
@@ -573,7 +859,12 @@
 					"rows": [
 						"Outline",
 						"Interview"
-					]
+					],
+					"in": "draft"
+				},
+				{
+					"rows": [],
+					"in": "pending"
 				}
 			]
 		},
@@ -613,10 +904,10 @@
 			"view_as": "edna",
 			"steps": [
 				{
-					"action": "publish",
-					"row": {
+					"drop": {
 						"title": "Interview"
-					}
+					},
+					"on": "publish"
 				}
 			],
 			"expect": [
@@ -627,10 +918,15 @@
 					}
 				},
 				{
-					"action": "unpublish",
-					"row": {
-						"title": "Interview"
-					}
+					"rows": [
+						"Interview",
+						"Launch"
+					],
+					"in": "publish"
+				},
+				{
+					"rows": [],
+					"in": "pending"
 				}
 			]
 		},
@@ -684,10 +980,15 @@
 					}
 				},
 				{
-					"action": "publish",
-					"row": {
-						"title": "Launch"
-					}
+					"rows": [
+						"Interview",
+						"Launch"
+					],
+					"in": "pending"
+				},
+				{
+					"rows": [],
+					"in": "publish"
 				}
 			]
 		},
@@ -744,6 +1045,10 @@
 					"row": {
 						"title": "Outline"
 					}
+				},
+				{
+					"rows": [],
+					"in": "publish"
 				}
 			]
 		},
@@ -831,25 +1136,24 @@
 			"view_as": "edna",
 			"expect": [
 				{
-					"rows": []
+					"rows": [],
+					"in": "draft"
+				},
+				{
+					"rows": [],
+					"in": "pending"
+				},
+				{
+					"rows": [
+						"Launch"
+					],
+					"in": "publish"
 				},
 				{
 					"text": "No drafts"
 				},
 				{
 					"text": "Nothing is waiting for review"
-				},
-				{
-					"text": "Draft"
-				},
-				{
-					"text": "Pending review"
-				},
-				{
-					"action": "unpublish",
-					"row": {
-						"title": "Launch"
-					}
 				}
 			]
 		},
@@ -897,12 +1201,29 @@
 			"posts:read"
 		],
 		"catalog": {
-			"Board": [
-				"columnBy",
-				"columns",
-				"fields",
-				"items",
-				"moves"
+			"Button": [
+				"accessibility",
+				"action",
+				"child",
+				"dropTarget",
+				"variant",
+				"visible"
+			],
+			"Card": [
+				"child",
+				"draggable"
+			],
+			"Column": [
+				"children",
+				"dropTarget"
+			],
+			"Row": [
+				"children"
+			],
+			"Text": [
+				"text",
+				"variant",
+				"visible"
 			]
 		}
 	},

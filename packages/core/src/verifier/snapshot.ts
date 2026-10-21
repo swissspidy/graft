@@ -28,6 +28,8 @@ export interface SnapshotInput {
 }
 
 export interface SnapshotTable {
+	/** Where it is drawn, when that place has a name (e.g. a container's drop target). */
+	zone?: string;
 	columns: string[];
 	rows: SnapshotRow[];
 }
@@ -55,6 +57,8 @@ export interface SnapshotAction {
 	action?: Action;
 	/** The record the action applies to: a table row or a slot instance. */
 	row?: unknown;
+	/** Dropping the record's card on the place with this name uses the action. */
+	dropTarget?: string;
 	/** A local event instead of a call: using it keeps `payload` under `name` in the group's entered values. */
 	event?: { group: string; name: string; payload?: unknown };
 }
