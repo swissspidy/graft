@@ -1,6 +1,7 @@
 import { readdir, readFile, stat } from 'node:fs/promises';
 import { dirname, isAbsolute, join, relative, resolve, sep } from 'node:path';
 import { canonicalJson, hasErrors, hashSpec, hashSurface, validateBuild, validateSpec, validateSurface, type Diagnostic, type Spec, type Surface } from '@swissspidy/graft-core';
+import { formatSpecLocation } from './format.ts';
 import { loadHostFormats } from './hosts.ts';
 import { loadSurface } from './validate.ts';
 
@@ -313,7 +314,8 @@ export function formatCheck(result: CheckCommandResult, cwd: string): string {
 		out.push(`${file.ok ? '✔' : '✖'} ${name(file.file)}${against}`);
 		for (const d of file.diagnostics) {
 			const where = d.line !== undefined ? `:${d.line}` : d.path ? `  ${d.path}` : '';
-			out.push(`  ${d.severity.padEnd(7)}${where}  ${d.message}  [${d.code}]`);
+			const spec = formatSpecLocation(d.spec, file.spec);
+			out.push(`  ${d.severity.padEnd(7)}${where}  ${d.message}  [${d.code}]${spec ? `  → ${spec}` : ''}`);
 		}
 	}
 	const count = (kind: CheckFileResult['kind']) => result.files.filter((f) => f.kind === kind).length;
