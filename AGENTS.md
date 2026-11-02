@@ -24,7 +24,7 @@ stop only when every check passes.
 | A canary tenant | `fixtures/canary/**` (spec and build together) | as for an example | `pnpm test:canary`, `pnpm test:canary:emdash` |
 | A design decision | a new `docs/adr/NNNN-*.md`, linked from the README's ADR table | nothing | review |
 
-Never edit these by hand: `surfaces/*.json`, `examples/agency/surface.json`,
+Never edit these by hand: `hosts/**/surfaces/*.json`, `examples/agency/surface.json`,
 `hosts/emdash/adapter/emdash-plugin.jsonc`, bundles (`examples/agency/managed`,
 `examples/chrome-extension/bundles`), and the `refs`, `spec` and `surface`
 fields of a build. `hosts/wordpress/plugin/build/` is the output of
