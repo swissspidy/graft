@@ -444,6 +444,7 @@
 			},
 			"verification": {
 				"passed": true,
+				"build": "sha256:9ee4276e08cee33483f324098b72b3891e5898f58a50763546458f015fe93a84",
 				"spec": {
 					"id": "upcoming-events",
 					"hash": "sha256:c8323508e979adb469d1ce701c1204c55995305f6222118f2cbacd7fe9375135"
@@ -480,7 +481,7 @@
 					}
 				],
 				"unchecked": [],
-				"verifiedAt": "2026-10-21T05:55:35.351Z"
+				"verifiedAt": "2026-11-02T20:38:52.915Z"
 			}
 		}
 	]

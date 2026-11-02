@@ -71,6 +71,12 @@ async function main(): Promise<number> {
 		const failing = { ...verification('publish-queue'), passed: false };
 		const failed = await pluginRoute<{ state: string }>(server, 'install', { source: example('publish-queue').source, build: example('publish-queue').build, verification: failing });
 		check('a failed verification leaves the version a draft', failed.state === 'draft', failed);
+		// A build changed after it was verified (here, a heading) still validates, but the
+		// verification names the build it verified, so it does not cover the changed one.
+		const edited = structuredClone(example('publish-queue').build);
+		(edited.ui.components as Array<{ id: string; text?: string }>).find((c) => c.id === 'title')!.text = 'Publish queue (edited)';
+		const changed = await pluginRoute<{ state: string }>(server, 'install', { source: example('publish-queue').source, build: edited, verification: verification('publish-queue') });
+		check('a verification of another build leaves the version a draft', changed.state === 'draft', changed);
 		const wrongScopes = structuredClone(example('drafts-glance').build);
 		(wrongScopes.data.drafts as { call: string }).call = 'content.publish';
 		const refused = await pluginRoute(server, 'install', { source: example('drafts-glance').source, build: wrongScopes }).then(

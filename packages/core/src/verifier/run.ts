@@ -1,5 +1,6 @@
 import { evaluate, isAction, type EvalContext } from '../build/evaluate.ts';
 import { removeRow } from '../build/rows.ts';
+import { buildHash } from '../build/hash.ts';
 import type { Build, Check, CheckStep } from '../build/types.ts';
 import type { Spec } from '../spec/types.ts';
 import { canonicalJson } from '../surface/hash.ts';
@@ -42,6 +43,13 @@ export interface CheckResult {
 
 export interface Verification {
 	passed: boolean;
+	/**
+	 * Content hash of the build that was verified (`buildHash`). It binds
+	 * the record to that build: a build changed afterwards, even in a way
+	 * that keeps it valid, no longer has a passing verification. Records
+	 * made before builds were named have none, and count as unverified.
+	 */
+	build?: string;
 	spec: { id: string; hash: string };
 	surface: { host: string; hostVersion: string; hash: string };
 	results: CheckResult[];
@@ -79,6 +87,7 @@ export async function verifyBuild(options: VerifyOptions): Promise<Verification>
 	const unchecked = spec.criteria.map((c) => c.id).filter((id) => !checked.has(id));
 	return {
 		passed: results.every((r) => r.passed) && unchecked.length === 0,
+		build: await buildHash(build),
 		spec: { id: build.spec.id, hash: build.spec.hash },
 		surface: { host: options.surface.host, hostVersion: options.surface.hostVersion, hash: build.surface.hash },
 		results,
@@ -477,4 +486,41 @@ function describeError(error: unknown): string {
 		return `${error.message} (${error.code})`;
 	}
 	return error instanceof Error ? error.message : String(error);
+}
+
+/**
+ * Why a verification record does not show that this build passed its
+ * checks, or undefined when it does: it must name this exact build, its
+ * spec version and its surface, and have one passing result for each of
+ * the build's checks, in order, with no criterion left unchecked. Both
+ * may come from a file or a request, so neither is trusted to be well
+ * formed.
+ */
+export async function verificationProblem(verification: Verification | undefined, build: Build): Promise<string | undefined> {
+	if (!verification) {
+		return 'The build has no verification.';
+	}
+	if (verification.build === undefined) {
+		return 'The verification does not name the build it verified; it was made before verifications did.';
+	}
+	if (verification.build !== (await buildHash(build))) {
+		return 'The verification is for another build: the build changed after it was verified.';
+	}
+	if (verification.spec?.id !== build.spec?.id || verification.spec?.hash !== build.spec?.hash) {
+		return 'The verification is for another version of the spec.';
+	}
+	if (verification.surface?.hash !== build.surface?.hash) {
+		return 'The verification is for another surface.';
+	}
+	const results = Array.isArray(verification.results) ? verification.results : [];
+	const checks = Array.isArray(build.checks) ? build.checks : [];
+	const covered =
+		results.length === checks.length &&
+		results.every((r, i) => r?.passed === true && r.check === i && r.criterion === checks[i]?.criterion) &&
+		Array.isArray(verification.unchecked) &&
+		verification.unchecked.length === 0;
+	if (verification.passed !== true || !covered) {
+		return 'The build did not pass all of its checks.';
+	}
+	return undefined;
 }

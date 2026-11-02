@@ -134,6 +134,16 @@ describe('graft check', () => {
 		expect(codes(result, 'builds/upcoming-events.json')).toContain('build-schema');
 	});
 
+	it('reports a bundled build edited by hand after it was verified', async () => {
+		const dir = copyAgency();
+		editJson(join(dir, 'managed/upcoming-events.json'), (bundle) => {
+			// A text change keeps the build valid and its refs the same; only the verification can tell.
+			const [table] = bundle.builds[0].build.ui.components;
+			table.empty = `${table.empty} (edited)`;
+		});
+		expect(codes(await checkFiles([dir]), 'managed/upcoming-events.json')).toEqual(['check-bundle-verification']);
+	});
+
 	it('reports a bundle whose verification says passed over a failed check', async () => {
 		const dir = copyAgency();
 		editJson(join(dir, 'managed/upcoming-events.json'), (bundle) => {

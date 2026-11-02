@@ -42,6 +42,10 @@ describe('the gateway', () => {
 		expect((await fromBundle(bundle, other, 'test')).problems).toEqual(['The bundle has no build for this version of the app.']);
 		const failed = { ...bundle, builds: bundle.builds.map((b) => ({ ...b, verification: { ...b.verification, passed: false } })) };
 		expect((await fromBundle(failed, surface, 'test')).problems).toEqual(['Its build was not verified for this spec and this version of the app.']);
+		// A build edited by hand after it was verified still validates, but is not the verified build.
+		const edited = JSON.parse(JSON.stringify(bundle).replace(/("text":")([^"]+)"/, '$1$2 (edited)"')) as CustomizationBundle;
+		expect(JSON.stringify(edited)).not.toBe(JSON.stringify(bundle));
+		expect((await fromBundle(edited, surface, 'test')).problems).toEqual(['Its build was not verified for this spec and this version of the app.']);
 	});
 
 	it('mounts only on the app’s pages that have the slot', async () => {
@@ -59,8 +63,10 @@ describe('the gateway', () => {
 		await expect(call('tasks.list', { project: 'launch', extra: 1 })).rejects.toMatchObject({ code: 'graft_invalid_input' });
 		const narrow = gatewayCall({ ...installed, grant: ['tasks:read'] }, surface, app.url, fetch);
 		await expect(narrow('tasks.complete', { id: 't1' })).rejects.toMatchObject({ code: 'graft_not_granted' });
+		// A build changed after it was verified is not served, even when it still validates.
 		const widened = { ...installed, build: { ...installed.build, data: { ...installed.build.data, members: { call: 'members.list', input: {} } } } };
-		expect(await unservable(widened, surface)).toBe('It needs permissions that were not approved: members:read.');
+		expect(await unservable(widened, surface)).toBe('Its build has not passed its checks for this version of the app.');
+		expect(await unservable({ ...installed, grant: ['tasks:read'] }, surface)).toBe('It needs permissions that were not approved: tasks.status:write.');
 		expect(app.log().filter((line) => line.includes('/api/members') || line.startsWith('POST'))).toEqual([]);
 	});
 

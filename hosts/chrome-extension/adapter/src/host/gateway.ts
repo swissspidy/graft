@@ -5,6 +5,7 @@ import {
 	hashSpec,
 	validateBuild,
 	validateSpec,
+	verificationProblem,
 	type Build,
 	type CustomizationBundle,
 	type SpecManifest,
@@ -80,7 +81,8 @@ export async function fromBundle(bundle: CustomizationBundle, surface: Surface, 
 			problems.push(...errors.map((d) => `${d.path ?? ''} ${d.message}`.trim()));
 			continue;
 		}
-		if (!verification.passed || verification.spec.hash !== specHash || verification.surface.hash !== surface.hash) {
+		// The record must name this build: a build edited after it was verified is not verified.
+		if (build.spec.hash !== specHash || build.surface.hash !== surface.hash || (await verificationProblem(verification, build))) {
 			problems.push('Its build was not verified for this spec and this version of the app.');
 			continue;
 		}
@@ -104,7 +106,7 @@ export async function unservable(installed: Installed, surface: Surface): Promis
 	if (build.spec.hash !== installed.specHash || (await hashSpec(installed.source)) !== installed.specHash) {
 		return 'Its build is for another version of its spec.';
 	}
-	if (!verification.passed || verification.surface.hash !== surface.hash || verification.spec.hash !== installed.specHash) {
+	if (verification.surface?.hash !== surface.hash || (await verificationProblem(verification, build))) {
 		return 'Its build has not passed its checks for this version of the app.';
 	}
 	const missing = extractRefs(build, surface).scopes.filter((scope) => !installed.grant!.includes(scope));

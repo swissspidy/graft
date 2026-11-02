@@ -1,4 +1,4 @@
-import { extractRefs, hashSpec, nextSpecState, validateBuild, validateSpec, type Build, type Diagnostic, type SpecEvent, type SpecState, type Surface, type Verification } from '@swissspidy/graft-core';
+import { extractRefs, hashSpec, nextSpecState, validateBuild, validateSpec, verificationProblem, type Build, type Diagnostic, type SpecEvent, type SpecState, type Surface, type Verification } from '@swissspidy/graft-core';
 
 /**
  * Customizations, stored in the plugin's KV. One record per spec id, with
@@ -82,12 +82,15 @@ export function createStore(kv: KV, surface: () => Promise<Surface>) {
 	 * surface goes live when the grant covers it, else waits for approval.
 	 * Anything else leaves the version a draft.
 	 */
-	const settle = (record: SpecRecord, version: Version, verification: Verification, current: Surface) => {
+	const settle = async (record: SpecRecord, version: Version, verification: Verification, current: Surface) => {
+		// The record must name this version's build: a verification of any other build, or of
+		// this one before it was changed, leaves the version a draft.
 		const verified =
-			verification.passed === true &&
-			verification.spec.hash === version.specHash &&
-			verification.surface.hash === current.hash &&
-			version.build?.surface.hash === current.hash;
+			version.build !== undefined &&
+			version.build.surface.hash === current.hash &&
+			version.build.spec.hash === version.specHash &&
+			verification.surface?.hash === current.hash &&
+			!(await verificationProblem(verification, version.build));
 		if (!verified) {
 			return;
 		}
@@ -140,7 +143,7 @@ export function createStore(kv: KV, surface: () => Promise<Surface>) {
 				version.build = result.build;
 				version.scopes = buildScopes(result.build, current);
 				if (input.verification) {
-					settle(record, version, input.verification, current);
+					await settle(record, version, input.verification, current);
 				}
 			}
 			await kv.set(key(record.id), record);
@@ -160,7 +163,7 @@ export function createStore(kv: KV, surface: () => Promise<Surface>) {
 			if (version.state !== 'draft' || !version.build) {
 				throw new StoreError(`Version ${n} of "${id}" is ${version.state}${version.build ? '' : ' without a build'}; only built drafts take a verification.`);
 			}
-			settle(record, version, verification, await surface());
+			await settle(record, version, verification, await surface());
 			await kv.set(key(id), record);
 			return { record, version };
 		},

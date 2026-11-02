@@ -1,6 +1,6 @@
 import { readdir, readFile, stat } from 'node:fs/promises';
 import { dirname, isAbsolute, join, relative, resolve, sep } from 'node:path';
-import { canonicalJson, hasErrors, hashSpec, hashSurface, validateBuild, validateSpec, validateSurface, type Diagnostic, type Spec, type Surface } from '@swissspidy/graft-core';
+import { canonicalJson, hasErrors, hashSpec, hashSurface, validateBuild, validateSpec, validateSurface, verificationProblem, type Build, type Diagnostic, type Spec, type Surface, type Verification } from '@swissspidy/graft-core';
 import { formatSpecLocation } from './format.ts';
 import { loadHostFormats } from './hosts.ts';
 import { loadSurface } from './validate.ts';
@@ -276,23 +276,9 @@ export async function checkFiles(paths: string[], options: CheckCommandOptions =
 					continue;
 				}
 				diagnostics.push(...(await checkBuild(file, `${base}/build`, build as Record<string, unknown>, carried)).diagnostics);
-				const claimed = build as { spec?: unknown; surface?: { hash?: unknown } | null; checks?: Array<{ criterion?: unknown }> };
-				const verification = entry.verification as
-					| { passed?: unknown; spec?: unknown; surface?: { hash?: unknown }; results?: Array<{ passed?: unknown; check?: unknown; criterion?: unknown }>; unchecked?: unknown[] }
-					| undefined;
-				// Passed as the verifier decides it: one passing result for each of the build's checks,
-				// in order, and no criterion unchecked.
-				const checks = Array.isArray(claimed.checks) ? claimed.checks : [];
-				const passed =
-					verification?.passed === true &&
-					Array.isArray(verification.results) &&
-					verification.results.length > 0 &&
-					verification.results.length === checks.length &&
-					verification.results.every((r, i) => r?.passed === true && r.check === i && r.criterion === checks[i]?.criterion) &&
-					Array.isArray(verification.unchecked) &&
-					verification.unchecked.length === 0;
-				if (!passed || canonicalJson(verification?.spec) !== canonicalJson(claimed.spec) || verification?.surface?.hash !== claimed.surface?.hash) {
-					error('check-bundle-verification', `${base}/verification`, 'The build has no passing verification for its spec and surface. Bundle it again (graft bundle).');
+				const problem = await verificationProblem(entry.verification as Verification | undefined, build as unknown as Build);
+				if (problem) {
+					error('check-bundle-verification', `${base}/verification`, `${problem} Bundle it again (graft bundle).`);
 				}
 			}
 		}

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { extractRefs, FixtureError, validateSpec, verifyBuild } from '../src/index.ts';
+import { buildHash, extractRefs, FixtureError, validateSpec, verificationProblem, verifyBuild } from '../src/index.ts';
 import { createCan, fakeSandbox, fixtures, pageBuild, spec, specSource, surface } from './fixtures/acme.ts';
 
 describe('verifyBuild', () => {
@@ -145,5 +145,33 @@ describe('verifyBuild', () => {
 		build.checks = [build.checks[1]!];
 		const result = await verifyBuild({ build, spec: narrow, surface, sandbox: fakeSandbox(), createCan: () => () => true });
 		expect(result.results[0]!.failures[0]).toContain('(graft_not_granted)');
+	});
+});
+
+describe('verificationProblem', () => {
+	it('accepts the record of the build it verified, and nothing else', async () => {
+		const build = await pageBuild();
+		const verification = await verifyBuild({ build, spec, surface, sandbox: fakeSandbox(), createCan });
+		expect(verification.build).toBe(await buildHash(build));
+		expect(await verificationProblem(verification, build)).toBeUndefined();
+
+		// The same build, changed afterwards in a way that still validates.
+		const edited = structuredClone(build);
+		(edited.ui.components as Array<Record<string, unknown>>).push({ id: 'note', component: 'Text', text: 'Edited by hand' });
+		expect(await verificationProblem(verification, edited)).toMatch(/another build/);
+
+		expect(await verificationProblem({ ...verification, build: undefined }, build)).toMatch(/does not name the build/);
+		expect(await verificationProblem({ ...verification, passed: false }, build)).toMatch(/did not pass/);
+		expect(await verificationProblem({ ...verification, results: verification.results.slice(1) }, build)).toMatch(/did not pass/);
+		expect(await verificationProblem({ ...verification, unchecked: ['close'] }, build)).toMatch(/did not pass/);
+		expect(await verificationProblem(undefined, build)).toMatch(/no verification/);
+	});
+
+	it('holds a record to the spec and surface its build names', async () => {
+		const build = await pageBuild();
+		const verification = await verifyBuild({ build, spec, surface, sandbox: fakeSandbox(), createCan });
+		// Rewriting the record to name another spec or surface does not make it fit.
+		expect(await verificationProblem({ ...verification, spec: { ...verification.spec, hash: 'sha256:other' } }, build)).toMatch(/another version of the spec/);
+		expect(await verificationProblem({ ...verification, surface: { ...verification.surface, hash: 'sha256:other' } }, build)).toMatch(/another surface/);
 	});
 });
