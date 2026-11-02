@@ -2,7 +2,8 @@ import type { SchemaError as ErrorObject, Validator } from '../schema.ts';
 import buildSchema from '../../../../schemas/build.schema.json' with { type: 'json' };
 import '../ajv.ts';
 import { compileSchema, lazyValidator } from '../schema.ts';
-import { hasErrors, type Diagnostic } from '../diagnostics.ts';
+import { hasErrors, type Diagnostic, type SpecLocation } from '../diagnostics.ts';
+import { specKey } from '../spec/location.ts';
 import { describeSchemaError, schemaErrorPath } from '../schema-errors.ts';
 import type { Spec } from '../spec/types.ts';
 import { hashSurface } from '../surface/hash.ts';
@@ -126,20 +127,32 @@ export async function validateBuild(value: unknown, surface: Surface, options: V
 	// Against the spec.
 	if (options.spec) {
 		const { spec, hash } = options.spec;
-		if (build.spec.id !== spec.manifest.id || build.spec.hash !== hash) {
-			error('build-spec-mismatch', '/spec', `The build is for ${build.spec.id} ${build.spec.hash}, not ${spec.manifest.id} ${hash}.`);
+		const against = (diagnostic: Diagnostic, location: SpecLocation | undefined) => diagnostics.push(location ? { ...diagnostic, spec: location } : diagnostic);
+		if (build.spec.id !== spec.manifest.id) {
+			against(
+				{ severity: 'error', code: 'build-spec-mismatch', path: '/spec/id', message: `The build is for ${build.spec.id}, not ${spec.manifest.id}.` },
+				specKey(spec, '/id'),
+			);
+		} else if (build.spec.hash !== hash) {
+			error('build-spec-mismatch', '/spec/hash', `The build is for ${build.spec.id} ${build.spec.hash}, not ${spec.manifest.id} ${hash}.`);
 		}
 		if (build.mount.slot !== spec.manifest.mount.slot && !options.upgrade) {
-			error('build-spec-mismatch', '/mount/slot', `The spec mounts at "${spec.manifest.mount.slot}", the build at "${build.mount.slot}".`);
+			against(
+				{ severity: 'error', code: 'build-spec-mismatch', path: '/mount/slot', message: `The spec mounts at "${spec.manifest.mount.slot}", the build at "${build.mount.slot}".` },
+				specKey(spec, '/mount/slot'),
+			);
 		}
 		for (const scope of refs.scopes) {
 			if (!spec.manifest.permissions.includes(scope)) {
-				diagnostics.push({
-					severity: options.upgrade ? 'warning' : 'error',
-					code: 'build-scope-not-requested',
-					path: '/refs/scopes',
-					message: `The build needs "${scope}", which the spec does not request.`,
-				});
+				against(
+					{
+						severity: options.upgrade ? 'warning' : 'error',
+						code: 'build-scope-not-requested',
+						path: '/refs/scopes',
+						message: `The build needs "${scope}", which the spec does not request.`,
+					},
+					specKey(spec, '/permissions'),
+				);
 			}
 		}
 		const criteria = new Set(spec.criteria.map((c) => c.id));
@@ -150,12 +163,15 @@ export async function validateBuild(value: unknown, surface: Surface, options: V
 		});
 		for (const criterion of spec.criteria) {
 			if (!build.checks.some((check) => check.criterion === criterion.id)) {
-				diagnostics.push({
-					severity: 'warning',
-					code: 'build-criterion-unchecked',
-					path: '/checks',
-					message: `Criterion "${criterion.id}" has no check, so nothing verifies it.`,
-				});
+				against(
+					{
+						severity: 'warning',
+						code: 'build-criterion-unchecked',
+						path: '/checks',
+						message: `Criterion "${criterion.id}" has no check, so nothing verifies it.`,
+					},
+					{ line: criterion.line },
+				);
 			}
 		}
 	}
@@ -239,10 +255,17 @@ function validateTriggers(build: Build, surface: Surface, options: ValidateBuild
 	const error = (code: string, path: string, message: string) => diagnostics.push({ severity: 'error', code, path, message });
 	const triggers = build.triggers ?? {};
 	const declared = options.spec?.spec.manifest.triggers ?? {};
+	const inSpec = (pointer: string) => (options.spec ? { spec: specKey(options.spec.spec, pointer) } : {});
 	if (options.spec) {
 		for (const id of Object.keys(declared)) {
 			if (!triggers[id]) {
-				error('build-trigger-missing', '/triggers', `The spec declares trigger "${id}", which the build does not implement.`);
+				diagnostics.push({
+					severity: 'error',
+					code: 'build-trigger-missing',
+					path: '/triggers',
+					message: `The spec declares trigger "${id}", which the build does not implement.`,
+					...inSpec(`/triggers/${pointerKey(id)}`),
+				});
 			}
 		}
 	}
@@ -260,7 +283,7 @@ function validateTriggers(build: Build, surface: Surface, options: ValidateBuild
 		const path = `/triggers/${id}`;
 		const spec = declared[id];
 		if (options.spec && !spec) {
-			error('build-trigger-undeclared', path, `The spec declares no trigger "${id}".`);
+			diagnostics.push({ severity: 'error', code: 'build-trigger-undeclared', path, message: `The spec declares no trigger "${id}".`, ...inSpec('/triggers') });
 		}
 
 		// When.
@@ -289,6 +312,7 @@ function validateTriggers(build: Build, surface: Surface, options: ValidateBuild
 				code: 'build-trigger-when-mismatch',
 				path,
 				message: `Trigger "${id}" must run when the spec says (${canonicalJson(spec.schedule ?? spec.event)}).`,
+				...inSpec(`/triggers/${pointerKey(id)}/${spec.schedule ? 'schedule' : 'event'}`),
 			});
 		}
 
@@ -348,12 +372,18 @@ function validateTriggers(build: Build, surface: Surface, options: ValidateBuild
 						code: 'build-trigger-scope-not-requested',
 						path,
 						message: `Trigger "${id}" needs "${scope}", which the spec does not list for it.`,
+						...inSpec(`/triggers/${pointerKey(id)}/permissions`),
 					});
 				}
 			}
 		}
 	}
 	return diagnostics;
+}
+
+/** A key as one segment of a JSON pointer (RFC 6901). */
+function pointerKey(key: string): string {
+	return key.replace(/~/g, '~0').replace(/\//g, '~1');
 }
 
 /** The schema of a list's items in a capability's output, at a dotted path. */

@@ -7,6 +7,7 @@ import { compileFile } from './compile.ts';
 import { emdashSiteInstall, emdashSitePull, emdashSiteVerify } from './site-emdash.ts';
 import { sitePull, siteVerify, type Site } from './site.ts';
 import { formatCanaryReport } from '@swissspidy/graft-core';
+import { formatBuildDiagnostic } from './format.ts';
 import { formatVerification, verifyFiles } from './verify.ts';
 import { formatResults, loadSurface, validateFiles } from './validate.ts';
 
@@ -112,7 +113,7 @@ export async function main(argv: string[]): Promise<number> {
 		});
 		console.log(`${result.ok ? '✔' : '✖'} ${file}${result.fixed ? '  (refs recomputed)' : ''}`);
 		for (const d of result.diagnostics) {
-			console.log(`  ${d.severity.padEnd(7)} ${d.path ?? ''}  ${d.message}  [${d.code}]`);
+			console.log(`  ${formatBuildDiagnostic(d, values.spec)}`);
 		}
 		return result.ok ? 0 : 1;
 	}

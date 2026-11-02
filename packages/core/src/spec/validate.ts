@@ -76,5 +76,24 @@ export function validateSpec(source: string, options: ValidateSpecOptions = {}):
 	if (parsed.notes !== undefined) {
 		spec.notes = parsed.notes;
 	}
+	spec.lines = manifestLines(frontmatter, parsed.lineOf);
 	return { ok: true, spec, diagnostics };
+}
+
+/** The line of every key and item in the frontmatter, by JSON pointer. */
+function manifestLines(value: unknown, lineOf: (pointer: string) => number | undefined): Record<string, number> {
+	const lines: Record<string, number> = {};
+	const walk = (node: unknown, pointer: string) => {
+		const line = lineOf(pointer);
+		if (line !== undefined && pointer !== '') {
+			lines[pointer] = line;
+		}
+		if (node !== null && typeof node === 'object') {
+			for (const [key, child] of Object.entries(node)) {
+				walk(child, `${pointer}/${key.replace(/~/g, '~0').replace(/\//g, '~1')}`);
+			}
+		}
+	};
+	walk(value, '');
+	return lines;
 }

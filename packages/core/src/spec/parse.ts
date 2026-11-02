@@ -1,4 +1,4 @@
-import { LineCounter, parseDocument, isNode, type Document } from 'yaml';
+import { LineCounter, parseDocument, isMap, isNode, isScalar, type Document } from 'yaml';
 import type { Diagnostic } from '../diagnostics.ts';
 import { CRITERION_ID, deriveCriterionId, splitIdMarker } from './criteria.ts';
 import type { Criterion, Section } from './types.ts';
@@ -39,7 +39,7 @@ export function parseSpec(source: string): ParsedSpec {
 		.slice(front.bodyStart)
 		.map((text, i) => ({ text, number: front.bodyStart + i + 1 }));
 
-	const { title, blocks } = splitSections(body, diagnostics);
+	const { title, titleLine, blocks } = splitSections(body, diagnostics);
 
 	const description = blocks.preamble.map((l) => l.text).join('\n').trim();
 	if (title && !description) {
@@ -47,6 +47,7 @@ export function parseSpec(source: string): ParsedSpec {
 			severity: 'warning',
 			code: 'description-missing',
 			message: 'Add a short description of the intent below the title.',
+			...(titleLine !== undefined ? { line: titleLine } : {}),
 		});
 	}
 
@@ -160,8 +161,17 @@ function lineOfPointer(doc: Document, counter: LineCounter, pointer: string, off
 		.slice(1)
 		.map((part) => part.replace(/~1/g, '/').replace(/~0/g, '~'))
 		.map((part) => (/^\d+$/.test(part) ? Number(part) : part));
-	// Walk up until a node with a source range is found.
+	// Walk up until a node with a source range is found. A key in a mapping is on the line of
+	// the key, not of its value, which for a nested mapping or list starts a line below.
 	for (let depth = path.length; depth >= 0; depth--) {
+		if (depth > 0) {
+			const parent = depth === 1 ? doc.contents : doc.getIn(path.slice(0, depth - 1), true);
+			const key = path[depth - 1];
+			const pair = isMap(parent) ? parent.items.find((item) => isScalar(item.key) && String(item.key.value) === String(key)) : undefined;
+			if (pair && isNode(pair.key) && pair.key.range) {
+				return counter.linePos(pair.key.range[0]).line + offset;
+			}
+		}
 		const node = depth === 0 ? doc.contents : doc.getIn(path.slice(0, depth), true);
 		if (isNode(node) && node.range) {
 			return counter.linePos(node.range[0]).line + offset;
@@ -179,8 +189,9 @@ interface Block {
 function splitSections(
 	body: Line[],
 	diagnostics: Diagnostic[],
-): { title: string; blocks: { preamble: Line[]; sections: Block[] } } {
+): { title: string; titleLine?: number; blocks: { preamble: Line[]; sections: Block[] } } {
 	let title = '';
+	let titleLine: number | undefined;
 	const preamble: Line[] = [];
 	const sections: Block[] = [];
 	let current: Block | undefined;
@@ -201,6 +212,7 @@ function splitSections(
 				});
 			} else {
 				title = heading[2] ?? '';
+				titleLine = line.number;
 				continue;
 			}
 		}
@@ -213,13 +225,15 @@ function splitSections(
 	}
 
 	if (!title) {
-		diagnostics.push({
-			severity: 'error',
-			code: 'title-missing',
-			message: 'A spec needs a "# " title.',
-		});
+		const diagnostic: Diagnostic = { severity: 'error', code: 'title-missing', message: 'A spec needs a "# " title.' };
+		// Where it goes: the first line after the frontmatter.
+		const first = body[0]?.number;
+		if (first !== undefined) {
+			diagnostic.line = first;
+		}
+		diagnostics.push(diagnostic);
 	}
-	return { title, blocks: { preamble, sections } };
+	return { title, ...(titleLine !== undefined ? { titleLine } : {}), blocks: { preamble, sections } };
 }
 
 interface Item {

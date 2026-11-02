@@ -119,7 +119,8 @@ describe('validateSpec against a surface', () => {
 			{ surface: s },
 		);
 		expect(result.diagnostics.map((d) => [d.code, d.line])).toEqual([
-			['mount-invalid-options', 6],
+			// A missing field is reported on the key of the mapping that lacks it.
+			['mount-invalid-options', 5],
 			['mount-invalid-options', 7],
 			['audience-unknown', 8],
 			['permission-unknown-scope', 9],

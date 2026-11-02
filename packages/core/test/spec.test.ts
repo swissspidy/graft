@@ -92,6 +92,24 @@ describe('validateSpec', () => {
 		expect(codes('---\n- a\n---\n')).toContain('frontmatter-not-object');
 	});
 
+	it('keeps the line of every frontmatter key, on the key', () => {
+		const { spec } = validateSpec(valid);
+		const lines = valid.split('\n');
+		for (const key of ['id', 'mount', 'slot', 'menu', 'permissions']) {
+			const pointer = key === 'slot' || key === 'menu' ? `/mount/${key}` : `/${key}`;
+			expect(lines[spec!.lines![pointer]! - 1], pointer).toMatch(new RegExp(`^\\s*${key}:`));
+		}
+		// An item of a list written on one line is on that line.
+		expect(spec!.lines!['/permissions/1']).toBe(spec!.lines!['/permissions']);
+	});
+
+	it('puts a missing title and description on a line', () => {
+		const title = validateSpec(valid.replace(/^# Review queue.*$/m, '')).diagnostics.find((d) => d.code === 'title-missing');
+		expect(title?.line).toBeDefined();
+		const description = validateSpec(valid.replace(/(^# Review queue.*\n)[\s\S]*?(?=^## )/m, '$1\n')).diagnostics.find((d) => d.code === 'description-missing');
+		expect(valid.split('\n')[description!.line! - 1]).toMatch(/^# Review queue/);
+	});
+
 	it('requires a title and acceptance criteria', () => {
 		expect(codes(valid.replace('# Review queue', ''))).toContain('title-missing');
 		expect(codes(valid.replace('## Acceptance criteria', '## Criteria'))).toContain('criteria-missing');

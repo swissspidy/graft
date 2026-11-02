@@ -357,6 +357,14 @@ describe('triggers in builds', () => {
 		expect(await mutate((b) => (b.triggers!['close-stale']!.targets!.input = { status: { $target: 'status' } }))).toEqual(['build-trigger-expression']);
 		expect(await mutate((b) => (b.triggers!['close-reopened']!.call = 'items.list'))).toEqual(['build-trigger-scope-not-requested']);
 		expect(await mutate((b) => (b.data.open!.input = { status: { $target: 'status' } }))).toEqual(['build-target-outside-trigger']);
+
+		// Diagnostics about what the spec declares point at it.
+		const missing = await triggerBuild();
+		delete missing.triggers!['close-reopened'];
+		missing.refs = extractRefs(missing, surface);
+		const [diagnostic] = (await validateBuild(missing, surface, { spec: { spec, hash: specHash } })).diagnostics;
+		expect(diagnostic?.spec?.path).toBe('/triggers/close-reopened');
+		expect(specSource.split('\n')[diagnostic!.spec!.line! - 1]).toMatch(/^\s+close-reopened:/);
 		const unattended = { ...surface, triggers: { ...surface.triggers!, capabilities: ['items.list'] } };
 		const build = await triggerBuild();
 		expect(await codes(build, { ...unattended, hash: await hashSurface(unattended) })).toEqual(expect.arrayContaining(['build-trigger-capability']));
