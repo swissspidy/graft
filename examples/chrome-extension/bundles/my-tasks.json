@@ -426,6 +426,7 @@
 			},
 			"verification": {
 				"passed": true,
+				"build": "sha256:ebf22d2ace36bebd443b8591e96681ea9d03270fd210b137fac30e1403ee5aa1",
 				"spec": {
 					"id": "my-tasks",
 					"hash": "sha256:a99a811f6868d9da3c37cbba3ccfee336d04b2bbfcd08ca28bff550aabff03b5"
@@ -480,7 +481,7 @@
 					}
 				],
 				"unchecked": [],
-				"verifiedAt": "2026-10-21T03:45:08.185Z"
+				"verifiedAt": "2026-11-02T20:37:41.799Z"
 			}
 		}
 	]

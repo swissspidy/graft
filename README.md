@@ -106,6 +106,10 @@ before it: without a sandbox, it confirms every build and bundle in a
 directory still carries the hash of the spec next to it and of a current
 surface, and that its refs and checks still match its content, so a spec
 edited without recompiling, or a build edited by hand, fails CI in seconds.
+A verification record names the build it verified by content hash, so a
+bundled build changed after it was verified, even in a way that keeps it
+valid, is not verified any more: not for `graft check`, and not for the
+EmDash and browser hosts that install it.
 
 **Compile.** Claude writes the checks from the criteria first, without
 seeing any implementation, and those checks are frozen. It then builds the

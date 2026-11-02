@@ -47,7 +47,7 @@ export {
 	type SnapshotInput,
 	type SnapshotTable,
 } from './verifier/snapshot.ts';
-export { matchesRecord, verifyBuild, type CheckResult, type Verification, type VerifyOptions } from './verifier/run.ts';
+export { matchesRecord, verificationProblem, verifyBuild, type CheckResult, type Verification, type VerifyOptions } from './verifier/run.ts';
 export { buildHash, compileSpec, COMPILER_VERSION } from './compiler/compile.ts';
 export { modelAnswers } from './compiler/answers.ts';
 export { assembleChecks, assembleUnverifiable } from './compiler/assemble.ts';

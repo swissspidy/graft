@@ -6,7 +6,8 @@ import { uiFormatNamed, uiFormatOf, type UiFormat } from '../build/format.ts';
 import { extractRefs } from '../build/refs.ts';
 import type { Build, Check } from '../build/types.ts';
 import { validateBuild } from '../build/validate.ts';
-import { canonicalJson, sha256 } from '../surface/hash.ts';
+import { buildHash } from '../build/hash.ts';
+import { sha256 } from '../surface/hash.ts';
 import { assembleChecks, assembleUnverifiable } from './assemble.ts';
 import { checksPrompt, checksSystem, describeTriggers, TRIGGER_VOCABULARY } from './prompt.ts';
 import { checksOutputSchema } from './schemas.ts';
@@ -225,7 +226,4 @@ function checkProblems(checks: Check[], criteria: string[]): string[] {
 	return problems;
 }
 
-/** Content hash of a build, for provenance. */
-export async function buildHash(build: Build): Promise<string> {
-	return `sha256:${await sha256(canonicalJson(build))}`;
-}
+export { buildHash };
