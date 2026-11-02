@@ -1,6 +1,7 @@
 import { parseArgs } from 'node:util';
 import { anthropicModel, DEFAULT_MODEL } from './anthropic.ts';
 import { checkBuildFile } from './build.ts';
+import { checkFiles, formatCheck } from './check.ts';
 import { bundleFiles } from './bundle.ts';
 import { canaryCommand } from './canary.ts';
 import { compileFile } from './compile.ts';
@@ -22,6 +23,13 @@ Commands:
     --surface <file>   Surface the build targets (required)
     --spec <file>      Also check it against the spec it implements
     --fix-refs         Recompute refs and hashes and rewrite the file
+  check <path...>      Check, without a sandbox, that every build under the paths is
+                       up to date: its spec (nearest by directory, matched by id)
+                       and a surface still have the hashes it claims, and its refs
+                       and checks still match its content and the spec
+    --surface <file>   A surface to check builds against (repeatable; surfaces
+                       under the paths are found on their own)
+    --json             Print results as JSON
   verify <file...>     Run builds' checks in a sandbox of their host
     --surface <file>   Surface the builds target (required)
     --spec <path>      Spec file, or directory of specs matched by id (required)
@@ -115,6 +123,23 @@ export async function main(argv: string[]): Promise<number> {
 		for (const d of result.diagnostics) {
 			console.log(`  ${formatBuildDiagnostic(d, values.spec)}`);
 		}
+		return result.ok ? 0 : 1;
+	}
+	if (command === 'check') {
+		const { values, positionals } = parseArgs({
+			args: rest,
+			allowPositionals: true,
+			options: {
+				surface: { type: 'string', multiple: true },
+				json: { type: 'boolean', default: false },
+			},
+		});
+		if (positionals.length === 0) {
+			console.error('graft check: pass at least one file or directory.');
+			return 2;
+		}
+		const result = await checkFiles(positionals, { surfaces: values.surface ?? [] });
+		console.log(values.json ? JSON.stringify(result, null, 2) : formatCheck(result, process.cwd()));
 		return result.ok ? 0 : 1;
 	}
 	if (command === 'verify') {

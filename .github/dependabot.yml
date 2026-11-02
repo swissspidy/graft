@@ -17,18 +17,18 @@ updates:
       # graft-a2ui builds the catalog the WordPress renderer (@swissspidy/a2ui-wp)
       # draws with, so both must resolve to the same @a2ui/web_core: a second
       # copy breaks the Catalog and DataContext types. a2ui-wp pins a 0.x minor
-      # (^0.12.0), so web_core moves only after an a2ui-wp release that allows
-      # it (see the web_core ignore below).
+      # of web_core (^0.14.0), so a new web_core minor moves only with an
+      # a2ui-wp release that allows it.
       a2ui:
         patterns: ['@a2ui/*', '@swissspidy/a2ui-wp']
       # Minor and patch updates in one PR; majors stay separate.
       npm-minor-and-patch:
         update-types: [minor, patch]
     ignore:
-      # a2ui-wp allows only ^0.12.0. Raise this bound with the a2ui-wp release
-      # that widens its range, so both move in the a2ui group's PR.
+      # a2ui-wp 0.2 allows only ^0.14.0. Raise this bound with the a2ui-wp
+      # release that widens its range, so both move in the a2ui group's PR.
       - dependency-name: '@a2ui/web_core'
-        versions: ['>=0.13.0']
+        versions: ['>=0.15.0']
       # Component and function schemas are handed to @a2ui/web_core, which is on
       # zod 3; zod 4 schemas don't fit its types. Lift this once web_core moves.
       - dependency-name: zod
