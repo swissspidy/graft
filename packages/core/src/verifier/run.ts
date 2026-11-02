@@ -516,7 +516,7 @@ export async function verificationProblem(verification: Verification | undefined
 	const checks = Array.isArray(build.checks) ? build.checks : [];
 	const covered =
 		results.length === checks.length &&
-		results.every((r, i) => r?.passed === true && r.check === i && r.criterion === checks[i]?.criterion) &&
+		results.every((r, i) => r?.passed === true && Array.isArray(r.failures) && r.failures.length === 0 && r.check === i && r.criterion === checks[i]?.criterion) &&
 		Array.isArray(verification.unchecked) &&
 		verification.unchecked.length === 0;
 	if (verification.passed !== true || !covered) {

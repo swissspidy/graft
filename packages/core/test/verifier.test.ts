@@ -164,6 +164,8 @@ describe('verificationProblem', () => {
 		expect(await verificationProblem({ ...verification, passed: false }, build)).toMatch(/did not pass/);
 		expect(await verificationProblem({ ...verification, results: verification.results.slice(1) }, build)).toMatch(/did not pass/);
 		expect(await verificationProblem({ ...verification, unchecked: ['close'] }, build)).toMatch(/did not pass/);
+		// A result that says it passed but lists failures contradicts itself.
+		expect(await verificationProblem({ ...verification, results: verification.results.map((r, i) => (i === 0 ? { ...r, failures: ['Expected a row.'] } : r)) }, build)).toMatch(/did not pass/);
 		expect(await verificationProblem(undefined, build)).toMatch(/no verification/);
 	});
 
