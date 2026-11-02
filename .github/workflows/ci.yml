@@ -34,6 +34,8 @@ jobs:
       - name: Tests again on the schema engine used in sandboxes (no code generation)
         run: pnpm test:cfworker
       - run: pnpm validate:examples
+      - name: The example and canary builds and bundles are up to date with their specs and surfaces
+        run: pnpm check:builds
       - name: The npm packages install and import outside the workspace
         run: pnpm test:packages
 
