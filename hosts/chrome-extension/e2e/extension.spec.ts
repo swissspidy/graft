@@ -86,7 +86,8 @@ test('a guest gets no "Done" button, and a forged click is refused before it rea
 
 test('a customization whose build calls a capability outside its grant is not served', async ({ signIn, approve, app, worker, context, extensionId }) => {
 	await approve('My open tasks');
-	// The build changed underneath its approval: it now also loads everyone's email addresses.
+	// The build changed underneath its approval: it now also loads everyone's email addresses. Its
+	// verification names the build that was verified, so the changed one is not verified any more.
 	await worker.evaluate(async () => {
 		const graft = (globalThis as unknown as { graft: { stored(): Promise<Record<string, { build: { data: Record<string, unknown> } }>>; store(value: unknown): Promise<void> } }).graft;
 		const customizations = await graft.stored();
@@ -100,7 +101,7 @@ test('a customization whose build calls a capability outside its grant is not se
 
 	const options = await context.newPage();
 	await options.goto(`chrome-extension://${extensionId}/options.html`);
-	await expect(options.getByText('Approved, but not shown: It needs permissions that were not approved: members:read.')).toBeVisible();
+	await expect(options.getByText('Approved, but not shown: Its build has not passed its checks for this version of the app.')).toBeVisible();
 });
 
 test('when the app changes, the anchor is found again by its landmark and the drift is recorded', async ({ signIn, approve, app, worker }) => {
