@@ -244,7 +244,11 @@ export async function checkFiles(paths: string[], options: CheckCommandOptions =
 			if (canonicalJson(bundle.spec.manifest) !== canonicalJson(parsed.spec.manifest)) {
 				error('check-bundle-manifest', '/spec/manifest', "The bundle's manifest is not the one its spec source declares.");
 			}
-			const { spec: onDisk } = nearestSpec(file, parsed.spec.manifest.id, parsed.spec.manifest.host);
+			const found = nearestSpec(file, parsed.spec.manifest.id, parsed.spec.manifest.host);
+			const onDisk = found.spec;
+			if (!onDisk && found.closest.length > 1) {
+				error('check-spec-ambiguous', '/spec/source', `More than one spec with id "${parsed.spec.manifest.id}" is as near: ${found.closest.map((s) => s.file).join(', ')}.`);
+			}
 			if (onDisk) {
 				against = onDisk.file;
 				if (onDisk.hash !== hash) {
@@ -261,8 +265,18 @@ export async function checkFiles(paths: string[], options: CheckCommandOptions =
 				}
 				diagnostics.push(...(await checkBuild(file, `${base}/build`, build as Record<string, unknown>, carried)).diagnostics);
 				const claimed = build as { spec?: unknown; surface?: { hash?: unknown } | null };
-				const verification = entry.verification as { passed?: unknown; spec?: unknown; surface?: { hash?: unknown } } | undefined;
-				if (verification?.passed !== true || canonicalJson(verification.spec) !== canonicalJson(claimed.spec) || verification.surface?.hash !== claimed.surface?.hash) {
+				const verification = entry.verification as
+					| { passed?: unknown; spec?: unknown; surface?: { hash?: unknown }; results?: Array<{ passed?: unknown }>; unchecked?: unknown[] }
+					| undefined;
+				// Passed as the verifier decides it: every check passed and no criterion went unchecked.
+				const passed =
+					verification?.passed === true &&
+					Array.isArray(verification.results) &&
+					verification.results.length > 0 &&
+					verification.results.every((r) => r?.passed === true) &&
+					Array.isArray(verification.unchecked) &&
+					verification.unchecked.length === 0;
+				if (!passed || canonicalJson(verification?.spec) !== canonicalJson(claimed.spec) || verification?.surface?.hash !== claimed.surface?.hash) {
 					error('check-bundle-verification', `${base}/verification`, 'The build has no passing verification for its spec and surface. Bundle it again (graft bundle).');
 				}
 			}

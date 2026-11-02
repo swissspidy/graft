@@ -216,7 +216,7 @@ pnpm graft site verify --site <url> --token <token>
 | --- | --- |
 | `pnpm typecheck`, `pnpm test` | Types and unit tests (core, A2UI, renderer, CLI, adapters) |
 | `pnpm test:wp` | Plugin smoke test in Playground on PHP 7.4 and 8.4: abilities, store, lifecycle, gateway, host changes, security regressions, triggers (the automation user, schedule, events, bounds, policy) |
-| `pnpm check:builds` | Every checked-in build and bundle still matches its spec and surface (no sandbox, seconds) |
+| `pnpm check:builds` | The example and canary builds and bundles still match their specs and surfaces (no sandbox, seconds) |
 | `pnpm verify:examples` | The example builds' checks in a WordPress sandbox |
 | `pnpm verify:agency` | The agency example builds' checks, in a sandbox that reproduces the client site's content model |
 | `pnpm test:compile` | The compile pipeline with a scripted model against WordPress: a wrong A2UI build is rejected in verification, the fix accepted |

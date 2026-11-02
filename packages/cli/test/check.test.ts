@@ -122,6 +122,22 @@ describe('graft check', () => {
 		expect(codes(result, 'builds/upcoming-events.json')).toContain('build-schema');
 	});
 
+	it('reports a bundle whose verification says passed over a failed check', async () => {
+		const dir = copyAgency();
+		editJson(join(dir, 'managed/upcoming-events.json'), (bundle) => {
+			bundle.builds[0].verification.results[0].passed = false;
+		});
+		expect(codes(await checkFiles([dir]), 'managed/upcoming-events.json')).toEqual(['check-bundle-verification']);
+	});
+
+	it('reports a bundle with two specs of its id equally near', async () => {
+		const dir = copyAgency();
+		cpSync(join(dir, 'specs/upcoming-events.md'), join(dir, 'specs/upcoming-events-copy.md'));
+		const result = await checkFiles([dir]);
+		expect(codes(result, 'managed/upcoming-events.json')).toEqual(['check-spec-ambiguous']);
+		expect(codes(result, 'builds/upcoming-events.json')).toEqual(['check-spec-ambiguous']);
+	});
+
 	it('reports a bundle without builds, or with a build missing its surface', async () => {
 		const empty = copyAgency();
 		editJson(join(empty, 'managed/upcoming-events.json'), (bundle) => {
