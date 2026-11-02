@@ -80,18 +80,25 @@ export function validateSpec(source: string, options: ValidateSpecOptions = {}):
 	return { ok: true, spec, diagnostics };
 }
 
-/** The line of every key and item in the frontmatter, by JSON pointer. */
+/**
+ * The line of every key and item in the frontmatter, by JSON pointer. YAML
+ * aliases can make the frontmatter cyclic (`mount: &m { extra: *m }`), so
+ * a value already on the path is not entered again.
+ */
 function manifestLines(value: unknown, lineOf: (pointer: string) => number | undefined): Record<string, number> {
 	const lines: Record<string, number> = {};
+	const path = new Set<object>();
 	const walk = (node: unknown, pointer: string) => {
 		const line = lineOf(pointer);
 		if (line !== undefined && pointer !== '') {
 			lines[pointer] = line;
 		}
-		if (node !== null && typeof node === 'object') {
+		if (node !== null && typeof node === 'object' && !path.has(node)) {
+			path.add(node);
 			for (const [key, child] of Object.entries(node)) {
 				walk(child, `${pointer}/${key.replace(/~/g, '~0').replace(/\//g, '~1')}`);
 			}
+			path.delete(node);
 		}
 	};
 	walk(value, '');

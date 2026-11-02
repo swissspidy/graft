@@ -103,6 +103,12 @@ describe('validateSpec', () => {
 		expect(spec!.lines!['/permissions/1']).toBe(spec!.lines!['/permissions']);
 	});
 
+	it('keeps lines for frontmatter that YAML aliases make cyclic', () => {
+		const cyclic = valid.replace('mount:\n  slot: admin.page\n', 'mount: &m\n  slot: admin.page\n  extra: *m\n');
+		const { spec } = validateSpec(cyclic);
+		expect(spec?.lines?.['/mount/extra']).toBeDefined();
+	});
+
 	it('puts a missing title and description on a line', () => {
 		const title = validateSpec(valid.replace(/^# Review queue.*$/m, '')).diagnostics.find((d) => d.code === 'title-missing');
 		expect(title?.line).toBeDefined();
