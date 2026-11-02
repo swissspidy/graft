@@ -1,4 +1,4 @@
-export { hasErrors, type Diagnostic, type Severity } from './diagnostics.ts';
+export { hasErrors, type Diagnostic, type Severity, type SpecLocation } from './diagnostics.ts';
 export { registerUiFormat, requireUiFormat, uiFormatNamed, uiFormatOf, type UiCompiler, type UiFormat } from './build/format.ts';
 export { ajvEngine, createAjv } from './ajv.ts';
 export { compileSchema, setSchemaEngine, type SchemaEngine, type SchemaError, type Validator } from './schema.ts';
@@ -6,6 +6,7 @@ export { parseSpec, type ParsedSpec } from './spec/parse.ts';
 export { validateSpec, type SpecValidation, type ValidateSpecOptions } from './spec/validate.ts';
 export { checkManifestAgainstSurface } from './spec/surface.ts';
 export { deriveCriterionId } from './spec/criteria.ts';
+export { specCriterion, specKey } from './spec/location.ts';
 export type { Criterion, Section, Spec, SpecManifest, SpecTrigger } from './spec/types.ts';
 export { createBundle, type CustomizationBundle } from './bundle.ts';
 export { validateSurface, type SurfaceValidation } from './surface/validate.ts';

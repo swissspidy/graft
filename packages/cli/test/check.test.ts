@@ -2,7 +2,7 @@ import { cpSync, mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { checkFiles } from '../src/check.ts';
+import { checkFiles, formatCheck } from '../src/check.ts';
 import { main } from '../src/main.ts';
 
 const root = join(import.meta.dirname, '../../..');
@@ -66,6 +66,18 @@ describe('graft check', () => {
 		expect(codes(result, 'builds/upcoming-events.json')).toEqual(['check-spec-stale']);
 		expect(codes(result, 'managed/upcoming-events.json')).toEqual(['check-bundle-stale']);
 		expect(codes(result, 'builds/family-friendly.json')).toEqual([]);
+	});
+
+	it('points a build diagnostic about its spec at the spec line', async () => {
+		const dir = copyAgency();
+		editJson(join(dir, 'builds/family-friendly.json'), (build) => {
+			const [first] = build.checks;
+			build.checks = build.checks.filter((check: { criterion: string }) => check.criterion !== first.criterion);
+		});
+		const result = await checkFiles([dir]);
+		const unchecked = result.files.find((f) => f.file.endsWith('builds/family-friendly.json'))?.diagnostics.find((d) => d.code === 'build-criterion-unchecked');
+		expect(unchecked?.spec?.line).toBeGreaterThan(0);
+		expect(formatCheck(result, dir)).toMatch(/\[build-criterion-unchecked\]  → .*family-friendly\.md:\d+/);
 	});
 
 	it('reports a build edited by hand', async () => {

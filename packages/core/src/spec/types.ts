@@ -47,4 +47,10 @@ export interface Spec {
 	notes?: string;
 	/** Unrecognized sections, preserved and passed to the compiler as context. */
 	sections: Section[];
+	/**
+	 * Line of each frontmatter key and item in the spec file, by JSON
+	 * pointer (`/mount/slot`, `/permissions/0`), so a build's diagnostics
+	 * can point at the line of the spec they are about.
+	 */
+	lines?: Record<string, number>;
 }

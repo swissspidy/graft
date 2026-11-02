@@ -167,6 +167,20 @@ describe('validateBuild', () => {
 		]);
 	});
 
+	it('points diagnostics about the spec at its lines', async () => {
+		const b = await build();
+		b.checks = [{ criterion: 'open-only', expect: [{ rows: 1 }] }];
+		b.mount.slot = 'row.actions';
+		b.refs = extractRefs(b, surface);
+		const narrow = validateSpec(specSource.replace('[items:read, items:write]', '[items:read]')).spec!;
+		const result = await validateBuild(b, surface, { spec: { spec: narrow, hash: await hashSpec(specSource) } });
+		expect(result.diagnostics.filter((d) => d.spec).map((d) => [d.code, d.spec])).toEqual([
+			['build-spec-mismatch', { path: '/mount/slot', line: 5 }],
+			['build-scope-not-requested', { path: '/permissions', line: 6 }],
+			['build-criterion-unchecked', { line: 16 }],
+		]);
+	});
+
 	it('rejects malformed builds', async () => {
 		expect((await validateBuild({ graft: 1 }, surface)).diagnostics[0]?.code).toBe('build-schema');
 	});
