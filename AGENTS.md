@@ -19,8 +19,8 @@ stop only when every check passes.
 | The agency example site | `hosts/wordpress/playground/sites/riverside.php` | `pnpm surface:agency`, then `pnpm bundle:agency` | `pnpm surface:agency --check`, `pnpm verify:agency` |
 | What EmDash offers builds | `hosts/emdash/adapter/src` | `pnpm surface:emdash`, `pnpm manifest:emdash` | the same with `--check` |
 | What the browser extension offers builds | `hosts/chrome-extension` | `pnpm surface:extension`, `pnpm bundle:extension` | `pnpm surface:extension --check`, `pnpm verify:extension` |
-| An example customization | its spec, `examples/**/specs/*.md` | `pnpm graft compile` (needs `ANTHROPIC_API_KEY`) | `pnpm validate:examples`, `pnpm verify:examples` (or `verify:emdash`, `verify:agency`, `verify:extension`) |
-| A build's `refs`, spec hash or surface hash | nothing: they are computed | `pnpm graft build <build> --surface <surface> --spec <spec> --fix-refs` | `pnpm graft build` |
+| An example customization | its spec, `examples/**/specs/*.md` | `pnpm graft compile` (needs `ANTHROPIC_API_KEY`) | `pnpm validate:examples`, `pnpm check:builds`, `pnpm verify:examples` (or `verify:emdash`, `verify:agency`, `verify:extension`) |
+| A build's `refs`, spec hash or surface hash | nothing: they are computed | `pnpm graft build <build> --surface <surface> --spec <spec> --fix-refs` | `pnpm check:builds` |
 | A canary tenant | `fixtures/canary/**` (spec and build together) | as for an example | `pnpm test:canary`, `pnpm test:canary:emdash` |
 | A design decision | a new `docs/adr/NNNN-*.md`, linked from the README's ADR table | nothing | review |
 
@@ -37,7 +37,7 @@ fields of a build. `hosts/wordpress/plugin/build/` is the output of
 3. Regenerate everything that derives from what you changed.
 4. Run the fast checks:
    ```sh
-   pnpm typecheck && pnpm test && pnpm test:cfworker && pnpm validate:examples
+   pnpm typecheck && pnpm test && pnpm test:cfworker && pnpm validate:examples && pnpm check:builds
    ```
 5. Run the slow suites for every host you touched, from the README's
    Tests table (for example `pnpm test:wp` and `pnpm verify:examples` for
