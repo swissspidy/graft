@@ -111,7 +111,8 @@ describe('validateSpec', () => {
 
 	it('puts a missing title and description on a line', () => {
 		const title = validateSpec(valid.replace(/^# Review queue.*$/m, '')).diagnostics.find((d) => d.code === 'title-missing');
-		expect(title?.line).toBeDefined();
+		// The first line after the frontmatter, where the title goes.
+		expect(title?.line).toBe(11);
 		const description = validateSpec(valid.replace(/(^# Review queue.*\n)[\s\S]*?(?=^## )/m, '$1\n')).diagnostics.find((d) => d.code === 'description-missing');
 		expect(valid.split('\n')[description!.line! - 1]).toMatch(/^# Review queue/);
 	});

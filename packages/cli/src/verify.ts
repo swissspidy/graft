@@ -24,6 +24,7 @@ export interface VerifyCommandResult {
 	spec?: { file: string; criteria: Record<string, number> };
 }
 
+/** Valid specs in a file or directory, by id, with their hash and file. */
 async function loadSpecs(path: string, surface: Surface): Promise<Map<string, { spec: Spec; hash: string; file: string }>> {
 	const files = path.endsWith('.md') ? [path] : (await readdir(path)).filter((f) => f.endsWith('.md')).map((f) => join(path, f));
 	const specs = new Map<string, { spec: Spec; hash: string; file: string }>();
@@ -85,10 +86,12 @@ export async function verifyFiles(files: string[], options: VerifyCommandOptions
 	return results;
 }
 
+/** The spec file and the line of each of its criteria, for pointing at them in output. */
 function specLines({ spec, file }: { spec: Spec; file: string }): { file: string; criteria: Record<string, number> } {
 	return { file, criteria: Object.fromEntries(spec.criteria.map((c) => [c.id, c.line])) };
 }
 
+/** Verification results as text: each build, its checks by criterion, and the spec line of each that failed or has no check. */
 export function formatVerification(results: VerifyCommandResult[]): string {
 	const out: string[] = [];
 	for (const { file, verification, errors, spec } of results) {

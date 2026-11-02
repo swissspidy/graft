@@ -303,6 +303,7 @@ export async function checkFiles(paths: string[], options: CheckCommandOptions =
 	return { ok: files.every((f) => f.ok), files, surfaces: surfaces.map((s) => s.file) };
 }
 
+/** Check results as text: each file, its diagnostics with the spec line they are about, and a summary. */
 export function formatCheck(result: CheckCommandResult, cwd: string): string {
 	const name = (file: string) => {
 		const rel = relative(cwd, file);

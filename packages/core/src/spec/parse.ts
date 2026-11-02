@@ -102,6 +102,7 @@ export function parseSpec(source: string): ParsedSpec {
 	return result;
 }
 
+/** Parses the YAML frontmatter between the leading `---` lines, and maps JSON pointers into it to lines. */
 function extractFrontmatter(
 	lines: string[],
 	diagnostics: Diagnostic[],
@@ -155,6 +156,7 @@ function extractFrontmatter(
 	};
 }
 
+/** The 1-based file line of the frontmatter key (or item) at a JSON pointer, or of its nearest ancestor. */
 function lineOfPointer(doc: Document, counter: LineCounter, pointer: string, offset: number): number | undefined {
 	const path = pointer
 		.split('/')
@@ -186,6 +188,7 @@ interface Block {
 	lines: Line[];
 }
 
+/** Splits the Markdown body into its title, the preamble below it and the `##` sections. */
 function splitSections(
 	body: Line[],
 	diagnostics: Diagnostic[],

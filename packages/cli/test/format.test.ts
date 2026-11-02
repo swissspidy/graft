@@ -32,7 +32,7 @@ describe('spec locations in the CLI', () => {
 		expect(output).toContain(`[build-scope-not-requested]  → ${spec}:${line} (/permissions)`);
 	});
 
-	it('graft verify names the spec line of each failing or unchecked criterion', () => {
+	it('formatVerification names the spec line of each failing or unchecked criterion', () => {
 		const verification = {
 			passed: false,
 			spec: { id: 'q', hash: 'sha256:x' },
