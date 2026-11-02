@@ -101,7 +101,11 @@ before the ability's own WordPress permission check runs.
 **Verify.** The verifier renders a build headlessly for a fixture user
 inside a throwaway WordPress, through real ability calls, and asserts over a
 semantic snapshot (rows, columns, text, available actions, resulting post
-state). No tenant data is ever touched.
+state). No tenant data is ever touched. `graft check` is the fast check
+before it: without a sandbox, it confirms every build and bundle in a
+directory still carries the hash of the spec next to it and of a current
+surface, and that its refs and checks still match its content, so a spec
+edited without recompiling, or a build edited by hand, fails CI in seconds.
 
 **Compile.** Claude writes the checks from the criteria first, without
 seeing any implementation, and those checks are frozen. It then builds the
@@ -183,6 +187,7 @@ centre's own **Family friendly** row action for **Events**.
 pnpm graft validate --surface hosts/wordpress/plugin/surfaces/7.1.json examples/specs
 pnpm graft build examples/builds/review-queue.json \
   --surface hosts/wordpress/plugin/surfaces/7.1.json --spec examples/specs/review-queue.md [--fix-refs]
+pnpm graft check examples --surface hosts/wordpress/plugin/surfaces/7.1.json   # fast: every build still matches its spec and surface
 pnpm graft verify --surface hosts/wordpress/plugin/surfaces/7.1.json --spec examples/specs examples/builds/*.json
 pnpm graft verify --surface hosts/emdash/adapter/surfaces/1.3.json --spec examples/emdash/specs examples/emdash/builds/*.json
 pnpm graft bundle --spec examples/agency/specs/upcoming-events.md --surface examples/agency/surface.json \
@@ -211,6 +216,7 @@ pnpm graft site verify --site <url> --token <token>
 | --- | --- |
 | `pnpm typecheck`, `pnpm test` | Types and unit tests (core, A2UI, renderer, CLI, adapters) |
 | `pnpm test:wp` | Plugin smoke test in Playground on PHP 7.4 and 8.4: abilities, store, lifecycle, gateway, host changes, security regressions, triggers (the automation user, schedule, events, bounds, policy) |
+| `pnpm check:builds` | The example and canary builds and bundles still match their specs and surfaces (no sandbox, seconds) |
 | `pnpm verify:examples` | The example builds' checks in a WordPress sandbox |
 | `pnpm verify:agency` | The agency example builds' checks, in a sandbox that reproduces the client site's content model |
 | `pnpm test:compile` | The compile pipeline with a scripted model against WordPress: a wrong A2UI build is rejected in verification, the fix accepted |

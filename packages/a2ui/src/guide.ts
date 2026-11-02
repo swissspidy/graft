@@ -20,7 +20,7 @@ The data model holds:
 
 Functions:
 - logic: and {"values": [...]}, or {"values": [...]}, not {"value": v}, equals {"a", "b"}, notEquals {"a", "b"}, greaterThan {"a", "b"}, lessThan {"a", "b"}, if {"condition": c, "then": v, "else": w};
-- strings: contains {"string", "substring"}, startsWith {"string", "prefix"}, endsWith {"string", "suffix"}, regex {"value", "pattern"} (true when the JavaScript pattern matches), length {"value", "min", "max"} (true when the length is within bounds), count {"value"} (the length of a string or list, a number), required {"value"} (true unless empty);
+- strings: contains {"string", "substring"}, startsWith {"string", "prefix"}, endsWith {"string", "suffix"}, regex {"value", "pattern"} (true when the JavaScript pattern matches; patterns that can backtrack catastrophically are refused, so anchor them at the start and avoid adjacent quantifiers that can match the same text), length {"value", "min", "max"} (true when the length is within bounds), count {"value"} (the length of a string or list, a number), required {"value"} (true unless empty);
 - numbers: add, subtract, multiply, divide {"a", "b"};
 - formatting: formatString {"value": "Text with \${/path} or \${count(value: \${/form/title})}"} interpolates paths and function calls, formatNumber {"value", "decimals"}, formatDate {"value", "format"}, pluralize {"value", "one", "other"};
 - lists ("by" is a relative JSON Pointer into each item, "" for the item itself): filter {"items", "by", "equals"} (items whose value equals), map {"items", "by"} (the values), distinct {"items", "by"} (first item per distinct value), sort {"items", "by", "descending"}, slice {"items", "start", "end"}, join {"values", "separator"} (non-empty values joined, default ", ");
