@@ -167,6 +167,12 @@ describe('verificationProblem', () => {
 		// A result that says it passed but lists failures contradicts itself.
 		expect(await verificationProblem({ ...verification, results: verification.results.map((r, i) => (i === 0 ? { ...r, failures: ['Expected a row.'] } : r)) }, build)).toMatch(/did not pass/);
 		expect(await verificationProblem(undefined, build)).toMatch(/no verification/);
+
+		// A build without checks verifies nothing, even when its record says it passed.
+		const unchecked = { ...structuredClone(build), checks: [] };
+		const empty = { ...verification, build: await buildHash(unchecked), results: [], unchecked: [] };
+		expect(await verificationProblem(empty, unchecked)).toMatch(/did not pass/);
+		expect(await verificationProblem({ ...empty, results: undefined as never }, unchecked)).toMatch(/did not pass/);
 	});
 
 	it('holds a record to the spec and surface its build names', async () => {

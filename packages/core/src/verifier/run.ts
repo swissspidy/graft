@@ -514,7 +514,9 @@ export async function verificationProblem(verification: Verification | undefined
 	}
 	const results = Array.isArray(verification.results) ? verification.results : [];
 	const checks = Array.isArray(build.checks) ? build.checks : [];
+	// A build with no checks verifies nothing, so a record with no results never passes.
 	const covered =
+		results.length > 0 &&
 		results.length === checks.length &&
 		results.every((r, i) => r?.passed === true && Array.isArray(r.failures) && r.failures.length === 0 && r.check === i && r.criterion === checks[i]?.criterion) &&
 		Array.isArray(verification.unchecked) &&
