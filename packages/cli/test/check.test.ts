@@ -109,6 +109,33 @@ describe('graft check', () => {
 		expect(codes(result, 'managed/upcoming-events.json')).toEqual(['check-bundle-verification']);
 	});
 
+	it('reports builds it cannot read instead of skipping them', async () => {
+		const dir = copyAgency();
+		const broken = join(dir, 'builds/family-friendly.json');
+		writeFileSync(broken, readFileSync(broken, 'utf8').replace(/\}\s*$/, ',}'));
+		editJson(join(dir, 'builds/upcoming-events.json'), (build) => {
+			delete build.ui;
+			build.kind = 'page';
+		});
+		const result = await checkFiles([dir]);
+		expect(codes(result, 'builds/family-friendly.json')).toEqual(['check-json']);
+		expect(codes(result, 'builds/upcoming-events.json')).toContain('build-schema');
+	});
+
+	it('reports a bundle without builds, or with a build missing its surface', async () => {
+		const empty = copyAgency();
+		editJson(join(empty, 'managed/upcoming-events.json'), (bundle) => {
+			bundle.builds = [];
+		});
+		expect(codes(await checkFiles([empty]), 'managed/upcoming-events.json')).toEqual(['check-bundle-shape']);
+
+		const nullSurface = copyAgency();
+		editJson(join(nullSurface, 'managed/upcoming-events.json'), (bundle) => {
+			bundle.builds[0].build.surface = null;
+		});
+		expect(codes(await checkFiles([nullSurface]), 'managed/upcoming-events.json')).toContain('check-build-shape');
+	});
+
 	it('exits 2 without paths', async () => {
 		vi.spyOn(console, 'error').mockImplementation(() => {});
 		expect(await main(['check'])).toBe(2);

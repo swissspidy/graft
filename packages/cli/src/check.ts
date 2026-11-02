@@ -57,26 +57,27 @@ async function collectFiles(paths: string[]): Promise<string[]> {
 type JsonKind = { kind: 'build' | 'bundle'; value: Record<string, unknown> } | { kind: 'surface'; value: unknown } | undefined;
 
 /**
- * What a JSON file is: a build (a `graft` document with a spec, a surface
- * and a UI), a customization bundle, a surface (a host with slots and
- * capabilities), or neither (schemas, package files, verification
- * records), which the check leaves alone.
+ * What a JSON file is. Every `graft` document is a customization bundle,
+ * a surface (a host with slots and capabilities) or else a build, which
+ * validation then judges, so a build missing a field is reported rather
+ * than skipped. Other JSON (schemas, package files, verification records)
+ * is left alone.
  */
 function classifyJson(value: unknown): JsonKind {
 	if (value === null || typeof value !== 'object' || Array.isArray(value)) {
 		return undefined;
 	}
 	const record = value as Record<string, unknown>;
-	if ('graft' in record && 'spec' in record && 'surface' in record && 'ui' in record && !('kind' in record)) {
-		return { kind: 'build', value: record };
+	if (!('graft' in record)) {
+		return undefined;
 	}
-	if ('graft' in record && record.kind === 'customization') {
+	if (record.kind === 'customization') {
 		return { kind: 'bundle', value: record };
 	}
 	if (typeof record.host === 'string' && 'slots' in record && 'capabilities' in record) {
 		return { kind: 'surface', value };
 	}
-	return undefined;
+	return { kind: 'build', value: record };
 }
 
 /** Number of leading directory segments two files share. */
@@ -128,8 +129,11 @@ export async function checkFiles(paths: string[], options: CheckCommandOptions =
 			let value: unknown;
 			try {
 				value = JSON.parse(await readFile(file, 'utf8'));
-			} catch {
-				continue; // Not ours to judge.
+			} catch (error) {
+				// A build or bundle that does not parse must not pass for being skipped.
+				const message = error instanceof Error ? error.message : String(error);
+				files.push({ file, kind: 'build', ok: false, diagnostics: [{ severity: 'error', code: 'check-json', path: '/', message: `Not valid JSON: ${message}` }] });
+				continue;
 			}
 			const kind = classifyJson(value);
 			if (kind?.kind === 'build') {
@@ -164,6 +168,10 @@ export async function checkFiles(paths: string[], options: CheckCommandOptions =
 		const host = claimed.surface?.host;
 		const diagnostics: Diagnostic[] = [];
 		const error = (code: string, path: string, message: string) => diagnostics.push({ severity: 'error', code, path: base + path, message });
+		if (typeof id !== 'string' || typeof host !== 'string') {
+			error('check-build-shape', '/', 'A build needs spec.id and surface.host to be checked at all.');
+			return { diagnostics, spec: undefined };
+		}
 
 		const ofHost = surfaces.filter((s) => s.surface.host === host);
 		const surface = ofHost.find((s) => s.hash === claimed.surface?.hash);
@@ -220,8 +228,8 @@ export async function checkFiles(paths: string[], options: CheckCommandOptions =
 		const diagnostics: Diagnostic[] = [];
 		const error = (code: string, path: string, message: string) => diagnostics.push({ severity: 'error', code, path, message });
 		let against: string | undefined;
-		if (typeof bundle.spec?.source !== 'string' || !Array.isArray(bundle.builds)) {
-			error('check-bundle-shape', '/', 'A bundle needs spec.source and a list of builds.');
+		if (typeof bundle.spec?.source !== 'string' || !Array.isArray(bundle.builds) || bundle.builds.length === 0) {
+			error('check-bundle-shape', '/', 'A bundle needs spec.source and at least one build.');
 			files.push({ file, kind: 'bundle', ok: false, diagnostics });
 			continue;
 		}
@@ -252,9 +260,9 @@ export async function checkFiles(paths: string[], options: CheckCommandOptions =
 					continue;
 				}
 				diagnostics.push(...(await checkBuild(file, `${base}/build`, build as Record<string, unknown>, carried)).diagnostics);
-				const claimed = build as { spec: unknown; surface: { hash?: unknown } };
+				const claimed = build as { spec?: unknown; surface?: { hash?: unknown } | null };
 				const verification = entry.verification as { passed?: unknown; spec?: unknown; surface?: { hash?: unknown } } | undefined;
-				if (verification?.passed !== true || canonicalJson(verification.spec) !== canonicalJson(claimed.spec) || verification.surface?.hash !== claimed.surface.hash) {
+				if (verification?.passed !== true || canonicalJson(verification.spec) !== canonicalJson(claimed.spec) || verification.surface?.hash !== claimed.surface?.hash) {
 					error('check-bundle-verification', `${base}/verification`, 'The build has no passing verification for its spec and surface. Bundle it again (graft bundle).');
 				}
 			}
