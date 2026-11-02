@@ -130,6 +130,22 @@ describe('graft check', () => {
 		expect(codes(await checkFiles([dir]), 'managed/upcoming-events.json')).toEqual(['check-bundle-verification']);
 	});
 
+	it('reports a bundle whose verification does not cover every check of its build', async () => {
+		const dir = copyAgency();
+		editJson(join(dir, 'managed/upcoming-events.json'), (bundle) => {
+			bundle.builds[0].verification.results.pop();
+		});
+		expect(codes(await checkFiles([dir]), 'managed/upcoming-events.json')).toEqual(['check-bundle-verification']);
+	});
+
+	it('leaves JSON that is not a graft document alone, even when it does not parse', async () => {
+		const dir = copyAgency();
+		writeFileSync(join(dir, 'tsconfig.json'), '{\n\t// comments are fine here\n\t"compilerOptions": {},\n}\n');
+		const result = await checkFiles([dir]);
+		expect(result.ok).toBe(true);
+		expect(result.files.some((f) => f.file.endsWith('tsconfig.json'))).toBe(false);
+	});
+
 	it('reports a bundle with two specs of its id equally near', async () => {
 		const dir = copyAgency();
 		cpSync(join(dir, 'specs/upcoming-events.md'), join(dir, 'specs/upcoming-events-copy.md'));

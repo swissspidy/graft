@@ -126,13 +126,24 @@ export async function checkFiles(paths: string[], options: CheckCommandOptions =
 				specs.push({ file, spec: result.spec, hash: await hashSpec(source) });
 			}
 		} else if (file.endsWith('.json')) {
+			const fail = (code: string, message: string) => files.push({ file, kind: 'build', ok: false, diagnostics: [{ severity: 'error', code, path: '/', message }] });
+			const reason = (error: unknown) => (error instanceof Error ? error.message : String(error));
+			let text: string;
+			try {
+				text = await readFile(file, 'utf8');
+			} catch (error) {
+				fail('check-read', `Could not read the file: ${reason(error)}`);
+				continue;
+			}
 			let value: unknown;
 			try {
-				value = JSON.parse(await readFile(file, 'utf8'));
+				value = JSON.parse(text);
 			} catch (error) {
-				// A build or bundle that does not parse must not pass for being skipped.
-				const message = error instanceof Error ? error.message : String(error);
-				files.push({ file, kind: 'build', ok: false, diagnostics: [{ severity: 'error', code: 'check-json', path: '/', message: `Not valid JSON: ${message}` }] });
+				// A build or bundle that does not parse must not pass for being skipped; other JSON
+				// (a tsconfig.json with comments) is not ours to judge.
+				if (/"graft"\s*:/.test(text)) {
+					fail('check-json', `Not valid JSON: ${reason(error)}`);
+				}
 				continue;
 			}
 			const kind = classifyJson(value);
@@ -264,16 +275,19 @@ export async function checkFiles(paths: string[], options: CheckCommandOptions =
 					continue;
 				}
 				diagnostics.push(...(await checkBuild(file, `${base}/build`, build as Record<string, unknown>, carried)).diagnostics);
-				const claimed = build as { spec?: unknown; surface?: { hash?: unknown } | null };
+				const claimed = build as { spec?: unknown; surface?: { hash?: unknown } | null; checks?: Array<{ criterion?: unknown }> };
 				const verification = entry.verification as
-					| { passed?: unknown; spec?: unknown; surface?: { hash?: unknown }; results?: Array<{ passed?: unknown }>; unchecked?: unknown[] }
+					| { passed?: unknown; spec?: unknown; surface?: { hash?: unknown }; results?: Array<{ passed?: unknown; check?: unknown; criterion?: unknown }>; unchecked?: unknown[] }
 					| undefined;
-				// Passed as the verifier decides it: every check passed and no criterion went unchecked.
+				// Passed as the verifier decides it: one passing result for each of the build's checks,
+				// in order, and no criterion unchecked.
+				const checks = Array.isArray(claimed.checks) ? claimed.checks : [];
 				const passed =
 					verification?.passed === true &&
 					Array.isArray(verification.results) &&
 					verification.results.length > 0 &&
-					verification.results.every((r) => r?.passed === true) &&
+					verification.results.length === checks.length &&
+					verification.results.every((r, i) => r?.passed === true && r.check === i && r.criterion === checks[i]?.criterion) &&
 					Array.isArray(verification.unchecked) &&
 					verification.unchecked.length === 0;
 				if (!passed || canonicalJson(verification?.spec) !== canonicalJson(claimed.spec) || verification?.surface?.hash !== claimed.surface?.hash) {
