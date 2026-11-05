@@ -13,7 +13,7 @@
     "./standard": "./src/plugin/standard.ts"
   },
   "dependencies": {
-    "@anthropic-ai/sdk": "^0.137.0",
+    "@anthropic-ai/sdk": "^1.3.0",
     "@swissspidy/graft-a2ui": "workspace:*",
     "@swissspidy/graft-core": "workspace:*"
   },
