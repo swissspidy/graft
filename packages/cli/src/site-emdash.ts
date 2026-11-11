@@ -113,6 +113,10 @@ export async function emdashSitePull(site: EmDashSite, dir: string): Promise<str
 		if (!version?.build || version.build.surface.hash !== hash) {
 			continue;
 		}
+		// The id becomes a file name: one a site made up must not reach outside the directory.
+		if (!/^[a-z0-9][a-z0-9-]*$/.test(record.id)) {
+			throw new Error(`The site returned a customization id that is not a valid spec id: ${JSON.stringify(record.id)}.`);
+		}
 		await writeFile(join(dir, `${record.id}.md`), version.source);
 		await writeFile(join(dir, `${record.id}.json`), JSON.stringify(version.build, null, '\t') + '\n');
 		await writeFile(join(dir, `${record.id}.grant.json`), JSON.stringify({ scopes: record.grant }, null, '\t') + '\n');

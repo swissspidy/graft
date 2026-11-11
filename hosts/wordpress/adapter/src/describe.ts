@@ -30,7 +30,24 @@ export const describers: CheckDescribers = {
 		if (kind !== 'post') {
 			return undefined;
 		}
-		const post = expected as { title?: string; status?: string };
-		return `the post "${post.title}" is ${statuses[post.status ?? ''] ?? post.status}`;
+		const post = expected as { title?: string; status?: string; excerpt?: string; meta?: Record<string, unknown>; terms?: Record<string, string[]> };
+		// Any of status, excerpt, meta and terms may be asserted: say only the ones that are.
+		const parts: string[] = [];
+		if (post.status !== undefined) {
+			parts.push(`is ${statuses[post.status] ?? post.status}`);
+		}
+		if (post.excerpt !== undefined) {
+			parts.push(`has the excerpt "${post.excerpt}"`);
+		}
+		for (const [field, value] of Object.entries(post.meta ?? {})) {
+			parts.push(value === null ? `has no "${field}"` : `has "${field}" set to ${JSON.stringify(value)}`);
+		}
+		for (const [taxonomy, slugs] of Object.entries(post.terms ?? {})) {
+			parts.push(slugs.length === 0 ? `has no "${taxonomy}" terms` : `has exactly the "${taxonomy}" terms ${slugs.map((slug) => `"${slug}"`).join(', ')}`);
+		}
+		if (parts.length === 0) {
+			return `the post "${post.title}" exists`;
+		}
+		return `the post "${post.title}" ${parts.length > 1 ? `${parts.slice(0, -1).join(', ')} and ${parts.at(-1)}` : parts[0]}`;
 	},
 };

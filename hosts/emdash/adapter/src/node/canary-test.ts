@@ -42,6 +42,13 @@ try {
 		const { report } = await runEmDashCanary({ corpus, from, scenario, sandbox, regenerate: scriptedRegenerate });
 		console.log(`\n## ${scenario.name}: ${scenario.description}\n`);
 		console.log(formatCanaryReport(report));
+		// A customization the corpus lost would otherwise pass by not being there.
+		for (const spec of Object.keys(scenario.expect)) {
+			if (!report.entries.some((entry) => entry.spec === spec)) {
+				mismatches++;
+				console.log(`✖ ${spec}: expected ${scenario.expect[spec]}, but no tenant in the corpus has it`);
+			}
+		}
 		for (const entry of report.entries) {
 			const expected = scenario.expect[entry.spec];
 			if (entry.outcome !== expected) {

@@ -1,4 +1,4 @@
-import { createA2UIFormat, INPUT_GROUP, walkA2UI, type A2UIBuild, type A2UIFormatHost, type DrawnButton } from '@swissspidy/graft-a2ui';
+import { createA2UIFormat, INPUT_GROUP, localState, walkA2UI, type A2UIBuild, type A2UIFormatHost, type DrawnButton } from '@swissspidy/graft-a2ui';
 import { registerUiFormat, type Build, type EvalContext } from '@swissspidy/graft-core';
 import { button, rowKey, toneMarkers, type Block, type Rendered, type RenderedAction, type Tone } from './blocks.ts';
 
@@ -57,7 +57,9 @@ function toBlock(drawn: DrawnButton, actionId: string, value?: string): { elemen
  * local actions set (pointer to value, in order). `prefix` namespaces
  * action ids, so several customizations can share a page.
  */
-export function renderA2UI(build: Build, ctx: EvalContext, prefix: string, state: Record<string, unknown> = {}): Rendered {
+export function renderA2UI(build: Build, ctx: EvalContext, prefix: string, sent: Record<string, unknown> = {}): Rendered {
+	// The state came back from the admin's browser: only what the build's own actions set is taken from it.
+	const state = localState(build as unknown as A2UIBuild, sent);
 	const rendered: Rendered = { blocks: [], actions: [], state, problems: [] };
 	let out: Block[] = rendered.blocks;
 	let buttons = 0;
@@ -79,7 +81,9 @@ export function renderA2UI(build: Build, ctx: EvalContext, prefix: string, state
 			}
 		},
 		button: (drawn) => {
-			const { element: block, action } = toBlock(drawn, `${prefix}:b${buttons++}`);
+			// One of a list's buttons carries its item, so a click on a list that changed meanwhile finds nothing instead of its neighbour.
+			const n = buttons++;
+			const { element: block, action } = toBlock(drawn, `${prefix}:b${n}`, drawn.row === undefined ? undefined : rowKey(drawn.row, n));
 			rendered.actions.push(action);
 			if (block) {
 				element(block);

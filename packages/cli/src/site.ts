@@ -156,6 +156,10 @@ export async function sitePull(site: Site, dir: string): Promise<string[]> {
 		if (!record || !build) {
 			continue;
 		}
+		// The id becomes a file name: one a site made up must not reach outside the directory.
+		if (!/^[a-z0-9][a-z0-9-]*$/.test(spec.spec_id)) {
+			throw new Error(`The site returned a customization id that is not a valid spec id: ${JSON.stringify(spec.spec_id)}.`);
+		}
 		await writeFile(join(dir, `${spec.spec_id}.md`), record.source);
 		await writeFile(join(dir, `${spec.spec_id}.json`), JSON.stringify(build, null, '\t') + '\n');
 		await writeFile(join(dir, `${spec.spec_id}.grant.json`), JSON.stringify({ scopes: record.grant?.scopes ?? [] }, null, '\t') + '\n');

@@ -24,9 +24,8 @@ function register_sandbox_package_route(): void {
 		array(
 			'methods'             => WP_REST_Server::READABLE,
 			'callback'            => __NAMESPACE__ . '\rest_sandbox_package',
-			'permission_callback' => static function (): bool {
-				return current_user_can( 'manage_options' );
-			},
+			// Whoever may build a customization verifies it in their browser.
+			'permission_callback' => __NAMESPACE__ . '\\can_author_personal',
 		)
 	);
 }

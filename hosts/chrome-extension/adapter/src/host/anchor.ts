@@ -10,6 +10,11 @@ import type { Anchor, Landmark } from './surface.ts';
  * element, which is also the landmark, wins. When none does, the landmark
  * alone is looked for (its role and accessible name): exactly one match
  * is the anchor again, *re-anchored*, with a selector proposed for it.
+ *
+ * An anchor in one of the app's locked areas is broken, whichever way it
+ * was found: what is drawn next to it (`before`, `after`) changes its
+ * parent, so there the parent's area counts; `append` and `prepend`
+ * change the element itself.
  */
 
 export interface Resolved {
@@ -97,7 +102,28 @@ export function proposeSelector(element: Element, root: ParentNode): string | un
 
 const describe = (element: Element) => ({ tag: element.localName, role: roleOf(element), name: nameOf(element) });
 
+/** The locked area an anchor's element would be drawn into, if any. */
+export function lockedArea(anchor: Anchor, element: Element): string | undefined {
+	const changed = anchor.insert === 'before' || anchor.insert === 'after' ? element.parentElement : element;
+	return (anchor.locked ?? []).find((selector) => {
+		try {
+			return changed?.closest(selector) != null;
+		} catch {
+			// A selector that cannot be read locks: an area the app meant to rule out is not opened by a typo.
+			return true;
+		}
+	});
+}
+
 export function resolveAnchor(anchor: Anchor, root: ParentNode): Resolved {
+	const found = locate(anchor, root);
+	const locked = found.element ? lockedArea(anchor, found.element) : undefined;
+	// Not "moved": nothing is proposed for a place the app's description rules out.
+	// Compared with undefined: a selector that locks may be the empty string, which cannot be read and so locks.
+	return locked !== undefined ? { status: 'broken', reason: `it is now inside a locked area of the app (${locked || 'a selector that cannot be read'})` } : found;
+}
+
+function locate(anchor: Anchor, root: ParentNode): Resolved {
 	const reasons: string[] = [];
 	for (const [i, selector] of anchor.selectors.entries()) {
 		const found = all(root, selector);

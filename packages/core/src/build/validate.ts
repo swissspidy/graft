@@ -69,7 +69,7 @@ export async function validateBuild(value: unknown, surface: Surface, options: V
 	}
 
 	// Mount.
-	const slot = surface.slots[build.mount.slot];
+	const slot = Object.hasOwn(surface.slots, build.mount.slot) ? surface.slots[build.mount.slot] : undefined;
 	if (!slot) {
 		error('build-unknown-slot', '/mount/slot', `Unknown slot "${build.mount.slot}".`);
 	}
@@ -92,7 +92,7 @@ export async function validateBuild(value: unknown, surface: Surface, options: V
 			if (isSlotRef(item) && !slotProps.includes(item.$slot.split('.')[0] ?? '')) {
 				error('build-unknown-slot-prop', path, `Slot "${build.mount.slot}" does not provide "${item.$slot}".`);
 			}
-			if (isCan(item) && !surface.scopes[item.$can]) {
+			if (isCan(item) && !Object.hasOwn(surface.scopes, item.$can)) {
 				error('build-unknown-scope', path, `Unknown scope "${item.$can}".`);
 			}
 			if (isTargetRef(item)) {
@@ -120,7 +120,7 @@ export async function validateBuild(value: unknown, surface: Surface, options: V
 
 	// Refs are computed, never trusted.
 	const refs = extractRefs(build, surface);
-	if (JSON.stringify(refs) !== JSON.stringify(build.refs)) {
+	if (canonicalJson(refs) !== canonicalJson(build.refs)) {
 		error('build-refs-mismatch', '/refs', 'The stored refs do not match the build content. Recompute them (graft build --fix-refs).');
 	}
 
@@ -296,7 +296,7 @@ function validateTriggers(build: Build, surface: Surface, options: ValidateBuild
 				error('build-trigger-at', `${path}/schedule/at`, 'A time of day ("at") only goes with a schedule in days.');
 			}
 		}
-		if (trigger.event && !host.events[trigger.event]) {
+		if (trigger.event && !Object.hasOwn(host.events, trigger.event)) {
 			error('build-trigger-unknown-event', `${path}/event`, `Unknown event "${trigger.event}". Available: ${Object.keys(host.events).join(', ') || 'none'}.`);
 		}
 		if (spec && canonicalJson({ schedule: trigger.schedule ?? null, event: trigger.event ?? null }) !== canonicalJson({ schedule: spec.schedule ?? null, event: spec.event ?? null })) {

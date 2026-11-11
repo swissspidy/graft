@@ -3,6 +3,7 @@ export { tasklet, taskletProbes } from '../apps/tasklet.ts';
 export { connectSandbox, startTaskletSandbox, verifyInBrowserHost, type FixtureSandbox, type TaskletSandbox, type VerifyTarget } from './sandbox.ts';
 export {
 	checkDrift,
+	driftedOutput,
 	formatDriftReport,
 	observe,
 	observedSurface,

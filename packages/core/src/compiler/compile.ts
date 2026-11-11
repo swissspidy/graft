@@ -7,7 +7,7 @@ import { extractRefs } from '../build/refs.ts';
 import type { Build, Check } from '../build/types.ts';
 import { validateBuild } from '../build/validate.ts';
 import { buildHash } from '../build/hash.ts';
-import { sha256 } from '../surface/hash.ts';
+import { hashSurface, sha256 } from '../surface/hash.ts';
 import { assembleChecks, assembleUnverifiable } from './assemble.ts';
 import { checksPrompt, checksSystem, describeTriggers, TRIGGER_VOCABULARY } from './prompt.ts';
 import { checksOutputSchema } from './schemas.ts';
@@ -89,7 +89,7 @@ export async function compileSpec(options: CompileOptions): Promise<CompileResul
 	const triggers = Object.keys(spec.manifest.triggers ?? {}).length > 0;
 	const system = triggers ? [ui.system(spec, surface, host.notes), TRIGGER_VOCABULARY, describeTriggers(spec, surface)].join('\n\n') : ui.system(spec, surface, host.notes);
 	const schema = triggers ? withTriggers(ui.schema(spec, surface)) : ui.schema(spec, surface);
-	const surfaceHash = surface.hash ?? '';
+	const surfaceHash = surface.hash ?? (await hashSurface(surface));
 	let feedback: string[] = [];
 	let candidate: Build | undefined;
 	for (let attempt = 1; attempt <= maxAttempts; attempt++) {

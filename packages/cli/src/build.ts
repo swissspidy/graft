@@ -19,6 +19,7 @@ export interface BuildCommandResult {
  * Validates a build file against a surface and optionally its spec. With
  * fixRefs, recomputes the stored refs (and the spec and surface hashes)
  * and rewrites the file, which is how hand-written builds are maintained.
+ * A build that is still invalid afterwards is left as it was.
  */
 export async function checkBuildFile(file: string, options: BuildCommandOptions): Promise<BuildCommandResult> {
 	const surface = await loadSurface(options.surface);
@@ -44,9 +45,12 @@ export async function checkBuildFile(file: string, options: BuildCommandOptions)
 			surface: { host: surface.host, hostVersion: surface.hostVersion, hash: surface.hash ?? build.surface.hash },
 			refs: result.refs,
 		};
-		await writeFile(file, JSON.stringify(build, null, '\t') + '\n');
-		fixed = true;
 		result = await validateBuild(build, surface, spec);
+		// Only a build that is valid once re-stamped is written: stamping a broken one would hide that its spec moved on.
+		if (result.ok) {
+			await writeFile(file, JSON.stringify(build, null, '\t') + '\n');
+			fixed = true;
+		}
 	}
 	return { ok: result.ok, diagnostics: result.diagnostics, fixed };
 }

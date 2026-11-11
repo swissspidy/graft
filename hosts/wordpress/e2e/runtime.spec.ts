@@ -149,13 +149,16 @@ test('the gateway logs what it refused, for administrators only', async ({ page 
 	expect(status).toBe('rest_forbidden');
 });
 
+/** Customizations other tests write in wp-admin (here, and a contributor's own in personal.spec.ts): not part of the seed. */
+const written = ['waiting-copy', 'my-waiting'];
+
 test('the served specs are verified, not flagged', async ({ page }) => {
 	await login(page, 'admin');
 	const specs = (await page.evaluate(() => window.wp.apiFetch({ path: '/graft/v1/specs' }))) as Array<{
 		spec_id: string;
 		versions: Array<{ state: string; unverified: boolean; builds: Record<string, { verification: { passed: boolean } | null }> }>;
 	}>;
-	expect(specs.filter((s) => s.spec_id !== 'waiting-copy').map((s) => [s.spec_id, s.versions[0]!.state]).sort()).toEqual([
+	expect(specs.filter((s) => !written.includes(s.spec_id)).map((s) => [s.spec_id, s.versions[0]!.state]).sort()).toEqual([
 		['headline-check', 'active'],
 		['kanban-board', 'active'],
 		['pending-by-author', 'active'],
@@ -236,6 +239,21 @@ test('admins write a spec in wp-admin, see it validated, and build it', async ({
 	await expect(card.locator('.graft-checks')).toContainText('Shows at most five posts');
 });
 
+test('the customizations screen says who changed what, and offers a customization for one person', async ({ page }) => {
+	await login(page, 'admin');
+	await page.goto('/wp-admin/tools.php?page=graft-customizations');
+	const history = page.locator('[data-graft-history]');
+	await history.getByRole('button', { name: 'Show what changed' }).click();
+	// The seed approved the examples; every approval says what it allowed.
+	await expect(history.locator('[data-graft-change="approve"]').first()).toContainText('approved');
+	await expect(history.locator('[data-graft-change="approve"]').first()).toContainText('allowing:');
+	await expect(page.locator('[data-graft-not-served]')).toHaveCount(0);
+	await expect(page.locator('[data-graft-safe-mode]')).toHaveCount(0);
+
+	await page.getByRole('button', { name: 'New customization' }).click();
+	await expect(page.getByRole('checkbox', { name: 'Only for me' })).not.toBeChecked();
+});
+
 const graft = async (...args: string[]) => {
 	const password = readFileSync(new URL('../../../test-results/e2e-fixtures/app-password.txt', import.meta.url), 'utf8').trim();
 	const { stdout } = await promisify(execFile)(
@@ -267,23 +285,30 @@ test('graft site pull exports the active customizations as a canary corpus', asy
 	const out = new URL('../../../test-results/pulled/e2e-site', import.meta.url).pathname;
 	const output = await graft('site', 'pull', '--out', out);
 	expect(output).toContain('Wrote 10 customization(s)');
-	for (const spec of ['review-queue', 'quick-approve', 'stale-drafts', 'headline-check', 'pending-by-author', 'publish-checklist', 'kanban-board', 'waiting-posts', 'waiting-copy']) {
+	for (const spec of ['review-queue', 'quick-approve', 'stale-drafts', 'headline-check', 'pending-by-author', 'publish-checklist', 'kanban-board', 'waiting-too-long', 'waiting-posts', 'waiting-copy']) {
 		expect(existsSync(`${out}/${spec}.md`) && existsSync(`${out}/${spec}.json`) && existsSync(`${out}/${spec}.grant.json`)).toBe(true);
 	}
 	expect(JSON.parse(readFileSync(`${out}/review-queue.grant.json`, 'utf8'))).toEqual({ scopes: ['posts:read', 'posts.status:write'] });
 });
 
-test('only administrators may use the model proxy', async ({ page }) => {
+test('the model proxy is for people who may write customizations: not subscribers', async ({ page }) => {
+	// Anyone who can edit posts builds customizations for themselves through it, within a daily limit (ADR 0014).
+	const generate = () =>
+		page.evaluate(async () => {
+			const nonce = await (await fetch('/wp-admin/admin-ajax.php?action=rest-nonce', { credentials: 'same-origin' })).text();
+			const response = await fetch('/wp-json/graft/v1/generate', {
+				method: 'POST',
+				credentials: 'same-origin',
+				headers: { 'content-type': 'application/json', 'x-wp-nonce': nonce },
+				body: JSON.stringify({ purpose: 'ui', system: 's', prompt: 'p', schema: { type: 'object' } }),
+			});
+			return response.status;
+		});
+	await login(page, 'subscriber');
+	expect(await generate()).toBe(403);
+	await page.context().clearCookies();
 	await login(page, 'editor');
-	const status = await page.evaluate(async () => {
-		try {
-			await window.wp.apiFetch({ path: '/graft/v1/generate', method: 'POST', data: { purpose: 'ui', system: '', prompt: '', schema: {} } });
-			return 'allowed';
-		} catch (error) {
-			return (error as { code: string }).code;
-		}
-	});
-	expect(status).toBe('rest_forbidden');
+	expect(await generate()).toBe(200);
 });
 
 test('subscribers get no review queue', async ({ page }) => {

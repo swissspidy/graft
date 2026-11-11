@@ -79,6 +79,7 @@ export function describeCheck(check: Check, describers: CheckDescribers = {}): s
 		if ('run' in e) {
 			const run = (e.run ?? {}) as Record<string, unknown>;
 			const counts = [
+				run.matched !== undefined ? `finds ${run.matched} target${run.matched === 1 ? '' : 's'} to act on` : '',
 				run.calls !== undefined ? `acts on ${run.calls} target${run.calls === 1 ? '' : 's'}` : '',
 				run.failed !== undefined ? `has ${run.failed} failed call${run.failed === 1 ? '' : 's'}` : '',
 				run.skipped !== undefined ? `leaves ${run.skipped} for the next run` : '',

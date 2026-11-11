@@ -48,8 +48,6 @@ function canaryOptions(options: HostCanaryOptions) {
 }
 
 export interface HostToolOptions {
-	/** WordPress version for the Playground sandbox. */
-	wp?: string;
 	verbose?: boolean;
 }
 
@@ -63,14 +61,15 @@ export async function loadHostFormats(host: string): Promise<void> {
 	} else if (host === 'emdash') {
 		await import('@graft/emdash/node');
 	} else if (host === 'browser') {
-		await import('@graft/chrome-extension/node');
+		// Only the format: the node entry also loads Playwright and esbuild, which validating needs none of.
+		await import('@graft/chrome-extension/host');
 	}
 }
 
 export async function hostTools(surface: Surface, options: HostToolOptions = {}): Promise<HostTools> {
 	if (surface.host === 'wordpress') {
 		const wordpress = await import('@graft/wordpress-adapter');
-		const wp = options.wp ?? wordpress.playgroundVersion(surface.hostVersion);
+		const wp = wordpress.playgroundVersion(surface.hostVersion);
 		return {
 			guide: wordpress.hostGuide,
 			startSandbox: () => wordpress.startSandbox({ wp, verbose: options.verbose ?? false }),

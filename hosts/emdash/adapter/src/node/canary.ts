@@ -87,8 +87,11 @@ export async function loadCorpus(dir: string): Promise<CorpusEntry[]> {
 			let grant = validateSpec(source).spec?.manifest.permissions ?? [];
 			try {
 				grant = (JSON.parse(await readFile(join(dir, tenant, file.replace(/\.md$/, '.grant.json')), 'utf8')) as { scopes: string[] }).scopes;
-			} catch {
-				// No stored grant: assume the requested permissions were approved.
+			} catch (error) {
+				// No stored grant: assume the requested permissions were approved. A grant file that is there but broken is not that.
+				if ((error as NodeJS.ErrnoException).code !== 'ENOENT') {
+					throw new Error(`${join(dir, tenant, file.replace(/\.md$/, '.grant.json'))}: ${(error as Error).message}`);
+				}
 			}
 			entries.push({ tenant, source, build, grant });
 		}

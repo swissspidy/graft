@@ -53,6 +53,17 @@ describe('validateSpec', () => {
 	});
 
 	it('parses every part of a spec', () => {
+		// A criterion's id marker ends its first line even when the criterion goes on.
+		const wrapped = validateSpec(valid.replace('are listed {#pending-only}', 'are listed {#pending-only}\n  and nothing else'));
+		expect(wrapped.spec?.criteria[0]).toMatchObject({ id: 'pending-only', text: 'Only posts with status "pending" are listed and nothing else', explicitId: true });
+		// Closing #s are not part of a heading, and a long run of spaces does not stall the parser.
+		expect(validateSpec(valid.replace('# Review queue', '# Review queue ##')).spec?.title).toBe('Review queue');
+		const started = Date.now();
+		validateSpec(valid.replace('# Review queue', `# Review${' '.repeat(20000)}queue`));
+		// Nor in a criterion that goes on over lines.
+		validateSpec(valid.replace('are listed {#pending-only}', `are listed${' '.repeat(20000)}x\n  and nothing else\n  at all`));
+		expect(Date.now() - started).toBeLessThan(500);
+
 		const { ok, spec } = validateSpec(valid);
 		expect(ok).toBe(true);
 		expect(spec?.manifest.mount).toEqual({ slot: 'admin.page', menu: { parent: 'posts', title: 'Review queue' } });

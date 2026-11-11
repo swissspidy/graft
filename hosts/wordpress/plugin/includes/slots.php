@@ -123,7 +123,7 @@ function post_slot_props( WP_Post $post ): array {
 	return array(
 		'post' => array(
 			'id'     => $post->ID,
-			'title'  => get_the_title( $post ),
+			'title'  => $post->post_title,
 			'status' => $post->post_status,
 			'type'   => $post->post_type,
 			'meta'   => (object) post_meta_values( $post ),

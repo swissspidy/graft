@@ -55,6 +55,7 @@ async function store(customizations: Record<string, Installed>): Promise<void> {
 async function installPackaged(): Promise<void> {
 	const { surfaces, bundles } = await loadPackaged();
 	const customizations = await stored();
+	const shipped = new Set<string>();
 	for (const bundle of bundles) {
 		for (const surface of surfaces) {
 			const { installed, problems } = await fromBundle(bundle, surface, PACKAGED);
@@ -64,9 +65,16 @@ async function installPackaged(): Promise<void> {
 				}
 				continue;
 			}
+			shipped.add(installed.id);
 			const previous = customizations[installed.id];
 			const keep = previous && previous.specHash === installed.specHash && previous.grant;
 			customizations[installed.id] = keep ? { ...installed, grant: previous.grant, ...(previous.approvedAt ? { approvedAt: previous.approvedAt } : {}) } : installed;
+		}
+	}
+	// What an update of the extension withdrew, or ships in a form that no longer installs, goes with its grant.
+	for (const [id, installed] of Object.entries(customizations)) {
+		if (installed.from === PACKAGED && !shipped.has(id)) {
+			delete customizations[id];
 		}
 	}
 	await store(customizations);

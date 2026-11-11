@@ -1,7 +1,7 @@
 name: Playground demo
 
 # Publishes the WordPress Playground demo to GitHub Pages on every push to
-# main: the plugin zip, the verified example customizations, the seed script
+# main, once it passes its test: the plugin zip, the verified example customizations, the seed script
 # and the blueprint the README's "Try it" badge opens.
 
 on:
@@ -34,6 +34,10 @@ jobs:
       - run: pnpm build
       - name: Build the demo (verifies the examples in Playground)
         run: pnpm demo:build --out _site --base-url "https://${GITHUB_REPOSITORY_OWNER}.github.io/${GITHUB_REPOSITORY#*/}/"
+      - name: Install Chromium
+        run: pnpm exec playwright install --with-deps chromium
+      - name: The demo boots from its blueprint and shows the examples, or nothing is published
+        run: pnpm test:demo
       - uses: actions/upload-pages-artifact@fc324d3547104276b827a68afc52ff2a11cc49c9 # v5.0.0
         with:
           path: _site

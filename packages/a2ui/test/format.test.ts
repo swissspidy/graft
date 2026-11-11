@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { applyMigrations, compileSpec, extractRefs, hashSurface, modelAnswers, registerUiFormat, validateBuild, verifyBuild, type Build, type CompileOptions } from '@swissspidy/graft-core';
 import { createCan, fakeSandbox, fixtures, format, pageBuild, spec, surface } from '../../core/test/fixtures/acme.ts';
-import { answerA2UI, assembleA2UI, createA2UIFormat, type A2UIBuild } from '../src/index.ts';
+import { answerA2UI, assembleA2UI, createA2UIFormat, localState, type A2UIBuild } from '../src/index.ts';
 
 /** The acme page build (an A2UI surface), changed by `change`. */
 async function a2uiBuild(change?: (build: A2UIBuild) => void): Promise<Build> {
@@ -84,6 +84,70 @@ describe('A2UI builds', () => {
 				'a2ui-unused-event /events/close',
 			]),
 		);
+	});
+
+	it('are refused for what validation could not otherwise see or the renderer would not run', async () => {
+		const build = await a2uiBuild((b) => {
+			const action = (b.ui.components[2]!.rowActions as Array<Record<string, unknown>>)[0]!;
+			// A scope or a pattern read from data, and calls hidden in a template.
+			action.visible = { call: 'can', args: { scope: { path: 'title' } } };
+			b.ui.components[1]!.text = { call: 'formatString', args: { value: 'Hi ${can(scope: "items:write")} ${/slot/user/name}' } };
+			b.ui.computed = {
+				slow: { call: 'replace', args: { value: { path: '/items/items/0/title' }, pattern: '(a+)+$', with: 'x' } },
+				broken: { call: 'replace', args: { value: 'a', pattern: '(', with: 'x' } },
+				fromData: { call: 'replace', args: { value: 'a', pattern: { path: '/items/items/0/title' }, with: 'x' } },
+			};
+			// Names every object has are not bound events, capabilities or scopes.
+			b.ui.components.push({ id: 'go', component: 'Button', child: 'go-label', action: { event: { name: 'toString' } } });
+			b.ui.components.push({ id: 'go-label', component: 'Text', text: 'Go' });
+			// Writing over what the host loaded, a child listed twice, two columns with one label.
+			b.ui.components.push({ id: 'over', component: 'Button', child: 'go-label', action: { functionCall: { call: 'set', args: { target: '/open/items', value: [] } } } });
+			b.ui.components.push({ id: 'all', component: 'Button', child: 'go-label', action: { functionCall: { call: 'set', args: { target: '/', value: {} } } } });
+			b.ui.components.push({ id: 'twice', component: 'Button', child: 'go-label', action: { functionCall: { call: 'set', args: { target: '//slot/user', value: {} } } } });
+			b.events.close!.then = ['remove-row:open:extra'];
+			b.ui.components.push({ id: 'field', component: 'TextField', label: 'Name', value: { path: '/slot/user/name' }, validationRegexp: '(a+)+$' });
+			(b.ui.components[0]!.children as string[]).push('go', 'over', 'all', 'twice', 'field', 'field');
+			const fields = b.ui.components[2]!.fields as Array<Record<string, unknown>>;
+			fields.push({ ...fields[0]! });
+		});
+		const codes = (await validateBuild(build, surface)).diagnostics.map((d) => `${d.code} ${d.path}`);
+		expect(codes).toEqual(
+			expect.arrayContaining([
+				'a2ui-function-args /ui/components/2/rowActions/0/visible/args/scope',
+				'a2ui-template-call /ui/components/1/text/args/value',
+				'a2ui-unsafe-pattern /ui/computed/slow/args/pattern',
+				'a2ui-function-args /ui/computed/broken/args/pattern',
+				'a2ui-function-args /ui/computed/fromData/args/pattern',
+				'a2ui-unbound-event /events',
+				'a2ui-model-key /ui/components/5/action/functionCall/args/target',
+				'a2ui-model-key /ui/components/6/action/functionCall/args/target',
+				'a2ui-model-key /ui/components/7/action/functionCall/args/target',
+				'build-unknown-data /events/close/then/0',
+				'a2ui-input-binding /ui/components/8/value',
+				'a2ui-unsafe-pattern /ui/components/8/validationRegexp',
+				'a2ui-duplicate-reference /ui/components/0/children',
+				`a2ui-duplicate-label /ui/components/2/fields/${(components(build)[2]!.fields as unknown[]).length - 1}/label`,
+			]),
+		);
+		expect(format.slotPropsUsed!(build)).toContain('user');
+	});
+
+	it('never let what was entered replace what the host loaded', async () => {
+		const build = await a2uiBuild();
+		// However the pointer is spelled: the data model reads "//open" as "/open", and "/" is everything.
+		const forged = { '/open/items': [{ id: 99, title: 'Forged', status: 'open' }], '/slot': { forged: true }, '//open/items': [{ id: 98, title: 'Forged' }], '/': { open: { items: [{ id: 97, title: 'Forged' }] } } };
+		const snapshot = format.snapshot(build, { data: { open: { items: [] } }, slot: {}, viewer: { id: 1, role: 'm' }, can: () => true } as never, { surface: forged });
+		expect(JSON.stringify(snapshot)).not.toContain('Forged');
+		expect(snapshot.problems?.length).toBe(4);
+	});
+
+	it('take from state kept outside the host only what their own actions set', async () => {
+		const build = (await a2uiBuild((b) => {
+			b.ui.components.push({ id: 'done', component: 'Button', child: 'done-label', action: { functionCall: { call: 'set', args: { target: '/form/status', value: 'done' } } } });
+			b.ui.components.push({ id: 'done-label', component: 'Text', text: 'Show done' });
+			(b.ui.components[0]!.children as string[]).push('done');
+		})) as unknown as A2UIBuild;
+		expect(localState(build, { '/form/status': 'done', '/form/confirmed': true, '/open/items': [] })).toEqual({ '/form/status': 'done' });
 	});
 
 	it('are refused when what a row writes starts as a literal row value', async () => {

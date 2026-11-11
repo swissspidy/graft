@@ -36,8 +36,11 @@ export async function exampleFixtures(options: { verifyAgainst?: Surface; dir?: 
 		let build: Record<string, unknown> | null = null;
 		try {
 			build = JSON.parse(await readFile(`${buildsDir}/${file.replace(/\.md$/, '.json')}`, 'utf8')) as Record<string, unknown>;
-		} catch {
-			// No hand-written build for this spec.
+		} catch (error) {
+			// No build for this spec. One that is there but does not parse is an error, not an absence.
+			if ((error as NodeJS.ErrnoException).code !== 'ENOENT') {
+				throw new Error(`${buildsDir}/${file.replace(/\.md$/, '.json')}: ${(error as Error).message}`);
+			}
 		}
 		fixtures[spec.manifest.id] = {
 			source,

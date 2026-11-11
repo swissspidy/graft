@@ -10,7 +10,6 @@ export interface VerifyCommandOptions {
 	/** A spec file, or a directory of specs matched to builds by id. */
 	spec: string;
 	out?: string;
-	wp?: string;
 	verbose?: boolean;
 }
 
@@ -51,7 +50,13 @@ export async function verifyFiles(files: string[], options: VerifyCommandOptions
 
 	await loadHostFormats(surface.host);
 	for (const file of files) {
-		const build = JSON.parse(await readFile(file, 'utf8')) as Build;
+		let build: Build;
+		try {
+			build = JSON.parse(await readFile(file, 'utf8')) as Build;
+		} catch (error) {
+			results.push({ file, errors: [`Could not read the build: ${(error as Error).message}`] });
+			continue;
+		}
 		const spec = specs.get(build.spec?.id);
 		if (!spec) {
 			results.push({ file, errors: [`No valid spec with id "${build.spec?.id}" in ${options.spec}.`] });
@@ -70,7 +75,7 @@ export async function verifyFiles(files: string[], options: VerifyCommandOptions
 	}
 
 	if (targets.length > 0) {
-		const host = await hostTools(surface, { ...(options.wp ? { wp: options.wp } : {}), verbose: options.verbose ?? false });
+		const host = await hostTools(surface, { verbose: options.verbose ?? false });
 		const verifications = await host.verify(targets.map(({ build, spec }) => ({ build, spec, surface })));
 		targets.forEach(({ file, spec, specFile }, i) => results.push({ file, verification: verifications[i]!, errors: [], spec: specLines({ spec, file: specFile }) }));
 	}

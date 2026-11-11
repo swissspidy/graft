@@ -159,7 +159,10 @@ export function graftRoutes(options: RouteOptions = {}): Partial<Record<RouteNam
 		}),
 		approve: route('approve', async (request, ctx) => {
 			const id = (request.input as { id?: unknown } | undefined)?.id;
-			const record = await guarded(() => storeFor(ctx).approve(String(id)));
+			if (typeof id !== 'string') {
+				throw new GraftRouteError('BAD_REQUEST', 'Pass "id".');
+			}
+			const record = await guarded(() => storeFor(ctx).approve(id));
 			return { id: record.id, grant: record.grant };
 		}),
 	};

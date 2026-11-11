@@ -48,10 +48,16 @@ function register_post_types(): void {
  * @return string
  */
 function normalize_spec_source( string $source ): string {
-	$source = preg_replace( '/^\x{FEFF}/u', '', $source );
-	$source = str_replace( array( "\r\n", "\r" ), "\n", (string) $source );
-	$lines  = array_map( 'rtrim', explode( "\n", $source ) );
-	return rtrim( implode( "\n", $lines ) ) . "\n";
+	$bom    = preg_replace( '/^\x{FEFF}/u', '', $source );
+	$source = str_replace( array( "\r\n", "\r" ), "\n", null === $bom ? $source : $bom );
+	// What JavaScript's trimEnd() strips, so both sides hash a spec alike (rtrim() knows no Unicode spaces).
+	$trim  = static function ( string $text ): string {
+		$trimmed = preg_replace( '/[\s\x{00A0}\x{1680}\x{2000}-\x{200A}\x{2028}\x{2029}\x{202F}\x{205F}\x{3000}\x{FEFF}]+$/u', '', $text );
+		// Not UTF-8: nothing the core could have hashed either; fall back to plain whitespace.
+		return null === $trimmed ? rtrim( $text, " \t\n\r\v\f" ) : $trimmed;
+	};
+	$lines = array_map( $trim, explode( "\n", $source ) );
+	return $trim( implode( "\n", $lines ) ) . "\n";
 }
 
 /**
@@ -417,10 +423,14 @@ function create_version( array $args ) {
 	update_post_meta( $version_id, '_graft_hash', $hash );
 	update_post_meta( $version_id, '_graft_state', lifecycle()['initial'] );
 	set_json_meta( $version_id, '_graft_manifest', $manifest );
+	// The source as written. post_content goes through kses for users without unfiltered_html
+	// ("<" in a criterion becomes "&lt;"), and would no longer be what the hash is of.
+	set_json_meta( $version_id, '_graft_source', $source );
 	set_json_meta( $version_id, '_graft_builds', (object) array() );
 	if ( $grant ) {
 		set_json_meta( $version_id, '_graft_grant', $grant );
 	}
+	record_change( 'created', $spec_id, $number, array( 'hash' => $hash ) );
 	return version_record( get_post( $version_id ) );
 }
 
@@ -433,6 +443,8 @@ function create_version( array $args ) {
 function version_record( WP_Post $post ): array {
 	$spec   = get_post( $post->post_parent );
 	$builds = get_json_meta( $post->ID, '_graft_builds' );
+	// Versions stored before the source had its own meta only have the post content.
+	$source = get_json_meta( $post->ID, '_graft_source' );
 	return array(
 		'spec_id'    => $spec ? $spec->post_name : '',
 		'version'    => (int) get_post_meta( $post->ID, '_graft_version', true ),
@@ -440,11 +452,12 @@ function version_record( WP_Post $post ): array {
 		'hash'       => (string) get_post_meta( $post->ID, '_graft_hash', true ),
 		'state'      => (string) get_post_meta( $post->ID, '_graft_state', true ),
 		'unverified' => (bool) get_post_meta( $post->ID, '_graft_unverified', true ),
-		'source'     => $post->post_content,
+		'source'     => is_string( $source ) ? $source : $post->post_content,
 		'manifest'   => get_json_meta( $post->ID, '_graft_manifest' ),
 		'grant'      => get_json_meta( $post->ID, '_graft_grant' ),
 		'builds'     => is_array( $builds ) ? $builds : array(),
-		'owner'      => (int) $post->post_author,
+		// A personal customization belongs to whoever wrote the spec, whoever stored this version of it.
+		'owner'      => (int) ( $spec ? $spec->post_author : $post->post_author ),
 		'scope'      => $spec ? get_json_meta( $spec->ID, '_graft_scope' ) : null,
 		'created'    => mysql_to_rfc3339( $post->post_date_gmt ),
 	);
@@ -567,7 +580,9 @@ function attach_build( string $spec_id, int $version, $build, ?array $verificati
 		return new WP_Error( 'graft_unknown_surface', __( 'The build targets a surface this plugin does not know.', 'graft' ), array( 'status' => 400 ) );
 	}
 	$slot       = (string) ( $build['mount']['slot'] ?? '' );
-	$reanchored = 'reanchored' === ( $build['provenance']['strategy'] ?? null ) && isset( $snapshot['slots'][ $slot ] );
+	$upgrading  = 'active' === $record['state'] || 'upgrading' === $record['state'];
+	// Only an upgrade moves a customization to another slot: a new build mounts where its spec says.
+	$reanchored = $upgrading && 'reanchored' === ( $build['provenance']['strategy'] ?? null ) && isset( $snapshot['slots'][ $slot ] );
 	// Validate the mount against the slot on this host. A build re-anchored
 	// to a slot of a future surface is validated when that surface is live.
 	if ( isset( surface_slots()[ $slot ] ) ) {
@@ -579,11 +594,17 @@ function attach_build( string $spec_id, int $version, $build, ?array $verificati
 	if ( $slot !== ( $record['manifest']['mount']['slot'] ?? null ) && ! $reanchored ) {
 		return new WP_Error( 'graft_build_mismatch', __( 'The build mounts somewhere else than the spec.', 'graft' ), array( 'status' => 400 ) );
 	}
+	// The policy's places apply to where the build mounts, not only to where the spec asked to.
+	if ( $reanchored && null === managed_by( $spec_id ) ) {
+		$allowed_slot = policy_allows_manifest( array( 'mount' => array( 'slot' => $slot ) ) );
+		if ( is_wp_error( $allowed_slot ) ) {
+			return $allowed_slot;
+		}
+	}
 	// An upgraded build may need scopes the spec never asked for (the host
 	// moved a capability behind a new permission). It is stored, but only
 	// served once an admin widens the grant.
-	$scopes    = build_scopes( $build );
-	$upgrading = 'active' === $record['state'] || 'upgrading' === $record['state'];
+	$scopes = build_scopes( $build );
 	if ( array_diff( $scopes, $record['manifest']['permissions'] ) && ! $upgrading ) {
 		return new WP_Error( 'graft_build_scope', __( 'The build needs permissions the spec does not request.', 'graft' ), array( 'status' => 400 ) );
 	}
@@ -601,6 +622,14 @@ function attach_build( string $spec_id, int $version, $build, ?array $verificati
 		if ( array_diff( trigger_scopes( (array) $trigger ), (array) ( $declared[ $id ]['permissions'] ?? array() ) ) && ! $upgrading ) {
 			return new WP_Error( 'graft_build_scope', __( 'A trigger needs permissions the spec does not list for it.', 'graft' ), array( 'status' => 400 ) );
 		}
+		// It runs when the spec says: the host's limits were checked on the spec's schedule and event, not the build's.
+		// (An upgrade may follow the host renaming the event; its schedule still has to be the spec's.)
+		$when     = static fn( $from ) => array( (string) ( $from['schedule']['every'] ?? '' ), (string) ( $from['schedule']['at'] ?? '' ) );
+		$same     = $when( (array) $trigger ) === $when( (array) $declared[ $id ] );
+		$on_event = (string) ( ( (array) $trigger )['event'] ?? '' ) === (string) ( $declared[ $id ]['event'] ?? '' );
+		if ( ! $same || ( ! $on_event && ! $upgrading ) ) {
+			return new WP_Error( 'graft_build_mismatch', __( 'A trigger of the build does not run when the spec says.', 'graft' ), array( 'status' => 400 ) );
+		}
 	}
 
 	$verified = ! empty( $verification['passed'] );
@@ -611,6 +640,11 @@ function attach_build( string $spec_id, int $version, $build, ?array $verificati
 		return new WP_Error( 'graft_unverified', __( 'Only verified builds can be attached to an active customization.', 'graft' ), array( 'status' => 400 ) );
 	}
 
+	if ( ! $verified && ! $allowed && ! empty( $record['builds'][ $surface_hash ]['verification']['passed'] ) ) {
+		// Nor a verified build with an unverified one, in any state: approval would then put it live.
+		return new WP_Error( 'graft_unverified', __( 'A verified build can only be replaced by a verified one.', 'graft' ), array( 'status' => 400 ) );
+	}
+
 	// Stored as sent: the builds already there are read back as objects too.
 	$builds                    = stored_builds( $post->ID );
 	$builds->{ $surface_hash } = array(
@@ -619,12 +653,24 @@ function attach_build( string $spec_id, int $version, $build, ?array $verificati
 		'attached'     => gmdate( 'c' ),
 	);
 	set_json_meta( $post->ID, '_graft_builds', $builds );
+	record_change(
+		'build_attached',
+		$spec_id,
+		$version,
+		array(
+			'surface'  => $surface_hash,
+			'verified' => $verified,
+			'runner'   => is_array( $verification ) ? (string) ( $verification['runner'] ?? '' ) : '',
+		)
+	);
 
 	if ( ! $verified ) {
 		if ( ! $allowed ) {
 			return version_record( get_post( $post->ID ) );
 		}
 		update_post_meta( $post->ID, '_graft_unverified', 1 );
+	} else {
+		delete_post_meta( $post->ID, '_graft_unverified' );
 	}
 
 	if ( 'upgrading' === $record['state'] ) {
@@ -643,7 +689,12 @@ function attach_build( string $spec_id, int $version, $build, ?array $verificati
 	if ( 'building' !== get_post_meta( $post->ID, '_graft_state', true ) ) {
 		return version_record( get_post( $post->ID ) );
 	}
-	return transition( $post, grant_covers_build( $record['grant'], $build ) ? 'verified_within_grant' : 'verified_needs_grant' );
+	$result = transition( $post, grant_covers_build( $record['grant'], $build ) ? 'verified_within_grant' : 'verified_needs_grant' );
+	// A customization its author alone sees, that only reads, needs no administrator (ADR 0014).
+	if ( ! is_wp_error( $result ) && 'needs_approval' === $result['state'] && $verified && self_approvable( $result, $build ) ) {
+		return approve_version( $spec_id, $version, (int) $result['owner'] );
+	}
+	return $result;
 }
 
 /**
@@ -704,19 +755,27 @@ function apply_event( string $spec_id, int $version, string $event ) {
  * All specs with their versions.
  *
  * @param bool $output For a response: builds exactly as stored (see stored_builds()).
+ * @param int  $owner  Only the personal specs of this user (0 for every spec).
  * @return array<int, array<string, mixed>>
  */
-function list_specs( bool $output = false ): array {
+function list_specs( bool $output = false, int $owner = 0 ): array {
 	$specs = get_posts(
-		array(
-			'post_type'        => SPEC_POST_TYPE,
-			'post_status'      => 'private',
-			'numberposts'      => -1,
-			'orderby'          => 'title',
-			'order'            => 'ASC',
-			'suppress_filters' => true,
+		array_merge(
+			array(
+				'post_type'        => SPEC_POST_TYPE,
+				'post_status'      => 'private',
+				'numberposts'      => -1,
+				'orderby'          => 'title',
+				'order'            => 'ASC',
+				'suppress_filters' => true,
+			),
+			$owner ? array( 'author' => $owner ) : array()
 		)
 	);
+	if ( $owner ) {
+		// Before any version is read: a shared spec its author happens to own is not a personal one.
+		$specs = array_values( array_filter( $specs, static fn( WP_Post $spec ): bool => 'user' === ( get_json_meta( $spec->ID, '_graft_scope' )['type'] ?? '' ) ) );
+	}
 	return array_map(
 		static function ( WP_Post $spec ) use ( $output ): array {
 			return array(
@@ -724,11 +783,14 @@ function list_specs( bool $output = false ): array {
 				'title'          => $spec->post_title,
 				'scope'          => get_json_meta( $spec->ID, '_graft_scope' ),
 				'owner'          => (int) $spec->post_author,
+				'owner_name'     => (string) ( get_userdata( (int) $spec->post_author )->display_name ?? '' ),
 				'active_version' => (int) get_post_meta( $spec->ID, '_graft_active_version', true ) ?: null,
 				'managed_by'     => managed_by( $spec->post_name ),
 				'versions'       => array_map(
 					static function ( WP_Post $version ) use ( $output ): array {
 						$record = version_record( $version );
+						// Why it shows nowhere, when it does not: null when it is served.
+						$record['not_served'] = not_served_reason( $record );
 						if ( $output ) {
 							$record['builds'] = stored_builds( $version->ID );
 						}

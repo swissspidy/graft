@@ -39,16 +39,17 @@ function register_routes(): void {
 			array(
 				'methods'             => WP_REST_Server::READABLE,
 				'callback'            => static function (): WP_REST_Response {
-					return new WP_REST_Response( list_specs( true ) );
+					// People who are not administrators see the customizations they wrote for themselves.
+					return new WP_REST_Response( list_specs( true, current_user_can( 'manage_options' ) ? 0 : get_current_user_id() ) );
 				},
-				'permission_callback' => $manage,
+				'permission_callback' => __NAMESPACE__ . '\\can_author_personal',
 			),
 			array(
 				'methods'             => WP_REST_Server::CREATABLE,
 				'callback'            => __NAMESPACE__ . '\rest_create_version',
 				'permission_callback' => static function ( WP_REST_Request $request ): bool {
 					$scope = $request['scope']['type'] ?? 'org';
-					return 'user' === $scope ? current_user_can( 'edit_posts' ) : current_user_can( 'manage_options' );
+					return 'user' === $scope ? can_author_personal() : current_user_can( 'manage_options' );
 				},
 				'args'                => array(
 					'source'   => array(
@@ -169,9 +170,26 @@ function register_routes(): void {
 					return new WP_Error( 'graft_invalid_build', __( 'Missing build.', 'graft' ), array( 'status' => 400 ) );
 				}
 				$verification = is_array( $request['verification'] ) ? $request['verification'] : null;
+				if ( ! current_user_can( 'manage_options' ) ) {
+					// Someone's own customization: only with checks that passed, and marked as verified by its author.
+					if ( empty( $verification['passed'] ) ) {
+						return new WP_Error( 'graft_unverified', __( 'Your customization can only be saved once its checks pass.', 'graft' ), array( 'status' => 400 ) );
+					}
+					$verification['runner'] = 'author';
+				}
+				// A managed customization can be carried over to a surface it has no build for (an upgrade
+				// on this site). The build its maintainer shipped for a surface is not replaced from here.
+				$hash    = (string) ( is_object( $build ) ? ( $build->surface->hash ?? '' ) : ( $build['surface']['hash'] ?? '' ) );
+				$version = get_version_post( $request['spec_id'], (int) $request['version'] );
+				if ( $version && isset( version_record( $version )['builds'][ $hash ] ) ) {
+					$allowed = policy_allows_changing( $request['spec_id'] );
+					if ( is_wp_error( $allowed ) ) {
+						return $allowed;
+					}
+				}
 				return rest_ensure_response( attach_build( $request['spec_id'], (int) $request['version'], $build, $verification ) );
 			},
-			'permission_callback' => $manage,
+			'permission_callback' => static fn( WP_REST_Request $request ): bool => current_user_can( 'manage_options' ) || ( can_author_personal() && owns_personal( (string) $request['spec_id'] ) ),
 			'args'                => array_merge(
 				$version_args,
 				array(
@@ -207,7 +225,10 @@ function register_routes(): void {
 						: apply_event( $request['spec_id'], (int) $request['version'], $event );
 					return rest_ensure_response( $result );
 				},
-				'permission_callback' => $manage,
+				// People may take down what they wrote for themselves; everything else is an administrator's.
+				'permission_callback' => 'archive' === $event
+					? static fn( WP_REST_Request $request ): bool => current_user_can( 'manage_options' ) || owns_personal( (string) $request['spec_id'] )
+					: $manage,
 				'args'                => $version_args,
 			)
 		);
@@ -221,13 +242,18 @@ function register_routes(): void {
 			'callback'            => __NAMESPACE__ . '\rest_call',
 			'permission_callback' => 'is_user_logged_in',
 			'args'                => array(
+				// Bounded: a refused call is written to the audit log as sent.
 				'spec'       => array(
-					'type'     => 'string',
-					'required' => true,
+					'type'      => 'string',
+					'required'  => true,
+					'maxLength' => 63,
+					'pattern'   => '^[a-z0-9][a-z0-9-]*$',
 				),
 				'capability' => array(
-					'type'     => 'string',
-					'required' => true,
+					'type'      => 'string',
+					'required'  => true,
+					'maxLength' => 100,
+					'pattern'   => '^[A-Za-z0-9_.:/-]+$',
 				),
 				'input'      => array(
 					'type' => array( 'object', 'array', 'string', 'number', 'integer', 'boolean', 'null' ),
@@ -327,8 +353,8 @@ function audit_refusal( string $spec_id, string $capability, WP_Error $error, ar
 		array(
 			'time'       => gmdate( 'c' ),
 			'user'       => get_current_user_id(),
-			'spec'       => $spec_id,
-			'capability' => $capability,
+			'spec'       => substr( $spec_id, 0, 63 ),
+			'capability' => substr( $capability, 0, 100 ),
 			'code'       => $error->get_error_code(),
 		),
 		$context

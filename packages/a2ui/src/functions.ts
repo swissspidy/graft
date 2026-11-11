@@ -4,6 +4,7 @@
  * web_core.
  * `can` and `set` need the live surface and are bound by whoever draws it.
  */
+import { isSafeRegex } from '@a2ui/web_core/v0_9';
 
 /** Reads a relative JSON Pointer ("author/name") from a value. */
 export function readPointer(value: unknown, pointer: string): unknown {
@@ -22,6 +23,14 @@ const text = (value: unknown): string => (value === null || value === undefined 
 const number = (value: unknown): number => (typeof value === 'number' ? value : Number(value));
 const same = (a: unknown, b: unknown) => JSON.stringify(a ?? null) === JSON.stringify(b ?? null);
 const DAY = 86_400_000;
+const safePattern = (pattern: unknown): boolean => {
+	try {
+		new RegExp(String(pattern));
+		return isSafeRegex(String(pattern));
+	} catch {
+		return false;
+	}
+};
 
 export type PureFunction = (args: Record<string, unknown>) => unknown;
 
@@ -44,7 +53,8 @@ export function pureFunctions(now: Date): Record<string, PureFunction> {
 		endsWith: ({ string, suffix }) => text(string).endsWith(text(suffix)),
 		lower: ({ value }) => text(value).toLowerCase(),
 		upper: ({ value }) => text(value).toUpperCase(),
-		replace: ({ value, pattern, with: replacement }) => text(value).replace(new RegExp(String(pattern), 'g'), text(replacement)),
+		// Validation refuses these patterns; a build that never met it gets its text back unchanged.
+		replace: ({ value, pattern, with: replacement }) => (safePattern(pattern) ? text(value).replace(new RegExp(String(pattern), 'g'), text(replacement)) : text(value)),
 		count: ({ value }) => (typeof value === 'string' || Array.isArray(value) ? value.length : 0),
 		join: ({ values, separator }) => list(values).map(text).filter(Boolean).join(separator === undefined ? ', ' : text(separator)),
 		// Lists; "by" is a JSON Pointer into each item ("" for the item itself).
