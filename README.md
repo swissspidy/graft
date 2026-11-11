@@ -201,7 +201,7 @@ pnpm graft build examples/builds/review-queue.json \
 pnpm graft check examples/specs examples/builds --surface hosts/wordpress/plugin/surfaces/7.1.json   # fast: every build still matches its spec and surface
 pnpm check:builds   # the same for every example and canary build, on all three hosts
 pnpm graft verify --surface hosts/wordpress/plugin/surfaces/7.1.json --spec examples/specs examples/builds/*.json
-pnpm graft verify --surface hosts/emdash/adapter/surfaces/1.3.json --spec examples/emdash/specs examples/emdash/builds/*.json
+pnpm graft verify --surface hosts/emdash/adapter/surfaces/1.4.json --spec examples/emdash/specs examples/emdash/builds/*.json
 pnpm graft bundle --spec examples/agency/specs/upcoming-events.md --surface examples/agency/surface.json \
   --out upcoming-events.bundle.json examples/agency/builds/upcoming-events.json   # a verified customization as one file
 

@@ -103,7 +103,7 @@ the test site, because EmDash's real sign-in needs passkeys.
 `src/host/surface.ts` declares slots, components, capabilities and scopes.
 `hostVersion` comes from EmDash's `package.json`. The hash leaves the
 version out, so a new EmDash only changes it when what builds can use
-changes. The snapshot is `hosts/emdash/adapter/surfaces/1.3.json`.
+changes. The snapshot is `hosts/emdash/adapter/surfaces/1.4.json`.
 
 ## Consequences
 

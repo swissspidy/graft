@@ -38,7 +38,7 @@ describe('graft check', () => {
 			'--surface',
 			join(root, 'hosts/wordpress/plugin/surfaces/7.1.json'),
 			'--surface',
-			join(root, 'hosts/emdash/adapter/surfaces/1.3.json'),
+			join(root, 'hosts/emdash/adapter/surfaces/1.4.json'),
 			'--surface',
 			join(root, 'hosts/chrome-extension/adapter/surfaces/tasklet.json'),
 		]);
