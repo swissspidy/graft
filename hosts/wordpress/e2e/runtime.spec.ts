@@ -288,17 +288,24 @@ test('graft site pull exports the active customizations as a canary corpus', asy
 	expect(JSON.parse(readFileSync(`${out}/review-queue.grant.json`, 'utf8'))).toEqual({ scopes: ['posts:read', 'posts.status:write'] });
 });
 
-test('only administrators may use the model proxy', async ({ page }) => {
+test('the model proxy is for people who may write customizations: not subscribers', async ({ page }) => {
+	// Anyone who can edit posts builds customizations for themselves through it, within a daily limit (ADR 0014).
+	const generate = () =>
+		page.evaluate(async () => {
+			const nonce = await (await fetch('/wp-admin/admin-ajax.php?action=rest-nonce', { credentials: 'same-origin' })).text();
+			const response = await fetch('/wp-json/graft/v1/generate', {
+				method: 'POST',
+				credentials: 'same-origin',
+				headers: { 'content-type': 'application/json', 'x-wp-nonce': nonce },
+				body: JSON.stringify({ purpose: 'ui', system: 's', prompt: 'p', schema: { type: 'object' } }),
+			});
+			return response.status;
+		});
+	await login(page, 'subscriber');
+	expect(await generate()).toBe(403);
+	await page.context().clearCookies();
 	await login(page, 'editor');
-	const status = await page.evaluate(async () => {
-		try {
-			await window.wp.apiFetch({ path: '/graft/v1/generate', method: 'POST', data: { purpose: 'ui', system: '', prompt: '', schema: {} } });
-			return 'allowed';
-		} catch (error) {
-			return (error as { code: string }).code;
-		}
-	});
-	expect(status).toBe('rest_forbidden');
+	expect(await generate()).toBe(200);
 });
 
 test('subscribers get no review queue', async ({ page }) => {
