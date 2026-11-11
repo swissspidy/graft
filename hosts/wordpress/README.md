@@ -143,7 +143,14 @@ a hash and need no rebuild.
   and archived what, and what each approval allowed
   (`GET /graft/v1/changes`; `graft_change_recorded` fires for each).
 - **For one person.** "Only for me" when writing a customization shows it
-  to its author alone.
+  to its author alone. People who can edit posts and are not
+  administrators have the same screen for customizations of their own:
+  one that only reads goes live when its checks pass, anything else waits
+  for an administrator, and model calls go through the site's AI provider
+  up to a daily limit
+  ([ADR 0014](../../docs/adr/0014-customizations-of-ones-own.md);
+  `graft_personal_authoring`, `graft_self_service_scopes`,
+  `graft_personal_generate_limit`).
 - **REST.** `GET /graft/v1/surface` (the site's current surface),
   `GET /graft/v1/host-surface`, `GET /graft/v1/surfaces` and
   `/surfaces/<hash>` (what the host offers now, and the snapshots the

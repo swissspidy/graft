@@ -466,8 +466,14 @@ check(
 	in_array( 'graft/graft.php', $names, true ) && in_array( 'graft/includes/store.php', $names, true ) && ! preg_grep( '#^graft/build/.*\.js$#', $names ),
 	array_slice( $names, 0, 20 )
 );
+// Whoever may build a customization verifies it in their browser (ADR 0014): the package is the plugin's own code.
+wp_set_current_user( user_named( 'subscriber', 'no-package' ) );
+check( 'people who cannot write customizations do not get the sandbox package', 403 === rest( 'GET', '/graft/v1/sandbox-package' )['status'] );
 wp_set_current_user( $contributor3 );
-check( 'only administrators get the sandbox package', 403 === rest( 'GET', '/graft/v1/sandbox-package' )['status'] );
+check( 'people who can, do', 200 === rest( 'GET', '/graft/v1/sandbox-package' )['status'] );
+add_filter( 'graft_personal_authoring', '__return_false' );
+check( 'and only administrators where a site turns writing for oneself off', 403 === rest( 'GET', '/graft/v1/sandbox-package' )['status'] );
+remove_filter( 'graft_personal_authoring', '__return_false' );
 
 // Builds are stored exactly as sent: an empty object stays an object.
 wp_set_current_user( $admin );
@@ -804,6 +810,109 @@ foreach ( array( 1, 2, 3 ) as $day ) {
 }
 $state_t = Graft\trigger_states()['waiting-too-long/flag-stale'];
 check( 'three failed runs in a row pause the trigger', 'failed' === $failed['status'] && ! empty( $state_t['paused'] ) && 3 === $state_t['failures'], array( $failed, $state_t ) );
+
+// Customizations people write for themselves (ADR 0014).
+$self = user_named( 'contributor', 'self-service' );
+wp_set_current_user( $self );
+$waiting                   = $examples['waiting-posts'];
+$mine_source               = str_replace( 'id: waiting-posts', 'id: my-waiting', $waiting['source'] );
+$mine_manifest             = $waiting['manifest'];
+$mine_manifest['id']       = 'my-waiting';
+$mine_build                = $waiting['build'];
+$mine_build['spec']        = array(
+	'id'   => 'my-waiting',
+	'hash' => Graft\hash_spec( $mine_source ),
+);
+$mine_build['surface']['hash'] = Graft\current_surface( true )['hash'];
+$mine = rest(
+	'POST',
+	'/graft/v1/specs',
+	array(
+		'source'   => $mine_source,
+		'manifest' => $mine_manifest,
+		'scope'    => array( 'type' => 'user' ),
+	)
+);
+$unchecked = rest( 'POST', '/graft/v1/specs/my-waiting/versions/1/builds', array( 'build' => $mine_build ) );
+check( 'people cannot save a build of their own that has not passed its checks', 201 === $mine['status'] && 400 === $unchecked['status'] && 'graft_unverified' === $unchecked['code'], array( $mine, $unchecked ) );
+$live = rest(
+	'POST',
+	'/graft/v1/specs/my-waiting/versions/1/builds',
+	array(
+		'build'        => $mine_build,
+		'verification' => array(
+			'passed' => true,
+			'runner' => 'browser',
+		),
+	)
+);
+check(
+	'a customization that only reads, for its author alone, goes live without an administrator',
+	'active' === ( $live['data']['state'] ?? null ) && $self === ( $live['data']['grant']['approved_by'] ?? null ) && isset( Graft\servable_specs()['my-waiting'] ),
+	$live
+);
+$live_record = Graft\version_record( Graft\get_version_post( 'my-waiting', 1 ) );
+check( 'its verification is marked as its author\'s', 'author' === ( $live_record['builds'][ $mine_build['surface']['hash'] ]['verification']['runner'] ?? null ) );
+$own = rest( 'GET', '/graft/v1/specs' );
+check( 'people see the customizations they wrote, and no others', 200 === $own['status'] && array( 'my-waiting' ) === array_column( $own['data'], 'spec_id' ), array_column( (array) $own['data'], 'spec_id' ) );
+check( 'they cannot take down the site\'s', 403 === rest( 'POST', '/graft/v1/specs/review-queue/versions/2/archive' )['status'] );
+
+$writes_manifest       = $queue['manifest'];
+$writes_manifest['id'] = 'my-approvals';
+$writes_source         = str_replace( 'id: review-queue', 'id: my-approvals', $queue['source'] );
+$writes_build          = $queue['build'];
+$writes_build['spec']  = array(
+	'id'   => 'my-approvals',
+	'hash' => Graft\hash_spec( $writes_source ),
+);
+$writes_build['surface']['hash'] = Graft\current_surface()['hash'];
+rest(
+	'POST',
+	'/graft/v1/specs',
+	array(
+		'source'   => $writes_source,
+		'manifest' => $writes_manifest,
+		'scope'    => array( 'type' => 'user' ),
+	)
+);
+$waits = rest(
+	'POST',
+	'/graft/v1/specs/my-approvals/versions/1/builds',
+	array(
+		'build'        => $writes_build,
+		'verification' => array( 'passed' => true ),
+	)
+);
+check( 'one that changes anything waits for an administrator', 'needs_approval' === ( $waits['data']['state'] ?? null ) && ! isset( Graft\servable_specs()['my-approvals'] ), $waits );
+check( 'and its author cannot approve it', 403 === rest( 'POST', '/graft/v1/specs/my-approvals/versions/1/approve' )['status'] );
+
+$scripted = static fn() => array(
+	'output' => array(),
+	'model'  => 'scripted',
+);
+$two      = static fn() => 2;
+add_filter( 'graft_pre_generate', $scripted );
+add_filter( 'graft_personal_generate_limit', $two );
+$ask   = array(
+	'purpose' => 'checks',
+	'system'  => 's',
+	'prompt'  => 'p',
+	'schema'  => array( 'type' => 'object' ),
+);
+$calls = array( rest( 'POST', '/graft/v1/generate', $ask )['status'], rest( 'POST', '/graft/v1/generate', $ask )['status'], rest( 'POST', '/graft/v1/generate', $ask ) );
+check( 'model calls go through the site, up to a daily limit a person', array( 200, 200 ) === array_slice( $calls, 0, 2 ) && 429 === $calls[2]['status'] && 'graft_generate_limit' === $calls[2]['code'], $calls );
+wp_set_current_user( $admin );
+check( 'administrators are not counted', 200 === rest( 'POST', '/graft/v1/generate', $ask )['status'] && 200 === rest( 'POST', '/graft/v1/generate', $ask )['status'] && 200 === rest( 'POST', '/graft/v1/generate', $ask )['status'] );
+remove_filter( 'graft_pre_generate', $scripted );
+remove_filter( 'graft_personal_generate_limit', $two );
+check( 'the administrator sees it waiting, marked as its author\'s', in_array( 'my-approvals', array_column( rest( 'GET', '/graft/v1/specs' )['data'], 'spec_id' ), true ) );
+
+wp_set_current_user( $self );
+$down = rest( 'POST', '/graft/v1/specs/my-waiting/versions/1/archive' );
+check( 'people can take down their own', 'archived' === ( $down['data']['state'] ?? null ), $down );
+add_filter( 'graft_personal_authoring', '__return_false' );
+check( 'a site can turn writing for oneself off', 403 === rest( 'GET', '/graft/v1/specs' )['status'] && 403 === rest( 'POST', '/graft/v1/generate', $ask )['status'] );
+remove_filter( 'graft_personal_authoring', '__return_false' );
 
 // Why a customization is not showing, safe mode, and the change log.
 wp_set_current_user( $admin );

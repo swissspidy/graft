@@ -115,23 +115,13 @@ says, and the list marks it. It is still compiled, verified and approved
 like any other. An administrator can live with a customization before
 giving it to a whole role.
 
-## Not decided
+## Decided since
 
-**People who are not administrators writing their own.** The store lets
-any user who can edit posts create a personal spec (ten at most), and
-nothing lets them build it: compiling costs the site model calls,
-verification runs in their browser, and approval is an administrator's.
-Before a screen for it exists, three questions need answers:
-
-1. Who pays for the compile, and how many may one person start?
-2. May a personal customization that only reads, in a slot only its
-   author sees, go live without an administrator? The policy would need
-   a list of scopes people may grant themselves.
-3. Where does the author see it waiting, and where does the
-   administrator see the queue?
-
-This is the largest gap between what Graft says it is for and what it
-does, and it is a product decision before it is code.
+People who are not administrators writing their own was left open here.
+[ADR 0014](0014-customizations-of-ones-own.md) decides it: the site pays
+for the compile within a daily limit, a read-only customization of one's
+own goes live without an administrator, and both sides see it on the same
+screen under Tools.
 
 ## Consequences
 

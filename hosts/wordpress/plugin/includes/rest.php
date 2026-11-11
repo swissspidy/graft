@@ -39,16 +39,21 @@ function register_routes(): void {
 			array(
 				'methods'             => WP_REST_Server::READABLE,
 				'callback'            => static function (): WP_REST_Response {
-					return new WP_REST_Response( list_specs( true ) );
+					$specs = list_specs( true );
+					// People who are not administrators see the customizations they wrote for themselves.
+					if ( ! current_user_can( 'manage_options' ) ) {
+						$specs = array_values( array_filter( $specs, static fn( array $spec ): bool => owns_personal( $spec['spec_id'] ) ) );
+					}
+					return new WP_REST_Response( $specs );
 				},
-				'permission_callback' => $manage,
+				'permission_callback' => __NAMESPACE__ . '\\can_author_personal',
 			),
 			array(
 				'methods'             => WP_REST_Server::CREATABLE,
 				'callback'            => __NAMESPACE__ . '\rest_create_version',
 				'permission_callback' => static function ( WP_REST_Request $request ): bool {
 					$scope = $request['scope']['type'] ?? 'org';
-					return 'user' === $scope ? current_user_can( 'edit_posts' ) : current_user_can( 'manage_options' );
+					return 'user' === $scope ? can_author_personal() : current_user_can( 'manage_options' );
 				},
 				'args'                => array(
 					'source'   => array(
@@ -169,6 +174,13 @@ function register_routes(): void {
 					return new WP_Error( 'graft_invalid_build', __( 'Missing build.', 'graft' ), array( 'status' => 400 ) );
 				}
 				$verification = is_array( $request['verification'] ) ? $request['verification'] : null;
+				if ( ! current_user_can( 'manage_options' ) ) {
+					// Someone's own customization: only with checks that passed, and marked as verified by its author.
+					if ( empty( $verification['passed'] ) ) {
+						return new WP_Error( 'graft_unverified', __( 'Your customization can only be saved once its checks pass.', 'graft' ), array( 'status' => 400 ) );
+					}
+					$verification['runner'] = 'author';
+				}
 				// A managed customization can be carried over to a surface it has no build for (an upgrade
 				// on this site). The build its maintainer shipped for a surface is not replaced from here.
 				$hash    = (string) ( is_object( $build ) ? ( $build->surface->hash ?? '' ) : ( $build['surface']['hash'] ?? '' ) );
@@ -181,7 +193,7 @@ function register_routes(): void {
 				}
 				return rest_ensure_response( attach_build( $request['spec_id'], (int) $request['version'], $build, $verification ) );
 			},
-			'permission_callback' => $manage,
+			'permission_callback' => static fn( WP_REST_Request $request ): bool => current_user_can( 'manage_options' ) || ( can_author_personal() && owns_personal( (string) $request['spec_id'] ) ),
 			'args'                => array_merge(
 				$version_args,
 				array(
@@ -217,7 +229,10 @@ function register_routes(): void {
 						: apply_event( $request['spec_id'], (int) $request['version'], $event );
 					return rest_ensure_response( $result );
 				},
-				'permission_callback' => $manage,
+				// People may take down what they wrote for themselves; everything else is an administrator's.
+				'permission_callback' => 'archive' === $event
+					? static fn( WP_REST_Request $request ): bool => current_user_can( 'manage_options' ) || owns_personal( (string) $request['spec_id'] )
+					: $manage,
 				'args'                => $version_args,
 			)
 		);

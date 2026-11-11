@@ -689,7 +689,12 @@ function attach_build( string $spec_id, int $version, $build, ?array $verificati
 	if ( 'building' !== get_post_meta( $post->ID, '_graft_state', true ) ) {
 		return version_record( get_post( $post->ID ) );
 	}
-	return transition( $post, grant_covers_build( $record['grant'], $build ) ? 'verified_within_grant' : 'verified_needs_grant' );
+	$result = transition( $post, grant_covers_build( $record['grant'], $build ) ? 'verified_within_grant' : 'verified_needs_grant' );
+	// A customization its author alone sees, that only reads, needs no administrator (ADR 0014).
+	if ( ! is_wp_error( $result ) && 'needs_approval' === $result['state'] && $verified && self_approvable( $result, $build ) ) {
+		return approve_version( $spec_id, $version, (int) $result['owner'] );
+	}
+	return $result;
 }
 
 /**

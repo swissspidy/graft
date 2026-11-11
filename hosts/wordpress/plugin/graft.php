@@ -27,6 +27,7 @@ require_once __DIR__ . '/includes/current-surface.php';
 require_once __DIR__ . '/includes/lifecycle.php';
 require_once __DIR__ . '/includes/store.php';
 require_once __DIR__ . '/includes/policy.php';
+require_once __DIR__ . '/includes/personal.php';
 require_once __DIR__ . '/includes/triggers.php';
 require_once __DIR__ . '/includes/runtime.php';
 require_once __DIR__ . '/includes/changes.php';

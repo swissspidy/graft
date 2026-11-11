@@ -25,10 +25,8 @@ function register_generate_route(): void {
 		array(
 			'methods'             => WP_REST_Server::CREATABLE,
 			'callback'            => __NAMESPACE__ . '\rest_generate',
-			// Model calls cost money and compile customizations for the whole site.
-			'permission_callback' => static function (): bool {
-				return current_user_can( 'manage_options' );
-			},
+			// Model calls cost the site money: administrators, and people writing for themselves within a daily limit.
+			'permission_callback' => __NAMESPACE__ . '\\can_author_personal',
 			'args'                => array(
 				'purpose' => array(
 					'type'     => 'string',
@@ -78,6 +76,10 @@ function rest_generate( WP_REST_Request $request ) {
 	 * @param array|WP_Error|null  $response Null to use the AI client.
 	 * @param array<string, mixed> $args     purpose, system, prompt, schema.
 	 */
+	$spent = spend_generate_call();
+	if ( is_wp_error( $spent ) ) {
+		return $spent;
+	}
 	$pre = apply_filters( 'graft_pre_generate', null, $args );
 	if ( null !== $pre ) {
 		return is_wp_error( $pre ) ? $pre : new WP_REST_Response( $pre );

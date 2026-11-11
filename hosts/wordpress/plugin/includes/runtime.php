@@ -26,10 +26,8 @@ function applies_to_user( array $record, WP_User $user ): bool {
 	$scope = $record['scope'] ?? array( 'type' => 'org' );
 	switch ( $scope['type'] ?? 'org' ) {
 		case 'user':
-			if ( (int) $record['owner'] !== $user->ID ) {
-				return false;
-			}
-			break;
+			// Its owner's alone, whatever audience its spec names: they wrote it for themselves.
+			return (int) $record['owner'] === $user->ID;
 		case 'team':
 			if ( ! in_array( $scope['role'] ?? '', $user->roles, true ) ) {
 				return false;
@@ -308,7 +306,8 @@ function register_admin_screen(): void {
 	$hook = add_management_page(
 		__( 'Customizations', 'graft' ),
 		__( 'Customizations', 'graft' ),
-		'manage_options',
+		// Administrators manage the site's; where the site allows it, people who write posts manage their own.
+		personal_authoring() ? 'edit_posts' : 'manage_options',
 		'graft-customizations',
 		static function (): void {
 			printf( '<div class="wrap"><h1>%s</h1><div id="graft-admin"></div></div>', esc_html__( 'Customizations', 'graft' ) );
@@ -344,6 +343,9 @@ function register_admin_screen(): void {
 						'surface'             => $surface,
 						'policy'              => admin_policy(),
 						'safeMode'            => safe_mode(),
+						// Administrators manage every customization; everyone else, their own.
+						'admin'               => current_user_can( 'manage_options' ),
+						'selfService'         => self_service_scopes(),
 						// Who triggers run as; null when the site runs none (ADR 0010).
 						'triggers'            => null === surface_triggers() ? null : array( 'identity' => __( 'Graft automation', 'graft' ) ),
 						/**

@@ -41,6 +41,10 @@ interface AdminConfig {
 	triggers: { identity: string } | null;
 	/** GRAFT_SAFE_MODE: nothing is served and nothing runs. */
 	safeMode?: boolean;
+	/** Whether the viewer manages every customization; otherwise they see and write their own (ADR 0014). */
+	admin?: boolean;
+	/** Scopes a customization of one's own may have without an administrator. */
+	selfService?: string[];
 }
 
 interface VersionRecord {
@@ -101,7 +105,7 @@ const actions: Record<string, Array<{ event: string; label: string; primary?: bo
 	],
 };
 
-function Version({ version, config, onEvent, busy, managed }: { version: VersionRecord; config: AdminConfig; onEvent(event: string): void; busy: boolean; managed: boolean }) {
+function Version({ version, config, onEvent, busy, managed, own = false }: { version: VersionRecord; config: AdminConfig; onEvent(event: string): void; busy: boolean; managed: boolean; own?: boolean }) {
 	const current = config.surface ? version.builds[config.surface.hash] : undefined;
 	const granted = version.grant?.scopes ?? [];
 	const needed = [...new Set([...version.manifest.permissions, ...(current?.build.refs.scopes ?? [])])];
@@ -196,7 +200,8 @@ function Version({ version, config, onEvent, busy, managed }: { version: Version
 			) : null}
 
 			<div style={{ display: 'flex', gap: 8, marginTop: 12 }}>
-				{(managed ? [] : (actions[version.state] ?? [])).map((action) => (
+				{/* What someone wrote for themselves they may take down; approving is an administrator's. */}
+				{(managed ? [] : (actions[version.state] ?? []).filter((action) => !own || action.event === 'archive')).map((action) => (
 					<Button key={action.event} variant={action.primary ? 'primary' : 'secondary'} isBusy={busy} disabled={busy} onClick={() => onEvent(action.event)}>
 						{action.label}
 					</Button>
@@ -207,6 +212,8 @@ function Version({ version, config, onEvent, busy, managed }: { version: Version
 }
 
 function App({ config }: { config: AdminConfig }) {
+	// Older plugin code sent no flag: this screen was the administrator's alone.
+	const admin = config.admin !== false;
 	const [specs, setSpecs] = useState<SpecRecord[] | null>(null);
 	const [error, setError] = useState<string | null>(null);
 	const [busy, setBusy] = useState<string | null>(null);
@@ -261,9 +268,14 @@ function App({ config }: { config: AdminConfig }) {
 					</span>
 				</Notice>
 			) : null}
-			{config.surface ? null : <RecordSurface />}
-			{config.surface && config.triggers ? <Automation surface={config.surface} scopes={config.scopes} /> : null}
-			{config.surface && config.browserVerification && specs ? (
+			{admin ? null : (
+				<p data-graft-mine="">
+					Customizations you wrote for yourself. Nobody else sees them, and they can only do what you can do on this site.
+				</p>
+			)}
+			{config.surface || !admin ? null : <RecordSurface />}
+			{admin && config.surface && config.triggers ? <Automation surface={config.surface} scopes={config.scopes} /> : null}
+			{admin && config.surface && config.browserVerification && specs ? (
 				<Upgrades
 					candidates={upgradeCandidates(specs, config.surface.hash)}
 					surface={config.surface}
@@ -299,6 +311,8 @@ function App({ config }: { config: AdminConfig }) {
 					<CardBody>
 						<Authoring
 							surface={config.surface}
+							personalOnly={!admin}
+							selfService={config.selfService ?? []}
 							{...(config.browserVerification
 								? {
 										startVerifier: async () => {
@@ -318,7 +332,7 @@ function App({ config }: { config: AdminConfig }) {
 				</Card>
 			) : null}
 			{specs === null ? <Spinner /> : null}
-			{specs?.length === 0 ? <p>No customizations yet.</p> : null}
+			{specs?.length === 0 ? <p>{admin ? 'No customizations yet.' : 'You have not written any yet.'}</p> : null}
 			{specs?.map((spec) => {
 				// What is live, and separately the newest version waiting to
 				// replace it, so a new draft never hides the live one.
@@ -347,6 +361,7 @@ function App({ config }: { config: AdminConfig }) {
 											config={config}
 											busy={busy === spec.spec_id}
 											managed={spec.managed_by !== null}
+											own={!admin}
 											onEvent={(event) => void onEvent(spec, version, event)}
 										/>
 									</div>
@@ -356,7 +371,7 @@ function App({ config }: { config: AdminConfig }) {
 					</div>
 				);
 			})}
-			<History scopes={config.scopes} />
+			{admin ? <History scopes={config.scopes} /> : null}
 		</div>
 	);
 }

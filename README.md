@@ -156,6 +156,11 @@ installed.
 3. The administrator reviews the permissions and every check in plain
    language, next to the criterion it proves, and approves it.
 
+People who can edit posts and are not administrators have the same screen
+for customizations of their own, which only they see. One that only reads
+is live as soon as its checks pass; anything else waits for an
+administrator ([ADR 0014](docs/adr/0014-customizations-of-ones-own.md)).
+
 Where Playground can't start (offline, blocked), the build is saved as an
 unverified draft, and
 `graft site verify --site <url> --user <admin> --password <application password>`
@@ -267,6 +272,7 @@ Later decisions each have their own record:
 | [0011](docs/adr/0011-browser-extension-host.md) | A browser extension as the host for web apps without a plugin API (proposed; a [prototype](hosts/chrome-extension/README.md)) |
 | [0012](docs/adr/0012-drag-and-drop.md) | Dragging a card as another way to press its button (WordPress) |
 | [0013](docs/adr/0013-operating-and-recovering.md) | Safe mode, a change log, why a customization is not showing, locked areas, customizations for one person |
+| [0014](docs/adr/0014-customizations-of-ones-own.md) | People who are not administrators writing customizations for themselves (WordPress) |
 
 [docs/audit-2026-11.md](docs/audit-2026-11.md) lists what a full read of the
 code found, what was fixed and what is still open, and compares Graft with
