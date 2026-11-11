@@ -1,0 +1,37 @@
+[
+	{
+		"attempt": 1,
+		"seconds": 9,
+		"model": "claude-opus-5-5",
+		"problems": [],
+		"results": "✔shown-on-pending#1 ✔hidden-otherwise#2 ✔approve#3 ✔requires-publish#4",
+		"output": {
+			"components": [
+				{
+					"id": "root",
+					"component": "Button",
+					"props_json": "{\"child\":\"approve-label\",\"variant\":\"primary\",\"actionId\":\"approve\",\"visible\":{\"call\":\"and\",\"args\":{\"values\":[{\"call\":\"equals\",\"args\":{\"a\":{\"path\":\"/slot/post/status\"},\"b\":\"pending\"}},{\"path\":\"/slot/post/can/publish\"},{\"call\":\"can\",\"args\":{\"scope\":\"posts.status:write\",\"on\":{\"path\":\"/slot/post\"}}}]}},\"action\":{\"event\":{\"name\":\"approve\",\"context\":{\"id\":{\"path\":\"/slot/post/id\"}}}}}"
+				},
+				{
+					"id": "approve-label",
+					"component": "Text",
+					"props_json": "{\"text\":\"Approve\"}"
+				}
+			],
+			"initial_json": "{}",
+			"computed_json": "{}",
+			"data": [],
+			"events": [
+				{
+					"name": "approve",
+					"call": "posts.update_status",
+					"input_json": "{\"id\":{\"$context\":\"id\"},\"status\":\"publish\"}",
+					"then": [
+						"reload:page"
+					],
+					"notice": "Post approved and published."
+				}
+			]
+		}
+	}
+]

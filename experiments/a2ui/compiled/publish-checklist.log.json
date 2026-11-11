@@ -1,0 +1,105 @@
+[
+	{
+		"attempt": 1,
+		"seconds": 38,
+		"model": "claude-opus-5-5",
+		"problems": [],
+		"results": "✔prefilled#1 ✔checklist#2 ✔checklist#3 ✔facts#4 ✔facts#5 ✔live#6 ✔save#7 ✔save#8 ✔publish#9 ✔publish#10 ✔publish#11 ✔contributors#12 ✔contributors#13",
+		"output": {
+			"components": [
+				{
+					"id": "root",
+					"component": "Column",
+					"props_json": "{\"children\":[\"title\",\"excerpt\",\"facts\",\"divider\",\"check_len\",\"check_caps\",\"check_excerpt\",\"check_facts\",\"save\",\"publish\",\"unsaved\"]}"
+				},
+				{
+					"id": "title",
+					"component": "TextField",
+					"props_json": "{\"label\":\"Headline\",\"value\":{\"path\":\"/form/title\"},\"variant\":\"shortText\"}"
+				},
+				{
+					"id": "excerpt",
+					"component": "TextField",
+					"props_json": "{\"label\":\"Excerpt\",\"value\":{\"path\":\"/form/excerpt\"},\"variant\":\"longText\"}"
+				},
+				{
+					"id": "facts",
+					"component": "CheckBox",
+					"props_json": "{\"label\":\"Facts and names checked\",\"value\":{\"path\":\"/form/facts\"}}"
+				},
+				{
+					"id": "divider",
+					"component": "Divider",
+					"props_json": "{}"
+				},
+				{
+					"id": "check_len",
+					"component": "Text",
+					"props_json": "{\"variant\":\"body\",\"text\":{\"call\":\"if\",\"args\":{\"condition\":{\"call\":\"length\",\"args\":{\"value\":{\"path\":\"/form/title\"},\"min\":20,\"max\":70}},\"then\":\"✓ Headline is 20 to 70 characters\",\"else\":{\"call\":\"formatString\",\"args\":{\"value\":\"✗ Headline is 20 to 70 characters (${count(value: ${/form/title})} now)\"}}}}}"
+				},
+				{
+					"id": "check_caps",
+					"component": "Text",
+					"props_json": "{\"variant\":\"body\",\"text\":{\"call\":\"if\",\"args\":{\"condition\":{\"call\":\"not\",\"args\":{\"value\":{\"call\":\"regex\",\"args\":{\"value\":{\"path\":\"/form/title\"},\"pattern\":\"^[^a-z]*[A-Z][^a-z]*$\"}}}},\"then\":\"✓ Headline is not in capitals\",\"else\":\"✗ Headline is not in capitals\"}}}"
+				},
+				{
+					"id": "check_excerpt",
+					"component": "Text",
+					"props_json": "{\"variant\":\"body\",\"text\":{\"call\":\"if\",\"args\":{\"condition\":{\"call\":\"length\",\"args\":{\"value\":{\"path\":\"/form/excerpt\"},\"min\":50}},\"then\":\"✓ Excerpt of at least 50 characters\",\"else\":{\"call\":\"formatString\",\"args\":{\"value\":\"✗ Excerpt of at least 50 characters (${count(value: ${/form/excerpt})} now)\"}}}}}"
+				},
+				{
+					"id": "check_facts",
+					"component": "Text",
+					"props_json": "{\"variant\":\"body\",\"text\":{\"call\":\"if\",\"args\":{\"condition\":{\"path\":\"/form/facts\"},\"then\":\"✓ Facts and names checked\",\"else\":\"✗ Facts and names checked\"}}}"
+				},
+				{
+					"id": "save_label",
+					"component": "Text",
+					"props_json": "{\"text\":\"Save\"}"
+				},
+				{
+					"id": "save",
+					"component": "Button",
+					"props_json": "{\"child\":\"save_label\",\"variant\":\"default\",\"action\":{\"event\":{\"name\":\"save\",\"context\":{\"id\":{\"path\":\"/slot/post/id\"},\"title\":{\"path\":\"/form/title\"},\"excerpt\":{\"path\":\"/form/excerpt\"}}}},\"checks\":[{\"condition\":{\"call\":\"length\",\"args\":{\"value\":{\"path\":\"/form/title\"},\"min\":1,\"max\":200}},\"message\":\"The headline must be 1 to 200 characters.\"},{\"condition\":{\"call\":\"length\",\"args\":{\"value\":{\"path\":\"/form/excerpt\"},\"max\":1000}},\"message\":\"The excerpt must be at most 1000 characters.\"}]}"
+				},
+				{
+					"id": "publish_label",
+					"component": "Text",
+					"props_json": "{\"text\":\"Publish\"}"
+				},
+				{
+					"id": "publish",
+					"component": "Button",
+					"props_json": "{\"child\":\"publish_label\",\"variant\":\"primary\",\"visible\":{\"call\":\"and\",\"args\":{\"values\":[{\"call\":\"can\",\"args\":{\"scope\":\"posts.status:write\",\"on\":{\"path\":\"/slot/post\"}}},{\"path\":\"/slot/post/can/publish\"},{\"call\":\"notEquals\",\"args\":{\"a\":{\"path\":\"/slot/post/status\"},\"b\":\"publish\"}}]}},\"action\":{\"event\":{\"name\":\"publish\",\"context\":{\"id\":{\"path\":\"/slot/post/id\"}}}},\"checks\":[{\"condition\":{\"call\":\"length\",\"args\":{\"value\":{\"path\":\"/form/title\"},\"min\":20,\"max\":70}},\"message\":\"The headline must be 20 to 70 characters.\"},{\"condition\":{\"call\":\"not\",\"args\":{\"value\":{\"call\":\"regex\",\"args\":{\"value\":{\"path\":\"/form/title\"},\"pattern\":\"^[^a-z]*[A-Z][^a-z]*$\"}}}},\"message\":\"The headline must not be in capitals.\"},{\"condition\":{\"call\":\"length\",\"args\":{\"value\":{\"path\":\"/form/excerpt\"},\"min\":50}},\"message\":\"The excerpt must be at least 50 characters.\"},{\"condition\":{\"path\":\"/form/facts\"},\"message\":\"Check facts and names first.\"},{\"condition\":{\"call\":\"and\",\"args\":{\"values\":[{\"call\":\"equals\",\"args\":{\"a\":{\"path\":\"/form/title\"},\"b\":{\"path\":\"/slot/post/title\"}}},{\"call\":\"equals\",\"args\":{\"a\":{\"path\":\"/form/excerpt\"},\"b\":{\"path\":\"/slot/post/excerpt\"}}}]}},\"message\":\"Save your changes before publishing.\"}]}"
+				},
+				{
+					"id": "unsaved",
+					"component": "Text",
+					"props_json": "{\"variant\":\"caption\",\"text\":\"Save your changes before publishing.\",\"visible\":{\"call\":\"and\",\"args\":{\"values\":[{\"call\":\"can\",\"args\":{\"scope\":\"posts.status:write\",\"on\":{\"path\":\"/slot/post\"}}},{\"path\":\"/slot/post/can/publish\"},{\"call\":\"notEquals\",\"args\":{\"a\":{\"path\":\"/slot/post/status\"},\"b\":\"publish\"}},{\"call\":\"or\",\"args\":{\"values\":[{\"call\":\"notEquals\",\"args\":{\"a\":{\"path\":\"/form/title\"},\"b\":{\"path\":\"/slot/post/title\"}}},{\"call\":\"notEquals\",\"args\":{\"a\":{\"path\":\"/form/excerpt\"},\"b\":{\"path\":\"/slot/post/excerpt\"}}}]}}]}}}"
+				}
+			],
+			"initial_json": "{\"form\":{\"title\":{\"path\":\"/slot/post/title\"},\"excerpt\":{\"path\":\"/slot/post/excerpt\"},\"facts\":false}}",
+			"data": [],
+			"events": [
+				{
+					"name": "save",
+					"call": "posts.update_fields",
+					"input_json": "{\"id\":{\"$context\":\"id\"},\"title\":{\"$context\":\"title\"},\"excerpt\":{\"$context\":\"excerpt\"}}",
+					"then": [
+						"reload:page"
+					],
+					"notice": "Headline and excerpt saved."
+				},
+				{
+					"name": "publish",
+					"call": "posts.update_status",
+					"input_json": "{\"id\":{\"$context\":\"id\"},\"status\":\"publish\"}",
+					"then": [
+						"reload:page"
+					],
+					"notice": "Post published."
+				}
+			]
+		}
+	}
+]

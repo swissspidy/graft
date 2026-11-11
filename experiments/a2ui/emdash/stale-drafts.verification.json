@@ -1,0 +1,46 @@
+{
+	"passed": true,
+	"spec": {
+		"id": "stale-drafts",
+		"hash": "sha256:b42a4999b74eadcb0fb64b412f4f22e51e4cfb533f314c205aff41431d7d9719"
+	},
+	"surface": {
+		"host": "emdash",
+		"hostVersion": "1.0.1",
+		"hash": "sha256:b9329970caab68a82f9e7fe44db516aa9d4dfddfe028473af619f480e85a35a0"
+	},
+	"results": [
+		{
+			"criterion": "drafts-only",
+			"check": 0,
+			"passed": true,
+			"failures": []
+		},
+		{
+			"criterion": "days",
+			"check": 1,
+			"passed": true,
+			"failures": []
+		},
+		{
+			"criterion": "age-tone",
+			"check": 2,
+			"passed": true,
+			"failures": []
+		},
+		{
+			"criterion": "age-tone",
+			"check": 3,
+			"passed": true,
+			"failures": []
+		},
+		{
+			"criterion": "age-tone",
+			"check": 4,
+			"passed": true,
+			"failures": []
+		}
+	],
+	"unchecked": [],
+	"verifiedAt": "2026-10-08T12:55:07.249Z"
+}

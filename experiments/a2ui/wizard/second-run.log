@@ -1,0 +1,14 @@
+→ building the UI (attempt 1)
+✖ verification failed (attempt 1)
+✖ UI attempt 1 rejected:
+    Check for "back": Step 1: no available "choose" action for title "Draft A".
+    Check for "back": Step 1: no available "choose" action for title "Draft A".
+    Check for "send": Step 1: no available "choose" action for title "Draft B".
+    Check for "send": Step 1: no available "choose" action for title "Alice Draft".
+    Check for "drafts-only": Expected rows "Draft One", but nothing lists rows.
+    Check for "drafts-only": Expected "choose" to be available for title "Draft One", but it is not.
+    Check for "drafts-only": Expected "send" not to be available, but it is.
+→ building the UI (attempt 2)
+✔ verification passed (attempt 2)
+Wrote experiments/a2ui/wizard/submit-for-review.json
+exit 0

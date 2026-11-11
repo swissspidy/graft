@@ -1,0 +1,298 @@
+{
+	"graft": 1,
+	"spec": {
+		"id": "stale-drafts",
+		"hash": "sha256:b42a4999b74eadcb0fb64b412f4f22e51e4cfb533f314c205aff41431d7d9719"
+	},
+	"surface": {
+		"host": "emdash",
+		"hostVersion": "1.0.1",
+		"hash": "sha256:b9329970caab68a82f9e7fe44db516aa9d4dfddfe028473af619f480e85a35a0"
+	},
+	"mount": {
+		"slot": "dashboard.widget",
+		"title": "Stale drafts"
+	},
+	"data": {
+		"drafts": {
+			"call": "content.list",
+			"input": {
+				"collection": "posts",
+				"status": "draft",
+				"limit": 10
+			}
+		}
+	},
+	"ui": {
+		"protocol": "a2ui/v0.9",
+		"catalogId": "graft:emdash",
+		"components": [
+			{
+				"id": "root",
+				"component": "Column",
+				"children": [
+					"drafts-table"
+				]
+			},
+			{
+				"id": "drafts-table",
+				"component": "Table",
+				"rows": {
+					"path": "/drafts/items"
+				},
+				"fields": [
+					{
+						"id": "title",
+						"label": "Title",
+						"primary": true
+					},
+					{
+						"id": "age",
+						"label": "Days since update",
+						"type": "number",
+						"value": {
+							"call": "daysSince",
+							"args": {
+								"value": {
+									"path": "updatedAt"
+								}
+							}
+						},
+						"tone": {
+							"call": "if",
+							"args": {
+								"condition": {
+									"call": "greaterThan",
+									"args": {
+										"a": {
+											"call": "daysSince",
+											"args": {
+												"value": {
+													"path": "updatedAt"
+												}
+											}
+										},
+										"b": 29
+									}
+								},
+								"then": "error",
+								"else": {
+									"call": "if",
+									"args": {
+										"condition": {
+											"call": "greaterThan",
+											"args": {
+												"a": {
+													"call": "daysSince",
+													"args": {
+														"value": {
+															"path": "updatedAt"
+														}
+													}
+												},
+												"b": 6
+											}
+										},
+										"then": "warning",
+										"else": "success"
+									}
+								}
+							}
+						}
+					}
+				],
+				"empty": "No drafts"
+			}
+		]
+	},
+	"events": {},
+	"checks": [
+		{
+			"criterion": "drafts-only",
+			"fixtures": {
+				"users": [
+					{
+						"as": "e",
+						"role": "editor"
+					}
+				],
+				"entries": [
+					{
+						"title": "Draft A",
+						"status": "draft"
+					},
+					{
+						"title": "Post B",
+						"status": "published"
+					}
+				]
+			},
+			"view_as": "e",
+			"expect": [
+				{
+					"rows": [
+						"Draft A"
+					]
+				},
+				{
+					"columns": [
+						"Title",
+						"Days since update"
+					]
+				}
+			]
+		},
+		{
+			"criterion": "days",
+			"fixtures": {
+				"users": [
+					{
+						"as": "e",
+						"role": "editor"
+					}
+				],
+				"entries": [
+					{
+						"title": "Draft A",
+						"status": "draft"
+					}
+				]
+			},
+			"view_as": "e",
+			"clock": {
+				"advanceDays": 12
+			},
+			"expect": [
+				{
+					"cell": {
+						"row": {
+							"title": "Draft A"
+						},
+						"column": "Days since update",
+						"text": "12"
+					}
+				}
+			]
+		},
+		{
+			"criterion": "age-tone",
+			"fixtures": {
+				"users": [
+					{
+						"as": "e",
+						"role": "editor"
+					}
+				],
+				"entries": [
+					{
+						"title": "Draft A",
+						"status": "draft"
+					}
+				]
+			},
+			"view_as": "e",
+			"expect": [
+				{
+					"cell": {
+						"row": {
+							"title": "Draft A"
+						},
+						"column": "Days since update",
+						"tone": "success"
+					}
+				}
+			]
+		},
+		{
+			"criterion": "age-tone",
+			"fixtures": {
+				"users": [
+					{
+						"as": "e",
+						"role": "editor"
+					}
+				],
+				"entries": [
+					{
+						"title": "Draft A",
+						"status": "draft"
+					}
+				]
+			},
+			"view_as": "e",
+			"expect": [
+				{
+					"cell": {
+						"row": {
+							"title": "Draft A"
+						},
+						"column": "Days since update",
+						"tone": "warning"
+					}
+				}
+			],
+			"clock": {
+				"advanceDays": 8
+			}
+		},
+		{
+			"criterion": "age-tone",
+			"fixtures": {
+				"users": [
+					{
+						"as": "e",
+						"role": "editor"
+					}
+				],
+				"entries": [
+					{
+						"title": "Draft A",
+						"status": "draft"
+					}
+				]
+			},
+			"view_as": "e",
+			"expect": [
+				{
+					"cell": {
+						"row": {
+							"title": "Draft A"
+						},
+						"column": "Days since update",
+						"tone": "error"
+					}
+				}
+			],
+			"clock": {
+				"advanceDays": 31
+			}
+		}
+	],
+	"refs": {
+		"slot": "dashboard.widget",
+		"components": {},
+		"capabilities": [
+			"content.list"
+		],
+		"scopes": [
+			"content:read"
+		],
+		"catalog": {
+			"Column": [
+				"children"
+			],
+			"Table": [
+				"empty",
+				"fields",
+				"rows"
+			]
+		}
+	},
+	"provenance": {
+		"compiler": "graft-compiler/0.1.0",
+		"model": "claude-opus-5-5",
+		"promptHash": "sha256:da9b9763dadf70d0fea7011cb5241cd78e22d95bf327fe90d5762348afc9ed88",
+		"strategy": "regenerated",
+		"replaces": "sha256:2575c80612da8975a09e860d48cfd0a4001a7198c9456b9f16525488e1967f7b"
+	}
+}

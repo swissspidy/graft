@@ -1,0 +1,381 @@
+{
+	"graft": 1,
+	"spec": {
+		"id": "stale-drafts",
+		"hash": "sha256:41bfa1153acecd449d4ce7224006ba440bf93bf14b183c0d5cccaa2695442019"
+	},
+	"surface": {
+		"host": "wordpress",
+		"hostVersion": "7.1.2",
+		"hash": "sha256:6f170822cb71accfa0c59633044953ce846b218fbcbd1f6406323c4f38e17cdc"
+	},
+	"mount": {
+		"slot": "dashboard.widget",
+		"title": "Stale drafts"
+	},
+	"data": {
+		"drafts": {
+			"call": "posts.list",
+			"input": {
+				"post_type": "post",
+				"status": [
+					"draft"
+				],
+				"orderby": "modified",
+				"order": "asc",
+				"per_page": 100
+			}
+		}
+	},
+	"checks": [
+		{
+			"criterion": "drafts-only",
+			"expect": [
+				{
+					"rows": [
+						"Draft A",
+						"Draft B"
+					]
+				}
+			],
+			"fixtures": {
+				"users": [
+					{
+						"as": "ed",
+						"role": "editor"
+					},
+					{
+						"as": "au",
+						"role": "author"
+					}
+				],
+				"posts": [
+					{
+						"title": "Draft A",
+						"status": "draft",
+						"author": "au"
+					},
+					{
+						"title": "Draft B",
+						"status": "draft"
+					},
+					{
+						"title": "Pending P",
+						"status": "pending",
+						"author": "au"
+					},
+					{
+						"title": "Published X",
+						"status": "publish"
+					},
+					{
+						"title": "Private Y",
+						"status": "private"
+					}
+				]
+			},
+			"view_as": "ed"
+		},
+		{
+			"criterion": "drafts-only",
+			"expect": [
+				{
+					"rows": []
+				}
+			],
+			"fixtures": {
+				"users": [
+					{
+						"as": "boss",
+						"role": "administrator"
+					}
+				],
+				"posts": [
+					{
+						"title": "Pending Only",
+						"status": "pending"
+					},
+					{
+						"title": "Live Post",
+						"status": "publish"
+					},
+					{
+						"title": "Hidden Post",
+						"status": "private"
+					}
+				]
+			},
+			"view_as": "boss"
+		},
+		{
+			"criterion": "days",
+			"expect": [
+				{
+					"rows": [
+						"Forgotten Draft"
+					]
+				},
+				{
+					"text": "47"
+				}
+			],
+			"fixtures": {
+				"users": [
+					{
+						"as": "ed",
+						"role": "editor"
+					}
+				],
+				"posts": [
+					{
+						"title": "Forgotten Draft",
+						"status": "draft"
+					},
+					{
+						"title": "Shipped Post",
+						"status": "publish"
+					}
+				]
+			},
+			"view_as": "ed",
+			"clock": {
+				"advanceDays": 47
+			}
+		},
+		{
+			"criterion": "age-tone",
+			"expect": [
+				{
+					"cell": {
+						"row": {
+							"title": "Fresh Draft"
+						},
+						"column": "Last updated",
+						"text": "6",
+						"tone": "success"
+					}
+				}
+			],
+			"fixtures": {
+				"users": [
+					{
+						"as": "ed",
+						"role": "editor"
+					}
+				],
+				"posts": [
+					{
+						"title": "Fresh Draft",
+						"status": "draft"
+					}
+				]
+			},
+			"view_as": "ed",
+			"clock": {
+				"advanceDays": 6
+			}
+		},
+		{
+			"criterion": "age-tone",
+			"expect": [
+				{
+					"cell": {
+						"row": {
+							"title": "Week Old Draft"
+						},
+						"column": "Last updated",
+						"text": "7",
+						"tone": "warning"
+					}
+				}
+			],
+			"fixtures": {
+				"users": [
+					{
+						"as": "ed",
+						"role": "editor"
+					}
+				],
+				"posts": [
+					{
+						"title": "Week Old Draft",
+						"status": "draft"
+					}
+				]
+			},
+			"view_as": "ed",
+			"clock": {
+				"advanceDays": 7
+			}
+		},
+		{
+			"criterion": "age-tone",
+			"expect": [
+				{
+					"cell": {
+						"row": {
+							"title": "Almost Month Draft"
+						},
+						"column": "Last updated",
+						"text": "29",
+						"tone": "warning"
+					}
+				}
+			],
+			"fixtures": {
+				"users": [
+					{
+						"as": "ed",
+						"role": "editor"
+					}
+				],
+				"posts": [
+					{
+						"title": "Almost Month Draft",
+						"status": "draft"
+					}
+				]
+			},
+			"view_as": "ed",
+			"clock": {
+				"advanceDays": 29
+			}
+		},
+		{
+			"criterion": "age-tone",
+			"expect": [
+				{
+					"cell": {
+						"row": {
+							"title": "Month Old Draft"
+						},
+						"column": "Last updated",
+						"text": "30",
+						"tone": "error"
+					}
+				}
+			],
+			"fixtures": {
+				"users": [
+					{
+						"as": "boss",
+						"role": "administrator"
+					}
+				],
+				"posts": [
+					{
+						"title": "Month Old Draft",
+						"status": "draft"
+					}
+				]
+			},
+			"view_as": "boss",
+			"clock": {
+				"advanceDays": 30
+			}
+		}
+	],
+	"ui": {
+		"protocol": "a2ui/v0.9.1",
+		"catalogId": "graft:wordpress",
+		"components": [
+			{
+				"id": "root",
+				"component": "Table",
+				"rows": {
+					"path": "/drafts/items"
+				},
+				"fields": [
+					{
+						"id": "title",
+						"label": "Title",
+						"type": "string",
+						"primary": true
+					},
+					{
+						"id": "author/name",
+						"label": "Author",
+						"type": "string"
+					},
+					{
+						"id": "days",
+						"label": "Last updated",
+						"type": "integer",
+						"value": {
+							"call": "daysSince",
+							"args": {
+								"value": {
+									"path": "modified"
+								}
+							}
+						},
+						"tone": {
+							"call": "if",
+							"args": {
+								"condition": {
+									"call": "greaterThan",
+									"args": {
+										"a": {
+											"call": "daysSince",
+											"args": {
+												"value": {
+													"path": "modified"
+												}
+											}
+										},
+										"b": 29
+									}
+								},
+								"then": "error",
+								"else": {
+									"call": "if",
+									"args": {
+										"condition": {
+											"call": "greaterThan",
+											"args": {
+												"a": {
+													"call": "daysSince",
+													"args": {
+														"value": {
+															"path": "modified"
+														}
+													}
+												},
+												"b": 6
+											}
+										},
+										"then": "warning",
+										"else": "success"
+									}
+								}
+							}
+						}
+					}
+				],
+				"empty": "No drafts."
+			}
+		]
+	},
+	"events": {},
+	"refs": {
+		"slot": "dashboard.widget",
+		"catalog": {
+			"Table": [
+				"empty",
+				"fields",
+				"rows"
+			]
+		},
+		"capabilities": [
+			"posts.list"
+		],
+		"scopes": [
+			"posts:read"
+		]
+	},
+	"provenance": {
+		"compiler": "a2ui-poc",
+		"model": "claude-opus-5-5",
+		"strategy": "compiled"
+	}
+}

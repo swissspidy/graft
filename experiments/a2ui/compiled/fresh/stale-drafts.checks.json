@@ -1,0 +1,317 @@
+{
+	"checks": [
+		{
+			"criterion": "drafts-only",
+			"expect": [
+				{
+					"rows": [
+						"Draft A",
+						"Draft B"
+					]
+				}
+			],
+			"fixtures": {
+				"users": [
+					{
+						"as": "ed",
+						"role": "editor"
+					},
+					{
+						"as": "au",
+						"role": "author"
+					}
+				],
+				"posts": [
+					{
+						"title": "Draft A",
+						"status": "draft",
+						"author": "au"
+					},
+					{
+						"title": "Draft B",
+						"status": "draft"
+					},
+					{
+						"title": "Pending P",
+						"status": "pending",
+						"author": "au"
+					},
+					{
+						"title": "Published X",
+						"status": "publish"
+					},
+					{
+						"title": "Private Y",
+						"status": "private"
+					}
+				]
+			},
+			"view_as": "ed"
+		},
+		{
+			"criterion": "drafts-only",
+			"expect": [
+				{
+					"rows": []
+				}
+			],
+			"fixtures": {
+				"users": [
+					{
+						"as": "boss",
+						"role": "administrator"
+					}
+				],
+				"posts": [
+					{
+						"title": "Pending Only",
+						"status": "pending"
+					},
+					{
+						"title": "Live Post",
+						"status": "publish"
+					},
+					{
+						"title": "Hidden Post",
+						"status": "private"
+					}
+				]
+			},
+			"view_as": "boss"
+		},
+		{
+			"criterion": "days",
+			"expect": [
+				{
+					"rows": [
+						"Forgotten Draft"
+					]
+				},
+				{
+					"text": "47"
+				}
+			],
+			"fixtures": {
+				"users": [
+					{
+						"as": "ed",
+						"role": "editor"
+					}
+				],
+				"posts": [
+					{
+						"title": "Forgotten Draft",
+						"status": "draft"
+					},
+					{
+						"title": "Shipped Post",
+						"status": "publish"
+					}
+				]
+			},
+			"view_as": "ed",
+			"clock": {
+				"advanceDays": 47
+			}
+		},
+		{
+			"criterion": "age-tone",
+			"expect": [
+				{
+					"cell": {
+						"row": {
+							"title": "Fresh Draft"
+						},
+						"column": "Last updated",
+						"text": "6",
+						"tone": "success"
+					}
+				}
+			],
+			"fixtures": {
+				"users": [
+					{
+						"as": "ed",
+						"role": "editor"
+					}
+				],
+				"posts": [
+					{
+						"title": "Fresh Draft",
+						"status": "draft"
+					}
+				]
+			},
+			"view_as": "ed",
+			"clock": {
+				"advanceDays": 6
+			}
+		},
+		{
+			"criterion": "age-tone",
+			"expect": [
+				{
+					"cell": {
+						"row": {
+							"title": "Week Old Draft"
+						},
+						"column": "Last updated",
+						"text": "7",
+						"tone": "warning"
+					}
+				}
+			],
+			"fixtures": {
+				"users": [
+					{
+						"as": "ed",
+						"role": "editor"
+					}
+				],
+				"posts": [
+					{
+						"title": "Week Old Draft",
+						"status": "draft"
+					}
+				]
+			},
+			"view_as": "ed",
+			"clock": {
+				"advanceDays": 7
+			}
+		},
+		{
+			"criterion": "age-tone",
+			"expect": [
+				{
+					"cell": {
+						"row": {
+							"title": "Almost Month Draft"
+						},
+						"column": "Last updated",
+						"text": "29",
+						"tone": "warning"
+					}
+				}
+			],
+			"fixtures": {
+				"users": [
+					{
+						"as": "ed",
+						"role": "editor"
+					}
+				],
+				"posts": [
+					{
+						"title": "Almost Month Draft",
+						"status": "draft"
+					}
+				]
+			},
+			"view_as": "ed",
+			"clock": {
+				"advanceDays": 29
+			}
+		},
+		{
+			"criterion": "age-tone",
+			"expect": [
+				{
+					"cell": {
+						"row": {
+							"title": "Month Old Draft"
+						},
+						"column": "Last updated",
+						"text": "30",
+						"tone": "error"
+					}
+				}
+			],
+			"fixtures": {
+				"users": [
+					{
+						"as": "boss",
+						"role": "administrator"
+					}
+				],
+				"posts": [
+					{
+						"title": "Month Old Draft",
+						"status": "draft"
+					}
+				]
+			},
+			"view_as": "boss",
+			"clock": {
+				"advanceDays": 30
+			}
+		}
+	],
+	"log": [
+		{
+			"attempt": 1,
+			"problems": [],
+			"output": {
+				"unverifiable": [],
+				"checks": [
+					{
+						"criterion": "drafts-only",
+						"fixtures_json": "{\"users\":[{\"as\":\"ed\",\"role\":\"editor\"},{\"as\":\"au\",\"role\":\"author\"}],\"posts\":[{\"title\":\"Draft A\",\"status\":\"draft\",\"author\":\"au\"},{\"title\":\"Draft B\",\"status\":\"draft\"},{\"title\":\"Pending P\",\"status\":\"pending\",\"author\":\"au\"},{\"title\":\"Published X\",\"status\":\"publish\"},{\"title\":\"Private Y\",\"status\":\"private\"}]}",
+						"view_as": "ed",
+						"advance_days": 0,
+						"steps_json": "[]",
+						"expect_json": "[{\"rows\":[\"Draft A\",\"Draft B\"]}]"
+					},
+					{
+						"criterion": "drafts-only",
+						"fixtures_json": "{\"users\":[{\"as\":\"boss\",\"role\":\"administrator\"}],\"posts\":[{\"title\":\"Pending Only\",\"status\":\"pending\"},{\"title\":\"Live Post\",\"status\":\"publish\"},{\"title\":\"Hidden Post\",\"status\":\"private\"}]}",
+						"view_as": "boss",
+						"advance_days": 0,
+						"steps_json": "[]",
+						"expect_json": "[{\"rows\":[]}]"
+					},
+					{
+						"criterion": "days",
+						"fixtures_json": "{\"users\":[{\"as\":\"ed\",\"role\":\"editor\"}],\"posts\":[{\"title\":\"Forgotten Draft\",\"status\":\"draft\"},{\"title\":\"Shipped Post\",\"status\":\"publish\"}]}",
+						"view_as": "ed",
+						"advance_days": 47,
+						"steps_json": "[]",
+						"expect_json": "[{\"rows\":[\"Forgotten Draft\"]},{\"text\":\"47\"}]"
+					},
+					{
+						"criterion": "age-tone",
+						"fixtures_json": "{\"users\":[{\"as\":\"ed\",\"role\":\"editor\"}],\"posts\":[{\"title\":\"Fresh Draft\",\"status\":\"draft\"}]}",
+						"view_as": "ed",
+						"advance_days": 6,
+						"steps_json": "[]",
+						"expect_json": "[{\"cell\":{\"row\":{\"title\":\"Fresh Draft\"},\"column\":\"Last updated\",\"text\":\"6\",\"tone\":\"success\"}}]"
+					},
+					{
+						"criterion": "age-tone",
+						"fixtures_json": "{\"users\":[{\"as\":\"ed\",\"role\":\"editor\"}],\"posts\":[{\"title\":\"Week Old Draft\",\"status\":\"draft\"}]}",
+						"view_as": "ed",
+						"advance_days": 7,
+						"steps_json": "[]",
+						"expect_json": "[{\"cell\":{\"row\":{\"title\":\"Week Old Draft\"},\"column\":\"Last updated\",\"text\":\"7\",\"tone\":\"warning\"}}]"
+					},
+					{
+						"criterion": "age-tone",
+						"fixtures_json": "{\"users\":[{\"as\":\"ed\",\"role\":\"editor\"}],\"posts\":[{\"title\":\"Almost Month Draft\",\"status\":\"draft\"}]}",
+						"view_as": "ed",
+						"advance_days": 29,
+						"steps_json": "[]",
+						"expect_json": "[{\"cell\":{\"row\":{\"title\":\"Almost Month Draft\"},\"column\":\"Last updated\",\"text\":\"29\",\"tone\":\"warning\"}}]"
+					},
+					{
+						"criterion": "age-tone",
+						"fixtures_json": "{\"users\":[{\"as\":\"boss\",\"role\":\"administrator\"}],\"posts\":[{\"title\":\"Month Old Draft\",\"status\":\"draft\"}]}",
+						"view_as": "boss",
+						"advance_days": 30,
+						"steps_json": "[]",
+						"expect_json": "[{\"cell\":{\"row\":{\"title\":\"Month Old Draft\"},\"column\":\"Last updated\",\"text\":\"30\",\"tone\":\"error\"}}]"
+					}
+				]
+			}
+		}
+	]
+}

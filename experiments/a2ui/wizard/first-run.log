@@ -1,0 +1,18 @@
+→ writing checks from the criteria (attempt 1)
+→ building the UI (attempt 1)
+✖ tree attempt 1 rejected:
+    /ui/components/1/rowActions/0/action/event: Table "drafts_table": Required.
+    /ui/components/1/rowActions/0/action: Table "drafts_table": Unrecognized key(s) in object: 'functionCall'.
+→ building the UI (attempt 2)
+✖ verification failed (attempt 2)
+✖ tree attempt 2 rejected:
+    Check for "pick": Expected rows "Draft A", "Draft B", but nothing lists rows.
+    Check for "pick": Expected rows "Alice Draft", but nothing lists rows.
+    Check for "back": Expected rows "Draft A", "Draft B", but nothing lists rows.
+    Check for "drafts-only": Expected rows "Draft One", but nothing lists rows.
+→ building the UI (attempt 3)
+✖ tree attempt 3 rejected:
+    /ui/components/2/rowActions/0/action/event: Table "drafts_table": Required.
+    /ui/components/2/rowActions/0/action: Table "drafts_table": Unrecognized key(s) in object: 'functionCall'.
+Wrote the last (failing) candidate to experiments/a2ui/compiled/submit-for-review.a2ui.json
+exit 1
