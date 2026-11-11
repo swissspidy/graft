@@ -1,6 +1,6 @@
 import { LineCounter, parseDocument, isMap, isNode, isScalar, type Document } from 'yaml';
 import type { Diagnostic } from '../diagnostics.ts';
-import { CRITERION_ID, deriveCriterionId, splitIdMarker } from './criteria.ts';
+import { CRITERION_ID, deriveCriterionId, splitIdMarker, trailingIdMarker } from './criteria.ts';
 import type { Criterion, Section } from './types.ts';
 
 export interface ParsedSpec {
@@ -257,9 +257,8 @@ function listItems(lines: Line[]): Item[] {
 			items.push(current);
 		} else if (current && /^\s+\S/.test(line.text)) {
 			// A {#id} marker ends the item's first line; keep it at the end of the joined text, where it is read.
-			const marker = /\s*\{#[^}\s]*\}\s*$/.exec(current.text);
-			const head = marker ? current.text.slice(0, marker.index) : current.text;
-			current.text = head + ' ' + line.text.trim().replace(/^(?:[-*+]|\d+[.)])\s+/, '') + (marker ? ` ${marker[0].trim()}` : '');
+			const marker = trailingIdMarker(current.text);
+			current.text = (marker ? marker.head : current.text) + ' ' + line.text.trim().replace(/^(?:[-*+]|\d+[.)])\s+/, '') + (marker ? ` ${marker.marker}` : '');
 		} else if (line.text.trim() === '') {
 			current = undefined;
 		}

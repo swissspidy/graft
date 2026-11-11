@@ -11,7 +11,8 @@ on:
     - cron: '17 5 * * 1'
 
 concurrency:
-  group: ci-${{ github.head_ref || github.ref }}
+  # By pull request number: two forks may both call their branch the same.
+  group: ci-${{ github.event.pull_request.number || github.ref }}
   cancel-in-progress: true
 
 # Jobs only read the repository.

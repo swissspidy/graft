@@ -2,7 +2,7 @@ import { isSafeRegex, type Catalog, type ComponentApi } from '@a2ui/web_core/v0_
 import { compileSchema, type Build, type Diagnostic, type Surface } from '@swissspidy/graft-core';
 import type { z } from 'zod';
 import { createGraftCatalog, INPUT_COMPONENTS } from './catalog.ts';
-import { modelKey, type A2UIHost } from './walk.ts';
+import { writesLoaded, type A2UIHost } from './walk.ts';
 import type { A2UIBuild, A2UIComponent } from './types.ts';
 
 const isObject = (value: unknown): value is Record<string, unknown> => typeof value === 'object' && value !== null && !Array.isArray(value);
@@ -188,7 +188,7 @@ export function validateA2UI(value: Build, surface: Surface, host: A2UIHost): Di
 				if (hidden) {
 					error('a2ui-template-call', `${path}/args/value`, `formatString: "${hidden[1]}" cannot be called inside a template. Call it as {"call": "${hidden[1]}", ...} and put the result in the data model ("computed"), then interpolate its path.`);
 				}
-				if (item.call === 'set' && typeof item.args?.target === 'string' && item.args.target.startsWith('/') && loaded.has(modelKey(item.args.target))) {
+				if (item.call === 'set' && typeof item.args?.target === 'string' && item.args.target.startsWith('/') && writesLoaded(item.args.target, loaded)) {
 					error('a2ui-model-key', `${path}/args/target`, `"${item.args.target}" is loaded by the host (a data source or the slot), so "set" cannot write to it. Use a key of its own, e.g. "/form/...".`);
 				}
 			}
@@ -218,7 +218,7 @@ export function validateA2UI(value: Build, surface: Surface, host: A2UIHost): Di
 		}
 		if (INPUT_COMPONENTS.has(component.component) && !(isBinding(component.value) && component.value.path.startsWith('/'))) {
 			error('a2ui-input-binding', `${path}/value`, `The input "${component.id}" must bind "value" to an absolute pointer, e.g. {"path": "/form/${component.id}"}.`);
-		} else if (INPUT_COMPONENTS.has(component.component) && loaded.has(modelKey((component.value as { path: string }).path))) {
+		} else if (INPUT_COMPONENTS.has(component.component) && writesLoaded((component.value as { path: string }).path, loaded)) {
 			error('a2ui-input-binding', `${path}/value`, `The input "${component.id}" writes to "${(component.value as { path: string }).path}", which the host loads (a data source or the slot). Bind it to a key of its own, e.g. {"path": "/form/${component.id}"}, and start it from the loaded value in "initial".`);
 		}
 		const validation = component.validationRegexp;
@@ -279,7 +279,7 @@ export function validateA2UI(value: Build, surface: Surface, host: A2UIHost): Di
 		}
 		(binding.then ?? []).forEach((op, i) => {
 			const [kind, target, ...rest] = op.split(':');
-			const ok = rest.length === 0 && (kind === 'reload' && target === 'page') || ((kind === 'refresh' || kind === 'remove-row') && target !== undefined && Object.hasOwn(build.data, target));
+			const ok = rest.length === 0 && ((kind === 'reload' && target === 'page') || ((kind === 'refresh' || kind === 'remove-row') && target !== undefined && Object.hasOwn(build.data, target)));
 			if (!ok) {
 				error('build-unknown-data', `${path}/then/${i}`, `"${op}" is not "refresh:<source>", "remove-row:<source>" or "reload:page".`);
 			}

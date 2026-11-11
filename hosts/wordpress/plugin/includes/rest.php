@@ -39,12 +39,8 @@ function register_routes(): void {
 			array(
 				'methods'             => WP_REST_Server::READABLE,
 				'callback'            => static function (): WP_REST_Response {
-					$specs = list_specs( true );
 					// People who are not administrators see the customizations they wrote for themselves.
-					if ( ! current_user_can( 'manage_options' ) ) {
-						$specs = array_values( array_filter( $specs, static fn( array $spec ): bool => owns_personal( $spec['spec_id'] ) ) );
-					}
-					return new WP_REST_Response( $specs );
+					return new WP_REST_Response( list_specs( true, current_user_can( 'manage_options' ) ? 0 : get_current_user_id() ) );
 				},
 				'permission_callback' => __NAMESPACE__ . '\\can_author_personal',
 			),

@@ -157,9 +157,11 @@ installed.
    language, next to the criterion it proves, and approves it.
 
 People who can edit posts and are not administrators have the same screen
-for customizations of their own, which only they see. One that only reads
-is live as soon as its checks pass; anything else waits for an
-administrator ([ADR 0014](docs/adr/0014-customizations-of-ones-own.md)).
+for customizations of their own. Such a customization is shown to its
+author alone; administrators see it in their list, with its checks. One
+that only reads and has no triggers is live as soon as its checks pass;
+anything else waits for an administrator
+([ADR 0014](docs/adr/0014-customizations-of-ones-own.md)).
 
 Where Playground can't start (offline, blocked), the build is saved as an
 unverified draft, and

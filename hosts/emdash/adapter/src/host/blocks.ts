@@ -45,10 +45,22 @@ export const toneMarkers: Record<Tone, string> = { success: 'ðŸŸ¢', warning: 'ðŸ
 
 export const str = (value: unknown): string => (value === null || value === undefined ? '' : typeof value === 'string' ? value : typeof value === 'number' || typeof value === 'boolean' ? String(value) : JSON.stringify(value));
 
-/** The value that identifies a row in an action: its id, else its position. */
-export function rowKey(row: unknown, index: number): string {
+/**
+ * The value that identifies a row in an action: its id, else a digest of what
+ * the row holds. Never its position: a click on a list that changed
+ * meanwhile would then land on whatever row took that place.
+ */
+export function rowKey(row: unknown, _index?: number): string {
 	const id = typeof row === 'object' && row !== null ? (row as { id?: unknown }).id : undefined;
-	return typeof id === 'string' || typeof id === 'number' ? String(id) : `#${index}`;
+	if (typeof id === 'string' || typeof id === 'number') {
+		return String(id);
+	}
+	// FNV-1a over the row as JSON: the same row gives the same key, and that is all it has to do.
+	let hash = 0x811c9dc5;
+	for (const char of JSON.stringify(row) ?? '') {
+		hash = Math.imul(hash ^ char.codePointAt(0)!, 0x01000193) >>> 0;
+	}
+	return `~${hash.toString(36)}`;
 }
 
 /** What a button is: its id and label, whether the viewer may use it, and what it does. */

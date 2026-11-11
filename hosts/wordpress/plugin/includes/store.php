@@ -755,19 +755,27 @@ function apply_event( string $spec_id, int $version, string $event ) {
  * All specs with their versions.
  *
  * @param bool $output For a response: builds exactly as stored (see stored_builds()).
+ * @param int  $owner  Only the personal specs of this user (0 for every spec).
  * @return array<int, array<string, mixed>>
  */
-function list_specs( bool $output = false ): array {
+function list_specs( bool $output = false, int $owner = 0 ): array {
 	$specs = get_posts(
-		array(
-			'post_type'        => SPEC_POST_TYPE,
-			'post_status'      => 'private',
-			'numberposts'      => -1,
-			'orderby'          => 'title',
-			'order'            => 'ASC',
-			'suppress_filters' => true,
+		array_merge(
+			array(
+				'post_type'        => SPEC_POST_TYPE,
+				'post_status'      => 'private',
+				'numberposts'      => -1,
+				'orderby'          => 'title',
+				'order'            => 'ASC',
+				'suppress_filters' => true,
+			),
+			$owner ? array( 'author' => $owner ) : array()
 		)
 	);
+	if ( $owner ) {
+		// Before any version is read: a shared spec its author happens to own is not a personal one.
+		$specs = array_values( array_filter( $specs, static fn( WP_Post $spec ): bool => 'user' === ( get_json_meta( $spec->ID, '_graft_scope' )['type'] ?? '' ) ) );
+	}
 	return array_map(
 		static function ( WP_Post $spec ) use ( $output ): array {
 			return array(

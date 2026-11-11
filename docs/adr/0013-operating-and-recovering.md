@@ -15,8 +15,8 @@ the app runs. Its plugins are code and Graft's builds are not, and it has
 no answer to a host that changes, which is what Graft is for. But three
 things it gives the person operating it, Graft did not:
 
-- a way back that needs nothing to work (`?reset` turns every plugin off
-  before any runs);
+- a way back that needs nothing to work (`?reset` puts an app's plugins
+  back as its author shipped them, before any of them runs);
 - a record of every change, and a trace that says why something did not
   happen;
 - areas of a page its author marks as off limits, enforced by the
@@ -110,8 +110,8 @@ gives.
 
 The store, the gateway and the runtime have had `scope: user` since ADR
 0002; no screen offered it. **New customization** now has "Only for me":
-the customization is shown to its author alone, whatever its audience
-says, and the list marks it. It is still compiled, verified and approved
+the customization is shown to its author alone, as one of the roles its
+audience names, and the list marks it. It is still compiled, verified and approved
 like any other. An administrator can live with a customization before
 giving it to a whole role.
 

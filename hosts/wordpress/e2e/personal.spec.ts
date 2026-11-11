@@ -13,6 +13,8 @@ const browserVerify = process.env.GRAFT_E2E_BROWSER_VERIFY === '1';
 
 const source = readFileSync(new URL('../../../examples/specs/waiting-posts.md', import.meta.url), 'utf8')
 	.replace('id: waiting-posts', 'id: my-waiting')
+	// Shown to its author as one of the roles it names; its checks run as an editor.
+	.replace('audience: [editor, administrator]', 'audience: [editor, administrator, contributor]')
 	.replace('# Waiting for review', '# My waiting posts');
 
 test('people who are not administrators have their own customizations under Tools, and none of the site\'s', async ({ page }) => {
@@ -29,6 +31,9 @@ test('people who are not administrators have their own customizations under Tool
 	await expect(page.locator('[data-graft-personal-only]')).toContainText('yours alone');
 	await expect(page.locator('[data-graft-personal-only]')).toContainText('posts:read');
 	await expect(page.getByRole('checkbox', { name: 'Only for me' })).toBeHidden();
+	// The template's audience names editors and administrators: the editor says so, and does not build.
+	await expect(page.locator('[data-graft-not-for-me]')).toContainText('does not include your role (contributor)');
+	await expect(page.getByRole('button', { name: 'Build it' })).toBeDisabled();
 });
 
 test('the site\'s customizations stay out of their reach over REST', async ({ page }) => {
@@ -60,7 +65,7 @@ test('a contributor builds a customization that only reads, and it is live for t
 	const card = page.locator('[data-graft-spec="my-waiting"]');
 	await expect(card.locator('[data-graft-state]')).toHaveText('Active');
 
-	// On their Dashboard, though the spec's audience names editors; not on an editor's.
+	// On their Dashboard, and not on an editor's, though the audience names editors too.
 	await page.goto('/wp-admin/index.php');
 	// The widget's box is titled by the spec's mount; the build draws the table of pending posts in it.
 	await expect(page.locator('#graft-my-waiting')).toContainText('Title');

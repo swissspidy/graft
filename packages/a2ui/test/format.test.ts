@@ -102,8 +102,11 @@ describe('A2UI builds', () => {
 			b.ui.components.push({ id: 'go-label', component: 'Text', text: 'Go' });
 			// Writing over what the host loaded, a child listed twice, two columns with one label.
 			b.ui.components.push({ id: 'over', component: 'Button', child: 'go-label', action: { functionCall: { call: 'set', args: { target: '/open/items', value: [] } } } });
+			b.ui.components.push({ id: 'all', component: 'Button', child: 'go-label', action: { functionCall: { call: 'set', args: { target: '/', value: {} } } } });
+			b.ui.components.push({ id: 'twice', component: 'Button', child: 'go-label', action: { functionCall: { call: 'set', args: { target: '//slot/user', value: {} } } } });
+			b.events.close!.then = ['remove-row:open:extra'];
 			b.ui.components.push({ id: 'field', component: 'TextField', label: 'Name', value: { path: '/slot/user/name' }, validationRegexp: '(a+)+$' });
-			(b.ui.components[0]!.children as string[]).push('go', 'over', 'field', 'field');
+			(b.ui.components[0]!.children as string[]).push('go', 'over', 'all', 'twice', 'field', 'field');
 			const fields = b.ui.components[2]!.fields as Array<Record<string, unknown>>;
 			fields.push({ ...fields[0]! });
 		});
@@ -117,8 +120,11 @@ describe('A2UI builds', () => {
 				'a2ui-function-args /ui/computed/fromData/args/pattern',
 				'a2ui-unbound-event /events',
 				'a2ui-model-key /ui/components/5/action/functionCall/args/target',
-				'a2ui-input-binding /ui/components/6/value',
-				'a2ui-unsafe-pattern /ui/components/6/validationRegexp',
+				'a2ui-model-key /ui/components/6/action/functionCall/args/target',
+				'a2ui-model-key /ui/components/7/action/functionCall/args/target',
+				'build-unknown-data /events/close/then/0',
+				'a2ui-input-binding /ui/components/8/value',
+				'a2ui-unsafe-pattern /ui/components/8/validationRegexp',
 				'a2ui-duplicate-reference /ui/components/0/children',
 				`a2ui-duplicate-label /ui/components/2/fields/${(components(build)[2]!.fields as unknown[]).length - 1}/label`,
 			]),
@@ -128,10 +134,11 @@ describe('A2UI builds', () => {
 
 	it('never let what was entered replace what the host loaded', async () => {
 		const build = await a2uiBuild();
-		const forged = { '/open/items': [{ id: 99, title: 'Forged', status: 'open' }], '/slot': { forged: true } };
+		// However the pointer is spelled: the data model reads "//open" as "/open", and "/" is everything.
+		const forged = { '/open/items': [{ id: 99, title: 'Forged', status: 'open' }], '/slot': { forged: true }, '//open/items': [{ id: 98, title: 'Forged' }], '/': { open: { items: [{ id: 97, title: 'Forged' }] } } };
 		const snapshot = format.snapshot(build, { data: { open: { items: [] } }, slot: {}, viewer: { id: 1, role: 'm' }, can: () => true } as never, { surface: forged });
 		expect(JSON.stringify(snapshot)).not.toContain('Forged');
-		expect(snapshot.problems?.length).toBe(2);
+		expect(snapshot.problems?.length).toBe(4);
 	});
 
 	it('take from state kept outside the host only what their own actions set', async () => {

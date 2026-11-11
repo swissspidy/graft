@@ -22,8 +22,9 @@ Everything Graft needs to target WordPress 7.1+.
   adapter, not the surface.
 - **Capabilities:** `posts.list`, `terms.list`, `posts.update_status`,
   `posts.update_review_status` (draft ↔ pending only),
-  `posts.update_fields` (title, excerpt, exposed custom fields) and
-  `posts.set_terms` (Graft abilities), `site.info` and `users.current` (core abilities). Builds only
+  `posts.update_fields` (title and excerpt), `posts.update_meta` (custom
+  fields, on sites that expose some) and `posts.set_terms` (Graft
+  abilities), `site.info` and `users.current` (core abilities). Builds only
   ever reference these names; the ability behind a name can change, and
   that change is a surface migration.
 - **Scopes:** `posts:read`, `posts:write`, `posts.meta:write`,
@@ -143,10 +144,10 @@ a hash and need no rebuild.
   and archived what, and what each approval allowed
   (`GET /graft/v1/changes`; `graft_change_recorded` fires for each).
 - **For one person.** "Only for me" when writing a customization shows it
-  to its author alone. People who can edit posts and are not
+  to its author alone, as one of the roles its audience names. People who can edit posts and are not
   administrators have the same screen for customizations of their own:
-  one that only reads goes live when its checks pass, anything else waits
-  for an administrator, and model calls go through the site's AI provider
+  one that only reads and has no triggers goes live when its checks pass,
+  anything else waits for an administrator, and model calls go through the site's AI provider
   up to a daily limit
   ([ADR 0014](../../docs/adr/0014-customizations-of-ones-own.md);
   `graft_personal_authoring`, `graft_self_service_scopes`,

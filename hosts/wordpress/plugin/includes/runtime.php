@@ -26,8 +26,12 @@ function applies_to_user( array $record, WP_User $user ): bool {
 	$scope = $record['scope'] ?? array( 'type' => 'org' );
 	switch ( $scope['type'] ?? 'org' ) {
 		case 'user':
-			// Its owner's alone, whatever audience its spec names: they wrote it for themselves.
-			return (int) $record['owner'] === $user->ID;
+			// Its owner's alone. The audience below still applies: its checks ran as the roles the spec
+			// names, so those are the roles it was verified for (the editor says so before building).
+			if ( (int) $record['owner'] !== $user->ID ) {
+				return false;
+			}
+			break;
 		case 'team':
 			if ( ! in_array( $scope['role'] ?? '', $user->roles, true ) ) {
 				return false;
@@ -346,6 +350,7 @@ function register_admin_screen(): void {
 						// Administrators manage every customization; everyone else, their own.
 						'admin'               => current_user_can( 'manage_options' ),
 						'selfService'         => self_service_scopes(),
+						'roles'               => array_values( wp_get_current_user()->roles ),
 						// Who triggers run as; null when the site runs none (ADR 0010).
 						'triggers'            => null === surface_triggers() ? null : array( 'identity' => __( 'Graft automation', 'graft' ) ),
 						/**

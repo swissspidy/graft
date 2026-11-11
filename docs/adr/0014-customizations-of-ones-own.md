@@ -48,8 +48,12 @@ could already see. The verification record of such a build comes from the
 author's own browser, so it proves nothing to anyone else: it is stored
 with `runner: author`, and it is never served to another person.
 
-A personal customization is shown to its owner whatever audience its
-spec names. They wrote it for themselves.
+A personal customization is shown to its owner as one of the roles its
+audience names, like any other. Its checks ran as those roles, so those
+are the roles it was verified for: a contributor whose spec names only
+editors has checks that say what an editor sees, and nothing about what
+they will. The editor tells them so and does not build until the audience
+includes one of their roles (or names none).
 
 ### What people may and may not do
 
@@ -83,6 +87,10 @@ of all customizations. There is no separate queue and no notification.
 - An unverified build of one's own cannot be saved. Where in-browser
   verification is off or Playground cannot be reached, people cannot
   build their own, and the editor says so before any model call.
+- The daily limit is counted per request, not reserved: requests one
+  person sends at the same moment can each pass it. It bounds what a
+  person spends in a day to the limit plus what they manage to send at
+  once, which is what it is for.
 - Triggers stay an administrator's decision: a customization with
   triggers is never approved by its author.
 - EmDash and the browser extension have no equivalent yet. On EmDash only

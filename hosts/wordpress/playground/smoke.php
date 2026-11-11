@@ -815,9 +815,10 @@ check( 'three failed runs in a row pause the trigger', 'failed' === $failed['sta
 $self = user_named( 'contributor', 'self-service' );
 wp_set_current_user( $self );
 $waiting                   = $examples['waiting-posts'];
-$mine_source               = str_replace( 'id: waiting-posts', 'id: my-waiting', $waiting['source'] );
+$mine_source               = str_replace( array( 'id: waiting-posts', 'audience: [editor, administrator]' ), array( 'id: my-waiting', 'audience: [editor, administrator, contributor]' ), $waiting['source'] );
 $mine_manifest             = $waiting['manifest'];
 $mine_manifest['id']       = 'my-waiting';
+$mine_manifest['audience'] = array( 'editor', 'administrator', 'contributor' );
 $mine_build                = $waiting['build'];
 $mine_build['spec']        = array(
 	'id'   => 'my-waiting',
@@ -852,6 +853,9 @@ check(
 	$live
 );
 $live_record = Graft\version_record( Graft\get_version_post( 'my-waiting', 1 ) );
+$not_for_me                         = $live_record;
+$not_for_me['manifest']['audience'] = array( 'editor' );
+check( 'it is shown to its author as one of the roles its spec names, the ones its checks ran as', Graft\applies_to_user( $live_record, wp_get_current_user() ) && ! Graft\applies_to_user( $not_for_me, wp_get_current_user() ) );
 check( 'its verification is marked as its author\'s', 'author' === ( $live_record['builds'][ $mine_build['surface']['hash'] ]['verification']['runner'] ?? null ) );
 $own = rest( 'GET', '/graft/v1/specs' );
 check( 'people see the customizations they wrote, and no others', 200 === $own['status'] && array( 'my-waiting' ) === array_column( $own['data'], 'spec_id' ), array_column( (array) $own['data'], 'spec_id' ) );

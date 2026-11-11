@@ -60,6 +60,8 @@ describe('validateSpec', () => {
 		expect(validateSpec(valid.replace('# Review queue', '# Review queue ##')).spec?.title).toBe('Review queue');
 		const started = Date.now();
 		validateSpec(valid.replace('# Review queue', `# Review${' '.repeat(20000)}queue`));
+		// Nor in a criterion that goes on over lines.
+		validateSpec(valid.replace('are listed {#pending-only}', `are listed${' '.repeat(20000)}x\n  and nothing else\n  at all`));
 		expect(Date.now() - started).toBeLessThan(500);
 
 		const { ok, spec } = validateSpec(valid);

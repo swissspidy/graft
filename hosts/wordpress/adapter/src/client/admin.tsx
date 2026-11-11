@@ -45,6 +45,8 @@ interface AdminConfig {
 	admin?: boolean;
 	/** Scopes a customization of one's own may have without an administrator. */
 	selfService?: string[];
+	/** The viewer's roles. */
+	roles?: string[];
 }
 
 interface VersionRecord {
@@ -313,6 +315,7 @@ function App({ config }: { config: AdminConfig }) {
 							surface={config.surface}
 							personalOnly={!admin}
 							selfService={config.selfService ?? []}
+							roles={config.roles ?? []}
 							{...(config.browserVerification
 								? {
 										startVerifier: async () => {

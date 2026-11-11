@@ -289,11 +289,12 @@ async function runCheck(options: VerifyOptions, check: Check, index: number): Pr
 	};
 	for (const expectation of check.expect) {
 		const failure =
-			'run' in expectation
+			expectationProblem(expectation) ??
+			('run' in expectation
 				? expectRun(expectation.run, runs)
 				: 'refused' in expectation
 					? refusedFailure(expectation, direct)
-					: await evaluateExpectation(expectation, merged, sandbox);
+					: await evaluateExpectation(expectation, merged, sandbox));
 		if (failure) {
 			failures.push(failure);
 		}
@@ -380,10 +381,6 @@ function findAction(view: Instance[], id: string, matcher?: Record<string, unkno
  * Anything else is a host assertion handed to the sandbox.
  */
 async function evaluateExpectation(expectation: Record<string, unknown>, snapshot: Snapshot, sandbox: Sandbox): Promise<string | undefined> {
-	const malformed = expectationProblem(expectation);
-	if (malformed) {
-		return malformed;
-	}
 	if ('rows' in expectation) {
 		// The first list, or with "in", the lists drawn in the place of that name (e.g. a column's drop target).
 		const expected = expectation.rows as string[];
@@ -458,7 +455,7 @@ async function evaluateExpectation(expectation: Record<string, unknown>, snapsho
 	return ok ? undefined : `Expected ${kind} ${canonicalJson(expectation[kind])}, found ${canonicalJson(actual ?? null)}.`;
 }
 
-const VIEW_KINDS = ['rows', 'columns', 'text', 'cell', 'input', 'action'];
+const VIEW_KINDS = ['rows', 'columns', 'text', 'cell', 'input', 'action', 'run', 'refused'];
 const strings = (value: unknown): value is string[] => Array.isArray(value) && value.every((item) => typeof item === 'string');
 
 /**

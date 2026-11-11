@@ -48,6 +48,8 @@ export interface CapabilityObservation {
 	problems?: string[];
 	/** Keys the answer has that the surface does not declare (dropped by the gateway). */
 	undeclared?: string[];
+	/** The app says the endpoint is not there (404, 410), which a failure that may pass (401, 500, a sign-in page) does not. */
+	gone?: boolean;
 	reason?: string;
 }
 
@@ -126,8 +128,9 @@ const isPlain = (value: unknown): value is Record<string, unknown> => typeof val
  * it, the answer's shape only where it does not.
  *
  * A key the surface never declared stays out, as before the drift: it is
- * taken in only next to a declared key that is gone, where it may be what
- * that key was renamed to. So drift does not hand builds the fields the
+ * taken in only where exactly as many new keys appeared as declared keys
+ * went, where it may be what a key was renamed to. Where more appeared,
+ * some are fields the surface withheld, and none is taken. So drift does not hand builds the fields the
  * surface withheld, and the result does not depend on the probe account's
  * data (a null due date here, an empty list there).
  */
@@ -142,11 +145,15 @@ export function driftedOutput(declared: JsonSchema, value: unknown): JsonSchema 
 	if (isPlain(value) && isPlain(declared.properties)) {
 		const declaredProps = declared.properties as Record<string, JsonSchema>;
 		const gone = Object.keys(declaredProps).filter((key) => !(key in value));
+		const added = Object.keys(value).filter((key) => !Object.hasOwn(declaredProps, key));
+		// A rename shows as as many new keys as declared keys that went. With more new keys than that, some are
+		// fields the surface withheld, and nothing here can tell which: none is taken, and a person updates the description.
+		const renamed = gone.length > 0 && added.length === gone.length;
 		const properties: Record<string, JsonSchema> = {};
 		for (const key of Object.keys(value).sort()) {
 			if (Object.hasOwn(declaredProps, key)) {
 				properties[key] = driftedOutput(declaredProps[key]!, value[key]);
-			} else if (gone.length > 0) {
+			} else if (renamed) {
 				properties[key] = shapeOf(value[key]);
 			}
 		}
@@ -239,7 +246,7 @@ export async function observe(surface: Surface, options: ObserveOptions): Promis
 			const { url, init } = buildRequest(httpBinding(capability), options.probes.inputs[id], options.url);
 			const response = await fetch(url, init);
 			if (!response.ok) {
-				capabilities[id] = { status: 'broken', problems: [`The app answered ${response.status}.`] };
+				capabilities[id] = { status: 'broken', problems: [`The app answered ${response.status}.`], ...(response.status === 404 || response.status === 410 ? { gone: true } : {}) };
 				continue;
 			}
 			const parsed = await response.json().then(
@@ -291,8 +298,8 @@ export const observedVersion = (fingerprint: string) => `observed-${fingerprint.
  * The surface the app actually offers, from what the probe observed:
  * moved anchors re-anchored (the selector that found them goes first),
  * slots whose anchor is gone removed, capabilities whose answers broke
- * given the output they have now (driftedOutput), and capabilities that
- * no longer answer at all removed. Hashed, with the declared surface as previous.
+ * given the output they have now (driftedOutput), and capabilities the
+ * app answers 404 or 410 for removed. Hashed, with the declared surface as previous.
  */
 export async function observedSurface(surface: Surface, observation: Observation): Promise<Surface> {
 	const model = appModel(surface);
@@ -310,8 +317,9 @@ export async function observedSurface(surface: Surface, observation: Observation
 	const capabilities: Surface['capabilities'] = {};
 	for (const [id, capability] of Object.entries(surface.capabilities)) {
 		const seen = observation.capabilities[id];
-		if (seen?.status === 'broken' && !seen.shape) {
-			// It answers with an error, or not with JSON: the app no longer offers it, as a slot whose anchor is gone.
+		if (seen?.status === 'broken' && seen.gone) {
+			// The app says it is not there: it no longer offers it, as a slot whose anchor is gone.
+			// Any other failure without an answer to read (a 500, a sign-in page) may pass: the capability stays as declared.
 			continue;
 		}
 		capabilities[id] = seen?.status === 'broken' && seen.shape ? { ...capability, output: seen.shape } : capability;

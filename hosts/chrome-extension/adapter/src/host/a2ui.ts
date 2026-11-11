@@ -61,10 +61,22 @@ export interface Rendered {
 
 const TONES = new Set(['success', 'warning', 'error', 'info']);
 
-/** The value that identifies a row in a key: its id, else its position. */
-export function rowKey(row: unknown, index: number): string {
+/**
+ * The value that identifies a row in a key: its id, else a digest of what
+ * the row holds. Never its position: a click on a list that changed
+ * meanwhile would then land on whatever row took that place.
+ */
+export function rowKey(row: unknown, _index?: number): string {
 	const id = typeof row === 'object' && row !== null ? (row as { id?: unknown }).id : undefined;
-	return typeof id === 'string' || typeof id === 'number' ? String(id) : `#${index}`;
+	if (typeof id === 'string' || typeof id === 'number') {
+		return String(id);
+	}
+	// FNV-1a over the row as JSON: the same row gives the same key, and that is all it has to do.
+	let hash = 0x811c9dc5;
+	for (const char of JSON.stringify(row) ?? '') {
+		hash = Math.imul(hash ^ char.codePointAt(0)!, 0x01000193) >>> 0;
+	}
+	return `~${hash.toString(36)}`;
 }
 
 /**

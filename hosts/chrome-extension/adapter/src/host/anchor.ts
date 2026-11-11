@@ -109,7 +109,8 @@ export function lockedArea(anchor: Anchor, element: Element): string | undefined
 		try {
 			return changed?.closest(selector) != null;
 		} catch {
-			return false;
+			// A selector that cannot be read locks: an area the app meant to rule out is not opened by a typo.
+			return true;
 		}
 	});
 }

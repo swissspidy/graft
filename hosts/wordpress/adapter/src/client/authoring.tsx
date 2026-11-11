@@ -65,9 +65,11 @@ export interface AuthoringProps {
 	personalOnly?: boolean;
 	/** The permissions a customization of one's own may have without an administrator's approval. */
 	selfService?: string[];
+	/** The author's roles on the site: a customization of their own is shown to them as one of its audience. */
+	roles?: string[];
 }
 
-export function Authoring({ surface, onSaved, onCancel, startVerifier, personalOnly = false, selfService = [] }: AuthoringProps) {
+export function Authoring({ surface, onSaved, onCancel, startVerifier, personalOnly = false, selfService = [], roles = [] }: AuthoringProps) {
 	const [source, setSource] = useState(TEMPLATE);
 	const [log, setLog] = useState<string[]>([]);
 	const [busy, setBusy] = useState(false);
@@ -83,6 +85,9 @@ export function Authoring({ surface, onSaved, onCancel, startVerifier, personalO
 	}, [source]);
 	const validation = useMemo(() => validateSpec(debounced, { surface }), [debounced, surface]);
 	const current = debounced === source;
+	// A customization for oneself is shown to its author as one of the roles its spec names: its checks ran as those.
+	const audience = validation.spec?.manifest.audience ?? [];
+	const notForMe = personal && audience.length > 0 && !audience.some((role) => roles.includes(role));
 
 	const build = async () => {
 		const parsed = validateSpec(source, { surface });
@@ -201,6 +206,14 @@ export function Authoring({ surface, onSaved, onCancel, startVerifier, personalO
 					))}
 				</ol>
 			) : null}
+			{notForMe ? (
+				<Notice status="warning" isDismissible={false}>
+					<span data-graft-not-for-me="">
+						This customization is for you alone, but its audience ({audience.join(', ')}) does not include your role ({roles.join(', ') || 'none'}), so you would not see it. Add your
+						role to <code>audience</code>, and say in the criteria what you should see.
+					</span>
+				</Notice>
+			) : null}
 			{personalOnly ? (
 				<p data-graft-personal-only="">
 					This customization is yours alone: only you will see it. If all it asks for is{' '}
@@ -219,13 +232,13 @@ export function Authoring({ surface, onSaved, onCancel, startVerifier, personalO
 				<CheckboxControl
 					__nextHasNoMarginBottom
 					label="Only for me"
-					help="Shown to you alone, whatever its audience says. It still needs approval. A customization for everyone is a new one, with its own id."
+					help="Shown to you alone, as one of the roles its audience names. It still needs approval. A customization for everyone is a new one, with its own id."
 					checked={chosePersonal}
 					onChange={(checked) => (busy ? undefined : setPersonal(checked))}
 				/>
 			</div>
 			<div style={{ display: 'flex', gap: 8 }}>
-				<Button variant="primary" isBusy={busy} disabled={busy || !validation.ok || !current} onClick={() => void build()}>
+				<Button variant="primary" isBusy={busy} disabled={busy || !validation.ok || !current || notForMe} onClick={() => void build()}>
 					Build it
 				</Button>
 				<Button variant="tertiary" disabled={busy} onClick={onCancel}>
