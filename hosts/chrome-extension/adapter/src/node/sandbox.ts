@@ -1,4 +1,4 @@
-import { FixtureError, SandboxCallError, verifyBuild, type Build, type Sandbox, type Spec, type Surface, type Verification } from '@swissspidy/graft-core';
+import { compileSchema, FixtureError, SandboxCallError, verifyBuild, type Build, type Sandbox, type Spec, type Surface, type Verification } from '@swissspidy/graft-core';
 import { startTasklet, type TaskletServer, type TaskletVersion } from '../../../fixtures/tasklet/server.ts';
 import { createCan, usableScopes } from '../host/can.ts';
 import { CallError, perform, viewerRole, type Fetch } from '../host/http.ts';
@@ -75,6 +75,10 @@ export function connectSandbox(url: string, initial?: Surface): FixtureSandbox {
 			const declared = current().capabilities[capability];
 			if (!declared) {
 				throw new SandboxCallError('graft_unknown_capability', `The app has no "${capability}".`);
+			}
+			// As the gateway does, so a build cannot pass its checks with an input every real call would refuse.
+			if (!compileSchema(declared.input as object)(input ?? {})) {
+				throw new SandboxCallError('graft_invalid_input', `Invalid input for "${capability}".`);
 			}
 			try {
 				return await perform(declared, input ?? {}, url, await sessionFetch(user));

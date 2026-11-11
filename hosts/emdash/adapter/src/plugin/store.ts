@@ -75,6 +75,12 @@ export function createStore(kv: KV, surface: () => Promise<Surface>) {
 		if (previous && previous !== version) {
 			transition(previous, 'supersede');
 		}
+		// Older versions still waiting for approval go back to drafts: approving one later would put it over this newer one.
+		for (const older of record.versions) {
+			if (older.n < version.n && older.state === 'needs_approval') {
+				transition(older, 'decline');
+			}
+		}
 	};
 
 	/**
@@ -162,6 +168,11 @@ export function createStore(kv: KV, surface: () => Promise<Surface>) {
 			}
 			if (version.state !== 'draft' || !version.build) {
 				throw new StoreError(`Version ${n} of "${id}" is ${version.state}${version.build ? '' : ' without a build'}; only built drafts take a verification.`);
+			}
+			// An older draft (one declined when a newer version went live, say) does not come back over that newer one.
+			const live = activeVersion(record);
+			if (live && live.n > version.n) {
+				throw new StoreError(`Version ${live.n} of "${id}" is live; version ${n} is older and cannot replace it. Install it again as a new version.`);
 			}
 			await settle(record, version, verification, await surface());
 			await kv.set(key(id), record);

@@ -42,7 +42,7 @@ export async function validateSurface(value: unknown): Promise<SurfaceValidation
 
 	for (const [name, slot] of Object.entries(surface.slots)) {
 		const path = `/slots/${escape(name)}`;
-		if (slot.successor && !surface.slots[slot.successor]) {
+		if (slot.successor && !Object.hasOwn(surface.slots, slot.successor)) {
 			error('surface-unknown-slot', `${path}/successor`, `Slot "${name}" names unknown successor "${slot.successor}".`);
 		}
 		checkEmbedded(slot.options, `${path}/options`, diagnostics);

@@ -1,9 +1,9 @@
 import { fileURLToPath } from 'node:url';
 import { build as esbuild } from 'esbuild';
 import { chromium, type Browser, type BrowserContext } from '@playwright/test';
-import { canonicalJson, hashSurface, sha256, staticCheck, type Build, type JsonSchema, type LadderStart, type RefChange, type Surface } from '@swissspidy/graft-core';
+import { canonicalJson, compileSchema, hashSurface, sha256, staticCheck, type Build, type JsonSchema, type LadderStart, type RefChange, type Surface } from '@swissspidy/graft-core';
 import type { Resolved } from '../host/anchor.ts';
-import { buildRequest, checkOutput, type Fetch } from '../host/http.ts';
+import { buildRequest, checkOutput, viewerRole, type Fetch } from '../host/http.ts';
 import { appModel, httpBinding, type Anchor } from '../host/surface.ts';
 
 /**
@@ -48,6 +48,8 @@ export interface CapabilityObservation {
 	problems?: string[];
 	/** Keys the answer has that the surface does not declare (dropped by the gateway). */
 	undeclared?: string[];
+	/** The app says the endpoint is not there (404, 410), which a failure that may pass (401, 500, a sign-in page) does not. */
+	gone?: boolean;
 	reason?: string;
 }
 
@@ -118,6 +120,56 @@ function mergeShapes(a: JsonSchema, b: JsonSchema): JsonSchema {
 	return merged;
 }
 
+const isPlain = (value: unknown): value is Record<string, unknown> => typeof value === 'object' && value !== null && !Array.isArray(value);
+
+/**
+ * The output a capability has now, from what it declared and an answer
+ * that no longer fits: the declared schema wherever the answer still fits
+ * it, the answer's shape only where it does not.
+ *
+ * A key the surface never declared stays out, as before the drift, even
+ * where it looks like the new name of one that went: taking it in would
+ * hand builds a field nobody reviewed. So the result only ever narrows
+ * what was declared, and does not depend on the probe account's data (a
+ * null due date here, an empty list there).
+ */
+export function driftedOutput(declared: JsonSchema, value: unknown): JsonSchema {
+	if (typeof declared !== 'object' || declared === null || compileSchema(declared as object)(value)) {
+		return declared;
+	}
+	if (Array.isArray(value) && typeof declared.items === 'object' && declared.items !== null) {
+		const items = value.map((item) => driftedOutput(declared.items as JsonSchema, item));
+		return items.length === 0 ? declared : { ...declared, items: items.reduce(mergeShapes) };
+	}
+	if (isPlain(value) && isPlain(declared.properties)) {
+		const declaredProps = declared.properties as Record<string, JsonSchema>;
+		// Only what was declared is kept. A key the answer gained is never taken in, even next to one that went:
+		// it may be that key's new name, or a field the surface always withheld, and an answer cannot tell which.
+		// The probe lists such keys as `undeclared`, and a person adds the ones builds may read to the description.
+		const properties: Record<string, JsonSchema> = {};
+		for (const key of Object.keys(value).sort()) {
+			if (Object.hasOwn(declaredProps, key)) {
+				properties[key] = driftedOutput(declaredProps[key]!, value[key]);
+			}
+		}
+		const required = ((declared.required as string[] | undefined) ?? []).filter((key) => key in value);
+		return { ...declared, properties, required };
+	}
+	// Another kind of value altogether: there is nothing declared to keep, and nothing of the answer is taken in.
+	return bareShape(value);
+}
+
+/** The kind of a value and no more: an object with no properties, a list of such. Nothing in it reaches a build. */
+function bareShape(value: unknown): JsonSchema {
+	if (Array.isArray(value)) {
+		return { type: 'array', items: value.length > 0 ? bareShape(value[0]) : { type: 'object', properties: {} } };
+	}
+	if (isPlain(value)) {
+		return { type: 'object', properties: {} };
+	}
+	return shapeOf(value);
+}
+
 /**
  * Paths of keys an answer has that its schema does not declare
  * (`/tasks/[]/dueDate`): what the app added. With the answer's problems,
@@ -154,7 +206,9 @@ function contextFetch(context: BrowserContext): Fetch {
 			...(init.body ? { data: init.body as string } : {}),
 			maxRedirects: 0,
 		});
-		return new Response(new Uint8Array(await response.body()), { status: response.status(), headers: response.headers() });
+		// A status that has no body takes none: Response throws for one, and the probe would end there.
+		const empty = [204, 205, 304].includes(response.status());
+		return new Response(empty ? null : new Uint8Array(await response.body()), { status: response.status(), headers: response.headers() });
 	};
 }
 
@@ -168,6 +222,10 @@ export async function observe(surface: Surface, options: ObserveOptions): Promis
 		const page = await context.newPage();
 		if (options.probes.session) {
 			await page.goto(new URL(options.probes.session, options.url).href);
+			// Signed out, every page is the sign-in page and every read a 401: that would read as the whole app having changed.
+			if ((await viewerRole(model.viewer, options.url, contextFetch(context))) === undefined) {
+				throw new Error(`The probe is not signed in to ${options.url} after opening ${options.probes.session}: the app does not say who the viewer is. Nothing was probed.`);
+			}
 		}
 		const script = await resolverScript();
 		const slots: Record<string, SlotObservation> = {};
@@ -194,7 +252,7 @@ export async function observe(surface: Surface, options: ObserveOptions): Promis
 			const { url, init } = buildRequest(httpBinding(capability), options.probes.inputs[id], options.url);
 			const response = await fetch(url, init);
 			if (!response.ok) {
-				capabilities[id] = { status: 'broken', problems: [`The app answered ${response.status}.`] };
+				capabilities[id] = { status: 'broken', problems: [`The app answered ${response.status}.`], ...(response.status === 404 || response.status === 410 ? { gone: true } : {}) };
 				continue;
 			}
 			const parsed = await response.json().then(
@@ -210,7 +268,7 @@ export async function observe(surface: Surface, options: ObserveOptions): Promis
 			// Positions in lists are data, not structure: "/tasks/3 …" and "/tasks/0 …" are the same problem.
 			const problems = [...new Set(checkOutput(capability, body).problems.map((p) => p.replace(/\/\d+(?=\/|\s|$)/g, '/[]')))].sort();
 			const undeclared = undeclaredKeys(capability.output, body);
-			capabilities[id] = { status: problems.length === 0 ? 'ok' : 'broken', shape: shapeOf(body), ...(problems.length ? { problems } : {}), ...(undeclared.length ? { undeclared } : {}) };
+			capabilities[id] = { status: problems.length === 0 ? 'ok' : 'broken', shape: driftedOutput(capability.output, body), ...(problems.length ? { problems } : {}), ...(undeclared.length ? { undeclared } : {}) };
 		}
 		const fingerprint = `sha256:${await sha256(
 			canonicalJson({
@@ -246,7 +304,8 @@ export const observedVersion = (fingerprint: string) => `observed-${fingerprint.
  * The surface the app actually offers, from what the probe observed:
  * moved anchors re-anchored (the selector that found them goes first),
  * slots whose anchor is gone removed, capabilities whose answers broke
- * given the observed shape. Hashed, with the declared surface as previous.
+ * given the output they have now (driftedOutput), and capabilities the
+ * app answers 404 or 410 for removed. Hashed, with the declared surface as previous.
  */
 export async function observedSurface(surface: Surface, observation: Observation): Promise<Surface> {
 	const model = appModel(surface);
@@ -264,6 +323,11 @@ export async function observedSurface(surface: Surface, observation: Observation
 	const capabilities: Surface['capabilities'] = {};
 	for (const [id, capability] of Object.entries(surface.capabilities)) {
 		const seen = observation.capabilities[id];
+		if (seen?.status === 'broken' && seen.gone) {
+			// The app says it is not there: it no longer offers it, as a slot whose anchor is gone.
+			// Any other failure without an answer to read (a 500, a sign-in page) may pass: the capability stays as declared.
+			continue;
+		}
 		capabilities[id] = seen?.status === 'broken' && seen.shape ? { ...capability, output: seen.shape } : capability;
 	}
 	const observed: Surface = {

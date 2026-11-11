@@ -16,4 +16,14 @@ describe('WordPress check descriptions', () => {
 			'empty-state: Given an editor "e" and no posts, when "e" opens it, then the list is empty and the page says "Nothing to review".',
 		]);
 	});
+
+	it('say what a post assertion asserts, and nothing it does not', () => {
+		const say = (post: Record<string, unknown>) => describers.assertion!('post', post);
+		expect(say({ title: 'A', status: 'publish' })).toBe('the post "A" is published');
+		expect(say({ title: 'A', excerpt: 'Short.' })).toBe('the post "A" has the excerpt "Short."');
+		expect(say({ title: 'A', status: 'draft', meta: { sold_out: true, venue: null }, terms: { audience: ['family'], genre: [] } })).toBe(
+			'the post "A" is draft, has "sold_out" set to true, has no "venue", has exactly the "audience" terms "family" and has no "genre" terms',
+		);
+		expect(say({ title: 'A' })).toBe('the post "A" exists');
+	});
 });

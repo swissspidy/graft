@@ -47,7 +47,7 @@ export function normalizeWordPressSchema(schema: unknown): JsonSchema {
 		}
 		if (SCHEMA_MAPS.includes(key)) {
 			out[key] = mapValues(emptyToObject(value), normalizeWordPressSchema);
-		} else if (key === 'items' && Array.isArray(value)) {
+		} else if (key === 'items' && Array.isArray(value) && value.length > 0) {
 			out.prefixItems = value.map(normalizeWordPressSchema);
 		} else if (SCHEMA_VALUES.includes(key) && (isObject(value) || Array.isArray(value))) {
 			out[key] = normalizeWordPressSchema(value);

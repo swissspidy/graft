@@ -2,6 +2,7 @@ import { cpSync, mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, describe, expect, it, vi } from 'vitest';
+import { checkBuildFile } from '../src/build.ts';
 import { checkFiles, formatCheck } from '../src/check.ts';
 import { main } from '../src/main.ts';
 
@@ -193,5 +194,29 @@ describe('graft check', () => {
 	it('exits 2 without paths', async () => {
 		vi.spyOn(console, 'error').mockImplementation(() => {});
 		expect(await main(['check'])).toBe(2);
+	});
+});
+
+describe('graft build --fix-refs', () => {
+	const files = (dir: string) => ({ build: join(dir, 'builds/upcoming-events.json'), options: { surface: join(dir, 'surface.json'), spec: join(dir, 'specs/upcoming-events.md'), fixRefs: true } });
+
+	it('re-stamps a build whose refs are stale', async () => {
+		const { build, options } = files(copyAgency());
+		editJson(build, (value) => {
+			value.refs.capabilities = [];
+		});
+		expect(await checkBuildFile(build, options)).toMatchObject({ ok: true, fixed: true });
+		expect(JSON.parse(readFileSync(build, 'utf8')).refs.capabilities.length).toBeGreaterThan(0);
+	});
+
+	it('leaves a build that is still invalid as it was, so its stale spec hash keeps showing', async () => {
+		const { build, options } = files(copyAgency());
+		editJson(build, (value) => {
+			value.spec.hash = 'sha256:stale';
+			value.checks[0].criterion = 'gone';
+		});
+		const before = readFileSync(build, 'utf8');
+		expect(await checkBuildFile(build, options)).toMatchObject({ ok: false, fixed: false });
+		expect(readFileSync(build, 'utf8')).toBe(before);
 	});
 });

@@ -101,7 +101,7 @@ the observed one (`upgradeAfterDrift`, `pnpm drift:extension --spec`):
 | A selector broke, the landmark is still there (Tasklet 2) | The anchor's selectors gain the one that finds it now; the slot's contract (what it provides) is unchanged | static check finds no change: **reverify**, survived |
 | An anchor is gone (Tasklet 3's toolbar) | The slot is removed | **re-anchor** to its successor or a slot that provides the same props; else regenerate |
 | An answer gained fields | Unchanged; the fingerprint records the new keys | Nothing: the gateway drops them |
-| An answer lost or renamed a field (Tasklet 3's `due`) | The capability's output is the observed shape | **regenerate** with the frozen checks, or failed (suspended) without a model |
+| An answer lost or renamed a field (Tasklet 3's `due`) | The capability's output is what is left of the declared one: the field is dropped, and no field the answer gained is taken in until a person adds it to the description | **regenerate** with the frozen checks, or failed (suspended) without a model |
 | A write endpoint changed | Not probed | Seen at run time as the app's refusal; the sandbox copy has to be updated |
 
 Re-anchoring therefore happens at two levels. Re-anchoring *in the DOM*

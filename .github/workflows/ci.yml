@@ -1,7 +1,9 @@
 name: CI
 
 on:
+  # Branches are tested through their pull request: testing their pushes too ran every job twice.
   push:
+    branches: [main]
   pull_request:
   workflow_dispatch:
   schedule:
@@ -9,7 +11,8 @@ on:
     - cron: '17 5 * * 1'
 
 concurrency:
-  group: ci-${{ github.ref }}
+  # By pull request number: two forks may both call their branch the same.
+  group: ci-${{ github.event.pull_request.number || github.ref }}
   cancel-in-progress: true
 
 # Jobs only read the repository.
@@ -23,7 +26,7 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
-      - uses: pnpm/action-setup@ea17c68df8912ef543352723c149a84f56e3d413 # v6.1.0
+      - uses: pnpm/action-setup@73e46992e05b19abd31f2f3c20e0e7370d762115 # v6.1.1
       - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           node-version: 24
@@ -45,7 +48,7 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
-      - uses: pnpm/action-setup@ea17c68df8912ef543352723c149a84f56e3d413 # v6.1.0
+      - uses: pnpm/action-setup@73e46992e05b19abd31f2f3c20e0e7370d762115 # v6.1.1
       - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           node-version: 24
@@ -93,7 +96,7 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
-      - uses: pnpm/action-setup@ea17c68df8912ef543352723c149a84f56e3d413 # v6.1.0
+      - uses: pnpm/action-setup@73e46992e05b19abd31f2f3c20e0e7370d762115 # v6.1.1
       - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           node-version: 24
@@ -103,8 +106,6 @@ jobs:
         run: pnpm surface:emdash --check && pnpm manifest:emdash --check
       - name: Validate the plugin manifest with EmDash's plugin CLI
         run: pnpm dlx @emdash-cms/plugin-cli@0.13.1 validate hosts/emdash/adapter
-      - name: Validate the example specs against the EmDash surface
-        run: pnpm graft validate --surface hosts/emdash/adapter/surfaces/1.3.json examples/emdash/specs
       - name: Verify the example builds in an EmDash sandbox
         run: pnpm verify:emdash
       - name: Smoke test the plugin in EmDash (install, approve, serve, refuse)
@@ -138,7 +139,7 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
-      - uses: pnpm/action-setup@ea17c68df8912ef543352723c149a84f56e3d413 # v6.1.0
+      - uses: pnpm/action-setup@73e46992e05b19abd31f2f3c20e0e7370d762115 # v6.1.1
       - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           node-version: 24
@@ -148,8 +149,6 @@ jobs:
         run: pnpm exec playwright install --with-deps chromium
       - name: Check the checked-in Tasklet surface is up to date (fingerprinted against the fixture app)
         run: pnpm surface:extension --check
-      - name: Validate the example spec against the Tasklet surface
-        run: pnpm graft validate --surface hosts/chrome-extension/adapter/surfaces/tasklet.json examples/chrome-extension/specs
       - name: Verify the example build against a copy of the app
         run: pnpm verify:extension
       - name: The unpacked extension in Chromium, and drift detection feeding the upgrade ladder
@@ -169,7 +168,7 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
-      - uses: pnpm/action-setup@ea17c68df8912ef543352723c149a84f56e3d413 # v6.1.0
+      - uses: pnpm/action-setup@73e46992e05b19abd31f2f3c20e0e7370d762115 # v6.1.1
       - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           node-version: 24
@@ -182,13 +181,15 @@ jobs:
   nightly-canary:
     # An early warning about the next WordPress: does every customization in
     # the corpus survive it? Upstream breakage should not block changes here.
+    # Weekly (and on request): it tests WordPress, not the change.
+    if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
     continue-on-error: true
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
-      - uses: pnpm/action-setup@ea17c68df8912ef543352723c149a84f56e3d413 # v6.1.0
+      - uses: pnpm/action-setup@73e46992e05b19abd31f2f3c20e0e7370d762115 # v6.1.1
       - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           node-version: 24

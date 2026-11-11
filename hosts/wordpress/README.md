@@ -12,18 +12,29 @@ Everything Graft needs to target WordPress 7.1+.
 
 ## Surface v0
 
-- **Slots:** `admin.page` and `dashboard.widget` (owned), and
+- **Slots:** `admin.page` and `dashboard.widget` (owned),
   `posts.list.row-actions` (extension slot on the Posts screen, anchored to
-  the `post_row_actions` filter, provides the row's post).
+  the `post_row_actions` filter, provides the row's post), and
+  `post.editor.panel` (a panel in the block editor's sidebar, provides the
+  post being edited).
 - **UI:** builds are A2UI surfaces in the `graft:wordpress` catalog
   ([ADR 0009](../../docs/adr/0009-a2ui.md)); the catalog belongs to the
   adapter, not the surface.
-- **Capabilities:** `posts.list`, `posts.update_status` and
-  `posts.update_review_status` (draft ↔ pending only) (Graft abilities), `site.info` and `users.current` (core abilities). Builds only
+- **Capabilities:** `posts.list`, `terms.list`, `posts.update_status`,
+  `posts.update_review_status` (draft ↔ pending only),
+  `posts.update_fields` (title and excerpt), `posts.update_meta` (custom
+  fields, on sites that expose some) and `posts.set_terms` (Graft
+  abilities), `site.info` and `users.current` (core abilities). Builds only
   ever reference these names; the ability behind a name can change, and
   that change is a surface migration.
-- **Scopes:** `posts:read`, `posts.review:write`, `posts.status:write`, `site:read`,
-  `users.current:read`, each with the WordPress capabilities it maps to.
+- **Scopes:** `posts:read`, `posts:write`, `posts.meta:write`,
+  `posts.terms:write`, `posts.review:write`, `posts.status:write`,
+  `site:read`, `users.current:read`, each with the WordPress capabilities
+  it maps to.
+- **Triggers:** the events, capabilities and limits a customization may
+  use when it acts on its own ([ADR 0010](../../docs/adr/0010-scheduled-actions.md)).
+
+`plugin/surfaces/7.1.json` is the full list; this section only names it.
 - **Audiences:** the roles of a fresh install.
 
 ## Sites with their own content, and agencies
@@ -101,7 +112,8 @@ a hash and need no rebuild.
 - **Authoring.** "New customization" on the same screen opens a spec
   editor that validates against the site's surface as you type and
   compiles in the browser. Model requests go to `POST /graft/v1/generate`
-  (administrators only), which answers through `wp_ai_client_prompt()`, so
+  (administrators, and people writing for themselves within their daily
+  limit), which answers through `wp_ai_client_prompt()`, so
   provider keys stay in the site's AI settings; the `graft_pre_generate`
   filter can answer instead (the e2e tests script it). Compiled builds are
   saved as drafts until they are verified, e.g. with `graft site verify`,
@@ -123,8 +135,33 @@ a hash and need no rebuild.
   pause, dry run and run now, a pause-all switch and the recent runs
   (`graft_trigger_ran` fires for each). `GRAFT_DISABLE_TRIGGERS` turns
   them off for good.
+- **Getting back.** `define( 'GRAFT_SAFE_MODE', true )` in `wp-config.php`
+  serves no customization and runs no trigger; Tools → Customizations
+  still works and says so, so the one that causes trouble can be archived
+  ([ADR 0013](../../docs/adr/0013-operating-and-recovering.md)).
+- **What happened.** An active customization that shows nowhere says why
+  ("Not showing": no build for the site as it is now, permissions not
+  approved, ...). **History** lists who wrote, built, approved, declined
+  and archived what, and what each approval allowed
+  (`GET /graft/v1/changes`; `graft_change_recorded` fires for each).
+- **For one person.** "Only for me" when writing a customization shows it
+  to its author alone, as one of the roles its audience names. People who can edit posts and are not
+  administrators have the same screen for customizations of their own:
+  one that only reads and has no triggers goes live when its checks pass,
+  anything else waits for an administrator, and model calls go through the site's AI provider
+  up to a daily limit
+  ([ADR 0014](../../docs/adr/0014-customizations-of-ones-own.md);
+  `graft_personal_authoring`, `graft_self_service_scopes`,
+  `graft_personal_generate_limit`).
 - **REST.** `GET /graft/v1/surface` (the site's current surface),
-  `GET/POST /graft/v1/specs`,
+  `GET /graft/v1/host-surface`, `GET /graft/v1/surfaces` and
+  `/surfaces/<hash>` (what the host offers now, and the snapshots the
+  plugin knows), `GET /graft/v1/audit` (the gateway's latest refusals),
+  `GET /graft/v1/changes` (who changed what),
+  `POST /graft/v1/generate` (a model request through the site's AI
+  client), `GET /graft/v1/sandbox-package` (what in-browser verification
+  installs), `POST /graft/v1/call` (the capability gateway; any signed-in
+  user), `GET/POST /graft/v1/specs`,
   `POST /graft/v1/specs/<id>/versions/<n>/builds|approve|decline|archive`
   (administrators; users may create `user`-scoped specs),
   `GET /graft/v1/triggers` and
@@ -142,12 +179,12 @@ fixtures, renders the build headlessly for the `view_as` user, with data
 from real ability calls, performs the steps, and evaluates the
 expectations over a semantic snapshot.
 
-- **Fixtures:** `{ users: [{ as, role }], posts: [{ title, status, author? }] }`,
+- **Fixtures:** `{ users: [{ as, role }], posts: [{ title, status, author?, excerpt?, type?, meta?, terms? }], terms? }`,
   where `author` is a user alias.
 - **Expectations:** `rows` (primary labels of the table, any order),
   `columns`, `text`, `action` (with optional `row` matcher and
   `available`), `run` (what the latest trigger run did), and the host
-  assertion `post` (`{ title, status }`).
+  assertion `post` (`{ title }` with any of `status`, `excerpt`, `meta`, `terms`).
 - **Triggers:** the step `{ trigger, target? }` runs one with the plugin's
   own runner (the sandbox's `fire` operation), as the automation user with
   the permissions the spec lists for it, at the check's clock. For an event
@@ -159,9 +196,10 @@ expectations over a semantic snapshot.
   same web_core and catalog the browser uses; table cells read as
   `adapter/src/cells.ts` formats them for both.
 
-The grant is simulated as the spec's requested permissions, and the
-gateway's checks (capability in the build, scopes granted) are applied as
-in production.
+The grant is simulated as the spec's requested permissions. The gateway's
+checks (capability in the build, scopes granted) are applied by the
+verifier before it calls the sandbox, which runs the ability itself; the
+plugin's own gateway is covered by `pnpm test:wp` and `pnpm test:e2e`.
 
 ## Upgrades
 

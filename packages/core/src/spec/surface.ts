@@ -32,7 +32,7 @@ export function checkManifestAgainstSurface(
 	}
 
 	const { slot: slotId, ...options } = manifest.mount;
-	const slot = surface.slots[slotId];
+	const slot = Object.hasOwn(surface.slots, slotId) ? surface.slots[slotId] : undefined;
 	if (!slot) {
 		report(
 			'error',
@@ -99,11 +99,11 @@ export function checkManifestAgainstSurface(
 					report('error', 'trigger-at', `${path}/schedule/at`, 'A time of day ("at") only goes with a schedule in days, e.g. every: 1d.');
 				}
 			}
-			if (trigger.event && !host.events[trigger.event]) {
+			if (trigger.event && !Object.hasOwn(host.events, trigger.event)) {
 				report('error', 'trigger-unknown-event', `${path}/event`, `Unknown event "${trigger.event}". Available: ${Object.keys(host.events).join(', ') || 'none'}.`);
 			}
 			trigger.permissions.forEach((scope, i) => {
-				if (!surface.scopes[scope]) {
+				if (!Object.hasOwn(surface.scopes, scope)) {
 					report('error', 'permission-unknown-scope', `${path}/permissions/${i}`, `Unknown permission "${scope}". Available: ${Object.keys(surface.scopes).join(', ')}.`);
 				} else if (!host.capabilities.some((name) => surface.capabilities[name]?.scopes.includes(scope))) {
 					report('error', 'trigger-scope-unusable', `${path}/permissions/${i}`, `No capability triggers may use needs "${scope}", so granting it does nothing.`);

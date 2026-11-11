@@ -139,8 +139,8 @@
         {
           "description": "A plain object. Keys starting with $ are reserved for expressions.",
           "type": "object",
-          "propertyNames": { "pattern": "^[^$]" },
-          "additionalProperties": { "$ref": "#/$defs/value" }
+          "patternProperties": { "^[^$]": { "$ref": "#/$defs/value" } },
+          "additionalProperties": false
         }
       ]
     },

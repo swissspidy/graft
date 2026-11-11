@@ -42,10 +42,22 @@ let mismatches = 0;
 try {
 	// --scenario <name> runs one.
 	const only = process.argv.includes('--scenario') ? process.argv[process.argv.indexOf('--scenario') + 1] : undefined;
-	for (const scenario of scenarios.filter((s) => !only || s.name === only)) {
+	const chosen = scenarios.filter((s) => !only || s.name === only);
+	if (chosen.length === 0) {
+		mismatches++;
+		console.log(`✖ No scenario "${only}". Scenarios: ${scenarios.map((s) => s.name).join(', ')}.`);
+	}
+	for (const scenario of chosen) {
 		const { report } = await runWordPressCanary({ corpus, from, scenario, sandbox, regenerate: scriptedRegenerate });
 		console.log(`\n## ${scenario.name}: ${scenario.description}\n`);
 		console.log(formatCanaryReport(report));
+		// A customization the corpus lost would otherwise pass by not being there.
+		for (const spec of Object.keys(scenario.expect)) {
+			if (!report.entries.some((entry) => entry.spec === spec)) {
+				mismatches++;
+				console.log(`✖ ${spec}: expected ${scenario.expect[spec]}, but no tenant in the corpus has it`);
+			}
+		}
 		for (const entry of report.entries) {
 			const expected = scenario.expect[entry.spec];
 			if (entry.outcome !== expected) {

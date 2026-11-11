@@ -3,6 +3,25 @@ import { buildHash, extractRefs, FixtureError, validateSpec, verificationProblem
 import { createCan, fakeSandbox, fixtures, pageBuild, spec, specSource, surface } from './fixtures/acme.ts';
 
 describe('verifyBuild', () => {
+	it('fails a check whose expectation is malformed or names two things, instead of passing part of it or throwing', async () => {
+		const build = await pageBuild();
+		build.checks = [
+			{ criterion: 'open-only', fixtures, view_as: 'm', expect: [{ rows: 1 } as never] },
+			{ criterion: 'close', fixtures, view_as: 'm', expect: [{ text: 'NOT SHOWN ANYWHERE', rows: ['Open A'] }] },
+			// A kind decided before the view is read is one thing too.
+			{ criterion: 'clerks', fixtures, view_as: 'm', expect: [{ refused: 'close', text: 'NOT SHOWN ANYWHERE' } as never] },
+		];
+		const result = await verifyBuild({ build, spec, surface, sandbox: fakeSandbox(), createCan });
+		expect(result.results.map((r) => [r.criterion, r.passed])).toEqual([
+			['open-only', false],
+			['close', false],
+			['clerks', false],
+		]);
+		expect(result.results[2]!.failures[0]).toContain('an expectation checks one thing');
+		expect(result.results[0]!.failures[0]).toContain('"rows" must be a list of row labels');
+		expect(result.results[1]!.failures[0]).toContain('an expectation checks one thing');
+	});
+
 	it('passes a build that meets its criteria', async () => {
 		const sandbox = fakeSandbox();
 		const result = await verifyBuild({ build: await pageBuild(), spec, surface, sandbox, createCan });

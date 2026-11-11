@@ -1,6 +1,6 @@
-import { useEffect, useMemo, useState } from 'react';
+import { Fragment, useEffect, useMemo, useState } from 'react';
 import apiFetch from '@wordpress/api-fetch';
-import { Button, Notice } from '@wordpress/components';
+import { Button, CheckboxControl, Notice } from '@wordpress/components';
 import { compileSpec, hashSpec, validateSpec, type Build, type CompileEvent, type ModelClient, type Spec, type Surface, type Verification } from '@swissspidy/graft-core';
 import { hostGuide } from '../guide.ts';
 
@@ -58,14 +58,26 @@ export interface AuthoringProps {
 	 * it. Without it, or when it fails to start, builds are saved unverified.
 	 */
 	startVerifier?: () => Promise<(build: Build, spec: Spec) => Promise<Verification>>;
+	/**
+	 * The author is not an administrator: the customization is theirs
+	 * alone, and is only saved once its checks passed (ADR 0014).
+	 */
+	personalOnly?: boolean;
+	/** The permissions a customization of one's own may have without an administrator's approval. */
+	selfService?: string[];
+	/** The author's roles on the site: a customization of their own is shown to them as one of its audience. */
+	roles?: string[];
 }
 
-export function Authoring({ surface, onSaved, onCancel, startVerifier }: AuthoringProps) {
+export function Authoring({ surface, onSaved, onCancel, startVerifier, personalOnly = false, selfService = [], roles = [] }: AuthoringProps) {
 	const [source, setSource] = useState(TEMPLATE);
 	const [log, setLog] = useState<string[]>([]);
 	const [busy, setBusy] = useState(false);
 	const [error, setError] = useState<string | null>(null);
 	const [debounced, setDebounced] = useState(source);
+	// For the person writing it only: a way to live with a customization before the whole audience gets it.
+	const [chosePersonal, setPersonal] = useState(false);
+	const personal = personalOnly || chosePersonal;
 
 	useEffect(() => {
 		const timer = setTimeout(() => setDebounced(source), 300);
@@ -73,6 +85,9 @@ export function Authoring({ surface, onSaved, onCancel, startVerifier }: Authori
 	}, [source]);
 	const validation = useMemo(() => validateSpec(debounced, { surface }), [debounced, surface]);
 	const current = debounced === source;
+	// A customization for oneself is shown to its author as one of the roles its spec names: its checks ran as those.
+	const audience = validation.spec?.manifest.audience ?? [];
+	const notForMe = personal && audience.length > 0 && !audience.some((role) => roles.includes(role));
 
 	const build = async () => {
 		const parsed = validateSpec(source, { surface });
@@ -87,12 +102,21 @@ export function Authoring({ surface, onSaved, onCancel, startVerifier }: Authori
 			const spec = parsed.spec;
 			let verify: ((build: Build, spec: Spec) => Promise<Verification>) | undefined;
 			let sandboxFailed: string | null = null;
+			if (personalOnly && !startVerifier) {
+				setError('This site does not check customizations in the browser, so you cannot build your own here. Ask an administrator.');
+				return;
+			}
 			if (startVerifier) {
 				setLog(['Starting a private WordPress in this browser to run the checks…']);
 				try {
 					verify = await startVerifier();
 				} catch (e) {
 					sandboxFailed = (e as { message?: string }).message ?? 'it did not start';
+					if (personalOnly) {
+						// Before any model call: nothing unverified of one's own can be saved.
+						setError(`The private WordPress that runs the checks could not start in this browser (${sandboxFailed}), and your customization can only be saved once its checks pass.`);
+						return;
+					}
 					setLog((lines) => [...lines, `The private WordPress could not start (${sandboxFailed}); the build will be saved unverified.`]);
 				}
 			}
@@ -120,18 +144,23 @@ export function Authoring({ surface, onSaved, onCancel, startVerifier }: Authori
 			const version = await apiFetch<{ version: number }>({
 				path: '/graft/v1/specs',
 				method: 'POST',
-				data: { source, manifest: parsed.spec.manifest, title: parsed.spec.title },
+				data: { source, manifest: parsed.spec.manifest, title: parsed.spec.title, ...(personal ? { scope: { type: 'user' } } : {}) },
 			});
-			await apiFetch({
+			const stored = await apiFetch<{ state: string }>({
 				path: `/graft/v1/specs/${parsed.spec.manifest.id}/versions/${version.version}/builds`,
 				method: 'POST',
 				data: { build: result.build, verification: result.verification ?? null },
 			});
 			const verified = result.verification?.passed === true;
+			const title = `"${parsed.spec.title}"`;
 			onSaved(
-				verified
-					? `"${parsed.spec.title}" was built and verified. Review and approve it below.`
-					: `"${parsed.spec.title}" was built. It needs verification before it can be approved${sandboxFailed ? ` (the in-browser check could not run: ${sandboxFailed})` : ''}.`,
+				stored.state === 'active'
+					? `${title} was built and verified, and is live for you: it only reads, so it needed no approval.`
+					: verified
+						? personalOnly
+							? `${title} was built and verified. It changes things, so an administrator has to approve it before you see it.`
+							: `${title} was built and verified. Review and approve it below.`
+						: `${title} was built. It needs verification before it can be approved${sandboxFailed ? ` (the in-browser check could not run: ${sandboxFailed})` : ''}.`,
 			);
 		} catch (e) {
 			setError((e as { message?: string }).message ?? 'Building failed.');
@@ -177,8 +206,39 @@ export function Authoring({ surface, onSaved, onCancel, startVerifier }: Authori
 					))}
 				</ol>
 			) : null}
+			{notForMe ? (
+				<Notice status="warning" isDismissible={false}>
+					<span data-graft-not-for-me="">
+						This customization is for you alone, but its audience ({audience.join(', ')}) does not include your role ({roles.join(', ') || 'none'}), so you would not see it. Add your
+						role to <code>audience</code>, and say in the criteria what you should see.
+					</span>
+				</Notice>
+			) : null}
+			{personalOnly ? (
+				<p data-graft-personal-only="">
+					This customization is yours alone: only you will see it. If all it asks for is{' '}
+					{selfService.length > 0
+						? selfService.map((scope, i) => (
+								<Fragment key={scope}>
+									{i ? ', ' : ''}
+									<code>{scope}</code>
+								</Fragment>
+							))
+						: 'nothing'}
+					, it goes live as soon as its checks pass. Anything more waits for an administrator.
+				</p>
+			) : null}
+			<div data-graft-personal-option="" hidden={personalOnly}>
+				<CheckboxControl
+					__nextHasNoMarginBottom
+					label="Only for me"
+					help="Shown to you alone, as one of the roles its audience names. It still needs approval. A customization for everyone is a new one, with its own id."
+					checked={chosePersonal}
+					onChange={(checked) => (busy ? undefined : setPersonal(checked))}
+				/>
+			</div>
 			<div style={{ display: 'flex', gap: 8 }}>
-				<Button variant="primary" isBusy={busy} disabled={busy || !validation.ok || !current} onClick={() => void build()}>
+				<Button variant="primary" isBusy={busy} disabled={busy || !validation.ok || !current || notForMe} onClick={() => void build()}>
 					Build it
 				</Button>
 				<Button variant="tertiary" disabled={busy} onClick={onCancel}>

@@ -219,16 +219,18 @@ async function runCheck(options: VerifyOptions, check: Check, index: number): Pr
 			view = view.map((item) => (item === instance ? snap({ slot: item.slot, data: item.data, entered }) : item));
 			continue;
 		}
+		let dropped: ReturnType<typeof findDrop>;
 		if ('drop' in step) {
 			// Dragging is pressing the action the record has for where it lands.
-			const dropped = findDrop(view, step.drop, step.on);
+			dropped = findDrop(view, step.drop, step.on);
 			if (!dropped) {
 				failures.push(`Step ${i + 1}: ${describeMatcher(step.drop)} cannot be dropped on "${step.on}".`);
 				return result();
 			}
 			step = { action: dropped.action.id, row: step.drop };
 		}
-		const found = findAction(view, step.action, step.row, step.direct === true);
+		// A drop presses the very button found for that target: another of the card's buttons may share its id.
+		const found = dropped ?? findAction(view, step.action, step.row, step.direct === true);
 		if (!found) {
 			failures.push(`Step ${i + 1}: no ${step.direct ? '' : 'available '}"${step.action}" action${step.row ? ` for ${describeMatcher(step.row)}` : ''}.`);
 			return result();
@@ -287,11 +289,12 @@ async function runCheck(options: VerifyOptions, check: Check, index: number): Pr
 	};
 	for (const expectation of check.expect) {
 		const failure =
-			'run' in expectation
+			expectationProblem(expectation) ??
+			('run' in expectation
 				? expectRun(expectation.run, runs)
 				: 'refused' in expectation
 					? refusedFailure(expectation, direct)
-					: await evaluateExpectation(expectation, merged, sandbox);
+					: await evaluateExpectation(expectation, merged, sandbox));
 		if (failure) {
 			failures.push(failure);
 		}
@@ -450,6 +453,31 @@ async function evaluateExpectation(expectation: Record<string, unknown>, snapsho
 	const [kind] = kinds as [string];
 	const { ok, actual } = await sandbox.assert(kind, expectation[kind]);
 	return ok ? undefined : `Expected ${kind} ${canonicalJson(expectation[kind])}, found ${canonicalJson(actual ?? null)}.`;
+}
+
+const VIEW_KINDS = ['rows', 'columns', 'text', 'cell', 'input', 'action', 'run', 'refused'];
+const strings = (value: unknown): value is string[] => Array.isArray(value) && value.every((item) => typeof item === 'string');
+
+/**
+ * Why an expectation cannot be evaluated as written, if it cannot: a check
+ * with a malformed expectation fails with that reason, it neither passes
+ * by having part of it ignored nor stops the whole run.
+ */
+export function expectationProblem(expectation: Record<string, unknown>): string | undefined {
+	const kinds = VIEW_KINDS.filter((kind) => kind in expectation);
+	if (kinds.length > 1) {
+		return `The expectation ${canonicalJson(expectation)} names ${list(kinds)}: an expectation checks one thing, so only the first would count. Write one expectation for each.`;
+	}
+	if ('rows' in expectation && !strings(expectation.rows)) {
+		return `"rows" must be a list of row labels, not ${canonicalJson(expectation.rows ?? null)}.`;
+	}
+	if ('columns' in expectation && !strings(expectation.columns)) {
+		return `"columns" must be a list of column labels, not ${canonicalJson(expectation.columns ?? null)}.`;
+	}
+	if ('cell' in expectation && (typeof expectation.cell !== 'object' || expectation.cell === null || Array.isArray(expectation.cell))) {
+		return `"cell" must be an object with "row", "column" and "text" or "tone", not ${canonicalJson(expectation.cell ?? null)}.`;
+	}
+	return undefined;
 }
 
 /**

@@ -131,13 +131,3 @@ function current_surface( bool $refresh = false ): ?array {
 	}
 	return $current;
 }
-
-/**
- * Whether a surface hash belongs to a shipped snapshot.
- *
- * @param string $hash Surface hash.
- * @return bool
- */
-function is_known_surface( string $hash ): bool {
-	return null !== surface_snapshot( $hash );
-}

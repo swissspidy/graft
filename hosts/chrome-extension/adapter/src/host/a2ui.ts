@@ -1,4 +1,4 @@
-import { createA2UIFormat, INPUT_GROUP, walkA2UI, type A2UIBuild, type A2UIFormatHost, type DrawnButton } from '@swissspidy/graft-a2ui';
+import { createA2UIFormat, INPUT_GROUP, localState, walkA2UI, type A2UIBuild, type A2UIFormatHost, type DrawnButton } from '@swissspidy/graft-a2ui';
 import { registerUiFormat, type Action, type Build, type EvalContext } from '@swissspidy/graft-core';
 
 /**
@@ -61,10 +61,33 @@ export interface Rendered {
 
 const TONES = new Set(['success', 'warning', 'error', 'info']);
 
-/** The value that identifies a row in a key: its id, else its position. */
-export function rowKey(row: unknown, index: number): string {
+/**
+ * The value that identifies a row in a key: its id, else a digest of what
+ * the row holds. Never its position: a click on a list that changed
+ * meanwhile would then land on whatever row took that place.
+ */
+export function rowKey(row: unknown, _index?: number): string {
 	const id = typeof row === 'object' && row !== null ? (row as { id?: unknown }).id : undefined;
-	return typeof id === 'string' || typeof id === 'number' ? String(id) : `#${index}`;
+	if (typeof id === 'string' || typeof id === 'number') {
+		// Content keys start with "~". An id that does too (or with the "=" that marks it) is marked, so that
+		// an id which happens to read like a row's content is never that row; every other id is itself.
+		const key = String(id);
+		return key.startsWith('~') || key.startsWith('=') ? `=${key}` : key;
+	}
+	// A short row is its own key. A longer one is cut down to two independent 32-bit hashes (FNV-1a and
+	// djb2) and its length: two different rows sharing all three is not something a list will meet.
+	const text = JSON.stringify(row) ?? '';
+	if (text.length <= 64) {
+		return `~${text}`;
+	}
+	let a = 0x811c9dc5;
+	let b = 5381;
+	for (const char of text) {
+		const code = char.codePointAt(0)!;
+		a = Math.imul(a ^ code, 0x01000193) >>> 0;
+		b = (Math.imul(b, 33) + code) >>> 0;
+	}
+	return `~${a.toString(36)}.${b.toString(36)}.${text.length.toString(36)}`;
 }
 
 /**
@@ -73,7 +96,9 @@ export function rowKey(row: unknown, index: number): string {
  * not drawn. `prefix` namespaces keys, so several customizations can share
  * a page.
  */
-export function renderA2UI(build: Build, ctx: EvalContext, prefix: string, state: Record<string, unknown> = {}): Rendered {
+export function renderA2UI(build: Build, ctx: EvalContext, prefix: string, sent: Record<string, unknown> = {}): Rendered {
+	// The state came from the page: only what the build's own actions set is taken from it.
+	const state = localState(build as unknown as A2UIBuild, sent);
 	const rendered: Rendered = { view: [], actions: [], problems: [] };
 	let out = rendered.view;
 	let n = 0;
@@ -91,7 +116,9 @@ export function renderA2UI(build: Build, ctx: EvalContext, prefix: string, state
 			}
 		},
 		button: (drawn) => {
-			const button = record(drawn, `${prefix}:b${n++}`);
+			// One of a list's buttons names its item, so a click on a list that changed meanwhile finds nothing instead of its neighbour.
+			const b = n++;
+			const button = record(drawn, `${prefix}:b${b}${drawn.row === undefined ? '' : `:${rowKey(drawn.row, b)}`}`);
 			if (button) {
 				out.push({ type: 'button', button });
 			}

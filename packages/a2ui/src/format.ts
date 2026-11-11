@@ -22,7 +22,7 @@ export function createA2UIFormat(host: A2UIFormatHost): UiFormat {
 		name: 'A2UI',
 		host: host.host,
 		handles: (build) => isA2UIBuild(build) && typeof build.ui.protocol === 'string' && build.ui.protocol.startsWith('a2ui/') && build.ui.catalogId === host.catalogId,
-		validate: (build, surface, spec) => validateA2UI(build, surface, host, spec),
+		validate: (build, surface) => validateA2UI(build, surface, host),
 		refs: (build) => a2uiRefs(build as unknown as A2UIBuild),
 		snapshot: (build, ctx, entered) => snapshotA2UI(build as unknown as A2UIBuild, ctx, entered, host),
 		migrate: (build, migration) => migrateA2UI(build as unknown as A2UIBuild, migration) as unknown as Build | undefined,
@@ -105,6 +105,12 @@ export function slotPropsUsedA2UI(build: A2UIBuild): string[] {
 		} else if (isObject(value)) {
 			if (typeof value.path === 'string' && value.path.startsWith('/slot/')) {
 				used.add(value.path.split('/')[2]!);
+			}
+			// A formatString template reads pointers as ${/slot/...}.
+			if (value.call === 'formatString' && isObject(value.args) && typeof value.args.value === 'string') {
+				for (const match of value.args.value.matchAll(/\$\{\s*\/slot\/([^/}\s]+)/g)) {
+					used.add(match[1]!);
+				}
 			}
 			Object.values(value).forEach(walk);
 		}

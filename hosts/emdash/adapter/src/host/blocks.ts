@@ -45,10 +45,33 @@ export const toneMarkers: Record<Tone, string> = { success: 'ðŸŸ¢', warning: 'ðŸ
 
 export const str = (value: unknown): string => (value === null || value === undefined ? '' : typeof value === 'string' ? value : typeof value === 'number' || typeof value === 'boolean' ? String(value) : JSON.stringify(value));
 
-/** The value that identifies a row in an action: its id, else its position. */
-export function rowKey(row: unknown, index: number): string {
+/**
+ * The value that identifies a row in an action: its id, else a digest of what
+ * the row holds. Never its position: a click on a list that changed
+ * meanwhile would then land on whatever row took that place.
+ */
+export function rowKey(row: unknown, _index?: number): string {
 	const id = typeof row === 'object' && row !== null ? (row as { id?: unknown }).id : undefined;
-	return typeof id === 'string' || typeof id === 'number' ? String(id) : `#${index}`;
+	if (typeof id === 'string' || typeof id === 'number') {
+		// Content keys start with "~". An id that does too (or with the "=" that marks it) is marked, so that
+		// an id which happens to read like a row's content is never that row; every other id is itself.
+		const key = String(id);
+		return key.startsWith('~') || key.startsWith('=') ? `=${key}` : key;
+	}
+	// A short row is its own key. A longer one is cut down to two independent 32-bit hashes (FNV-1a and
+	// djb2) and its length: two different rows sharing all three is not something a list will meet.
+	const text = JSON.stringify(row) ?? '';
+	if (text.length <= 64) {
+		return `~${text}`;
+	}
+	let a = 0x811c9dc5;
+	let b = 5381;
+	for (const char of text) {
+		const code = char.codePointAt(0)!;
+		a = Math.imul(a ^ code, 0x01000193) >>> 0;
+		b = (Math.imul(b, 33) + code) >>> 0;
+	}
+	return `~${a.toString(36)}.${b.toString(36)}.${text.length.toString(36)}`;
 }
 
 /** What a button is: its id and label, whether the viewer may use it, and what it does. */

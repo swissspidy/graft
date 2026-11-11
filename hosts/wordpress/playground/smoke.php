@@ -167,6 +167,7 @@ function call( string $spec, string $capability, $input = null ) {
 }
 
 check( 'PHP and TypeScript hash specs the same', Graft\hash_spec( $queue['source'] ) === $queue['hash'] && $queue['build']['spec']['hash'] === $queue['hash'] );
+check( 'and trailing spaces JavaScript trims but rtrim() does not', Graft\hash_spec( str_replace( "\n", "\u{00A0}\u{2028}\n", $queue['source'] ) ) === $queue['hash'] );
 check( 'PHP hash ignores CRLF and trailing spaces', Graft\hash_spec( str_replace( "\n", "  \r\n", $queue['source'] ) ) === $queue['hash'] );
 check( 'the plugin recognizes this surface', null !== Graft\current_surface() && Graft\current_surface()['hash'] === $queue['build']['surface']['hash'], Graft\current_surface()['hash'] ?? null );
 check( 'the lifecycle table is loaded', 'draft' === Graft\lifecycle()['initial'] && count( Graft\lifecycle()['transitions'] ) > 10 );
@@ -189,6 +190,15 @@ check( 'a build for other content is rejected', is_wp_error( Graft\attach_build(
 
 $verified = Graft\attach_build( 'review-queue', 1, $queue['build'], array( 'passed' => true, 'runner' => 'smoke' ) );
 check( 'a verified build without a grant needs approval', 'needs_approval' === ( $verified['state'] ?? null ), $verified['state'] ?? $verified );
+$swapped = Graft\attach_build( 'review-queue', 1, $queue['build'], null );
+check( 'an unverified build cannot take the place of the verified one waiting for approval', is_wp_error( $swapped ) && 'graft_unverified' === $swapped->get_error_code(), $swapped );
+$elsewhere                           = $queue['build'];
+$elsewhere['mount']                  = array(
+	'slot'  => 'dashboard.widget',
+	'title' => 'Moved',
+);
+$elsewhere['provenance']['strategy'] = 'reanchored';
+check( 'a new build cannot claim it was re-anchored to mount somewhere else than its spec', is_wp_error( Graft\attach_build( 'review-queue', 1, $elsewhere, array( 'passed' => true ) ) ) );
 
 wp_set_current_user( $editor );
 $call = call( 'review-queue', 'posts.list', array( 'status' => array( 'pending' ) ) );
@@ -374,16 +384,18 @@ check( 'contributors cannot add versions to shared specs', 403 === $hijack['stat
 
 $personal_manifest       = $queue['manifest'];
 $personal_manifest['id'] = 'my-queue';
+$personal_source         = str_replace( 'id: review-queue', 'id: my-queue', $queue['source'] ) . "\nOnly when views < 10, <em>never</em> otherwise.\n";
 $personal                = rest(
 	'POST',
 	'/graft/v1/specs',
 	array(
-		'source'   => str_replace( 'id: review-queue', 'id: my-queue', $queue['source'] ),
+		'source'   => $personal_source,
 		'manifest' => $personal_manifest,
 		'scope'    => array( 'type' => 'user' ),
 	)
 );
 check( 'contributors can create personal specs', 201 === $personal['status'], $personal );
+check( 'their spec is stored as written, whatever HTML filtering applies to them', $personal_source === ( $personal['data']['source'] ?? null ) && Graft\hash_spec( $personal_source ) === ( $personal['data']['hash'] ?? null ), $personal['data']['source'] ?? null );
 
 wp_set_current_user( $admin );
 $squat = rest(
@@ -454,8 +466,14 @@ check(
 	in_array( 'graft/graft.php', $names, true ) && in_array( 'graft/includes/store.php', $names, true ) && ! preg_grep( '#^graft/build/.*\.js$#', $names ),
 	array_slice( $names, 0, 20 )
 );
+// Whoever may build a customization verifies it in their browser (ADR 0014): the package is the plugin's own code.
+wp_set_current_user( user_named( 'subscriber', 'no-package' ) );
+check( 'people who cannot write customizations do not get the sandbox package', 403 === rest( 'GET', '/graft/v1/sandbox-package' )['status'] );
 wp_set_current_user( $contributor3 );
-check( 'only administrators get the sandbox package', 403 === rest( 'GET', '/graft/v1/sandbox-package' )['status'] );
+check( 'people who can, do', 200 === rest( 'GET', '/graft/v1/sandbox-package' )['status'] );
+add_filter( 'graft_personal_authoring', '__return_false' );
+check( 'and only administrators where a site turns writing for oneself off', 403 === rest( 'GET', '/graft/v1/sandbox-package' )['status'] );
+remove_filter( 'graft_personal_authoring', '__return_false' );
 
 // Builds are stored exactly as sent: an empty object stays an object.
 wp_set_current_user( $admin );
@@ -601,6 +619,15 @@ check( 'a managed bundle is installed and active without an administrator', 'act
 check( 'it is marked as managed', 'Acme Agency' === Graft\managed_by( 'stale-drafts' ) );
 $archive = rest( 'POST', '/graft/v1/specs/stale-drafts/versions/1/archive' );
 check( 'administrators cannot change a managed customization', 403 === $archive['status'] && 'graft_managed' === $archive['code'], $archive );
+$swap = rest(
+	'POST',
+	'/graft/v1/specs/stale-drafts/versions/1/builds',
+	array(
+		'build'        => $stale['build'],
+		'verification' => array( 'passed' => true ),
+	)
+);
+check( 'nor replace the build its maintainer shipped', 403 === $swap['status'] && 'graft_managed' === $swap['code'], $swap );
 unlink( "$dir/stale-drafts.json" );
 Graft\sync_managed( true );
 check( 'a managed customization whose bundle is gone is archived', 'archived' === Graft\version_record( Graft\get_version_post( 'stale-drafts', 1 ) )['state'] && null === Graft\managed_by( 'stale-drafts' ) );
@@ -656,6 +683,10 @@ $created = Graft\create_version(
 $bad     = $wtl['build'];
 unset( $bad['triggers']['clear-on-publish'] );
 check( "a build without the spec's triggers is refused", is_wp_error( Graft\attach_build( 'waiting-too-long', $created['version'], $bad, array( 'passed' => true ) ) ) );
+$often                                              = $wtl['build'];
+$often['triggers']['flag-stale']['schedule']['every'] = '1h';
+$hourly = Graft\attach_build( 'waiting-too-long', $created['version'], $often, array( 'passed' => true ) );
+check( 'a build whose trigger runs more often than the spec says is refused', is_wp_error( $hourly ) && 'graft_build_mismatch' === $hourly->get_error_code(), $hourly );
 $attached = Graft\attach_build( 'waiting-too-long', $created['version'], $wtl['build'], array( 'passed' => true ) );
 check( 'a build with triggers needs approval', 'needs_approval' === ( $attached['state'] ?? null ), $attached['state'] ?? $attached );
 $approved_t = Graft\approve_version( 'waiting-too-long', $created['version'] );
@@ -779,6 +810,138 @@ foreach ( array( 1, 2, 3 ) as $day ) {
 }
 $state_t = Graft\trigger_states()['waiting-too-long/flag-stale'];
 check( 'three failed runs in a row pause the trigger', 'failed' === $failed['status'] && ! empty( $state_t['paused'] ) && 3 === $state_t['failures'], array( $failed, $state_t ) );
+
+// Customizations people write for themselves (ADR 0014).
+$self = user_named( 'contributor', 'self-service' );
+wp_set_current_user( $self );
+$waiting                   = $examples['waiting-posts'];
+$mine_source               = str_replace( array( 'id: waiting-posts', 'audience: [editor, administrator]' ), array( 'id: my-waiting', 'audience: [editor, administrator, contributor]' ), $waiting['source'] );
+$mine_manifest             = $waiting['manifest'];
+$mine_manifest['id']       = 'my-waiting';
+$mine_manifest['audience'] = array( 'editor', 'administrator', 'contributor' );
+$mine_build                = $waiting['build'];
+$mine_build['spec']        = array(
+	'id'   => 'my-waiting',
+	'hash' => Graft\hash_spec( $mine_source ),
+);
+$mine_build['surface']['hash'] = Graft\current_surface( true )['hash'];
+$mine = rest(
+	'POST',
+	'/graft/v1/specs',
+	array(
+		'source'   => $mine_source,
+		'manifest' => $mine_manifest,
+		'scope'    => array( 'type' => 'user' ),
+	)
+);
+$unchecked = rest( 'POST', '/graft/v1/specs/my-waiting/versions/1/builds', array( 'build' => $mine_build ) );
+check( 'people cannot save a build of their own that has not passed its checks', 201 === $mine['status'] && 400 === $unchecked['status'] && 'graft_unverified' === $unchecked['code'], array( $mine, $unchecked ) );
+$live = rest(
+	'POST',
+	'/graft/v1/specs/my-waiting/versions/1/builds',
+	array(
+		'build'        => $mine_build,
+		'verification' => array(
+			'passed' => true,
+			'runner' => 'browser',
+		),
+	)
+);
+check(
+	'a customization that only reads, for its author alone, goes live without an administrator',
+	'active' === ( $live['data']['state'] ?? null ) && $self === ( $live['data']['grant']['approved_by'] ?? null ) && isset( Graft\servable_specs()['my-waiting'] ),
+	$live
+);
+$live_record = Graft\version_record( Graft\get_version_post( 'my-waiting', 1 ) );
+$not_for_me                         = $live_record;
+$not_for_me['manifest']['audience'] = array( 'editor' );
+check( 'it is shown to its author as one of the roles its spec names, the ones its checks ran as', Graft\applies_to_user( $live_record, wp_get_current_user() ) && ! Graft\applies_to_user( $not_for_me, wp_get_current_user() ) );
+check( 'its verification is marked as its author\'s', 'author' === ( $live_record['builds'][ $mine_build['surface']['hash'] ]['verification']['runner'] ?? null ) );
+$own = rest( 'GET', '/graft/v1/specs' );
+check( 'people see the customizations they wrote, and no others', 200 === $own['status'] && array( 'my-waiting' ) === array_column( $own['data'], 'spec_id' ), array_column( (array) $own['data'], 'spec_id' ) );
+check( 'they cannot take down the site\'s', 403 === rest( 'POST', '/graft/v1/specs/review-queue/versions/2/archive' )['status'] );
+
+$writes_manifest       = $queue['manifest'];
+$writes_manifest['id'] = 'my-approvals';
+$writes_source         = str_replace( 'id: review-queue', 'id: my-approvals', $queue['source'] );
+$writes_build          = $queue['build'];
+$writes_build['spec']  = array(
+	'id'   => 'my-approvals',
+	'hash' => Graft\hash_spec( $writes_source ),
+);
+$writes_build['surface']['hash'] = Graft\current_surface()['hash'];
+rest(
+	'POST',
+	'/graft/v1/specs',
+	array(
+		'source'   => $writes_source,
+		'manifest' => $writes_manifest,
+		'scope'    => array( 'type' => 'user' ),
+	)
+);
+$waits = rest(
+	'POST',
+	'/graft/v1/specs/my-approvals/versions/1/builds',
+	array(
+		'build'        => $writes_build,
+		'verification' => array( 'passed' => true ),
+	)
+);
+check( 'one that changes anything waits for an administrator', 'needs_approval' === ( $waits['data']['state'] ?? null ) && ! isset( Graft\servable_specs()['my-approvals'] ), $waits );
+check( 'and its author cannot approve it', 403 === rest( 'POST', '/graft/v1/specs/my-approvals/versions/1/approve' )['status'] );
+
+$scripted = static fn() => array(
+	'output' => array(),
+	'model'  => 'scripted',
+);
+$two      = static fn() => 2;
+add_filter( 'graft_pre_generate', $scripted );
+add_filter( 'graft_personal_generate_limit', $two );
+$ask   = array(
+	'purpose' => 'checks',
+	'system'  => 's',
+	'prompt'  => 'p',
+	'schema'  => array( 'type' => 'object' ),
+);
+$calls = array( rest( 'POST', '/graft/v1/generate', $ask )['status'], rest( 'POST', '/graft/v1/generate', $ask )['status'], rest( 'POST', '/graft/v1/generate', $ask ) );
+check( 'model calls go through the site, up to a daily limit a person', array( 200, 200 ) === array_slice( $calls, 0, 2 ) && 429 === $calls[2]['status'] && 'graft_generate_limit' === $calls[2]['code'], $calls );
+wp_set_current_user( $admin );
+check( 'administrators are not counted', 200 === rest( 'POST', '/graft/v1/generate', $ask )['status'] && 200 === rest( 'POST', '/graft/v1/generate', $ask )['status'] && 200 === rest( 'POST', '/graft/v1/generate', $ask )['status'] );
+remove_filter( 'graft_pre_generate', $scripted );
+remove_filter( 'graft_personal_generate_limit', $two );
+check( 'the administrator sees it waiting, marked as its author\'s', in_array( 'my-approvals', array_column( rest( 'GET', '/graft/v1/specs' )['data'], 'spec_id' ), true ) );
+
+wp_set_current_user( $self );
+$down = rest( 'POST', '/graft/v1/specs/my-waiting/versions/1/archive' );
+check( 'people can take down their own', 'archived' === ( $down['data']['state'] ?? null ), $down );
+add_filter( 'graft_personal_authoring', '__return_false' );
+check( 'a site can turn writing for oneself off', 403 === rest( 'GET', '/graft/v1/specs' )['status'] && 403 === rest( 'POST', '/graft/v1/generate', $ask )['status'] );
+remove_filter( 'graft_personal_authoring', '__return_false' );
+
+// Why a customization is not showing, safe mode, and the change log.
+wp_set_current_user( $admin );
+$wtl_record = Graft\version_record( Graft\get_version_post( 'waiting-too-long', $created['version'] ) );
+check( 'a served customization has no reason not to show', null === Graft\not_served_reason( $wtl_record ) );
+$queue_draft = Graft\version_record( Graft\get_version_post( 'my-queue', 1 ) );
+check( 'one that is not live says why', 'not_active' === ( Graft\not_served_reason( $queue_draft )['code'] ?? null ) );
+$listed = rest( 'GET', '/graft/v1/specs' );
+check( 'and the list of customizations carries the reason', array_key_exists( 'not_served', $listed['data'][0]['versions'][0] ?? array() ), array_keys( $listed['data'][0]['versions'][0] ?? array() ) );
+add_filter( 'graft_safe_mode', '__return_true' );
+check(
+	'safe mode serves nothing and runs nothing, and says so',
+	'safe_mode' === ( Graft\not_served_reason( $wtl_record )['code'] ?? null ) && array() === Graft\trigger_specs() && null !== Graft\triggers_disabled()
+);
+remove_filter( 'graft_safe_mode', '__return_true' );
+$changes  = rest( 'GET', '/graft/v1/changes' );
+$approval = current( array_filter( $changes['data'], static fn( $entry ) => 'approve' === $entry['what'] && 'waiting-too-long' === $entry['spec'] ) );
+check(
+	'the change log says who approved what, newest first',
+	200 === $changes['status'] && $approval && $admin === $approval['user'] && in_array( 'posts:read', $approval['granted'], true ) && isset( $approval['granted_triggers']['flag-stale'] ) && '' !== $approval['user_name'],
+	$approval
+);
+check( 'and what was created and attached', array( 'build_attached', 'created' ) === array_values( array_unique( array_map( static fn( $entry ) => $entry['what'], array_filter( $changes['data'], static fn( $entry ) => in_array( $entry['what'], array( 'created', 'build_attached' ), true ) && 'waiting-too-long' === $entry['spec'] ) ) ) ) );
+wp_set_current_user( user_named( 'editor', 'editor-changes' ) );
+check( 'only administrators read it', 403 === rest( 'GET', '/graft/v1/changes' )['status'] );
 
 global $wp_version;
 echo wp_json_encode(

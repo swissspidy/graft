@@ -34,6 +34,8 @@ export interface CanaryEntry {
 	changes: string[];
 	path: UpgradeStep[];
 	extraScopes?: string[];
+	/** Scopes its triggers need beyond their grants, by trigger (needs_approval). */
+	extraTriggerScopes?: Record<string, string[]>;
 	/** The build to serve on the new surface, when there is one. */
 	build?: Build;
 	/** Criteria that still fail, for failed outcomes. */
@@ -87,6 +89,9 @@ export async function runCanary(options: CanaryOptions): Promise<CanaryReport> {
 		}
 		if (result.extraScopes) {
 			entry.extraScopes = result.extraScopes;
+		}
+		if (result.extraTriggerScopes) {
+			entry.extraTriggerScopes = result.extraTriggerScopes;
 		}
 		if (result.outcome === 'failed' && result.verification) {
 			entry.failing = [
@@ -148,7 +153,11 @@ export function formatCanaryReport(report: CanaryReport): string {
 		if (entry.outcome === 'reanchored' && entry.build) {
 			detail = `moved to ${entry.build.mount.slot}`;
 		} else if (entry.outcome === 'needs_approval') {
-			detail = `needs ${entry.extraScopes?.join(', ')}`;
+			const needs = [
+				...(entry.extraScopes ?? []),
+				...Object.entries(entry.extraTriggerScopes ?? {}).map(([id, scopes]) => `${scopes.join(', ')} for the trigger "${id}"`),
+			];
+			detail = `needs ${needs.join('; ') || 'approval'}`;
 		} else if (entry.outcome === 'failed') {
 			detail = `${detail}${entry.failing?.length ? `; failing: ${entry.failing.join(', ')}` : ''}`;
 		}

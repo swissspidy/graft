@@ -225,4 +225,20 @@ describe('hashSpec', () => {
 		expect(await hashSpec('a  \r\nb\n\n')).toBe(await hashSpec('a\nb'));
 		expect(await hashSpec('a\nb')).not.toBe(await hashSpec('a\nc'));
 	});
+
+describe('names every object has', () => {
+	it('are not slots, events or scopes of a surface', async () => {
+		const b = await build();
+		b.mount.slot = 'constructor';
+		expect((await validateBuild(b, surface)).diagnostics.map((d) => d.code)).toContain('build-unknown-slot');
+		const mounted = validateSpec(specSource.replace('mount: { slot: page }', 'mount: { slot: constructor }'), { surface });
+		expect(mounted.diagnostics.map((d) => d.code)).toContain('mount-unknown-slot');
+	});
+
+	it('does not matter in which order the refs are written', async () => {
+		const b = await build();
+		b.refs = Object.fromEntries(Object.entries(b.refs).reverse()) as typeof b.refs;
+		expect((await validateBuild(b, surface)).diagnostics.map((d) => d.code)).not.toContain('build-refs-mismatch');
+	});
+});
 });

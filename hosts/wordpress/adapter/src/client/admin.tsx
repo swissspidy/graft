@@ -12,6 +12,7 @@ import { describers } from '../describe.ts';
 import { Authoring } from './authoring.tsx';
 import { RecordSurface, Upgrades, type UpgradeCandidate } from './site-surface.tsx';
 import { Automation } from './automation.tsx';
+import { History } from './history.tsx';
 
 /**
  * Tools → Customizations: every spec on the site with its state, the
@@ -38,6 +39,14 @@ interface AdminConfig {
 	};
 	/** Who triggers run as; null when the site runs none. */
 	triggers: { identity: string } | null;
+	/** GRAFT_SAFE_MODE: nothing is served and nothing runs. */
+	safeMode?: boolean;
+	/** Whether the viewer manages every customization; otherwise they see and write their own (ADR 0014). */
+	admin?: boolean;
+	/** Scopes a customization of one's own may have without an administrator. */
+	selfService?: string[];
+	/** The viewer's roles. */
+	roles?: string[];
 }
 
 interface VersionRecord {
@@ -46,6 +55,8 @@ interface VersionRecord {
 	title: string;
 	state: string;
 	unverified: boolean;
+	/** Why it shows nowhere on this site; null when it is served. */
+	not_served?: { code: string; message: string } | null;
 	source: string;
 	manifest: { permissions: string[]; audience?: string[]; mount: { slot: string }; triggers?: Record<string, SpecTrigger> };
 	grant: { scopes: string[]; triggers?: Record<string, string[]> } | null;
@@ -59,6 +70,9 @@ interface SpecRecord {
 	active_version: number | null;
 	/** Who ships and manages it, for customizations that come with the site's code. */
 	managed_by: string | null;
+	/** Who sees it: everyone in its audience (org), one role (team), or only its owner (user). */
+	scope?: { type: 'org' | 'team' | 'user'; role?: string } | null;
+	owner_name?: string;
 	versions: VersionRecord[];
 }
 
@@ -93,7 +107,7 @@ const actions: Record<string, Array<{ event: string; label: string; primary?: bo
 	],
 };
 
-function Version({ version, config, onEvent, busy, managed }: { version: VersionRecord; config: AdminConfig; onEvent(event: string): void; busy: boolean; managed: boolean }) {
+function Version({ version, config, onEvent, busy, managed, own = false }: { version: VersionRecord; config: AdminConfig; onEvent(event: string): void; busy: boolean; managed: boolean; own?: boolean }) {
 	const current = config.surface ? version.builds[config.surface.hash] : undefined;
 	const granted = version.grant?.scopes ?? [];
 	const needed = [...new Set([...version.manifest.permissions, ...(current?.build.refs.scopes ?? [])])];
@@ -110,6 +124,12 @@ function Version({ version, config, onEvent, busy, managed }: { version: Version
 					? ` · build ${current.build.provenance.strategy ?? 'compiled'}${current.verification?.passed ? ', verified' : ', not verified yet'}`
 					: ' · no build for this WordPress'}
 			</p>
+			{/* An active customization that shows nowhere: the other states say why themselves. */}
+			{version.state === 'active' && version.not_served ? (
+				<p data-graft-not-served={version.not_served.code}>
+					<strong>Not showing.</strong> {version.not_served.message}
+				</p>
+			) : null}
 
 			<h4>Permissions</h4>
 			<ul className="graft-permissions">
@@ -182,7 +202,8 @@ function Version({ version, config, onEvent, busy, managed }: { version: Version
 			) : null}
 
 			<div style={{ display: 'flex', gap: 8, marginTop: 12 }}>
-				{(managed ? [] : (actions[version.state] ?? [])).map((action) => (
+				{/* What someone wrote for themselves they may take down; approving is an administrator's. */}
+				{(managed ? [] : (actions[version.state] ?? []).filter((action) => !own || action.event === 'archive')).map((action) => (
 					<Button key={action.event} variant={action.primary ? 'primary' : 'secondary'} isBusy={busy} disabled={busy} onClick={() => onEvent(action.event)}>
 						{action.label}
 					</Button>
@@ -193,6 +214,8 @@ function Version({ version, config, onEvent, busy, managed }: { version: Version
 }
 
 function App({ config }: { config: AdminConfig }) {
+	// Older plugin code sent no flag: this screen was the administrator's alone.
+	const admin = config.admin !== false;
 	const [specs, setSpecs] = useState<SpecRecord[] | null>(null);
 	const [error, setError] = useState<string | null>(null);
 	const [busy, setBusy] = useState<string | null>(null);
@@ -211,7 +234,7 @@ function App({ config }: { config: AdminConfig }) {
 	// Starts Playground in this browser and returns a verifier for builds on this site's surface.
 	const startVerifier = async () => {
 		const sandbox = await browserSandbox(playgroundVersion(config.surface!.hostVersion), config.playground);
-		return (build: Build, spec: Parameters<typeof verifyBuild>[0]['spec'], grant?: string[]) =>
+		return (build: Build, spec: Parameters<typeof verifyBuild>[0]['spec'], grant?: string[], triggerGrant?: Record<string, string[]>) =>
 			verifyBuild({
 				build,
 				spec,
@@ -219,6 +242,7 @@ function App({ config }: { config: AdminConfig }) {
 				sandbox,
 				createCan,
 				...(grant ? { grant } : {}),
+				...(triggerGrant ? { triggerGrant } : {}),
 			});
 	};
 
@@ -238,15 +262,28 @@ function App({ config }: { config: AdminConfig }) {
 	return (
 		<div className="graft-admin" style={{ display: 'flex', flexDirection: 'column', gap: 16, maxWidth: 960 }}>
 			{config.policy.managedBy || config.policy.slots || config.policy.scopes || config.policy.triggers !== null || !config.policy.authoring ? <PolicyNotice policy={config.policy} /> : null}
-			{config.surface ? null : <RecordSurface />}
-			{config.surface && config.triggers ? <Automation surface={config.surface} scopes={config.scopes} /> : null}
-			{config.surface && config.browserVerification && specs ? (
+			{config.safeMode ? (
+				<Notice status="warning" isDismissible={false}>
+					<span data-graft-safe-mode="">
+						Safe mode is on (<code>GRAFT_SAFE_MODE</code> in the site configuration): no customization is shown and none acts on its own. Archive the one that
+						causes trouble here, then turn safe mode off.
+					</span>
+				</Notice>
+			) : null}
+			{admin ? null : (
+				<p data-graft-mine="">
+					Customizations you wrote for yourself. Nobody else sees them, and they can only do what you can do on this site.
+				</p>
+			)}
+			{config.surface || !admin ? null : <RecordSurface />}
+			{admin && config.surface && config.triggers ? <Automation surface={config.surface} scopes={config.scopes} /> : null}
+			{admin && config.surface && config.browserVerification && specs ? (
 				<Upgrades
 					candidates={upgradeCandidates(specs, config.surface.hash)}
 					surface={config.surface}
 					startVerifier={async () => {
 						const verify = await startVerifier();
-						return (build, grant, spec) => verify(build, spec, grant);
+						return (build, grant, spec, triggerGrant) => verify(build, spec, grant, triggerGrant);
 					}}
 					onDone={() => void load()}
 				/>
@@ -276,6 +313,9 @@ function App({ config }: { config: AdminConfig }) {
 					<CardBody>
 						<Authoring
 							surface={config.surface}
+							personalOnly={!admin}
+							selfService={config.selfService ?? []}
+							roles={config.roles ?? []}
 							{...(config.browserVerification
 								? {
 										startVerifier: async () => {
@@ -295,7 +335,7 @@ function App({ config }: { config: AdminConfig }) {
 				</Card>
 			) : null}
 			{specs === null ? <Spinner /> : null}
-			{specs?.length === 0 ? <p>No customizations yet.</p> : null}
+			{specs?.length === 0 ? <p>{admin ? 'No customizations yet.' : 'You have not written any yet.'}</p> : null}
 			{specs?.map((spec) => {
 				// What is live, and separately the newest version waiting to
 				// replace it, so a new draft never hides the live one.
@@ -313,6 +353,7 @@ function App({ config }: { config: AdminConfig }) {
 							<CardHeader>
 								<strong>{spec.title}</strong> <code>{spec.spec_id}</code>
 								{spec.managed_by ? <span data-graft-managed-by={spec.managed_by}> · Managed by {spec.managed_by}</span> : null}
+								{spec.scope?.type === 'user' ? <span data-graft-personal=""> · Only for {spec.owner_name || 'its owner'}</span> : null}
 							</CardHeader>
 							<CardBody>
 								{shown.map((version, i) => (
@@ -323,6 +364,7 @@ function App({ config }: { config: AdminConfig }) {
 											config={config}
 											busy={busy === spec.spec_id}
 											managed={spec.managed_by !== null}
+											own={!admin}
 											onEvent={(event) => void onEvent(spec, version, event)}
 										/>
 									</div>
@@ -332,6 +374,7 @@ function App({ config }: { config: AdminConfig }) {
 					</div>
 				);
 			})}
+			{admin ? <History scopes={config.scopes} /> : null}
 		</div>
 	);
 }
@@ -376,7 +419,7 @@ function upgradeCandidates(specs: SpecRecord[], hash: string): UpgradeCandidate[
 			.filter((entry) => entry.verification?.passed)
 			.sort((a, b) => b.attached.localeCompare(a.attached))[0];
 		if (previous) {
-			candidates.push({ specId: spec.spec_id, title: spec.title, version: version.version, source: version.source, grant: version.grant?.scopes ?? [], build: previous.build });
+			candidates.push({ specId: spec.spec_id, title: spec.title, version: version.version, source: version.source, grant: version.grant?.scopes ?? [], ...(version.grant?.triggers ? { triggerGrant: version.grant.triggers } : {}), build: previous.build });
 		}
 	}
 	return candidates;
