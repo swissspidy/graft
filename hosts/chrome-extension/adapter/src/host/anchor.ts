@@ -119,7 +119,8 @@ export function resolveAnchor(anchor: Anchor, root: ParentNode): Resolved {
 	const found = locate(anchor, root);
 	const locked = found.element ? lockedArea(anchor, found.element) : undefined;
 	// Not "moved": nothing is proposed for a place the app's description rules out.
-	return locked ? { status: 'broken', reason: `it is now inside a locked area of the app (${locked})` } : found;
+	// Compared with undefined: a selector that locks may be the empty string, which cannot be read and so locks.
+	return locked !== undefined ? { status: 'broken', reason: `it is now inside a locked area of the app (${locked || 'a selector that cannot be read'})` } : found;
 }
 
 function locate(anchor: Anchor, root: ParentNode): Resolved {

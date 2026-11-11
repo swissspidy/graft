@@ -31,6 +31,13 @@ describe('an anchor and the locked areas of an app', () => {
 		expect(resolveAnchor({ ...anchor, insert: 'append' }, page(html)).status).toBe('broken');
 	});
 
+	it('is broken when a locked-area selector cannot be read, the empty one included', () => {
+		const html = '<main><aside data-testid="details" aria-label="Details"></aside></main>';
+		for (const selector of ['', ':::', 'div[']) {
+			expect(resolveAnchor({ ...anchor, locked: [selector] }, page(html)).status).toBe('broken');
+		}
+	});
+
 	it('is part of the surface only for an app that declares locked areas', () => {
 		expect(appModel(appSurface(tasklet)).anchors['project.sidebar']).not.toHaveProperty('locked');
 		expect(appModel(appSurface({ ...tasklet, locked: ['#billing'] })).anchors['project.sidebar']!.locked).toEqual(['#billing']);
