@@ -700,6 +700,9 @@ function target_key( $target ): string {
  * @return string|null
  */
 function triggers_disabled(): ?string {
+	if ( safe_mode() ) {
+		return __( 'Safe mode is on (GRAFT_SAFE_MODE): nothing runs on its own.', 'graft' );
+	}
 	if ( defined( 'GRAFT_DISABLE_TRIGGERS' ) && GRAFT_DISABLE_TRIGGERS ) {
 		return __( 'Triggers are turned off in the site configuration (GRAFT_DISABLE_TRIGGERS).', 'graft' );
 	}
@@ -741,7 +744,7 @@ function trigger_specs(): array {
 		$post   = get_version_post( $spec->post_name, (int) get_post_meta( $spec->ID, '_graft_active_version', true ) );
 		$record = $post ? version_record( $post ) : null;
 		$build  = $record['builds'][ $current['hash'] ]['build'] ?? null;
-		if ( $record && 'active' === $record['state'] && is_array( $build ) && ! empty( $build['triggers'] ) && build_is_verified( $record, $current['hash'] ) ) {
+		if ( $record && is_array( $build ) && ! empty( $build['triggers'] ) && null === not_served_reason( $record, $current ) ) {
 			$out[ $spec->post_name ] = array(
 				'record'  => $record,
 				'build'   => $build,

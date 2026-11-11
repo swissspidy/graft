@@ -133,10 +133,22 @@ a hash and need no rebuild.
   pause, dry run and run now, a pause-all switch and the recent runs
   (`graft_trigger_ran` fires for each). `GRAFT_DISABLE_TRIGGERS` turns
   them off for good.
+- **Getting back.** `define( 'GRAFT_SAFE_MODE', true )` in `wp-config.php`
+  serves no customization and runs no trigger; Tools → Customizations
+  still works and says so, so the one that causes trouble can be archived
+  ([ADR 0013](../../docs/adr/0013-operating-and-recovering.md)).
+- **What happened.** An active customization that shows nowhere says why
+  ("Not showing": no build for the site as it is now, permissions not
+  approved, ...). **History** lists who wrote, built, approved, declined
+  and archived what, and what each approval allowed
+  (`GET /graft/v1/changes`; `graft_change_recorded` fires for each).
+- **For one person.** "Only for me" when writing a customization shows it
+  to its author alone.
 - **REST.** `GET /graft/v1/surface` (the site's current surface),
   `GET /graft/v1/host-surface`, `GET /graft/v1/surfaces` and
   `/surfaces/<hash>` (what the host offers now, and the snapshots the
   plugin knows), `GET /graft/v1/audit` (the gateway's latest refusals),
+  `GET /graft/v1/changes` (who changed what),
   `POST /graft/v1/generate` (a model request through the site's AI
   client), `GET /graft/v1/sandbox-package` (what in-browser verification
   installs), `POST /graft/v1/call` (the capability gateway; any signed-in

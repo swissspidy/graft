@@ -1,7 +1,9 @@
 name: CI
 
 on:
+  # Branches are tested through their pull request: testing their pushes too ran every job twice.
   push:
+    branches: [main]
   pull_request:
   workflow_dispatch:
   schedule:
@@ -9,7 +11,7 @@ on:
     - cron: '17 5 * * 1'
 
 concurrency:
-  group: ci-${{ github.ref }}
+  group: ci-${{ github.head_ref || github.ref }}
   cancel-in-progress: true
 
 # Jobs only read the repository.
@@ -178,6 +180,8 @@ jobs:
   nightly-canary:
     # An early warning about the next WordPress: does every customization in
     # the corpus survive it? Upstream breakage should not block changes here.
+    # Weekly (and on request): it tests WordPress, not the change.
+    if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
     continue-on-error: true
     steps:

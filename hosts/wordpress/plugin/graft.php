@@ -29,6 +29,7 @@ require_once __DIR__ . '/includes/store.php';
 require_once __DIR__ . '/includes/policy.php';
 require_once __DIR__ . '/includes/triggers.php';
 require_once __DIR__ . '/includes/runtime.php';
+require_once __DIR__ . '/includes/changes.php';
 require_once __DIR__ . '/includes/slots.php';
 require_once __DIR__ . '/includes/rest.php';
 require_once __DIR__ . '/includes/generate.php';

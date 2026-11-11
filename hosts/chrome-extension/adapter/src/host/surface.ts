@@ -50,6 +50,8 @@ export interface Anchor {
 	landmark?: Landmark;
 	/** Where the extension's element goes, relative to the anchor. */
 	insert: 'append' | 'prepend' | 'before' | 'after';
+	/** The app's locked areas (`AppDescription.locked`): an anchor found inside one is broken, however it was found. */
+	locked?: string[];
 }
 
 /** The host-defined part of a browser surface (`surface.model`). */
@@ -78,6 +80,14 @@ export interface AppDescription {
 	capabilities: Record<string, Capability & { binding: HttpBinding }>;
 	/** Scopes; `host` lists the app roles that may use each. */
 	scopes: Record<string, Scope>;
+	/**
+	 * CSS selectors of areas nothing is ever drawn in: a payment form, legal
+	 * text, a sign-in box. A slot's anchor is declared outside them, but an
+	 * app that changes can move it, and re-anchoring by landmark looks
+	 * anywhere on the page: inside a locked area an anchor is broken, never
+	 * moved. Part of every anchor, so part of the surface's hash.
+	 */
+	locked?: string[];
 }
 
 const describeLandmark = (landmark: Landmark | undefined) => (landmark ? `${landmark.role}${landmark.name ? ` "${landmark.name}"` : ''}` : 'element');
@@ -87,7 +97,7 @@ export function appSurface(app: AppDescription, observed?: { hostVersion: string
 	const anchors: Record<string, Anchor> = {};
 	const slots: Record<string, Slot> = {};
 	for (const [id, { at, ...slot }] of Object.entries(app.slots)) {
-		anchors[id] = at;
+		anchors[id] = app.locked?.length ? { ...at, locked: app.locked } : at;
 		slots[id] = { ...slot, anchor: describeLandmark(at.landmark) };
 	}
 	const model: AppModel = { app: { id: app.id, title: app.title, origins: app.origins }, viewer: app.viewer, anchors };

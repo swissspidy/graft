@@ -12,6 +12,7 @@ import { describers } from '../describe.ts';
 import { Authoring } from './authoring.tsx';
 import { RecordSurface, Upgrades, type UpgradeCandidate } from './site-surface.tsx';
 import { Automation } from './automation.tsx';
+import { History } from './history.tsx';
 
 /**
  * Tools → Customizations: every spec on the site with its state, the
@@ -38,6 +39,8 @@ interface AdminConfig {
 	};
 	/** Who triggers run as; null when the site runs none. */
 	triggers: { identity: string } | null;
+	/** GRAFT_SAFE_MODE: nothing is served and nothing runs. */
+	safeMode?: boolean;
 }
 
 interface VersionRecord {
@@ -46,6 +49,8 @@ interface VersionRecord {
 	title: string;
 	state: string;
 	unverified: boolean;
+	/** Why it shows nowhere on this site; null when it is served. */
+	not_served?: { code: string; message: string } | null;
 	source: string;
 	manifest: { permissions: string[]; audience?: string[]; mount: { slot: string }; triggers?: Record<string, SpecTrigger> };
 	grant: { scopes: string[]; triggers?: Record<string, string[]> } | null;
@@ -59,6 +64,9 @@ interface SpecRecord {
 	active_version: number | null;
 	/** Who ships and manages it, for customizations that come with the site's code. */
 	managed_by: string | null;
+	/** Who sees it: everyone in its audience (org), one role (team), or only its owner (user). */
+	scope?: { type: 'org' | 'team' | 'user'; role?: string } | null;
+	owner_name?: string;
 	versions: VersionRecord[];
 }
 
@@ -110,6 +118,12 @@ function Version({ version, config, onEvent, busy, managed }: { version: Version
 					? ` · build ${current.build.provenance.strategy ?? 'compiled'}${current.verification?.passed ? ', verified' : ', not verified yet'}`
 					: ' · no build for this WordPress'}
 			</p>
+			{/* An active customization that shows nowhere: the other states say why themselves. */}
+			{version.state === 'active' && version.not_served ? (
+				<p data-graft-not-served={version.not_served.code}>
+					<strong>Not showing.</strong> {version.not_served.message}
+				</p>
+			) : null}
 
 			<h4>Permissions</h4>
 			<ul className="graft-permissions">
@@ -239,6 +253,14 @@ function App({ config }: { config: AdminConfig }) {
 	return (
 		<div className="graft-admin" style={{ display: 'flex', flexDirection: 'column', gap: 16, maxWidth: 960 }}>
 			{config.policy.managedBy || config.policy.slots || config.policy.scopes || config.policy.triggers !== null || !config.policy.authoring ? <PolicyNotice policy={config.policy} /> : null}
+			{config.safeMode ? (
+				<Notice status="warning" isDismissible={false}>
+					<span data-graft-safe-mode="">
+						Safe mode is on (<code>GRAFT_SAFE_MODE</code> in the site configuration): no customization is shown and none acts on its own. Archive the one that
+						causes trouble here, then turn safe mode off.
+					</span>
+				</Notice>
+			) : null}
 			{config.surface ? null : <RecordSurface />}
 			{config.surface && config.triggers ? <Automation surface={config.surface} scopes={config.scopes} /> : null}
 			{config.surface && config.browserVerification && specs ? (
@@ -314,6 +336,7 @@ function App({ config }: { config: AdminConfig }) {
 							<CardHeader>
 								<strong>{spec.title}</strong> <code>{spec.spec_id}</code>
 								{spec.managed_by ? <span data-graft-managed-by={spec.managed_by}> · Managed by {spec.managed_by}</span> : null}
+								{spec.scope?.type === 'user' ? <span data-graft-personal=""> · Only for {spec.owner_name || 'its owner'}</span> : null}
 							</CardHeader>
 							<CardBody>
 								{shown.map((version, i) => (
@@ -333,6 +356,7 @@ function App({ config }: { config: AdminConfig }) {
 					</div>
 				);
 			})}
+			<History scopes={config.scopes} />
 		</div>
 	);
 }

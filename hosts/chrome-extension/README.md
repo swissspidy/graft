@@ -39,7 +39,7 @@ no longer matches, rather than showing anything wrong.
 | Path | What |
 | --- | --- |
 | `fixtures/tasklet/server.ts` | The target app, and the fixture protocol (`/__fixture/*`) that makes a copy of it a sandbox |
-| `adapter/src/apps/tasklet.ts` | Tasklet described from the outside: slots as DOM anchors, capabilities as API bindings, scopes as app roles, and where the drift probe looks |
+| `adapter/src/apps/tasklet.ts` | Tasklet described from the outside: slots as DOM anchors, capabilities as API bindings, scopes as app roles, and where the drift probe looks. A description may also list `locked` areas (a payment form, legal text): an anchor found inside one is broken, never re-anchored there ([ADR 0013](../../docs/adr/0013-operating-and-recovering.md)) |
 | `adapter/src/host` | The browser host: surface model, URL patterns, HTTP bindings and output projection, anchor resolution, the `graft:browser` catalog and view renderer, the gateway |
 | `adapter/src/extension` | The MV3 service worker (gateway and store), content script, options page, generated manifest |
 | `adapter/src/node` | The sandbox, the drift probe, upgrading after drift, and the CLI |

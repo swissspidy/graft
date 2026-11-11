@@ -236,6 +236,21 @@ test('admins write a spec in wp-admin, see it validated, and build it', async ({
 	await expect(card.locator('.graft-checks')).toContainText('Shows at most five posts');
 });
 
+test('the customizations screen says who changed what, and offers a customization for one person', async ({ page }) => {
+	await login(page, 'admin');
+	await page.goto('/wp-admin/tools.php?page=graft-customizations');
+	const history = page.locator('[data-graft-history]');
+	await history.getByRole('button', { name: 'Show what changed' }).click();
+	// The seed approved the examples; every approval says what it allowed.
+	await expect(history.locator('[data-graft-change="approve"]').first()).toContainText('approved');
+	await expect(history.locator('[data-graft-change="approve"]').first()).toContainText('allowing:');
+	await expect(page.locator('[data-graft-not-served]')).toHaveCount(0);
+	await expect(page.locator('[data-graft-safe-mode]')).toHaveCount(0);
+
+	await page.getByRole('button', { name: 'New customization' }).click();
+	await expect(page.getByRole('checkbox', { name: 'Only for me' })).not.toBeChecked();
+});
+
 const graft = async (...args: string[]) => {
 	const password = readFileSync(new URL('../../../test-results/e2e-fixtures/app-password.txt', import.meta.url), 'utf8').trim();
 	const { stdout } = await promisify(execFile)(

@@ -11,7 +11,7 @@
     "graft": "tsx packages/cli/src/main.ts",
     "typecheck": "tsc -p packages/core && tsc -p packages/a2ui && tsc -p packages/cli && tsc -p packages/renderer-react && tsc -p hosts/wordpress/adapter && tsc -p hosts/wordpress/e2e && tsc -p hosts/emdash/adapter && tsc -p hosts/emdash/e2e && tsc -p hosts/chrome-extension/adapter && tsc -p hosts/chrome-extension/e2e",
     "test": "vitest run",
-    "check:builds": "tsx packages/cli/src/main.ts check examples fixtures/canary --surface hosts/wordpress/plugin/surfaces/7.1.json --surface hosts/emdash/adapter/surfaces/1.3.json --surface hosts/chrome-extension/adapter/surfaces/tasklet.json",
+    "check:builds": "tsx packages/cli/src/main.ts check examples fixtures/canary experiments/kanban --surface hosts/wordpress/plugin/surfaces/7.1.json --surface hosts/emdash/adapter/surfaces/1.3.json --surface hosts/chrome-extension/adapter/surfaces/tasklet.json",
     "validate:examples": "tsx packages/cli/src/main.ts validate --surface hosts/wordpress/plugin/surfaces/7.1.json examples/specs && tsx packages/cli/src/main.ts validate --surface examples/agency/surface.json examples/agency/specs && tsx packages/cli/src/main.ts validate --surface hosts/emdash/adapter/surfaces/1.3.json examples/emdash/specs && tsx packages/cli/src/main.ts validate --surface hosts/chrome-extension/adapter/surfaces/tasklet.json examples/chrome-extension/specs",
     "surface:generate": "tsx hosts/wordpress/adapter/src/cli.ts",
     "surface:agency": "tsx hosts/wordpress/adapter/src/cli.ts --site hosts/wordpress/playground/sites/riverside.php --name surface --out-dir examples/agency",

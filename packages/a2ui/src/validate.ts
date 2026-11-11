@@ -322,6 +322,27 @@ export function collectScopes(value: unknown, into: Set<string>): Set<string> {
 	return into;
 }
 
+/**
+ * State a host kept outside itself (in the page, in a button's value),
+ * cut down to what the build's own `set` actions can write: the pointers
+ * they target. Anything else in it was not put there by the build.
+ */
+export function localState(build: A2UIBuild, state: Record<string, unknown>): Record<string, unknown> {
+	const targets = new Set<string>();
+	const collect = (value: unknown): void => {
+		if (Array.isArray(value)) {
+			value.forEach(collect);
+		} else if (isObject(value)) {
+			if (value.call === 'set' && isObject(value.args) && typeof value.args.target === 'string') {
+				targets.add(value.args.target);
+			}
+			Object.values(value).forEach(collect);
+		}
+	};
+	collect(build.ui.components);
+	return Object.fromEntries(Object.entries(state).filter(([pointer]) => targets.has(pointer)));
+}
+
 /** Pointers a local `set` writes from a row's own field ({"path": "id"} in a row's scope). */
 function rowWrittenTargets(value: unknown, into = new Set<string>()): Set<string> {
 	if (Array.isArray(value)) {

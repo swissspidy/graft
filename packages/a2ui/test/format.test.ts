@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { applyMigrations, compileSpec, extractRefs, hashSurface, modelAnswers, registerUiFormat, validateBuild, verifyBuild, type Build, type CompileOptions } from '@swissspidy/graft-core';
 import { createCan, fakeSandbox, fixtures, format, pageBuild, spec, surface } from '../../core/test/fixtures/acme.ts';
-import { answerA2UI, assembleA2UI, createA2UIFormat, type A2UIBuild } from '../src/index.ts';
+import { answerA2UI, assembleA2UI, createA2UIFormat, localState, type A2UIBuild } from '../src/index.ts';
 
 /** The acme page build (an A2UI surface), changed by `change`. */
 async function a2uiBuild(change?: (build: A2UIBuild) => void): Promise<Build> {
@@ -132,6 +132,15 @@ describe('A2UI builds', () => {
 		const snapshot = format.snapshot(build, { data: { open: { items: [] } }, slot: {}, viewer: { id: 1, role: 'm' }, can: () => true } as never, { surface: forged });
 		expect(JSON.stringify(snapshot)).not.toContain('Forged');
 		expect(snapshot.problems?.length).toBe(2);
+	});
+
+	it('take from state kept outside the host only what their own actions set', async () => {
+		const build = (await a2uiBuild((b) => {
+			b.ui.components.push({ id: 'done', component: 'Button', child: 'done-label', action: { functionCall: { call: 'set', args: { target: '/form/status', value: 'done' } } } });
+			b.ui.components.push({ id: 'done-label', component: 'Text', text: 'Show done' });
+			(b.ui.components[0]!.children as string[]).push('done');
+		})) as unknown as A2UIBuild;
+		expect(localState(build, { '/form/status': 'done', '/form/confirmed': true, '/open/items': [] })).toEqual({ '/form/status': 'done' });
 	});
 
 	it('are refused when what a row writes starts as a literal row value', async () => {

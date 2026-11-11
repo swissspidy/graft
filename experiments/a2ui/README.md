@@ -14,25 +14,12 @@ used to live here now lives in:
 | Example builds | `examples/builds` (WordPress), `examples/emdash/builds` |
 | Compiling | `graft compile` (the `--ui a2ui` flag of the time is gone: A2UI is the only format) |
 
-What stays here is evidence:
-
-- [`compiled/`](compiled/): the first compiles of the WordPress example
-  specs against their frozen checks, with every attempt's output, and
-  [`fresh/`](compiled/fresh/), the checks phase written for A2UI.
-  A script, since removed, turned them into the example builds (now in
-  `examples/builds`).
-- [`emdash/`](emdash/): the EmDash examples compiled with `graft compile
-  --ui a2ui`. `status-board.first-run.*` failed three attempts because of
-  a verifier bug, since fixed: a local `set` wrote into the build's own
-  `initial` object, so its state leaked into later checks. Claude spent
-  the attempts chasing it.
-- [`specs/submit-for-review.md`](specs/submit-for-review.md) and
-  [`wizard/`](wizard/): a two-step flow, compiled end to end (checks phase
-  included). The first run hit a catalog gap (row actions could not be
-  local actions). The second (`second-run.json`) passed all nine checks,
-  with a bug the checks cannot see: `initial` picks post 41. The validator
-  now refuses that (`a2ui-initial-row-value`); the third run, reusing the
-  checks, passed on its first attempt and starts with nothing chosen.
+What stays here is [`specs/submit-for-review.md`](specs/submit-for-review.md),
+a two-step flow that was compiled end to end (checks phase included) and
+that ADR 0009 refers to. The compiled builds, logs and verification
+records of these runs were removed in November 2026: they targeted
+surfaces two generations old and no longer passed `graft check`. They are
+in the history of this directory (`git log -- experiments/a2ui`).
 
 ## What the runs showed, in order
 

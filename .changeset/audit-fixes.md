@@ -12,6 +12,7 @@ Fixes from a full read of the code.
 - `can`'s scope must be written out (`a2ui-function-args`), and `can`, `regex`, `replace` and `set` cannot be called inside a `formatString` template (`a2ui-template-call`), where validation could not see them. `/slot/...` pointers inside templates now count as slot props the build reads.
 - Event, capability and scope names that every object has (`toString`, `constructor`) are no longer taken as bound or known.
 - New diagnostics: `a2ui-duplicate-label` (two table columns with one label) and `a2ui-duplicate-reference` (a child listed twice). `then` entries with extra `:` parts are refused.
+- `localState(build, state)` cuts state a host kept outside itself (in the page, in a button's value) down to the pointers the build's own `set` actions target.
 - `validateA2UI` no longer takes a `spec` argument (it never read it), and the unused `dynamicNumber` export is gone.
 
 `@swissspidy/graft-core`:

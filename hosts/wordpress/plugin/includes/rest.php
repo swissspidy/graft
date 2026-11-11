@@ -169,6 +169,16 @@ function register_routes(): void {
 					return new WP_Error( 'graft_invalid_build', __( 'Missing build.', 'graft' ), array( 'status' => 400 ) );
 				}
 				$verification = is_array( $request['verification'] ) ? $request['verification'] : null;
+				// A managed customization can be carried over to a surface it has no build for (an upgrade
+				// on this site). The build its maintainer shipped for a surface is not replaced from here.
+				$hash    = (string) ( is_object( $build ) ? ( $build->surface->hash ?? '' ) : ( $build['surface']['hash'] ?? '' ) );
+				$version = get_version_post( $request['spec_id'], (int) $request['version'] );
+				if ( $version && isset( version_record( $version )['builds'][ $hash ] ) ) {
+					$allowed = policy_allows_changing( $request['spec_id'] );
+					if ( is_wp_error( $allowed ) ) {
+						return $allowed;
+					}
+				}
 				return rest_ensure_response( attach_build( $request['spec_id'], (int) $request['version'], $build, $verification ) );
 			},
 			'permission_callback' => $manage,

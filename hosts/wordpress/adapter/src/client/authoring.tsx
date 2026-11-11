@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import apiFetch from '@wordpress/api-fetch';
-import { Button, Notice } from '@wordpress/components';
+import { Button, CheckboxControl, Notice } from '@wordpress/components';
 import { compileSpec, hashSpec, validateSpec, type Build, type CompileEvent, type ModelClient, type Spec, type Surface, type Verification } from '@swissspidy/graft-core';
 import { hostGuide } from '../guide.ts';
 
@@ -66,6 +66,8 @@ export function Authoring({ surface, onSaved, onCancel, startVerifier }: Authori
 	const [busy, setBusy] = useState(false);
 	const [error, setError] = useState<string | null>(null);
 	const [debounced, setDebounced] = useState(source);
+	// For the person writing it only: a way to live with a customization before the whole audience gets it.
+	const [personal, setPersonal] = useState(false);
 
 	useEffect(() => {
 		const timer = setTimeout(() => setDebounced(source), 300);
@@ -120,7 +122,7 @@ export function Authoring({ surface, onSaved, onCancel, startVerifier }: Authori
 			const version = await apiFetch<{ version: number }>({
 				path: '/graft/v1/specs',
 				method: 'POST',
-				data: { source, manifest: parsed.spec.manifest, title: parsed.spec.title },
+				data: { source, manifest: parsed.spec.manifest, title: parsed.spec.title, ...(personal ? { scope: { type: 'user' } } : {}) },
 			});
 			await apiFetch({
 				path: `/graft/v1/specs/${parsed.spec.manifest.id}/versions/${version.version}/builds`,
@@ -177,6 +179,15 @@ export function Authoring({ surface, onSaved, onCancel, startVerifier }: Authori
 					))}
 				</ol>
 			) : null}
+			<div data-graft-personal-option="">
+				<CheckboxControl
+					__nextHasNoMarginBottom
+					label="Only for me"
+					help="Shown to you alone, whatever its audience says. It still needs approval. A customization for everyone is a new one, with its own id."
+					checked={personal}
+					onChange={(checked) => (busy ? undefined : setPersonal(checked))}
+				/>
+			</div>
 			<div style={{ display: 'flex', gap: 8 }}>
 				<Button variant="primary" isBusy={busy} disabled={busy || !validation.ok || !current} onClick={() => void build()}>
 					Build it

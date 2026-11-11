@@ -48,10 +48,16 @@ function register_post_types(): void {
  * @return string
  */
 function normalize_spec_source( string $source ): string {
-	$source = preg_replace( '/^\x{FEFF}/u', '', $source );
-	$source = str_replace( array( "\r\n", "\r" ), "\n", (string) $source );
-	$lines  = array_map( 'rtrim', explode( "\n", $source ) );
-	return rtrim( implode( "\n", $lines ) ) . "\n";
+	$bom    = preg_replace( '/^\x{FEFF}/u', '', $source );
+	$source = str_replace( array( "\r\n", "\r" ), "\n", null === $bom ? $source : $bom );
+	// What JavaScript's trimEnd() strips, so both sides hash a spec alike (rtrim() knows no Unicode spaces).
+	$trim  = static function ( string $text ): string {
+		$trimmed = preg_replace( '/[\s\x{00A0}\x{1680}\x{2000}-\x{200A}\x{2028}\x{2029}\x{202F}\x{205F}\x{3000}\x{FEFF}]+$/u', '', $text );
+		// Not UTF-8: nothing the core could have hashed either; fall back to plain whitespace.
+		return null === $trimmed ? rtrim( $text, " \t\n\r\v\f" ) : $trimmed;
+	};
+	$lines = array_map( $trim, explode( "\n", $source ) );
+	return $trim( implode( "\n", $lines ) ) . "\n";
 }
 
 /**
@@ -417,10 +423,14 @@ function create_version( array $args ) {
 	update_post_meta( $version_id, '_graft_hash', $hash );
 	update_post_meta( $version_id, '_graft_state', lifecycle()['initial'] );
 	set_json_meta( $version_id, '_graft_manifest', $manifest );
+	// The source as written. post_content goes through kses for users without unfiltered_html
+	// ("<" in a criterion becomes "&lt;"), and would no longer be what the hash is of.
+	set_json_meta( $version_id, '_graft_source', $source );
 	set_json_meta( $version_id, '_graft_builds', (object) array() );
 	if ( $grant ) {
 		set_json_meta( $version_id, '_graft_grant', $grant );
 	}
+	record_change( 'created', $spec_id, $number, array( 'hash' => $hash ) );
 	return version_record( get_post( $version_id ) );
 }
 
@@ -433,6 +443,8 @@ function create_version( array $args ) {
 function version_record( WP_Post $post ): array {
 	$spec   = get_post( $post->post_parent );
 	$builds = get_json_meta( $post->ID, '_graft_builds' );
+	// Versions stored before the source had its own meta only have the post content.
+	$source = get_json_meta( $post->ID, '_graft_source' );
 	return array(
 		'spec_id'    => $spec ? $spec->post_name : '',
 		'version'    => (int) get_post_meta( $post->ID, '_graft_version', true ),
@@ -440,7 +452,7 @@ function version_record( WP_Post $post ): array {
 		'hash'       => (string) get_post_meta( $post->ID, '_graft_hash', true ),
 		'state'      => (string) get_post_meta( $post->ID, '_graft_state', true ),
 		'unverified' => (bool) get_post_meta( $post->ID, '_graft_unverified', true ),
-		'source'     => $post->post_content,
+		'source'     => is_string( $source ) ? $source : $post->post_content,
 		'manifest'   => get_json_meta( $post->ID, '_graft_manifest' ),
 		'grant'      => get_json_meta( $post->ID, '_graft_grant' ),
 		'builds'     => is_array( $builds ) ? $builds : array(),
@@ -641,6 +653,16 @@ function attach_build( string $spec_id, int $version, $build, ?array $verificati
 		'attached'     => gmdate( 'c' ),
 	);
 	set_json_meta( $post->ID, '_graft_builds', $builds );
+	record_change(
+		'build_attached',
+		$spec_id,
+		$version,
+		array(
+			'surface'  => $surface_hash,
+			'verified' => $verified,
+			'runner'   => is_array( $verification ) ? (string) ( $verification['runner'] ?? '' ) : '',
+		)
+	);
 
 	if ( ! $verified ) {
 		if ( ! $allowed ) {
@@ -748,11 +770,14 @@ function list_specs( bool $output = false ): array {
 				'title'          => $spec->post_title,
 				'scope'          => get_json_meta( $spec->ID, '_graft_scope' ),
 				'owner'          => (int) $spec->post_author,
+				'owner_name'     => (string) ( get_userdata( (int) $spec->post_author )->display_name ?? '' ),
 				'active_version' => (int) get_post_meta( $spec->ID, '_graft_active_version', true ) ?: null,
 				'managed_by'     => managed_by( $spec->post_name ),
 				'versions'       => array_map(
 					static function ( WP_Post $version ) use ( $output ): array {
 						$record = version_record( $version );
+						// Why it shows nowhere, when it does not: null when it is served.
+						$record['not_served'] = not_served_reason( $record );
 						if ( $output ) {
 							$record['builds'] = stored_builds( $version->ID );
 						}

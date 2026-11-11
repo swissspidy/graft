@@ -1,4 +1,4 @@
-import { createA2UIFormat, INPUT_GROUP, walkA2UI, type A2UIBuild, type A2UIFormatHost, type DrawnButton } from '@swissspidy/graft-a2ui';
+import { createA2UIFormat, INPUT_GROUP, localState, walkA2UI, type A2UIBuild, type A2UIFormatHost, type DrawnButton } from '@swissspidy/graft-a2ui';
 import { registerUiFormat, type Action, type Build, type EvalContext } from '@swissspidy/graft-core';
 
 /**
@@ -73,7 +73,9 @@ export function rowKey(row: unknown, index: number): string {
  * not drawn. `prefix` namespaces keys, so several customizations can share
  * a page.
  */
-export function renderA2UI(build: Build, ctx: EvalContext, prefix: string, state: Record<string, unknown> = {}): Rendered {
+export function renderA2UI(build: Build, ctx: EvalContext, prefix: string, sent: Record<string, unknown> = {}): Rendered {
+	// The state came from the page: only what the build's own actions set is taken from it.
+	const state = localState(build as unknown as A2UIBuild, sent);
 	const rendered: Rendered = { view: [], actions: [], problems: [] };
 	let out = rendered.view;
 	let n = 0;

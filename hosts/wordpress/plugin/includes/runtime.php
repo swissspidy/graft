@@ -74,9 +74,8 @@ function servable_specs(): array {
 			$record = version_record( $version );
 			$build  = $record['builds'][ $surface['hash'] ]['build'] ?? null;
 			// Never serve a build whose scopes the grant does not cover, or one that did not pass its checks
-			// (a version can be active through its build for another surface).
-			$covered = is_array( $build ) && build_is_verified( $record, $surface['hash'] ) && grant_covers( $record['grant'], build_scopes( $build ) );
-			if ( 'active' === $record['state'] && $covered && applies_to_user( $record, $user ) ) {
+			// (a version can be active through its build for another surface): see not_served_reason().
+			if ( null === not_served_reason( $record, $surface ) && applies_to_user( $record, $user ) ) {
 				$servable[ $spec->post_name ] = array(
 					'record' => $record,
 					'build'  => $build,
@@ -344,6 +343,7 @@ function register_admin_screen(): void {
 						// The whole snapshot: the editor validates and compiles against it.
 						'surface'             => $surface,
 						'policy'              => admin_policy(),
+						'safeMode'            => safe_mode(),
 						// Who triggers run as; null when the site runs none (ADR 0010).
 						'triggers'            => null === surface_triggers() ? null : array( 'identity' => __( 'Graft automation', 'graft' ) ),
 						/**

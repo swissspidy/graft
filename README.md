@@ -266,6 +266,7 @@ Later decisions each have their own record:
 | [0010](docs/adr/0010-scheduled-actions.md) | Triggers: customizations that act on a schedule or an event, as an automation user with its own grant (proposed; WordPress) |
 | [0011](docs/adr/0011-browser-extension-host.md) | A browser extension as the host for web apps without a plugin API (proposed; a [prototype](hosts/chrome-extension/README.md)) |
 | [0012](docs/adr/0012-drag-and-drop.md) | Dragging a card as another way to press its button (WordPress) |
+| [0013](docs/adr/0013-operating-and-recovering.md) | Safe mode, a change log, why a customization is not showing, locked areas, customizations for one person |
 
 [docs/audit-2026-11.md](docs/audit-2026-11.md) lists what a full read of the
 code found, what was fixed and what is still open, and compares Graft with
