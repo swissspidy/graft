@@ -71,12 +71,20 @@ export function rowKey(row: unknown, _index?: number): string {
 	if (typeof id === 'string' || typeof id === 'number') {
 		return String(id);
 	}
-	// FNV-1a over the row as JSON: the same row gives the same key, and that is all it has to do.
-	let hash = 0x811c9dc5;
-	for (const char of JSON.stringify(row) ?? '') {
-		hash = Math.imul(hash ^ char.codePointAt(0)!, 0x01000193) >>> 0;
+	// A short row is its own key. A longer one is cut down to two independent 32-bit hashes (FNV-1a and
+	// djb2) and its length: two different rows sharing all three is not something a list will meet.
+	const text = JSON.stringify(row) ?? '';
+	if (text.length <= 64) {
+		return `~${text}`;
 	}
-	return `~${hash.toString(36)}`;
+	let a = 0x811c9dc5;
+	let b = 5381;
+	for (const char of text) {
+		const code = char.codePointAt(0)!;
+		a = Math.imul(a ^ code, 0x01000193) >>> 0;
+		b = (Math.imul(b, 33) + code) >>> 0;
+	}
+	return `~${a.toString(36)}.${b.toString(36)}.${text.length.toString(36)}`;
 }
 
 /**

@@ -14,6 +14,11 @@ describe('what identifies a row in a click', () => {
 			expect(key(b, 1)).toBe(key({ title: 'B' }, 0));
 			expect(key({ title: 'C' }, 1)).not.toBe(key(b, 1));
 			expect(key(b, 1)).not.toContain('#');
+			// Two rows a single 32-bit FNV-1a hash cannot tell apart are told apart.
+			expect(key({ name: 'ae60045d38674386' }, 0)).not.toBe(key({ name: 'afaebb77f983fdc4' }, 0));
+			const long = (name: string) => ({ name, note: 'x'.repeat(80) });
+			expect(key(long('ae60045d38674386'), 0)).not.toBe(key(long('afaebb77f983fdc4'), 0));
+			expect(key(long('a'), 0)).toBe(key(long('a'), 5));
 		});
 	}
 });
