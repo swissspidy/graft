@@ -62,7 +62,9 @@ test('a contributor builds a customization that only reads, and it is live for t
 
 	// On their Dashboard, though the spec's audience names editors; not on an editor's.
 	await page.goto('/wp-admin/index.php');
-	await expect(page.locator('#graft-my-waiting')).toContainText('My waiting posts');
+	// The widget's box is titled by the spec's mount; the build draws the table of pending posts in it.
+	await expect(page.locator('#graft-my-waiting')).toContainText('Title');
+	await expect(page.locator('#graft-my-waiting')).toContainText('Author');
 	const other = await browser.newPage();
 	await login(other, 'editor');
 	await other.goto('/wp-admin/index.php');

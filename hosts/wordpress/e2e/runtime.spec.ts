@@ -149,13 +149,16 @@ test('the gateway logs what it refused, for administrators only', async ({ page 
 	expect(status).toBe('rest_forbidden');
 });
 
+/** Customizations other tests write in wp-admin (here, and a contributor's own in personal.spec.ts): not part of the seed. */
+const written = ['waiting-copy', 'my-waiting'];
+
 test('the served specs are verified, not flagged', async ({ page }) => {
 	await login(page, 'admin');
 	const specs = (await page.evaluate(() => window.wp.apiFetch({ path: '/graft/v1/specs' }))) as Array<{
 		spec_id: string;
 		versions: Array<{ state: string; unverified: boolean; builds: Record<string, { verification: { passed: boolean } | null }> }>;
 	}>;
-	expect(specs.filter((s) => s.spec_id !== 'waiting-copy').map((s) => [s.spec_id, s.versions[0]!.state]).sort()).toEqual([
+	expect(specs.filter((s) => !written.includes(s.spec_id)).map((s) => [s.spec_id, s.versions[0]!.state]).sort()).toEqual([
 		['headline-check', 'active'],
 		['kanban-board', 'active'],
 		['pending-by-author', 'active'],
