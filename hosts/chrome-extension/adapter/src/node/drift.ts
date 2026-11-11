@@ -127,12 +127,11 @@ const isPlain = (value: unknown): value is Record<string, unknown> => typeof val
  * that no longer fits: the declared schema wherever the answer still fits
  * it, the answer's shape only where it does not.
  *
- * A key the surface never declared stays out, as before the drift: it is
- * taken in only where exactly as many new keys appeared as declared keys
- * went, where it may be what a key was renamed to. Where more appeared,
- * some are fields the surface withheld, and none is taken. So drift does not hand builds the fields the
- * surface withheld, and the result does not depend on the probe account's
- * data (a null due date here, an empty list there).
+ * A key the surface never declared stays out, as before the drift, even
+ * where it looks like the new name of one that went: taking it in would
+ * hand builds a field nobody reviewed. So the result only ever narrows
+ * what was declared, and does not depend on the probe account's data (a
+ * null due date here, an empty list there).
  */
 export function driftedOutput(declared: JsonSchema, value: unknown): JsonSchema {
 	if (typeof declared !== 'object' || declared === null || compileSchema(declared as object)(value)) {
@@ -144,23 +143,30 @@ export function driftedOutput(declared: JsonSchema, value: unknown): JsonSchema 
 	}
 	if (isPlain(value) && isPlain(declared.properties)) {
 		const declaredProps = declared.properties as Record<string, JsonSchema>;
-		const gone = Object.keys(declaredProps).filter((key) => !(key in value));
-		const added = Object.keys(value).filter((key) => !Object.hasOwn(declaredProps, key));
-		// A rename shows as as many new keys as declared keys that went. With more new keys than that, some are
-		// fields the surface withheld, and nothing here can tell which: none is taken, and a person updates the description.
-		const renamed = gone.length > 0 && added.length === gone.length;
+		// Only what was declared is kept. A key the answer gained is never taken in, even next to one that went:
+		// it may be that key's new name, or a field the surface always withheld, and an answer cannot tell which.
+		// The probe lists such keys as `undeclared`, and a person adds the ones builds may read to the description.
 		const properties: Record<string, JsonSchema> = {};
 		for (const key of Object.keys(value).sort()) {
 			if (Object.hasOwn(declaredProps, key)) {
 				properties[key] = driftedOutput(declaredProps[key]!, value[key]);
-			} else if (renamed) {
-				properties[key] = shapeOf(value[key]);
 			}
 		}
 		const required = ((declared.required as string[] | undefined) ?? []).filter((key) => key in value);
 		return { ...declared, properties, required };
 	}
-	// Another kind of value altogether: there is nothing declared to keep.
+	// Another kind of value altogether: there is nothing declared to keep, and nothing of the answer is taken in.
+	return bareShape(value);
+}
+
+/** The kind of a value and no more: an object with no properties, a list of such. Nothing in it reaches a build. */
+function bareShape(value: unknown): JsonSchema {
+	if (Array.isArray(value)) {
+		return { type: 'array', items: value.length > 0 ? bareShape(value[0]) : { type: 'object', properties: {} } };
+	}
+	if (isPlain(value)) {
+		return { type: 'object', properties: {} };
+	}
 	return shapeOf(value);
 }
 
