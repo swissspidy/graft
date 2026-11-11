@@ -189,6 +189,15 @@ check( 'a build for other content is rejected', is_wp_error( Graft\attach_build(
 
 $verified = Graft\attach_build( 'review-queue', 1, $queue['build'], array( 'passed' => true, 'runner' => 'smoke' ) );
 check( 'a verified build without a grant needs approval', 'needs_approval' === ( $verified['state'] ?? null ), $verified['state'] ?? $verified );
+$swapped = Graft\attach_build( 'review-queue', 1, $queue['build'], null );
+check( 'an unverified build cannot take the place of the verified one waiting for approval', is_wp_error( $swapped ) && 'graft_unverified' === $swapped->get_error_code(), $swapped );
+$elsewhere                           = $queue['build'];
+$elsewhere['mount']                  = array(
+	'slot'  => 'dashboard.widget',
+	'title' => 'Moved',
+);
+$elsewhere['provenance']['strategy'] = 'reanchored';
+check( 'a new build cannot claim it was re-anchored to mount somewhere else than its spec', is_wp_error( Graft\attach_build( 'review-queue', 1, $elsewhere, array( 'passed' => true ) ) ) );
 
 wp_set_current_user( $editor );
 $call = call( 'review-queue', 'posts.list', array( 'status' => array( 'pending' ) ) );
@@ -656,6 +665,10 @@ $created = Graft\create_version(
 $bad     = $wtl['build'];
 unset( $bad['triggers']['clear-on-publish'] );
 check( "a build without the spec's triggers is refused", is_wp_error( Graft\attach_build( 'waiting-too-long', $created['version'], $bad, array( 'passed' => true ) ) ) );
+$often                                              = $wtl['build'];
+$often['triggers']['flag-stale']['schedule']['every'] = '1h';
+$hourly = Graft\attach_build( 'waiting-too-long', $created['version'], $often, array( 'passed' => true ) );
+check( 'a build whose trigger runs more often than the spec says is refused', is_wp_error( $hourly ) && 'graft_build_mismatch' === $hourly->get_error_code(), $hourly );
 $attached = Graft\attach_build( 'waiting-too-long', $created['version'], $wtl['build'], array( 'passed' => true ) );
 check( 'a build with triggers needs approval', 'needs_approval' === ( $attached['state'] ?? null ), $attached['state'] ?? $attached );
 $approved_t = Graft\approve_version( 'waiting-too-long', $created['version'] );

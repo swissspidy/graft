@@ -211,7 +211,7 @@ function App({ config }: { config: AdminConfig }) {
 	// Starts Playground in this browser and returns a verifier for builds on this site's surface.
 	const startVerifier = async () => {
 		const sandbox = await browserSandbox(playgroundVersion(config.surface!.hostVersion), config.playground);
-		return (build: Build, spec: Parameters<typeof verifyBuild>[0]['spec'], grant?: string[]) =>
+		return (build: Build, spec: Parameters<typeof verifyBuild>[0]['spec'], grant?: string[], triggerGrant?: Record<string, string[]>) =>
 			verifyBuild({
 				build,
 				spec,
@@ -219,6 +219,7 @@ function App({ config }: { config: AdminConfig }) {
 				sandbox,
 				createCan,
 				...(grant ? { grant } : {}),
+				...(triggerGrant ? { triggerGrant } : {}),
 			});
 	};
 
@@ -246,7 +247,7 @@ function App({ config }: { config: AdminConfig }) {
 					surface={config.surface}
 					startVerifier={async () => {
 						const verify = await startVerifier();
-						return (build, grant, spec) => verify(build, spec, grant);
+						return (build, grant, spec, triggerGrant) => verify(build, spec, grant, triggerGrant);
 					}}
 					onDone={() => void load()}
 				/>
@@ -376,7 +377,7 @@ function upgradeCandidates(specs: SpecRecord[], hash: string): UpgradeCandidate[
 			.filter((entry) => entry.verification?.passed)
 			.sort((a, b) => b.attached.localeCompare(a.attached))[0];
 		if (previous) {
-			candidates.push({ specId: spec.spec_id, title: spec.title, version: version.version, source: version.source, grant: version.grant?.scopes ?? [], build: previous.build });
+			candidates.push({ specId: spec.spec_id, title: spec.title, version: version.version, source: version.source, grant: version.grant?.scopes ?? [], ...(version.grant?.triggers ? { triggerGrant: version.grant.triggers } : {}), build: previous.build });
 		}
 	}
 	return candidates;

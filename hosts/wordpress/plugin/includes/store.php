@@ -444,7 +444,8 @@ function version_record( WP_Post $post ): array {
 		'manifest'   => get_json_meta( $post->ID, '_graft_manifest' ),
 		'grant'      => get_json_meta( $post->ID, '_graft_grant' ),
 		'builds'     => is_array( $builds ) ? $builds : array(),
-		'owner'      => (int) $post->post_author,
+		// A personal customization belongs to whoever wrote the spec, whoever stored this version of it.
+		'owner'      => (int) ( $spec ? $spec->post_author : $post->post_author ),
 		'scope'      => $spec ? get_json_meta( $spec->ID, '_graft_scope' ) : null,
 		'created'    => mysql_to_rfc3339( $post->post_date_gmt ),
 	);
@@ -567,7 +568,9 @@ function attach_build( string $spec_id, int $version, $build, ?array $verificati
 		return new WP_Error( 'graft_unknown_surface', __( 'The build targets a surface this plugin does not know.', 'graft' ), array( 'status' => 400 ) );
 	}
 	$slot       = (string) ( $build['mount']['slot'] ?? '' );
-	$reanchored = 'reanchored' === ( $build['provenance']['strategy'] ?? null ) && isset( $snapshot['slots'][ $slot ] );
+	$upgrading  = 'active' === $record['state'] || 'upgrading' === $record['state'];
+	// Only an upgrade moves a customization to another slot: a new build mounts where its spec says.
+	$reanchored = $upgrading && 'reanchored' === ( $build['provenance']['strategy'] ?? null ) && isset( $snapshot['slots'][ $slot ] );
 	// Validate the mount against the slot on this host. A build re-anchored
 	// to a slot of a future surface is validated when that surface is live.
 	if ( isset( surface_slots()[ $slot ] ) ) {
@@ -579,11 +582,17 @@ function attach_build( string $spec_id, int $version, $build, ?array $verificati
 	if ( $slot !== ( $record['manifest']['mount']['slot'] ?? null ) && ! $reanchored ) {
 		return new WP_Error( 'graft_build_mismatch', __( 'The build mounts somewhere else than the spec.', 'graft' ), array( 'status' => 400 ) );
 	}
+	// The policy's places apply to where the build mounts, not only to where the spec asked to.
+	if ( $reanchored && null === managed_by( $spec_id ) ) {
+		$allowed_slot = policy_allows_manifest( array( 'mount' => array( 'slot' => $slot ) ) );
+		if ( is_wp_error( $allowed_slot ) ) {
+			return $allowed_slot;
+		}
+	}
 	// An upgraded build may need scopes the spec never asked for (the host
 	// moved a capability behind a new permission). It is stored, but only
 	// served once an admin widens the grant.
-	$scopes    = build_scopes( $build );
-	$upgrading = 'active' === $record['state'] || 'upgrading' === $record['state'];
+	$scopes = build_scopes( $build );
 	if ( array_diff( $scopes, $record['manifest']['permissions'] ) && ! $upgrading ) {
 		return new WP_Error( 'graft_build_scope', __( 'The build needs permissions the spec does not request.', 'graft' ), array( 'status' => 400 ) );
 	}
@@ -601,6 +610,14 @@ function attach_build( string $spec_id, int $version, $build, ?array $verificati
 		if ( array_diff( trigger_scopes( (array) $trigger ), (array) ( $declared[ $id ]['permissions'] ?? array() ) ) && ! $upgrading ) {
 			return new WP_Error( 'graft_build_scope', __( 'A trigger needs permissions the spec does not list for it.', 'graft' ), array( 'status' => 400 ) );
 		}
+		// It runs when the spec says: the host's limits were checked on the spec's schedule and event, not the build's.
+		// (An upgrade may follow the host renaming the event; its schedule still has to be the spec's.)
+		$when     = static fn( $from ) => array( (string) ( $from['schedule']['every'] ?? '' ), (string) ( $from['schedule']['at'] ?? '' ) );
+		$same     = $when( (array) $trigger ) === $when( (array) $declared[ $id ] );
+		$on_event = (string) ( ( (array) $trigger )['event'] ?? '' ) === (string) ( $declared[ $id ]['event'] ?? '' );
+		if ( ! $same || ( ! $on_event && ! $upgrading ) ) {
+			return new WP_Error( 'graft_build_mismatch', __( 'A trigger of the build does not run when the spec says.', 'graft' ), array( 'status' => 400 ) );
+		}
 	}
 
 	$verified = ! empty( $verification['passed'] );
@@ -609,6 +626,11 @@ function attach_build( string $spec_id, int $version, $build, ?array $verificati
 		// Never replace what an active version serves (or will serve after an
 		// upgrade) with something unverified.
 		return new WP_Error( 'graft_unverified', __( 'Only verified builds can be attached to an active customization.', 'graft' ), array( 'status' => 400 ) );
+	}
+
+	if ( ! $verified && ! $allowed && ! empty( $record['builds'][ $surface_hash ]['verification']['passed'] ) ) {
+		// Nor a verified build with an unverified one, in any state: approval would then put it live.
+		return new WP_Error( 'graft_unverified', __( 'A verified build can only be replaced by a verified one.', 'graft' ), array( 'status' => 400 ) );
 	}
 
 	// Stored as sent: the builds already there are read back as objects too.
@@ -625,6 +647,8 @@ function attach_build( string $spec_id, int $version, $build, ?array $verificati
 			return version_record( get_post( $post->ID ) );
 		}
 		update_post_meta( $post->ID, '_graft_unverified', 1 );
+	} else {
+		delete_post_meta( $post->ID, '_graft_unverified' );
 	}
 
 	if ( 'upgrading' === $record['state'] ) {

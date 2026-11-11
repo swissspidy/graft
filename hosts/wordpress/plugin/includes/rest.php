@@ -221,13 +221,18 @@ function register_routes(): void {
 			'callback'            => __NAMESPACE__ . '\rest_call',
 			'permission_callback' => 'is_user_logged_in',
 			'args'                => array(
+				// Bounded: a refused call is written to the audit log as sent.
 				'spec'       => array(
-					'type'     => 'string',
-					'required' => true,
+					'type'      => 'string',
+					'required'  => true,
+					'maxLength' => 63,
+					'pattern'   => '^[a-z0-9][a-z0-9-]*$',
 				),
 				'capability' => array(
-					'type'     => 'string',
-					'required' => true,
+					'type'      => 'string',
+					'required'  => true,
+					'maxLength' => 100,
+					'pattern'   => '^[A-Za-z0-9_.:/-]+$',
 				),
 				'input'      => array(
 					'type' => array( 'object', 'array', 'string', 'number', 'integer', 'boolean', 'null' ),
@@ -327,8 +332,8 @@ function audit_refusal( string $spec_id, string $capability, WP_Error $error, ar
 		array(
 			'time'       => gmdate( 'c' ),
 			'user'       => get_current_user_id(),
-			'spec'       => $spec_id,
-			'capability' => $capability,
+			'spec'       => substr( $spec_id, 0, 63 ),
+			'capability' => substr( $capability, 0, 100 ),
 			'code'       => $error->get_error_code(),
 		),
 		$context

@@ -122,4 +122,29 @@ describe('schema engines', () => {
 		await validateBuild(JSON.parse(read('examples/emdash/builds/go-live.json')) as Build, surface);
 		expect(JSON.stringify(surface)).toBe(before);
 	});
+
+describe('a deeply nested expression', () => {
+	afterAll(() => setSchemaEngine(ajvEngine()));
+	const nested = (depth: number, leaf: unknown): unknown => (depth === 0 ? leaf : { $not: nested(depth - 1, leaf) });
+
+	for (const [name, engine] of [
+		['ajv', ajvEngine],
+		['cfworker', cfworkerEngine],
+	] as const) {
+		it(`is validated in time linear in its depth (${name})`, async () => {
+			setSchemaEngine(engine());
+			const surface = JSON.parse(read('hosts/wordpress/plugin/surfaces/7.1.json')) as Surface;
+			const build = JSON.parse(read('examples/builds/review-queue.json')) as Build;
+			const source = Object.keys(build.data)[0]!;
+			const started = Date.now();
+			build.data[source]!.input = { flag: nested(24, true) } as never;
+			const valid = await validateBuild(build, surface);
+			build.data[source]!.input = { flag: nested(24, { $unknown: 1 }) } as never;
+			const invalid = await validateBuild(build, surface);
+			expect(Date.now() - started).toBeLessThan(2000);
+			expect(valid.diagnostics.map((d) => d.code)).not.toContain('build-schema');
+			expect(invalid.ok).toBe(false);
+		});
+	}
+});
 });

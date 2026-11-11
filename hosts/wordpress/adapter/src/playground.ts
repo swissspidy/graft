@@ -70,8 +70,9 @@ function spawnOutput(command: string, args: string[], what: string): Promise<str
 		const child = spawn(command, args, { stdio: ['ignore', 'pipe', 'pipe'] });
 		let stdout = '';
 		let stderr = '';
-		child.stdout.on('data', (chunk: Buffer) => (stdout += chunk));
-		child.stderr.on('data', (chunk: Buffer) => (stderr += chunk));
+		// Decoded as streams, so a character split across two chunks stays one character.
+		child.stdout.setEncoding('utf8').on('data', (chunk: string) => (stdout += chunk));
+		child.stderr.setEncoding('utf8').on('data', (chunk: string) => (stderr += chunk));
 		child.on('error', reject);
 		child.on('close', (code) => {
 			if (code === 0) {

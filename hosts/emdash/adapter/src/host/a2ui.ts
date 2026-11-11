@@ -79,7 +79,9 @@ export function renderA2UI(build: Build, ctx: EvalContext, prefix: string, state
 			}
 		},
 		button: (drawn) => {
-			const { element: block, action } = toBlock(drawn, `${prefix}:b${buttons++}`);
+			// One of a list's buttons carries its item, so a click on a list that changed meanwhile finds nothing instead of its neighbour.
+			const n = buttons++;
+			const { element: block, action } = toBlock(drawn, `${prefix}:b${n}`, drawn.row === undefined ? undefined : rowKey(drawn.row, n));
 			rendered.actions.push(action);
 			if (block) {
 				element(block);

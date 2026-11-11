@@ -1,14 +1,23 @@
 import { isSafeRegex, type Catalog, type ComponentApi } from '@a2ui/web_core/v0_9';
-import { compileSchema, type Build, type Diagnostic, type Spec, type Surface } from '@swissspidy/graft-core';
+import { compileSchema, type Build, type Diagnostic, type Surface } from '@swissspidy/graft-core';
 import type { z } from 'zod';
 import { createGraftCatalog, INPUT_COMPONENTS } from './catalog.ts';
-import type { A2UIHost } from './walk.ts';
+import { modelKey, type A2UIHost } from './walk.ts';
 import type { A2UIBuild, A2UIComponent } from './types.ts';
 
 const isObject = (value: unknown): value is Record<string, unknown> => typeof value === 'object' && value !== null && !Array.isArray(value);
 const isBinding = (value: unknown): value is { path: string } => isObject(value) && typeof value.path === 'string' && Object.keys(value).length === 1;
 const isCall = (value: unknown): value is { call: string; args?: Record<string, unknown> } => isObject(value) && typeof value.call === 'string' && Object.keys(value).every((k) => ['call', 'args', 'returnType'].includes(k));
 const isDynamic = (value: unknown) => isBinding(value) || isCall(value);
+
+const compiles = (pattern: string): boolean => {
+	try {
+		new RegExp(pattern);
+		return true;
+	} catch {
+		return false;
+	}
+};
 
 /** Pointers written with "." where JSON Pointers use "/" (e.g. "can.publish"). */
 const dotted = (path: string) => path.split('/').some((segment) => /^[A-Za-z_]\w*(\.[A-Za-z_]\w*)+$/.test(segment));
@@ -77,7 +86,7 @@ export function inputProblems(surface: Surface, capability: string, input: unkno
  * surface, before anything runs: structure, every component's properties,
  * functions and their arguments, inputs, events and what they call.
  */
-export function validateA2UI(value: Build, surface: Surface, host: A2UIHost, spec?: Spec): Diagnostic[] {
+export function validateA2UI(value: Build, surface: Surface, host: A2UIHost): Diagnostic[] {
 	const build = value as unknown as A2UIBuild;
 	const diagnostics: Diagnostic[] = [];
 	const error = (code: string, path: string, message: string) => diagnostics.push({ severity: 'error', code, path, message });
@@ -137,6 +146,8 @@ export function validateA2UI(value: Build, surface: Surface, host: A2UIHost, spe
 		error('a2ui-unreachable', '/ui/components', `Components not reachable from "root": ${unreached.join(', ')}.`);
 	}
 
+	const loaded = new Set(['slot', ...Object.keys(build.data ?? {})]);
+
 	// Values anywhere: known functions with valid arguments, pointers, events sent.
 	const sent = new Set<string>();
 	const scan = (item: unknown, path: string) => {
@@ -157,12 +168,28 @@ export function validateA2UI(value: Build, surface: Surface, host: A2UIHost, spe
 				}
 				// web_core refuses to run a pattern that can backtrack catastrophically; the call would have no value.
 				const pattern = item.args?.pattern;
-				if (item.call === 'regex' && typeof pattern === 'string' && !isSafeRegex(pattern)) {
+				if ((item.call === 'regex' || item.call === 'replace') && isDynamic(pattern)) {
+					error('a2ui-function-args', `${path}/args/pattern`, `${item.call}: "pattern" must be written out as a string, not read from data.`);
+				} else if (item.call === 'replace' && typeof pattern === 'string' && !compiles(pattern)) {
+					error('a2ui-function-args', `${path}/args/pattern`, `replace: "${pattern}" is not a regular expression.`);
+				} else if ((item.call === 'regex' || item.call === 'replace') && typeof pattern === 'string' && !isSafeRegex(pattern)) {
 					error(
 						'a2ui-unsafe-pattern',
 						`${path}/args/pattern`,
-						`regex: "${pattern}" can backtrack catastrophically (ReDoS), so the renderer refuses to run it. Anchor it at the start (e.g. "^\\s*\\S+\\s+\\S" rather than "\\S+\\s+\\S") and avoid quantified parts that can match the same text.`,
+						`${item.call}: "${pattern}" can backtrack catastrophically (ReDoS), so the renderer refuses to run it. Anchor it at the start (e.g. "^\\s*\\S+\\s+\\S" rather than "\\S+\\s+\\S") and avoid quantified parts that can match the same text.`,
 					);
+				}
+				if (item.call === 'can' && isDynamic(item.args?.scope)) {
+					error('a2ui-function-args', `${path}/args/scope`, 'can: "scope" must be written out as a string, not read from data.');
+				}
+				// A template's calls are not objects, so nothing here can check them: keep the ones that need checking out.
+				const template = item.call === 'formatString' ? item.args?.value : undefined;
+				const hidden = typeof template === 'string' ? /\$\{\s*(can|regex|replace|set)\s*\(/.exec(template) : null;
+				if (hidden) {
+					error('a2ui-template-call', `${path}/args/value`, `formatString: "${hidden[1]}" cannot be called inside a template. Call it as {"call": "${hidden[1]}", ...} and put the result in the data model ("computed"), then interpolate its path.`);
+				}
+				if (item.call === 'set' && typeof item.args?.target === 'string' && item.args.target.startsWith('/') && loaded.has(modelKey(item.args.target))) {
+					error('a2ui-model-key', `${path}/args/target`, `"${item.args.target}" is loaded by the host (a data source or the slot), so "set" cannot write to it. Use a key of its own, e.g. "/form/...".`);
 				}
 			}
 		}
@@ -191,13 +218,29 @@ export function validateA2UI(value: Build, surface: Surface, host: A2UIHost, spe
 		}
 		if (INPUT_COMPONENTS.has(component.component) && !(isBinding(component.value) && component.value.path.startsWith('/'))) {
 			error('a2ui-input-binding', `${path}/value`, `The input "${component.id}" must bind "value" to an absolute pointer, e.g. {"path": "/form/${component.id}"}.`);
+		} else if (INPUT_COMPONENTS.has(component.component) && loaded.has(modelKey((component.value as { path: string }).path))) {
+			error('a2ui-input-binding', `${path}/value`, `The input "${component.id}" writes to "${(component.value as { path: string }).path}", which the host loads (a data source or the slot). Bind it to a key of its own, e.g. {"path": "/form/${component.id}"}, and start it from the loaded value in "initial".`);
+		}
+		const validation = component.validationRegexp;
+		if (component.component === 'TextField' && typeof validation === 'string' && !isSafeRegex(validation)) {
+			error('a2ui-unsafe-pattern', `${path}/validationRegexp`, `"${validation}" can backtrack catastrophically (ReDoS), so the renderer refuses to run it and the field would never be valid.`);
 		}
 		if (component.component === 'Table') {
-			((component.fields as Array<{ id?: unknown }> | undefined) ?? []).forEach((field, f) => {
+			const labels = new Set<unknown>();
+			((component.fields as Array<{ id?: unknown; label?: unknown }> | undefined) ?? []).forEach((field, f) => {
 				if (typeof field.id === 'string' && dotted(field.id)) {
 					error('a2ui-dotted-pointer', `${path}/fields/${f}/id`, `Field "${field.id}" is not a JSON Pointer into the row: use "${field.id.replace(/\./g, '/')}".`);
 				}
+				if (typeof field.label === 'string' && labels.has(field.label)) {
+					error('a2ui-duplicate-label', `${path}/fields/${f}/label`, `Two columns of "${component.id}" are labelled "${field.label}": a check names a column by its label.`);
+				}
+				labels.add(field.label);
 			});
+		}
+		const listed = Array.isArray(component.children) ? component.children.map(String) : [];
+		const twice = listed.find((child, c) => listed.indexOf(child) !== c);
+		if (twice !== undefined) {
+			error('a2ui-duplicate-reference', `${path}/children`, `"${component.id}" lists the child "${twice}" twice: a component is drawn once in a place.`);
 		}
 		scan(component, path);
 	});
@@ -217,7 +260,7 @@ export function validateA2UI(value: Build, surface: Surface, host: A2UIHost, spe
 
 	// Events: every one sent is bound, every bound one is sent, and each is a valid call.
 	for (const name of sent) {
-		if (!build.events[name]) {
+		if (!Object.hasOwn(build.events, name)) {
 			error('a2ui-unbound-event', '/events', `The event "${name}" is not bound in "events".`);
 		}
 	}
@@ -226,8 +269,7 @@ export function validateA2UI(value: Build, surface: Surface, host: A2UIHost, spe
 		if (!sent.has(name)) {
 			error('a2ui-unused-event', path, `The event "${name}" is bound but nothing sends it.`);
 		}
-		const capability = surface.capabilities[binding.call];
-		if (!capability) {
+		if (!Object.hasOwn(surface.capabilities, binding.call)) {
 			error('build-unknown-capability', `${path}/call`, `Unknown capability "${binding.call}".`);
 			continue;
 		}
@@ -236,8 +278,8 @@ export function validateA2UI(value: Build, surface: Surface, host: A2UIHost, spe
 			error('build-invalid-value', `${path}/input`, `Input for "${binding.call}": ${problem}.`);
 		}
 		(binding.then ?? []).forEach((op, i) => {
-			const [kind, target] = op.split(':');
-			const ok = (kind === 'reload' && target === 'page') || ((kind === 'refresh' || kind === 'remove-row') && target !== undefined && Object.hasOwn(build.data, target));
+			const [kind, target, ...rest] = op.split(':');
+			const ok = rest.length === 0 && (kind === 'reload' && target === 'page') || ((kind === 'refresh' || kind === 'remove-row') && target !== undefined && Object.hasOwn(build.data, target));
 			if (!ok) {
 				error('build-unknown-data', `${path}/then/${i}`, `"${op}" is not "refresh:<source>", "remove-row:<source>" or "reload:page".`);
 			}
@@ -260,7 +302,7 @@ export function validateA2UI(value: Build, surface: Surface, host: A2UIHost, spe
 	const scopes = new Set<string>();
 	collectScopes(build.ui, scopes);
 	for (const scope of scopes) {
-		if (!surface.scopes[scope]) {
+		if (!Object.hasOwn(surface.scopes, scope)) {
 			error('build-unknown-scope', '/ui', `Unknown scope "${scope}" in a "can" call.`);
 		}
 	}

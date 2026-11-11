@@ -73,8 +73,9 @@ function servable_specs(): array {
 			}
 			$record = version_record( $version );
 			$build  = $record['builds'][ $surface['hash'] ]['build'] ?? null;
-			// Never serve a build whose scopes the grant does not cover.
-			$covered = is_array( $build ) && grant_covers( $record['grant'], build_scopes( $build ) );
+			// Never serve a build whose scopes the grant does not cover, or one that did not pass its checks
+			// (a version can be active through its build for another surface).
+			$covered = is_array( $build ) && build_is_verified( $record, $surface['hash'] ) && grant_covers( $record['grant'], build_scopes( $build ) );
 			if ( 'active' === $record['state'] && $covered && applies_to_user( $record, $user ) ) {
 				$servable[ $spec->post_name ] = array(
 					'record' => $record,
@@ -85,6 +86,21 @@ function servable_specs(): array {
 	}
 	$cache[ $user_id ] = $servable;
 	return $servable;
+}
+
+/**
+ * Whether a version's build for a surface passed its checks, or the site
+ * allows unverified builds (development only).
+ *
+ * @param array<string, mixed> $record       Version record.
+ * @param string               $surface_hash Surface hash.
+ * @return bool
+ */
+function build_is_verified( array $record, string $surface_hash ): bool {
+	if ( defined( 'GRAFT_ALLOW_UNVERIFIED_BUILDS' ) && GRAFT_ALLOW_UNVERIFIED_BUILDS ) {
+		return true;
+	}
+	return ! empty( $record['builds'][ $surface_hash ]['verification']['passed'] );
 }
 
 /**
@@ -313,7 +329,8 @@ function register_admin_screen(): void {
 			wp_enqueue_script( 'graft-admin', plugins_url( 'build/admin.js', __DIR__ ), $asset['dependencies'], $asset['version'], true );
 			wp_enqueue_style( 'wp-components' );
 			$surface           = current_surface();
-			$playground_client = require dirname( __DIR__ ) . '/build/playground-client.asset.php';
+			$playground_file   = dirname( __DIR__ ) . '/build/playground-client.asset.php';
+			$playground_client = is_readable( $playground_file ) ? require $playground_file : array( 'version' => '' );
 			wp_add_inline_script(
 				'graft-admin',
 				'window.graftAdmin = ' . wp_json_encode(

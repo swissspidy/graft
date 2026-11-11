@@ -805,7 +805,8 @@ function prepare_post( \WP_Post $post ): array {
 	$author = get_userdata( (int) $post->post_author );
 	$item   = array(
 		'id'       => $post->ID,
-		'title'    => get_the_title( $post ),
+		// The title as written: get_the_title() is for HTML (entities, texturizing, a "Private: " prefix).
+		'title'    => $post->post_title,
 		'status'   => $post->post_status,
 		'type'     => $post->post_type,
 		'author'   => array(

@@ -741,7 +741,7 @@ function trigger_specs(): array {
 		$post   = get_version_post( $spec->post_name, (int) get_post_meta( $spec->ID, '_graft_active_version', true ) );
 		$record = $post ? version_record( $post ) : null;
 		$build  = $record['builds'][ $current['hash'] ]['build'] ?? null;
-		if ( $record && 'active' === $record['state'] && is_array( $build ) && ! empty( $build['triggers'] ) ) {
+		if ( $record && 'active' === $record['state'] && is_array( $build ) && ! empty( $build['triggers'] ) && build_is_verified( $record, $current['hash'] ) ) {
 			$out[ $spec->post_name ] = array(
 				'record'  => $record,
 				'build'   => $build,
@@ -1108,6 +1108,10 @@ function on_post_transition( string $new_status, string $old_status, WP_Post $po
 function run_event_trigger( string $spec_id, string $id, int $post_id, string $event ) {
 	$post = get_post( $post_id );
 	if ( ! $post || ! is_exposed_post_type( $post->post_type ) ) {
+		return null;
+	}
+	// The build may have changed since this was queued: only a trigger that still runs on this event runs.
+	if ( ( trigger_specs()[ $spec_id ]['build']['triggers'][ $id ]['event'] ?? null ) !== $event ) {
 		return null;
 	}
 	$now    = time();

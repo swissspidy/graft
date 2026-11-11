@@ -34,14 +34,19 @@ const sandbox = await startSandbox({
 	log: process.env.GRAFT_E2E_VERBOSE ? (l) => process.stderr.write(l) : undefined,
 });
 const server = sandbox.server;
-const shutdown = async () => {
+const shutdown = async (code = 0) => {
 	await rm(marker, { recursive: true, force: true });
 	stub.close();
 	await sandbox.close();
-	process.exit(0);
+	process.exit(code);
 };
-process.on('SIGINT', shutdown);
-process.on('SIGTERM', shutdown);
+process.on('SIGINT', () => shutdown());
+process.on('SIGTERM', () => shutdown());
+// The server is its own process group: anything failing during setup must not leave it running on the port.
+process.on('uncaughtException', (error) => {
+	console.error(error);
+	void shutdown(1);
+});
 
 const examples = await loadExamples();
 const verifications = await verifyInEmDash(examples, { sandbox });

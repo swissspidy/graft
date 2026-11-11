@@ -40,7 +40,7 @@ The example customizations in the demo are A2UI surfaces Claude compiled
 from the specs, checked in so the tests run without a model (the board
 and "Waiting too long", newer, were written by hand;
 [ADR 0012](docs/adr/0012-drag-and-drop.md), [ADR 0010](docs/adr/0010-scheduled-actions.md)). [Compiling with Claude](docs/compiling-with-claude.md)
-shows a real run: Claude compiles all seven example specs into builds that
+shows a real run: Claude compiles the seven example specs that existed then into builds that
 pass their checks, and regenerates five customizations after a host change.
 
 ## A customization
@@ -191,7 +191,8 @@ centre's own **Family friendly** row action for **Events**.
 pnpm graft validate --surface hosts/wordpress/plugin/surfaces/7.1.json examples/specs
 pnpm graft build examples/builds/review-queue.json \
   --surface hosts/wordpress/plugin/surfaces/7.1.json --spec examples/specs/review-queue.md [--fix-refs]
-pnpm graft check examples --surface hosts/wordpress/plugin/surfaces/7.1.json   # fast: every build still matches its spec and surface
+pnpm graft check examples/specs examples/builds --surface hosts/wordpress/plugin/surfaces/7.1.json   # fast: every build still matches its spec and surface
+pnpm check:builds   # the same for every example and canary build, on all three hosts
 pnpm graft verify --surface hosts/wordpress/plugin/surfaces/7.1.json --spec examples/specs examples/builds/*.json
 pnpm graft verify --surface hosts/emdash/adapter/surfaces/1.3.json --spec examples/emdash/specs examples/emdash/builds/*.json
 pnpm graft bundle --spec examples/agency/specs/upcoming-events.md --surface examples/agency/surface.json \
@@ -224,19 +225,19 @@ pnpm graft site verify --site <url> --token <token>
 | `pnpm verify:examples` | The example builds' checks in a WordPress sandbox |
 | `pnpm verify:agency` | The agency example builds' checks, in a sandbox that reproduces the client site's content model |
 | `pnpm test:compile` | The compile pipeline with a scripted model against WordPress: a wrong A2UI build is rejected in verification, the fix accepted |
-| `pnpm test:canary` | Eight synthetic host changes, each forcing one rung, against a five-tenant corpus |
+| `pnpm test:canary` | Six synthetic host changes, each forcing one rung, against a five-tenant corpus |
 | `pnpm test:e2e` | Playwright in wp-admin: serving, gateway and its audit log, Dashboard widgets with local state, row actions, the publish checklist in the block editor, approval, authoring, `graft site`, triggers (dry run, pause, run now, an event trigger from WP-Cron) |
 | `pnpm test:e2e:agency` | Playwright on a client site an agency built: custom post types, fields and terms, the agency's policy and managed customization, and upgrading after the agency changes the content model |
 | `pnpm verify:emdash` | The EmDash example builds' checks in a throwaway EmDash |
 | `pnpm test:compile:emdash` | The compile pipeline with a scripted model against EmDash, building an A2UI surface |
 | `pnpm test:canary:emdash` | Six synthetic EmDash changes, each forcing one rung, against a two-tenant corpus |
 | `pnpm test:site:emdash` | `graft site` against a live EmDash: install with local verification, verify drafts, pull into the canary |
+| `pnpm test:emdash` | EmDash plugin smoke test: install, approve, serve per role, forged and refused actions, the status board's local state and actions |
 | `pnpm test:emdash:sandboxed` | The same, with Graft in EmDash's plugin sandbox (workerd) |
 | `pnpm test:author:emdash` | Writing a customization (an A2UI surface) in the EmDash admin, with a stubbed Claude API, natively and sandboxed |
+| `pnpm test:e2e:emdash` | Playwright in the EmDash admin: the page, the widget and the editor panel |
 | `pnpm test:cfworker` | The unit tests again on the schema engine used where code generation is forbidden |
 | `pnpm test:packages` | The npm packages, packed as published, installed outside the workspace and imported |
-| `pnpm test:emdash` | EmDash plugin smoke test: install, approve, serve per role, forged and refused actions, the status board's local state and actions |
-| `pnpm test:e2e:emdash` | Playwright in the EmDash admin: the page, the widget and the editor panel |
 | `pnpm verify:extension` | The browser extension example build's checks against a copy of the fixture app |
 | `pnpm test:e2e:extension` | Playwright with the unpacked extension in Chromium: approval, the injected panel under the app's CSP, the gateway's refusals, drift and the upgrade ladder after it |
 
@@ -264,6 +265,11 @@ Later decisions each have their own record:
 | [0009](docs/adr/0009-a2ui.md) | A2UI surfaces as a build's UI, replacing trees |
 | [0010](docs/adr/0010-scheduled-actions.md) | Triggers: customizations that act on a schedule or an event, as an automation user with its own grant (proposed; WordPress) |
 | [0011](docs/adr/0011-browser-extension-host.md) | A browser extension as the host for web apps without a plugin API (proposed; a [prototype](hosts/chrome-extension/README.md)) |
+| [0012](docs/adr/0012-drag-and-drop.md) | Dragging a card as another way to press its button (WordPress) |
+
+[docs/audit-2026-11.md](docs/audit-2026-11.md) lists what a full read of the
+code found, what was fixed and what is still open, and compares Graft with
+[Extensible Web Apps](https://extensibleweb.app/).
 
 Known limits:
 

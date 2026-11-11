@@ -1,6 +1,6 @@
 import { compileSpec, hashSpec, validateSpec, type Diagnostic, type ModelClient, type ModelResponse, type Surface } from '@swissspidy/graft-core';
 import { hostGuide } from '../host/guide.ts';
-import type { KV, Store } from './store.ts';
+import { StoreError, type KV, type Store } from './store.ts';
 
 /**
  * Compiling a spec written in the EmDash admin. A compile makes several
@@ -140,8 +140,17 @@ export async function stepJob(job: Job, deps: { jobs: Jobs; store: Store; surfac
 		if (!result.ok || !result.build) {
 			return finish(deps.jobs, job, 'failed', problems.length > 0 ? problems : ['The compiler gave up.']);
 		}
-		const { version } = await deps.store.put({ source: job.source, build: result.build });
-		job.version = version.n;
+		let stored;
+		try {
+			stored = await deps.store.put({ source: job.source, build: result.build });
+		} catch (error) {
+			// The store refusing the build is final: continuing would replay the same answers into the same refusal.
+			if (error instanceof StoreError) {
+				return finish(deps.jobs, job, 'failed', [error.message, ...(error.diagnostics ?? []).map((d) => d.message)]);
+			}
+			throw error;
+		}
+		job.version = stored.version.n;
 		return finish(deps.jobs, job, 'built', ['Built. Verify it with graft site verify, then approve it here.']);
 	} catch (error) {
 		if (error instanceof Pause) {

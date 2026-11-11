@@ -22,7 +22,9 @@ interface Line {
 	number: number;
 }
 
-const HEADING = /^(#{1,6})\s+(.*?)\s*#*\s*$/;
+// The text is taken whole and its closing #s cut off in code: one pattern for both backtracks badly on long runs of spaces.
+const HEADING = /^(#{1,6})\s+(.*)$/;
+const headingText = (text: string): string => text.trimEnd().replace(/(?:^|\s)#+$/, '').trim();
 const LIST_ITEM = /^(?:[-*+]|\d+[.)])\s+(.*)$/;
 const FENCE = /^\s*(```|~~~)/;
 
@@ -214,13 +216,13 @@ function splitSections(
 					line: line.number,
 				});
 			} else {
-				title = heading[2] ?? '';
+				title = headingText(heading[2] ?? '');
 				titleLine = line.number;
 				continue;
 			}
 		}
 		if (heading && heading[1] === '##') {
-			current = { heading: heading[2] ?? '', line: line.number, lines: [] };
+			current = { heading: headingText(heading[2] ?? ''), line: line.number, lines: [] };
 			sections.push(current);
 			continue;
 		}
@@ -254,7 +256,10 @@ function listItems(lines: Line[]): Item[] {
 			current = { text: item[1] ?? '', line: line.number };
 			items.push(current);
 		} else if (current && /^\s+\S/.test(line.text)) {
-			current.text += ' ' + line.text.trim().replace(/^(?:[-*+]|\d+[.)])\s+/, '');
+			// A {#id} marker ends the item's first line; keep it at the end of the joined text, where it is read.
+			const marker = /\s*\{#[^}\s]*\}\s*$/.exec(current.text);
+			const head = marker ? current.text.slice(0, marker.index) : current.text;
+			current.text = head + ' ' + line.text.trim().replace(/^(?:[-*+]|\d+[.)])\s+/, '') + (marker ? ` ${marker[0].trim()}` : '');
 		} else if (line.text.trim() === '') {
 			current = undefined;
 		}

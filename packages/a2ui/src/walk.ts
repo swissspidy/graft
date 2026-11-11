@@ -31,6 +31,9 @@ export interface A2UIHost {
 /** What the viewer entered and local actions set, by input component id or pointer, in order. */
 export const INPUT_GROUP = 'surface';
 
+/** The top-level key of the data model an absolute JSON Pointer is under ("/form/title" → "form"). */
+export const modelKey = (pointer: string): string => (pointer.split('/')[1] ?? '').replace(/~1/g, '/').replace(/~0/g, '~');
+
 const defaultCell: CellFormatter = (field, _record, evaluate) => {
 	const value = evaluate(field.value);
 	const tone = field.tone === undefined ? undefined : evaluate(field.tone);
@@ -129,9 +132,14 @@ export function walkA2UI(build: A2UIBuild, ctx: EvalContext, entered: Record<str
 	};
 
 	safely('"initial"', () => seed(root, build.ui.initial));
+	// What was entered may come from whoever is looking (a host keeps it in the page), so it
+	// never replaces what the host loaded: the data sources' results and the slot.
+	const loaded = new Set(['slot', ...Object.keys(ctx.data)]);
 	for (const [id, value] of Object.entries(entered[INPUT_GROUP] ?? {})) {
 		const bound = id.startsWith('/') ? { path: id } : (components.get(id)?.value as { path?: unknown } | undefined);
-		if (typeof bound?.path === 'string' && bound.path.startsWith('/')) {
+		if (typeof bound?.path === 'string' && loaded.has(modelKey(bound.path))) {
+			drawer.problem(`"${bound.path}" is loaded by the host, so nothing entered or set can write to it.`);
+		} else if (typeof bound?.path === 'string' && bound.path.startsWith('/')) {
 			dataModel.set(bound.path, value ?? null);
 		} else {
 			drawer.problem(`The input "${id}" has no absolute "value" binding to write to.`);

@@ -215,13 +215,18 @@ export async function main(argv: string[]): Promise<number> {
 			console.error(`graft compile: ${error instanceof Error ? error.message : String(error)}`);
 			return 2;
 		}
+		const attempts = Number(values.attempts);
+		if (!Number.isInteger(attempts) || attempts < 1) {
+			console.error(`graft compile: --attempts must be a whole number of at least 1, not "${values.attempts}".`);
+			return 2;
+		}
 		const id = file.replace(/^.*\//, '').replace(/\.md$/, '');
 		const result = await compileFile(file, {
 			surface: values.surface,
 			out: values.out ?? `${id}.build.json`,
 			model,
 			verify: values.verify,
-			attempts: Number(values.attempts),
+			attempts,
 			...(values.previous ? { previous: values.previous } : {}),
 		});
 		return result.ok ? 0 : 1;

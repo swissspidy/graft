@@ -35,7 +35,8 @@ export async function loadSurface(file: string): Promise<Surface> {
 		const details = result.diagnostics.map((d) => `  ${d.path ?? ''} ${d.message}`).join('\n');
 		throw new Error(`Invalid surface ${file}:\n${details}`);
 	}
-	return result.surface;
+	// A surface file may leave its hash out; everything downstream identifies the surface by it.
+	return { ...result.surface, hash: result.hash ?? result.surface.hash };
 }
 
 export async function validateFiles(paths: string[], surface?: Surface): Promise<FileResult[]> {

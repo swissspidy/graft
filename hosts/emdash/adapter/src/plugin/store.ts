@@ -75,6 +75,12 @@ export function createStore(kv: KV, surface: () => Promise<Surface>) {
 		if (previous && previous !== version) {
 			transition(previous, 'supersede');
 		}
+		// Older versions still waiting for approval go back to drafts: approving one later would put it over this newer one.
+		for (const older of record.versions) {
+			if (older.n < version.n && older.state === 'needs_approval') {
+				transition(older, 'decline');
+			}
+		}
 	};
 
 	/**

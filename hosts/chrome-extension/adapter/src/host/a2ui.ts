@@ -91,7 +91,9 @@ export function renderA2UI(build: Build, ctx: EvalContext, prefix: string, state
 			}
 		},
 		button: (drawn) => {
-			const button = record(drawn, `${prefix}:b${n++}`);
+			// One of a list's buttons names its item, so a click on a list that changed meanwhile finds nothing instead of its neighbour.
+			const b = n++;
+			const button = record(drawn, `${prefix}:b${b}${drawn.row === undefined ? '' : `:${rowKey(drawn.row, b)}`}`);
 			if (button) {
 				out.push({ type: 'button', button });
 			}

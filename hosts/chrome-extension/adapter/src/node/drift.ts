@@ -154,7 +154,9 @@ function contextFetch(context: BrowserContext): Fetch {
 			...(init.body ? { data: init.body as string } : {}),
 			maxRedirects: 0,
 		});
-		return new Response(new Uint8Array(await response.body()), { status: response.status(), headers: response.headers() });
+		// A status that has no body takes none: Response throws for one, and the probe would end there.
+		const empty = [204, 205, 304].includes(response.status());
+		return new Response(empty ? null : new Uint8Array(await response.body()), { status: response.status(), headers: response.headers() });
 	};
 }
 

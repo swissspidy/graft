@@ -35,7 +35,6 @@ const binding = z.object({ path: z.string() }).strict();
 const call = z.object({ call: z.string(), args: z.record(z.any()).optional(), returnType: z.string().optional() }).strict();
 const dynamic = <T extends z.ZodTypeAny>(literal: T) => z.union([literal, binding, call]);
 export const dynamicString = dynamic(z.string());
-export const dynamicNumber = dynamic(z.number());
 export const dynamicBoolean = dynamic(z.boolean());
 const dynamicAny = z.any();
 

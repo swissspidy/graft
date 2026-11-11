@@ -82,6 +82,8 @@ export interface UpgradeCandidate {
 	version: number;
 	source: string;
 	grant: string[];
+	/** What each trigger's automation was granted, when the version has triggers. */
+	triggerGrant?: Record<string, string[]>;
 	build: Build;
 }
 
@@ -115,7 +117,7 @@ export function Upgrades({
 }: {
 	candidates: UpgradeCandidate[];
 	surface: Surface & { hash: string };
-	startVerifier: () => Promise<(build: Build, grant: string[], spec: NonNullable<ReturnType<typeof validateSpec>['spec']>) => Promise<Verification>>;
+	startVerifier: () => Promise<(build: Build, grant: string[], spec: NonNullable<ReturnType<typeof validateSpec>['spec']>, triggerGrant?: Record<string, string[]>) => Promise<Verification>>;
 	onDone(): void;
 }) {
 	const [running, setRunning] = useState(false);
@@ -175,7 +177,7 @@ export function Upgrades({
 async function upgradeOne(
 	candidate: UpgradeCandidate,
 	to: Surface & { hash: string },
-	verify: (build: Build, grant: string[], spec: NonNullable<ReturnType<typeof validateSpec>['spec']>) => Promise<Verification>,
+	verify: (build: Build, grant: string[], spec: NonNullable<ReturnType<typeof validateSpec>['spec']>, triggerGrant?: Record<string, string[]>) => Promise<Verification>,
 ): Promise<Outcome> {
 	try {
 		const from = await apiFetch<Surface>({ path: `/graft/v1/surfaces/${candidate.build.surface.hash}` });
@@ -188,9 +190,10 @@ async function upgradeOne(
 			spec,
 			specHash: candidate.build.spec.hash,
 			grant: candidate.grant,
+			...(candidate.triggerGrant ? { triggerGrant: candidate.triggerGrant } : {}),
 			from,
 			to,
-			verify: (build, grant) => verify(build, grant, spec),
+			verify: (build, grant, triggerGrant) => verify(build, grant, spec, triggerGrant),
 		});
 		if (result.build && result.verification) {
 			await apiFetch({
