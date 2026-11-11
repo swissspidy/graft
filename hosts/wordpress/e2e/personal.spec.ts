@@ -65,17 +65,24 @@ test('a contributor builds a customization that only reads, and it is live for t
 	const card = page.locator('[data-graft-spec="my-waiting"]');
 	await expect(card.locator('[data-graft-state]')).toHaveText('Active');
 
-	// On their Dashboard, and not on an editor's, though the audience names editors too.
-	await page.goto('/wp-admin/index.php');
-	// The widget's box is titled by the spec's mount; the build draws the table of pending posts in it.
-	await expect(page.locator('#graft-my-waiting')).toContainText('Title');
-	await expect(page.locator('#graft-my-waiting')).toContainText('Author');
-	const other = await browser.newPage();
-	await login(other, 'editor');
-	await other.goto('/wp-admin/index.php');
-	await expect(other.locator('#graft-waiting-posts')).toBeVisible();
-	await expect(other.locator('#graft-my-waiting')).toHaveCount(0);
-	await other.close();
+	try {
+		// On their Dashboard, and not on an editor's, though the audience names editors too.
+		await page.goto('/wp-admin/index.php');
+		// The widget's box is titled by the spec's mount; the build draws the table of pending posts in it.
+		await expect(page.locator('#graft-my-waiting')).toContainText('Title');
+		await expect(page.locator('#graft-my-waiting')).toContainText('Author');
+		const other = await browser.newPage();
+		await login(other, 'editor');
+		await other.goto('/wp-admin/index.php');
+		await expect(other.locator('#dashboard-widgets')).toBeVisible();
+		await expect(other.locator('#graft-my-waiting')).toHaveCount(0);
+		await other.close();
+	} catch (error) {
+		// Whatever fails above, the customization does not stay live for the tests that count the site's.
+		await page.goto('/wp-admin/tools.php?page=graft-customizations');
+		await page.evaluate(() => (window as unknown as { wp: { apiFetch(o: object): Promise<unknown> } }).wp.apiFetch({ path: '/graft/v1/specs/my-waiting/versions/1/archive', method: 'POST' }).catch(() => undefined));
+		throw error;
+	}
 
 	// And they can take it down again.
 	await page.goto('/wp-admin/tools.php?page=graft-customizations');

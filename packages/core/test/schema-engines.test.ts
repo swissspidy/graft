@@ -143,7 +143,8 @@ describe('a deeply nested expression', () => {
 			const invalid = await validateBuild(build, surface);
 			expect(Date.now() - started).toBeLessThan(2000);
 			expect(valid.diagnostics.map((d) => d.code)).not.toContain('build-schema');
-			expect(invalid.ok).toBe(false);
+			// The schema itself refuses the unknown expression at the bottom, not some later check.
+			expect(invalid.diagnostics.map((d) => d.code)).toContain('build-schema');
 		});
 	}
 });

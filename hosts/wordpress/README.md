@@ -112,7 +112,8 @@ a hash and need no rebuild.
 - **Authoring.** "New customization" on the same screen opens a spec
   editor that validates against the site's surface as you type and
   compiles in the browser. Model requests go to `POST /graft/v1/generate`
-  (administrators only), which answers through `wp_ai_client_prompt()`, so
+  (administrators, and people writing for themselves within their daily
+  limit), which answers through `wp_ai_client_prompt()`, so
   provider keys stay in the site's AI settings; the `graft_pre_generate`
   filter can answer instead (the e2e tests script it). Compiled builds are
   saved as drafts until they are verified, e.g. with `graft site verify`,
