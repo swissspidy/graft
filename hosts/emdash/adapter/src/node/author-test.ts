@@ -70,7 +70,9 @@ try {
 
 	const request = requests[0]!;
 	const body = request.body as { model?: string; output_config?: { effort?: string; format?: { type?: string } }; system?: unknown };
-	check('requests carry the key, model, effort and a JSON schema', request.headers['x-api-key'] === 'sk-test-key' && body.model === 'claude-opus-5-5' && body.output_config?.effort === 'low' && body.output_config?.format?.type === 'json_schema', { headers: request.headers, body: { ...body, system: '…' } });
+	// The SDK sends the key as x-api-key before 1.0 and as a bearer token since; the API takes either.
+	const sentKey = request.headers['x-api-key'] ?? String(request.headers.authorization ?? '').replace(/^Bearer /, '');
+	check('requests carry the key, model, effort and a JSON schema', sentKey === 'sk-test-key' && body.model === 'claude-opus-5-5' && body.output_config?.effort === 'low' && body.output_config?.format?.type === 'json_schema', { headers: request.headers, body: { ...body, system: '…' } });
 	check('refusals fall back server-side', String(request.headers['anthropic-beta']).includes('server-side-fallback-2026-07-01'), request.headers);
 	const retryPrompt = JSON.stringify((requests[2]!.body as { messages?: unknown }).messages);
 	check('the rejection is fed back to the model', retryPrompt.includes('must be one of') && !JSON.stringify((requests[1]!.body as { messages?: unknown }).messages).includes('must be one of'), retryPrompt.slice(0, 2000));
