@@ -9,6 +9,9 @@ describe('what identifies a row in a click', () => {
 	] as const) {
 		it(`is its id, else what it holds, never where it is (${host})`, () => {
 			expect(key({ id: 7, title: 'A' }, 3)).toBe('7');
+			// An id is never mistaken for the content of a row without one.
+			expect(key({ id: '~{"name":"B"}' }, 0)).not.toBe(key({ name: 'B' }, 0));
+			expect(key({ id: '=~x' }, 0)).not.toBe(key({ id: '~x' }, 0));
 			const b = { title: 'B' };
 			// The same row at another position keeps its key; another row at its old position has another.
 			expect(key(b, 1)).toBe(key({ title: 'B' }, 0));

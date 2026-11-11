@@ -53,7 +53,10 @@ export const str = (value: unknown): string => (value === null || value === unde
 export function rowKey(row: unknown, _index?: number): string {
 	const id = typeof row === 'object' && row !== null ? (row as { id?: unknown }).id : undefined;
 	if (typeof id === 'string' || typeof id === 'number') {
-		return String(id);
+		// Content keys start with "~". An id that does too (or with the "=" that marks it) is marked, so that
+		// an id which happens to read like a row's content is never that row; every other id is itself.
+		const key = String(id);
+		return key.startsWith('~') || key.startsWith('=') ? `=${key}` : key;
 	}
 	// A short row is its own key. A longer one is cut down to two independent 32-bit hashes (FNV-1a and
 	// djb2) and its length: two different rows sharing all three is not something a list will meet.
