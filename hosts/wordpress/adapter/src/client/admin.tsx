@@ -112,7 +112,28 @@ const actions: Record<string, Array<{ event: string; label: string; primary?: bo
 	],
 };
 
-function Version({ version, config, onEvent, busy, managed, own = false }: { version: VersionRecord; config: AdminConfig; onEvent(event: string): void; busy: boolean; managed: boolean; own?: boolean }) {
+function Version({
+	version,
+	config,
+	onEvent,
+	busy,
+	managed,
+	own = false,
+	level = 3,
+	describedBy,
+}: {
+	version: VersionRecord;
+	config: AdminConfig;
+	onEvent(event: string): void;
+	busy: boolean;
+	managed: boolean;
+	own?: boolean;
+	/** The level of its section headings, one below the heading it is under. */
+	level?: 3 | 4;
+	/** The id of the customization's title: every card has the same button labels. */
+	describedBy?: string;
+}) {
+	const Heading = level === 3 ? 'h3' : 'h4';
 	const current = config.surface ? version.builds[config.surface.hash] : undefined;
 	const granted = version.grant?.scopes ?? [];
 	const needed = [...new Set([...version.manifest.permissions, ...(current?.build.refs.scopes ?? [])])];
@@ -136,7 +157,7 @@ function Version({ version, config, onEvent, busy, managed, own = false }: { ver
 				</p>
 			) : null}
 
-			<h4>Permissions</h4>
+			<Heading>Permissions</Heading>
 			<ul className="graft-permissions">
 				{needed.map((scope) => (
 					<li key={scope}>
@@ -148,7 +169,7 @@ function Version({ version, config, onEvent, busy, managed, own = false }: { ver
 
 			{version.manifest.triggers && Object.keys(version.manifest.triggers).length > 0 ? (
 				<>
-					<h4>Runs on its own</h4>
+					<Heading>Runs on its own</Heading>
 					<p className="description">
 						Without anyone viewing it, as {config.triggers?.identity ?? 'the site\'s automation'}: a user with no role of its own that gets only the
 						permissions below, only while it runs. You can pause it at any time.
@@ -179,7 +200,7 @@ function Version({ version, config, onEvent, busy, managed, own = false }: { ver
 
 			{current ? (
 				<>
-					<h4>What is checked</h4>
+					<Heading>What is checked</Heading>
 					<table className="widefat striped graft-checks">
 						<thead>
 							<tr>
@@ -209,7 +230,15 @@ function Version({ version, config, onEvent, busy, managed, own = false }: { ver
 			<div style={{ display: 'flex', gap: 8, marginTop: 12 }}>
 				{/* What someone wrote for themselves they may take down; approving is an administrator's. */}
 				{(managed ? [] : (actions[version.state] ?? []).filter((action) => !own || action.event === 'archive')).map((action) => (
-					<Button key={action.event} variant={action.primary ? 'primary' : 'secondary'} isBusy={busy} disabled={busy} onClick={() => onEvent(action.event)}>
+					<Button
+						key={action.event}
+						variant={action.primary ? 'primary' : 'secondary'}
+						isBusy={busy}
+						disabled={busy}
+						accessibleWhenDisabled
+						aria-describedby={describedBy}
+						onClick={() => onEvent(action.event)}
+					>
 						{action.label}
 					</Button>
 				))}
@@ -313,7 +342,7 @@ function App({ config }: { config: AdminConfig }) {
 			{config.surface && authoring ? (
 				<Card>
 					<CardHeader>
-						<strong>New customization</strong>
+						<h2 style={{ margin: 0, fontSize: 'inherit' }}>New customization</h2>
 					</CardHeader>
 					<CardBody>
 						<Authoring
@@ -356,7 +385,10 @@ function App({ config }: { config: AdminConfig }) {
 					<div key={spec.spec_id} data-graft-spec={spec.spec_id}>
 						<Card>
 							<CardHeader>
-								<strong>{spec.title}</strong> <code>{spec.spec_id}</code>
+								<h2 id={`graft-spec-${spec.spec_id}-title`} style={{ margin: 0, fontSize: 'inherit' }}>
+									{spec.title}
+								</h2>{' '}
+								<code>{spec.spec_id}</code>
 								{spec.managed_by ? <span data-graft-managed-by={spec.managed_by}> · Managed by {spec.managed_by}</span> : null}
 								{spec.scope?.type === 'user' ? <span data-graft-personal=""> · Only for {spec.owner_name || 'its owner'}</span> : null}
 							</CardHeader>
@@ -366,6 +398,8 @@ function App({ config }: { config: AdminConfig }) {
 										{i > 0 ? <h3>Newer version</h3> : null}
 										<Version
 											version={version}
+											level={i > 0 ? 4 : 3}
+											describedBy={`graft-spec-${spec.spec_id}-title`}
 											config={config}
 											busy={busy === spec.spec_id}
 											managed={spec.managed_by !== null}

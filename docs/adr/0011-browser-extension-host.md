@@ -168,7 +168,10 @@ inside what the person approved.
   script draws with DOM APIs only (no markup is parsed), and styles come
   from a constructed stylesheet adopted by its shadow root, which Tasklet's
   `style-src 'self'` does not block. Extension pages use
-  `script-src 'self'; object-src 'none'`.
+  `script-src 'self'; object-src 'none'; base-uri 'none'` and enforce
+  Trusted Types with no policy (`require-trusted-types-for 'script';
+  trusted-types 'none'`): the options page builds its DOM without
+  markup too, so no string may reach an HTML or script sink.
 - **The shadow root is open, and only trusted clicks count.** A closed
   root would hide the customization's DOM from the page, but everything
   it shows comes from the app's own API, which the page can read anyway.

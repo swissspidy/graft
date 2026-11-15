@@ -17,7 +17,7 @@ import type { ContentMessage, MountInfo, RenderReply, Reply } from './messages.t
 
 const ANCHOR_TIMEOUT = 5_000;
 
-const STYLE = `:host{all:initial;display:block;margin:12px 0;font:14px/1.4 system-ui,sans-serif;color:#1d2327}
+const STYLE = `:host{all:initial;color-scheme:light;display:block;margin:12px 0;font:14px/1.4 system-ui,sans-serif;color:#1d2327}
 .graft{border:1px solid #c3c4c7;border-radius:6px;padding:10px 12px;background:#fff}
 .graft-title{font-weight:600;margin:0 0 6px}
 h1,h2,h3{font-size:15px;margin:6px 0}.caption{color:#646970;font-size:12px}
@@ -26,7 +26,8 @@ th{font-weight:600;font-size:12px;color:#50575e}
 button{font:inherit;border:1px solid #2271b1;border-radius:4px;background:#fff;color:#2271b1;padding:2px 10px;cursor:pointer}
 button.primary{background:#2271b1;color:#fff}.row{display:flex;gap:8px;flex-wrap:wrap}.card{border:1px solid #dcdcde;border-radius:4px;padding:8px}
 .tone-error{color:#d63638}.tone-warning{color:#996800}.tone-success{color:#00a32a}.tone-info{color:#2271b1}
-.notice{padding:6px 8px;border-left:4px solid #72aee6;margin:6px 0;background:#f6f7f7}.notice.error{border-color:#d63638}.notice.success{border-color:#00a32a}`;
+.notice{padding:6px 8px;border-left:4px solid #72aee6;margin:6px 0;background:#f6f7f7}.notice.error{border-color:#d63638}.notice.success{border-color:#00a32a}
+.visually-hidden{position:absolute;width:1px;height:1px;overflow:hidden;clip-path:inset(50%);white-space:nowrap}`;
 
 async function send<T>(message: ContentMessage): Promise<T> {
 	const reply = (await chrome.runtime.sendMessage(message)) as Reply<T> | undefined;
@@ -62,6 +63,8 @@ class MountedCustomization {
 	private readonly root: ShadowRoot;
 	private state: Record<string, unknown> = {};
 	private busy = false;
+	/** Each drawn button's key, to give focus back to the same button after a redraw. */
+	private readonly keys = new WeakMap<HTMLButtonElement, string>();
 
 	constructor(readonly info: MountInfo) {
 		this.host = document.createElement('graft-customization');
@@ -95,6 +98,8 @@ class MountedCustomization {
 
 	private show(reply: RenderReply): void {
 		this.state = reply.state;
+		// Redrawing replaces every button: the one that had focus hands it to its replacement, or to the box.
+		const focused = this.root.activeElement instanceof HTMLButtonElement ? this.keys.get(this.root.activeElement) : undefined;
 		const box = el('section', 'graft');
 		box.setAttribute('aria-label', this.info.title);
 		box.append(el('p', 'graft-title', this.info.title));
@@ -107,11 +112,21 @@ class MountedCustomization {
 			box.append(this.draw(node));
 		}
 		this.root.replaceChildren(box);
+		if (focused !== undefined) {
+			const again = [...box.querySelectorAll('button')].find((b) => this.keys.get(b) === focused);
+			if (again) {
+				again.focus();
+			} else {
+				box.tabIndex = -1;
+				box.focus();
+			}
+		}
 	}
 
 	private button(button: ViewButton): HTMLButtonElement {
 		const node = el('button', button.primary ? 'primary' : undefined, button.label);
 		node.type = 'button';
+		this.keys.set(node, button.key);
 		node.addEventListener('click', (event) => void this.press(button, event));
 		return node;
 	}
@@ -142,10 +157,17 @@ class MountedCustomization {
 				}
 				const table = el('table');
 				const head = el('tr');
-				node.columns.forEach((column) => head.append(el('th', undefined, column)));
+				const th = (text?: string) => {
+					const cell = el('th', undefined, text);
+					cell.scope = 'col';
+					return cell;
+				};
+				node.columns.forEach((column) => head.append(th(column)));
 				const withButtons = node.rows.some((row) => row.buttons.length > 0);
 				if (withButtons) {
-					head.append(el('th'));
+					const actions = th();
+					actions.append(el('span', 'visually-hidden', 'Actions'));
+					head.append(actions);
 				}
 				table.append(el('thead'), el('tbody'));
 				table.tHead!.append(head);

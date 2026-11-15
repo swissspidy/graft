@@ -74,7 +74,7 @@ export function Experiment({
 		const rate = (c: Counts) => (c.visits ? ` (${Math.round((c.conversions / c.visits) * 100)}%)` : '');
 		return (
 			<div data-graft-experiment={experiment.id}>
-				<h4>Being tested</h4>
+				<h3>Being tested</h3>
 				<p>
 					Shown to {percent(experiment.share)} of its audience since {new Date(experiment.started).toLocaleDateString()}. Counted for each person and day: whether
 					they caused “{options.metrics[experiment.metric] ?? experiment.metric}”.
@@ -113,7 +113,7 @@ export function Experiment({
 	}
 	return (
 		<div data-graft-experiment-start="">
-			<h4>Test it</h4>
+			<h3>Test it</h3>
 			<p className="description">
 				Show it to a share of its audience and count a site event for both groups. The site keeps it or reverts it when the numbers decide, or reverts it after 14
 				days.
