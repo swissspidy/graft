@@ -75,7 +75,10 @@ until the end has archived (or kept) and removed the marker, or put the
 experiment back. A marker left by a request that died is cleared by the
 next start after ten minutes; an end renews its marker in one update right
 before it archives, so an end that stalled past that and lost its marker
-changes nothing. Once the marker is in place recorders find no
+changes nothing. The timeout assumes an end does not stall for ten minutes
+between renewing and archiving; closing that, and the instant between an
+end's liveness check and putting an experiment back, would take one lock
+around lifecycle transitions and the experiment option. Once the marker is in place recorders find no
 running experiment, and the daily rule is applied again on the counts as
 they stand: if it no longer holds, the experiment is put back and keeps
 running, unless its version stopped being live meanwhile: then it ends
