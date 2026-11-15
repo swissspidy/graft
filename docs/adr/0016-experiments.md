@@ -34,7 +34,9 @@ as it refuses anyone the customization is not served to, so the split is
 enforced, not just drawn.
 
 Only customizations for the whole site can be tested. A team's or a
-person's has too few people to compare. A customization with triggers
+person's has too few people to compare. A customization that comes with the site (managed
+by whoever maintains it, ADR 0008) is theirs to roll out, not the
+site's. A customization with triggers
 cannot be tested either: its triggers run as the service identity for
 everyone, so the baseline would not be a baseline.
 
