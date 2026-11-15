@@ -1084,6 +1084,45 @@ check(
 	$slow
 );
 Graft\experiment_finish_end( 'headline-check', Graft\experiment_claim_end( 'headline-check', $taken_over ) );
+// The screen ends the experiment it shows, never one that replaced it.
+Graft\experiment_claim_start( 'headline-check', $headline_experiment );
+$wrong_end = rest( 'DELETE', '/graft/v1/specs/headline-check/experiment', array( 'outcome' => 'revert', 'experiment' => 'an-experiment-that-ended' ) );
+check(
+	'an end for another experiment than the running one is refused',
+	409 === $wrong_end['status'] && 'graft_experiment_changed' === $wrong_end['code'] && Graft\experiment_of( 'headline-check' ) === $headline_experiment && 'active' === Graft\version_record( Graft\get_version_post( 'headline-check', 1 ) )['state'],
+	$wrong_end
+);
+// A version that stops being live while an end holds the marker is not put back under test.
+$headline_spec = Graft\get_spec_post( 'headline-check' );
+$marker        = Graft\experiment_claim_end( 'headline-check', $headline_experiment );
+update_post_meta( $headline_spec->ID, '_graft_active_version', 2 );
+Graft\experiment_restore( 'headline-check', $marker );
+update_post_meta( $headline_spec->ID, '_graft_active_version', 1 );
+$last_change = array_slice( Graft\change_log(), -1 )[0] ?? array();
+check(
+	'an end that fails after its version stopped being live abandons the experiment instead of putting it back',
+	null === get_option( Graft\experiment_option( 'headline-check' ), null ) && 'experiment_abandoned' === ( $last_change['what'] ?? null ),
+	$last_change
+);
+// A newer version that goes live while a start is claiming: the start takes its claim back.
+$racing = static function ( string $query ) use ( $headline_spec ): string {
+	static $busy = false;
+	if ( ! $busy && false !== strpos( $query, 'INSERT IGNORE' ) && false !== strpos( $query, 'graft_experiment_headline-check' ) ) {
+		$busy = true;
+		update_post_meta( $headline_spec->ID, '_graft_active_version', 2 );
+		$busy = false;
+	}
+	return $query;
+};
+add_filter( 'query', $racing );
+$raced = rest( 'POST', '/graft/v1/specs/headline-check/experiment', $experiment_args );
+remove_filter( 'query', $racing );
+update_post_meta( $headline_spec->ID, '_graft_active_version', 1 );
+check(
+	'a start whose version is replaced while it claims takes the claim back',
+	409 === $raced['status'] && 'graft_experiment_not_active' === $raced['code'] && null === get_option( Graft\experiment_option( 'headline-check' ), null ),
+	$raced
+);
 Graft\experiment_claim_start( 'headline-check', $headline_experiment );
 $at                  = static fn( int $hours ) => static fn() => strtotime( $headline_experiment['started'] ) + $hours * HOUR_IN_SECONDS;
 add_filter( 'graft_experiment_now', $at( 23 ) );

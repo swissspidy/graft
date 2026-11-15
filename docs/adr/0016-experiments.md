@@ -65,7 +65,8 @@ The rule is the lab's, ported to PHP so that it runs on the site:
 
 A daily job applies the rule, and `POST graft/v1/experiments/decide`
 applies it on demand. Each running experiment is its own option. A start
-is one insert that fails while the option is taken. An end first swaps the
+is one `INSERT IGNORE` that fails while the option is taken, and it takes
+its claim back if the tested version stopped being live meanwhile. An end first swaps the
 exact experiment it was decided on for an "ending" marker, in one update,
 so a stale decision can never end a later experiment, and nothing can start
 until the end has archived (or kept) and removed the marker, or put the
@@ -75,7 +76,8 @@ before it archives, so an end that stalled past that and lost its marker
 changes nothing. Once the marker is in place recorders find no
 running experiment, and the daily rule is applied again on the counts as
 they stand: if it no longer holds, the experiment is put back and keeps
-running. A request that was already recording at that instant may still
+running, unless its version stopped being live meanwhile: then it ends
+without a decision. A request that was already recording at that instant may still
 add its row; it is not in the decision, and it goes with the experiment's
 other rows. `maxDays` counts elapsed time from
 the start. Events are counted only while the customization can be served
@@ -120,7 +122,8 @@ schema and core are unchanged.
 
 - `hosts/wordpress/plugin/includes/experiments.php`: bucketing, counting,
   the rule, the daily job and the REST API (`GET graft/v1/experiments`,
-  `POST` and `DELETE graft/v1/specs/<id>/experiment`,
+  `POST` and `DELETE graft/v1/specs/<id>/experiment`, where the screen
+  sends the id of the experiment it shows,
   `POST graft/v1/experiments/decide`), administrators only.
 - `servable_specs()` serves an experiment's customization to the variant
   only.

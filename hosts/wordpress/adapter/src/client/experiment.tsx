@@ -97,10 +97,10 @@ export function Experiment({
 					</p>
 				) : null}
 				<div style={{ display: 'flex', gap: 8 }}>
-					<Button variant="secondary" isBusy={busy} disabled={busy} onClick={() => void call({ path: `/graft/v1/specs/${specId}/experiment?outcome=keep`, method: 'DELETE' })}>
+					<Button variant="secondary" isBusy={busy} disabled={busy} onClick={() => void call({ path: `/graft/v1/specs/${specId}/experiment?outcome=keep&experiment=${experiment.id}`, method: 'DELETE' })}>
 						Keep it for everyone
 					</Button>
-					<Button variant="secondary" isDestructive isBusy={busy} disabled={busy} onClick={() => void call({ path: `/graft/v1/specs/${specId}/experiment?outcome=revert`, method: 'DELETE' })}>
+					<Button variant="secondary" isDestructive isBusy={busy} disabled={busy} onClick={() => void call({ path: `/graft/v1/specs/${specId}/experiment?outcome=revert&experiment=${experiment.id}`, method: 'DELETE' })}>
 						Revert it
 					</Button>
 				</div>

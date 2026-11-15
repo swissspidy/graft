@@ -92,16 +92,34 @@ const EXPERIMENT_ENDING_TIMEOUT = 600;
  * @return bool Whether it was stored.
  */
 function experiment_claim_start( string $spec_id, array $experiment ): bool {
-	if ( add_option( experiment_option( $spec_id ), $experiment, '', false ) ) {
+	if ( experiment_insert( $spec_id, $experiment ) ) {
 		return true;
 	}
-	wp_cache_delete( experiment_option( $spec_id ), 'options' );
 	$current = get_option( experiment_option( $spec_id ), null );
 	if ( is_array( $current ) && isset( $current['ending'] ) && time() - (int) ( $current['since'] ?? 0 ) > EXPERIMENT_ENDING_TIMEOUT ) {
 		experiment_swap( $spec_id, $current, null );
-		return add_option( experiment_option( $spec_id ), $experiment, '', false );
+		return experiment_insert( $spec_id, $experiment );
 	}
 	return false;
+}
+
+/**
+ * Inserts a spec's experiment option only if there is none: INSERT IGNORE
+ * adds the row or does nothing. add_option() is not enough, since it
+ * updates a row that appeared after its existence check.
+ *
+ * @param string               $spec_id    Spec id.
+ * @param array<string, mixed> $experiment Experiment.
+ * @return bool Whether this call inserted it.
+ */
+function experiment_insert( string $spec_id, array $experiment ): bool {
+	global $wpdb;
+	$name     = experiment_option( $spec_id );
+	$inserted = $wpdb->query( $wpdb->prepare( "INSERT IGNORE INTO {$wpdb->options} (option_name, option_value, autoload) VALUES (%s, %s, 'off')", $name, maybe_serialize( $experiment ) ) );
+	wp_cache_delete( $name, 'options' );
+	wp_cache_delete( 'notoptions', 'options' );
+	wp_cache_delete( 'alloptions', 'options' );
+	return 1 === (int) $inserted;
 }
 
 /**
@@ -181,7 +199,55 @@ function experiment_finish_end( string $spec_id, array $marker ): void {
  * @param array<string, mixed> $marker  The marker experiment_claim_end() returned.
  */
 function experiment_restore( string $spec_id, array $marker ): void {
-	experiment_swap( $spec_id, $marker, $marker['experiment'] );
+	$experiment = $marker['experiment'];
+	// A version that stopped being live while the marker was in place: the lifecycle hook found
+	// no running experiment then, so the end is recorded here instead of putting it back.
+	if ( ! experiment_version_live( $spec_id, (int) $experiment['version'] ) ) {
+		experiment_abandon( $spec_id, $marker, __( 'The version stopped being live while the experiment was ending.', 'graft' ) );
+		return;
+	}
+	experiment_swap( $spec_id, $marker, $experiment );
+}
+
+/**
+ * Whether a version is the spec's active version and is active.
+ *
+ * @param string $spec_id Spec id.
+ * @param int    $version Version.
+ */
+function experiment_version_live( string $spec_id, int $version ): bool {
+	$spec = get_spec_post( $spec_id );
+	if ( ! $spec || (int) get_post_meta( $spec->ID, '_graft_active_version', true ) !== $version ) {
+		return false;
+	}
+	$post = get_version_post( $spec_id, $version );
+	return $post && 'active' === ( version_record( $post )['state'] ?? '' );
+}
+
+/**
+ * Ends an experiment without a decision: removes its marker and counts and
+ * records experiment_abandoned.
+ *
+ * @param string               $spec_id Spec id.
+ * @param array<string, mixed> $marker  The marker this request claimed.
+ * @param string               $reason  Why.
+ */
+function experiment_abandon( string $spec_id, array $marker, string $reason ): void {
+	$experiment = $marker['experiment'];
+	if ( ! experiment_swap( $spec_id, $marker, null ) ) {
+		return;
+	}
+	$counts = experiment_counts( $experiment );
+	experiment_forget( $spec_id, $experiment );
+	record_change(
+		'experiment_abandoned',
+		$spec_id,
+		(int) $experiment['version'],
+		array(
+			'reason' => $reason,
+			'counts' => $counts,
+		)
+	);
 }
 
 /**
@@ -450,6 +516,12 @@ function start_experiment( string $spec_id, array $args ) {
 	if ( ! experiment_claim_start( $spec_id, $experiment ) ) {
 		return new WP_Error( 'graft_experiment_running', __( 'This customization is already being tested.', 'graft' ), array( 'status' => 409 ) );
 	}
+	// A newer version may have replaced the tested one between the checks above and the claim;
+	// the lifecycle hook then found nothing to end. Take the claim back.
+	if ( ! experiment_version_live( $spec_id, $active ) ) {
+		experiment_swap( $spec_id, $experiment, null );
+		return new WP_Error( 'graft_experiment_not_active', __( 'Only a customization that is live can be tested.', 'graft' ), array( 'status' => 409 ) );
+	}
 	record_change( 'experiment_started', $spec_id, $active, array( 'share' => $share, 'metric' => $metric ) );
 	return $experiment;
 }
@@ -657,7 +729,13 @@ function register_experiment_routes(): void {
 			array(
 				'methods'             => WP_REST_Server::DELETABLE,
 				'callback'            => static function ( WP_REST_Request $request ) {
-					$result = end_experiment( (string) $request['spec_id'], (string) $request['outcome'], __( 'Ended by an administrator.', 'graft' ) );
+					$spec_id  = (string) $request['spec_id'];
+					$snapshot = experiment_of( $spec_id );
+					// The screen sends the experiment it shows: a newer one is never ended by mistake.
+					if ( $snapshot && null !== $request['experiment'] && (string) $request['experiment'] !== (string) $snapshot['id'] ) {
+						return new WP_Error( 'graft_experiment_changed', __( 'The experiment changed since it was read: it ended, or another one is running now.', 'graft' ), array( 'status' => 409 ) );
+					}
+					$result = end_experiment( $spec_id, (string) $request['outcome'], __( 'Ended by an administrator.', 'graft' ), $snapshot );
 					return is_wp_error( $result ) ? $result : new WP_REST_Response( $result );
 				},
 				'permission_callback' => $manage,
@@ -666,6 +744,10 @@ function register_experiment_routes(): void {
 						'type'     => 'string',
 						'enum'     => array( 'keep', 'revert' ),
 						'required' => true,
+					),
+					'experiment' => array(
+						'type'        => 'string',
+						'description' => 'The id of the experiment to end; refused if another one runs now.',
 					),
 				),
 			),
@@ -697,16 +779,5 @@ function experiment_on_spec_transition( string $next, string $state, string $eve
 	if ( ! $marker ) {
 		return;
 	}
-	experiment_finish_end( $record['spec_id'], $marker );
-	$counts = experiment_counts( $experiment );
-	experiment_forget( $record['spec_id'], $experiment );
-	record_change(
-		'experiment_abandoned',
-		$record['spec_id'],
-		$record['version'],
-		array(
-			'reason' => sprintf( 'The version stopped being live (%s).', $event ),
-			'counts' => $counts,
-		)
-	);
+	experiment_abandon( $record['spec_id'], $marker, sprintf( 'The version stopped being live (%s).', $event ) );
 }
