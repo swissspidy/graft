@@ -563,6 +563,36 @@ function experiment_output( array $experiment ): array {
 }
 
 /**
+ * A spec's running experiment as the customizations screen shows it: the
+ * experiment, the rule applied to its counts now, and the viewer's bucket,
+ * so the screen can say that it is not showing to someone in the baseline.
+ * Null when nothing is being tested.
+ *
+ * @param string $spec_id Spec id.
+ * @return array<string, mixed>|null
+ */
+function experiment_view( string $spec_id ): ?array {
+	$experiment = experiment_of( $spec_id );
+	if ( ! $experiment ) {
+		return null;
+	}
+	return experiment_output( $experiment ) + array( 'viewer_bucket' => experiment_bucket( $spec_id, get_current_user_id(), (float) $experiment['share'] ) );
+}
+
+/**
+ * What the customizations screen needs to start an experiment: the metrics
+ * (the host's events) and the largest share.
+ *
+ * @return array{metrics: array<string, string>, maxShare: float}
+ */
+function experiment_options(): array {
+	return array(
+		'metrics'  => array_map( static fn( array $event ): string => (string) $event['title'], trigger_events() ),
+		'maxShare' => EXPERIMENT_MAX_SHARE,
+	);
+}
+
+/**
  * REST routes: list, start, end and decide experiments. Administrators only.
  */
 function register_experiment_routes(): void {

@@ -354,6 +354,8 @@ function register_admin_screen(): void {
 						'roles'               => array_values( wp_get_current_user()->roles ),
 						// Who triggers run as; null when the site runs none (ADR 0010).
 						'triggers'            => null === surface_triggers() ? null : array( 'identity' => __( 'Graft automation', 'graft' ) ),
+						// Starting an experiment: its metrics and largest share (ADR 0016).
+						'experiments'         => current_user_can( 'manage_options' ) ? experiment_options() : null,
 						/**
 						 * Filters whether wp-admin verifies builds in WordPress Playground
 						 * in the admin's browser (needs access to the Playground URL below).

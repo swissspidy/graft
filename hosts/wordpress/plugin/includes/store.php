@@ -786,6 +786,8 @@ function list_specs( bool $output = false, int $owner = 0 ): array {
 				'owner_name'     => (string) ( get_userdata( (int) $spec->post_author )->display_name ?? '' ),
 				'active_version' => (int) get_post_meta( $spec->ID, '_graft_active_version', true ) ?: null,
 				'managed_by'     => managed_by( $spec->post_name ),
+				// A running experiment and its counts, for administrators (ADR 0016).
+				'experiment'     => current_user_can( 'manage_options' ) ? experiment_view( $spec->post_name ) : null,
 				'versions'       => array_map(
 					static function ( WP_Post $version ) use ( $output ): array {
 						$record = version_record( $version );

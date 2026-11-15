@@ -316,6 +316,13 @@ check(
 	$counts
 );
 check( 'the rule would keep a clear winner at the planned sample', 'keep' === ( $running['data'][0]['decision']['action'] ?? null ), $running['data'][0]['decision'] ?? null );
+$listed = array_values( array_filter( rest( 'GET', '/graft/v1/specs' )['data'], static fn( $spec ) => 'pending-by-author' === $spec['spec_id'] ) )[0]['experiment'] ?? null;
+check(
+	'the customizations screen gets the experiment, its counts and which group the viewer is in',
+	is_array( $listed ) && $counts === $listed['decision']['counts'] && Graft\experiment_bucket( 'pending-by-author', $admin, 0.5 ) === $listed['viewer_bucket'] && 1 === $listed['version'],
+	$listed
+);
+check( 'the screen can offer the host events as metrics', array( 'post.published', 'post.submitted' ) === array_keys( Graft\experiment_options()['metrics'] ) && 0.5 === Graft\experiment_options()['maxShare'] );
 $decided = rest( 'POST', '/graft/v1/experiments/decide' );
 wp_set_current_user( user_named( 'editor', 'exp-after-keep' ) );
 check( 'keeping it serves it to the whole audience', 'keep' === ( $decided['data']->{'pending-by-author'}['outcome'] ?? $decided['data']['pending-by-author']['outcome'] ?? null ) && isset( Graft\servable_specs()['pending-by-author'] ) && null === Graft\experiment_of( 'pending-by-author' ), $decided );

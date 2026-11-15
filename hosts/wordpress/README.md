@@ -159,7 +159,9 @@ a hash and need no rebuild.
   `post.submitted`, once per person per day). A daily job keeps it for
   everyone when the variant clearly wins at the planned sample, and
   archives it when it clearly loses or runs out of days. Customizations
-  with triggers cannot be tested
+  with triggers cannot be tested. Tools → Customizations starts, shows
+  and ends experiments, and tells an administrator in the baseline that
+  the customization is not showing to them
   ([ADR 0016](../../docs/adr/0016-experiments.md);
   `GET /graft/v1/experiments`, `POST|DELETE /graft/v1/specs/<id>/experiment`,
   `POST /graft/v1/experiments/decide`).

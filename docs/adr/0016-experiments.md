@@ -122,6 +122,10 @@ schema and core are unchanged.
   `POST graft/v1/experiments/decide`), administrators only.
 - `servable_specs()` serves an experiment's customization to the variant
   only.
+- `GET graft/v1/specs` carries each spec's running experiment for
+  administrators (`experiment_view()`: the decision now and the viewer's
+  bucket); the screen's options come from `experiment_options()`.
+- `hosts/wordpress/adapter/src/client/experiment.tsx`: the screen's part.
 - `post_transition_event()` is shared by triggers and experiments.
 - `hosts/wordpress/playground/smoke.php` checks the bucketing against the
   lab's, the refusals, that each bucket sees what it should, the counts,
@@ -132,10 +136,12 @@ schema and core are unchanged.
 
 - An administrator can ask whether a customization helps, and the site
   answers within the experiment's days.
-- Starting and reading experiments is REST only. Tools → Customizations
-  does not show them yet.
-- "Why is this not showing" (ADR 0013) does not yet say that a person is
-  in an experiment's baseline.
+- Tools → Customizations shows a running experiment on the live version:
+  the share, the metric, the counts per group, the rule's verdict now, and
+  buttons to keep it for everyone or revert it. A live customization for
+  the whole site with no triggers offers "Test it" with a share and a
+  metric. An administrator in the baseline sees "Not showing to you" with
+  the reason (ADR 0013), since the version itself is served.
 - Counts are post meta on the spec: one row per person, day, bucket and
   kind, only ever added, and keyed by the experiment's id. Concurrent
   requests cannot lose each other's counts, a request cannot bring back an
