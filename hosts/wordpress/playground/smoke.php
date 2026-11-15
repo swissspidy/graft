@@ -324,8 +324,10 @@ wp_set_current_user( $admin );
 rest( 'POST', '/graft/v1/specs/pending-by-author/experiment', $experiment_args );
 $second = Graft\experiment_of( 'pending-by-author' );
 check( 'a new experiment starts from zero: the last one’s counts are not its own', array( 'baseline' => array( 'visits' => 0, 'conversions' => 0 ), 'variant' => array( 'visits' => 0, 'conversions' => 0 ) ) === Graft\experiment_counts( $second ) );
-$stale = Graft\end_experiment( 'pending-by-author', 'revert', 'A decision made for an earlier experiment.', 'not-this-experiment' );
+$stale = Graft\end_experiment( 'pending-by-author', 'revert', 'A decision made for an earlier experiment.', array_merge( $second, array( 'id' => 'an-earlier-experiment' ) ) );
 check( 'a decision never ends a later experiment', is_wp_error( $stale ) && 'graft_experiment_changed' === $stale->get_error_code() && null !== Graft\experiment_of( 'pending-by-author' ) );
+$recomputed = Graft\end_experiment( 'pending-by-author', 'revert', 'Decided on counts that have changed since.', $second, static fn() => array( 'action' => 'continue', 'reason' => 'Not decided on the final counts.' ) );
+check( 'a decision that no longer holds on the final counts puts the experiment back', is_wp_error( $recomputed ) && 'graft_experiment_recomputed' === $recomputed->get_error_code() && Graft\experiment_of( 'pending-by-author' ) === $second, $recomputed );
 add_filter( 'graft_safe_mode', '__return_true' );
 wp_set_current_user( $people['baseline'][0] );
 wp_update_post( array( 'ID' => wp_insert_post( array( 'post_title' => 'In safe mode', 'post_status' => 'draft', 'post_author' => $people['baseline'][0] ) ), 'post_status' => 'publish' ) );
@@ -1031,8 +1033,19 @@ $headline = $examples['headline-check'];
 Graft\create_version( array( 'source' => $headline['source'], 'manifest' => $headline['manifest'], 'title' => $headline['title'] ) );
 Graft\attach_build( 'headline-check', 1, $headline['build'], array( 'passed' => true ) );
 Graft\approve_version( 'headline-check', 1 );
+// A decision made on experiment A, applied after A ended and B started, must not touch B.
+rest( 'POST', '/graft/v1/specs/headline-check/experiment', $experiment_args );
+$first_headline = Graft\experiment_of( 'headline-check' );
+Graft\end_experiment( 'headline-check', 'keep', 'Ended by hand.' );
 rest( 'POST', '/graft/v1/specs/headline-check/experiment', array_merge( $experiment_args, array( 'maxDays' => 1 ) ) );
 $headline_experiment = Graft\experiment_of( 'headline-check' );
+$late                = Graft\end_experiment( 'headline-check', 'revert', 'Decided on experiment A.', $first_headline, 'Graft\\experiment_decision' );
+check(
+	'a stale decision does not end the experiment that replaced it, nor archive its version',
+	is_wp_error( $late ) && 'graft_experiment_changed' === $late->get_error_code() && Graft\experiment_of( 'headline-check' ) === $headline_experiment && 'active' === Graft\version_record( Graft\get_version_post( 'headline-check', 1 ) )['state'],
+	$late
+);
+check( 'two starts cannot both succeed', ! Graft\experiment_claim_start( 'headline-check', array_merge( $headline_experiment, array( 'id' => 'a-second-start' ) ) ) );
 $at                  = static fn( int $hours ) => static fn() => strtotime( $headline_experiment['started'] ) + $hours * HOUR_IN_SECONDS;
 add_filter( 'graft_experiment_now', $at( 23 ) );
 $before = Graft\experiment_decision( $headline_experiment )['action'];

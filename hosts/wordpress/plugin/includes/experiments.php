@@ -23,7 +23,8 @@ use WP_REST_Response;
 use WP_REST_Server;
 use WP_User;
 
-const EXPERIMENTS_OPTION = 'graft_experiments';
+/** One option per running experiment: `graft_experiment_<spec id>`. */
+const EXPERIMENT_OPTION_PREFIX = 'graft_experiment_';
 const EXPERIMENT_KEEP    = 0.95;
 const EXPERIMENT_REVERT  = 0.05;
 const EXPERIMENT_MAX_SHARE = 0.5;
@@ -37,13 +38,32 @@ const EXPERIMENT_MAX_SHARE = 0.5;
 const EXPERIMENT_MARK = '_graft_experiment_mark';
 
 /**
+ * The option that holds a spec's running experiment.
+ *
+ * @param string $spec_id Spec id.
+ * @return string
+ */
+function experiment_option( string $spec_id ): string {
+	return EXPERIMENT_OPTION_PREFIX . $spec_id;
+}
+
+/**
  * Running experiments, keyed by spec id.
  *
  * @return array<string, array<string, mixed>>
  */
 function experiments(): array {
-	$all = get_option( EXPERIMENTS_OPTION, array() );
-	return is_array( $all ) ? $all : array();
+	global $wpdb;
+	$names = $wpdb->get_col( $wpdb->prepare( "SELECT option_name FROM {$wpdb->options} WHERE option_name LIKE %s ORDER BY option_name", $wpdb->esc_like( EXPERIMENT_OPTION_PREFIX ) . '%' ) );
+	$all   = array();
+	foreach ( $names as $name ) {
+		$spec_id    = substr( (string) $name, strlen( EXPERIMENT_OPTION_PREFIX ) );
+		$experiment = experiment_of( $spec_id );
+		if ( $experiment ) {
+			$all[ $spec_id ] = $experiment;
+		}
+	}
+	return $all;
 }
 
 /**
@@ -53,24 +73,38 @@ function experiments(): array {
  * @return array<string, mixed>|null
  */
 function experiment_of( string $spec_id ): ?array {
-	$all = experiments();
-	return isset( $all[ $spec_id ] ) && is_array( $all[ $spec_id ] ) ? $all[ $spec_id ] : null;
+	$value = get_option( experiment_option( $spec_id ), null );
+	return is_array( $value ) ? $value : null;
 }
 
 /**
- * Stores or removes a spec's experiment.
+ * Stores an experiment only if none runs for the spec: add_option is one
+ * INSERT on the option's unique name, so two starts cannot both succeed.
  *
- * @param string                    $spec_id    Spec id.
- * @param array<string, mixed>|null $experiment The experiment, or null to remove it.
+ * @param string               $spec_id    Spec id.
+ * @param array<string, mixed> $experiment Experiment.
+ * @return bool Whether it was stored.
  */
-function save_experiment( string $spec_id, ?array $experiment ): void {
-	$all = experiments();
-	if ( null === $experiment ) {
-		unset( $all[ $spec_id ] );
-	} else {
-		$all[ $spec_id ] = $experiment;
-	}
-	update_option( EXPERIMENTS_OPTION, $all, false );
+function experiment_claim_start( string $spec_id, array $experiment ): bool {
+	return add_option( experiment_option( $spec_id ), $experiment, '', false );
+}
+
+/**
+ * Removes exactly this experiment: one DELETE that matches the stored value
+ * as well as the name. A request holding a stale copy (an experiment that
+ * ended, or one that another took over) removes nothing.
+ *
+ * @param string               $spec_id    Spec id.
+ * @param array<string, mixed> $experiment The experiment as it was read.
+ * @return bool Whether this call removed it.
+ */
+function experiment_claim_end( string $spec_id, array $experiment ): bool {
+	global $wpdb;
+	$name    = experiment_option( $spec_id );
+	$deleted = $wpdb->query( $wpdb->prepare( "DELETE FROM {$wpdb->options} WHERE option_name = %s AND option_value = %s", $name, maybe_serialize( $experiment ) ) );
+	wp_cache_delete( $name, 'options' );
+	wp_cache_delete( 'notoptions', 'options' );
+	return 1 === (int) $deleted;
 }
 
 /**
@@ -336,7 +370,9 @@ function start_experiment( string $spec_id, array $args ) {
 		'started'      => gmdate( 'c' ),
 		'startedBy'    => get_current_user_id(),
 	);
-	save_experiment( $spec_id, $experiment );
+	if ( ! experiment_claim_start( $spec_id, $experiment ) ) {
+		return new WP_Error( 'graft_experiment_running', __( 'This customization is already being tested.', 'graft' ), array( 'status' => 409 ) );
+	}
 	record_change( 'experiment_started', $spec_id, $active, array( 'share' => $share, 'metric' => $metric ) );
 	return $experiment;
 }
@@ -345,30 +381,43 @@ function start_experiment( string $spec_id, array $args ) {
  * Ends an experiment: `keep` serves the customization to its whole
  * audience, `revert` archives it.
  *
- * @param string      $spec_id  Spec id.
- * @param string      $outcome  keep or revert.
- * @param string      $reason   Why, for the change log.
- * @param string|null $expected The experiment id a decision was made for: a decision never ends a later experiment.
+ * Ending first claims the experiment (experiment_claim_end): only the
+ * request that removes it goes on, so a stale decision can never end a
+ * later experiment. After the claim no more counts arrive for it; with
+ * `$recheck`, the decision is taken again on those final counts, and the
+ * experiment is put back if it no longer holds.
+ *
+ * @param string                    $spec_id  Spec id.
+ * @param string                    $outcome  keep or revert.
+ * @param string                    $reason   Why, for the change log.
+ * @param array<string, mixed>|null $snapshot The experiment a decision was made on. Default: the one running now.
+ * @param callable|null             $recheck  Takes the experiment, returns a decision (see experiment_decision()).
  * @return array<string, mixed>|WP_Error The final counts and outcome.
  */
-function end_experiment( string $spec_id, string $outcome, string $reason, ?string $expected = null ) {
-	$experiment = experiment_of( $spec_id );
-	if ( ! $experiment ) {
-		return new WP_Error( 'graft_experiment_none', __( 'This customization is not being tested.', 'graft' ), array( 'status' => 404 ) );
-	}
-	if ( null !== $expected && ( $experiment['id'] ?? null ) !== $expected ) {
-		return new WP_Error( 'graft_experiment_changed', __( 'The experiment changed since it was decided: another one is running now.', 'graft' ), array( 'status' => 409 ) );
-	}
+function end_experiment( string $spec_id, string $outcome, string $reason, ?array $snapshot = null, ?callable $recheck = null ) {
 	if ( 'keep' !== $outcome && 'revert' !== $outcome ) {
 		return new WP_Error( 'graft_experiment_outcome', __( 'The outcome must be keep or revert.', 'graft' ), array( 'status' => 400 ) );
 	}
-	// Removed first, so archiving below is not mistaken for the version leaving on its own.
-	save_experiment( $spec_id, null );
+	$experiment = $snapshot ?? experiment_of( $spec_id );
+	if ( ! $experiment ) {
+		return new WP_Error( 'graft_experiment_none', __( 'This customization is not being tested.', 'graft' ), array( 'status' => 404 ) );
+	}
+	if ( ! experiment_claim_end( $spec_id, $experiment ) ) {
+		return new WP_Error( 'graft_experiment_changed', __( 'The experiment changed since it was read: it ended, or another one is running now.', 'graft' ), array( 'status' => 409 ) );
+	}
+	if ( $recheck ) {
+		$decision = $recheck( $experiment );
+		if ( ( $decision['action'] ?? null ) !== $outcome ) {
+			experiment_claim_start( $spec_id, $experiment );
+			return new WP_Error( 'graft_experiment_recomputed', __( 'The decision no longer holds on the final counts; the experiment keeps running.', 'graft' ), array( 'status' => 409 ) );
+		}
+		$reason = (string) $decision['reason'];
+	}
 	if ( 'revert' === $outcome ) {
 		$archived = apply_event( $spec_id, (int) $experiment['version'], 'archive' );
 		// A version that left `active` meanwhile (an upgrade, a newer version) is not archived here.
 		if ( is_wp_error( $archived ) && 'graft_invalid_transition' !== $archived->get_error_code() ) {
-			save_experiment( $spec_id, $experiment );
+			experiment_claim_start( $spec_id, $experiment );
 			return $archived;
 		}
 	}
@@ -425,7 +474,7 @@ function decide_experiments(): array {
 		if ( 'continue' === $decision['action'] ) {
 			continue;
 		}
-		$result = end_experiment( (string) $spec_id, $decision['action'], $decision['reason'], (string) ( $experiment['id'] ?? '' ) );
+		$result = end_experiment( (string) $spec_id, $decision['action'], $decision['reason'], $experiment, __NAMESPACE__ . '\\experiment_decision' );
 		if ( ! is_wp_error( $result ) ) {
 			$ended[ $spec_id ] = $result;
 		}
@@ -528,7 +577,10 @@ function experiment_on_spec_transition( string $next, string $state, string $eve
 	if ( ! $experiment || (int) $experiment['version'] !== $record['version'] ) {
 		return;
 	}
-	save_experiment( $record['spec_id'], null );
+	// Only the request that removes it records the end.
+	if ( ! experiment_claim_end( $record['spec_id'], $experiment ) ) {
+		return;
+	}
 	$counts = experiment_counts( $experiment );
 	experiment_forget( $record['spec_id'], $experiment );
 	record_change(
