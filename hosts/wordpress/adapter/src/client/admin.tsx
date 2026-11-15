@@ -422,6 +422,7 @@ function PolicyNotice({ policy }: { policy: AdminConfig['policy'] }) {
 
 /** Why a live customization cannot be tested, or null when it can (the plugin checks the same). */
 function testable(spec: SpecRecord, version: VersionRecord): string | null {
+	if (spec.managed_by !== null) return 'it is managed by whoever maintains the site';
 	if ((spec.scope?.type ?? 'org') !== 'org') return 'only customizations for the whole site';
 	if (version.manifest.triggers && Object.keys(version.manifest.triggers).length > 0) return 'it acts on its own';
 	if (version.not_served) return 'it is not showing';

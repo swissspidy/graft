@@ -706,6 +706,11 @@ $report            = Graft\sync_managed( true );
 $installed         = Graft\version_record( Graft\get_version_post( 'stale-drafts', 1 ) );
 check( 'a managed bundle is installed and active without an administrator', 'active' === $installed['state'] && 'policy' === ( $installed['grant']['approved_by'] ?? null ), $report );
 check( 'it is marked as managed', 'Acme Agency' === Graft\managed_by( 'stale-drafts' ) );
+$previous_user = get_current_user_id();
+wp_set_current_user( $admin );
+$managed_test = rest( 'POST', '/graft/v1/specs/stale-drafts/experiment', array( 'share' => 0.5, 'metric' => 'post.published' ) );
+wp_set_current_user( $previous_user );
+check( 'a managed customization cannot be tested on the site', 403 === $managed_test['status'] && 'graft_experiment_managed' === $managed_test['code'] && null === Graft\experiment_of( 'stale-drafts' ), $managed_test );
 $archive = rest( 'POST', '/graft/v1/specs/stale-drafts/versions/1/archive' );
 check( 'administrators cannot change a managed customization', 403 === $archive['status'] && 'graft_managed' === $archive['code'], $archive );
 $swap = rest(

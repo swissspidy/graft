@@ -479,6 +479,9 @@ function start_experiment( string $spec_id, array $args ) {
 	if ( ! $record || 'active' !== ( $record['state'] ?? '' ) ) {
 		return new WP_Error( 'graft_experiment_not_active', __( 'Only a customization that is live can be tested.', 'graft' ), array( 'status' => 409 ) );
 	}
+	if ( null !== managed_by( $spec_id ) ) {
+		return new WP_Error( 'graft_experiment_managed', __( 'A customization that comes with the site is managed by whoever maintains it; it cannot be tested here.', 'graft' ), array( 'status' => 403 ) );
+	}
 	if ( 'org' !== ( $record['scope']['type'] ?? 'org' ) ) {
 		return new WP_Error( 'graft_experiment_scope', __( 'Only a customization for the whole site can be tested. One for a team or a person has too few people to compare.', 'graft' ), array( 'status' => 400 ) );
 	}
