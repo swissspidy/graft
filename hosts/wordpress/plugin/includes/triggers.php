@@ -1069,6 +1069,24 @@ function schedule_trigger_tick(): void {
 }
 
 /**
+ * The host event a post status change is, if any: `post.published` or
+ * `post.submitted`. Triggers run on it and experiments count it.
+ *
+ * @param string $new_status New status.
+ * @param string $old_status Old status.
+ * @return string|null
+ */
+function post_transition_event( string $new_status, string $old_status ): ?string {
+	if ( 'publish' === $new_status && 'publish' !== $old_status ) {
+		return 'post.published';
+	}
+	if ( 'pending' === $new_status && 'pending' !== $old_status ) {
+		return 'post.submitted';
+	}
+	return null;
+}
+
+/**
  * Turns a post's status change into trigger events (hooked to
  * transition_post_status). Each trigger on the event runs later, in its
  * own WP-Cron job, never in the request of the person who caused it.
@@ -1079,12 +1097,7 @@ function schedule_trigger_tick(): void {
  * @param WP_Post $post       Post.
  */
 function on_post_transition( string $new_status, string $old_status, WP_Post $post ): void {
-	$event = null;
-	if ( 'publish' === $new_status && 'publish' !== $old_status ) {
-		$event = 'post.published';
-	} elseif ( 'pending' === $new_status && 'pending' !== $old_status ) {
-		$event = 'post.submitted';
-	}
+	$event = post_transition_event( $new_status, $old_status );
 	if ( null === $event || trigger_running() || ! is_exposed_post_type( $post->post_type ) || null !== triggers_disabled() ) {
 		return;
 	}

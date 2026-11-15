@@ -13,6 +13,7 @@ import { Authoring } from './authoring.tsx';
 import { RecordSurface, Upgrades, type UpgradeCandidate } from './site-surface.tsx';
 import { Automation } from './automation.tsx';
 import { History } from './history.tsx';
+import { Experiment, type ExperimentOptions, type ExperimentView } from './experiment.tsx';
 
 /**
  * Tools → Customizations: every spec on the site with its state, the
@@ -47,6 +48,8 @@ interface AdminConfig {
 	selfService?: string[];
 	/** The viewer's roles. */
 	roles?: string[];
+	/** Starting experiments, for administrators (ADR 0016). */
+	experiments?: ExperimentOptions | null;
 }
 
 interface VersionRecord {
@@ -73,6 +76,8 @@ interface SpecRecord {
 	/** Who sees it: everyone in its audience (org), one role (team), or only its owner (user). */
 	scope?: { type: 'org' | 'team' | 'user'; role?: string } | null;
 	owner_name?: string;
+	/** The running experiment, for administrators. */
+	experiment?: ExperimentView | null;
 	versions: VersionRecord[];
 }
 
@@ -367,6 +372,17 @@ function App({ config }: { config: AdminConfig }) {
 											own={!admin}
 											onEvent={(event) => void onEvent(spec, version, event)}
 										/>
+										{admin && config.experiments && version === active && version.state === 'active' ? (
+											<Experiment
+												specId={spec.spec_id}
+												version={version.version}
+												experiment={spec.experiment ?? null}
+												options={config.experiments}
+												testable={testable(spec, version)}
+												onChanged={() => void load()}
+												onError={setError}
+											/>
+										) : null}
 									</div>
 								))}
 							</CardBody>
@@ -402,6 +418,15 @@ function PolicyNotice({ policy }: { policy: AdminConfig['policy'] }) {
 			</div>
 		</Notice>
 	);
+}
+
+/** Why a live customization cannot be tested, or null when it can (the plugin checks the same). */
+function testable(spec: SpecRecord, version: VersionRecord): string | null {
+	if (spec.managed_by !== null) return 'it is managed by whoever maintains the site';
+	if ((spec.scope?.type ?? 'org') !== 'org') return 'only customizations for the whole site';
+	if (version.manifest.triggers && Object.keys(version.manifest.triggers).length > 0) return 'it acts on its own';
+	if (version.not_served) return 'it is not showing';
+	return null;
 }
 
 /**

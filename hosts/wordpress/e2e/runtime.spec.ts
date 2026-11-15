@@ -1,4 +1,5 @@
 import { execFile } from 'node:child_process';
+import { createHash } from 'node:crypto';
 import { existsSync, readFileSync } from 'node:fs';
 import { promisify } from 'node:util';
 import { expect, test, type Page } from '@playwright/test';
@@ -252,6 +253,32 @@ test('the customizations screen says who changed what, and offers a customizatio
 
 	await page.getByRole('button', { name: 'New customization' }).click();
 	await expect(page.getByRole('checkbox', { name: 'Only for me' })).not.toBeChecked();
+});
+
+test('admins test a customization on a share of its audience from the customizations screen, and end the test', async ({ page }) => {
+	await login(page, 'admin');
+	await page.goto('/wp-admin/tools.php?page=graft-customizations');
+	const card = page.locator('[data-graft-spec="headline-check"]');
+	const start = card.locator('[data-graft-experiment-start]');
+	await start.getByLabel('Show it to').selectOption('0.5');
+	await start.getByLabel('Count').selectOption('post.published');
+	await start.getByRole('button', { name: 'Start test' }).click();
+
+	const running = card.locator('[data-graft-experiment]');
+	await expect(running).toContainText('Shown to 50% of its audience');
+	await expect(running).toContainText('A post is published');
+	await expect(running.locator('[data-graft-experiment-decision]')).toHaveAttribute('data-graft-experiment-decision', 'continue');
+	// The admin is bucketed like everyone else: sha256("<spec>:<user id>").
+	const id = (await page.evaluate(() => window.wp.apiFetch({ path: '/wp/v2/users/me' }))) as { id: number };
+	const word = createHash('sha256').update(`headline-check:${id.id}`).digest().readUInt32BE(0);
+	await expect(card.locator('[data-graft-not-served="experiment_baseline"]')).toHaveCount(word / 2 ** 32 < 0.5 ? 0 : 1);
+
+	await running.getByRole('button', { name: 'Keep it for everyone' }).click();
+	await expect(running).toHaveCount(0);
+	await expect(start).toBeVisible();
+	await expect(card.locator('[data-graft-state]').first()).toHaveText('Active');
+	// A customization that acts on its own is not offered a test.
+	await expect(page.locator('[data-graft-spec="waiting-too-long"] [data-graft-experiment-start]')).toHaveCount(0);
 });
 
 const graft = async (...args: string[]) => {
