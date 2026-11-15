@@ -130,7 +130,7 @@ function Version({
 	own?: boolean;
 	/** The level of its section headings, one below the heading it is under. */
 	level?: 3 | 4;
-	/** The id of the customization's title: every card has the same button labels. */
+	/** The ids of the customization's title and spec id: every card has the same button labels, and titles can repeat. */
 	describedBy?: string;
 }) {
 	const Heading = level === 3 ? 'h3' : 'h4';
@@ -388,7 +388,7 @@ function App({ config }: { config: AdminConfig }) {
 								<h2 id={`graft-spec-${spec.spec_id}-title`} style={{ margin: 0, fontSize: 'inherit' }}>
 									{spec.title}
 								</h2>{' '}
-								<code>{spec.spec_id}</code>
+								<code id={`graft-spec-${spec.spec_id}-id`}>{spec.spec_id}</code>
 								{spec.managed_by ? <span data-graft-managed-by={spec.managed_by}> · Managed by {spec.managed_by}</span> : null}
 								{spec.scope?.type === 'user' ? <span data-graft-personal=""> · Only for {spec.owner_name || 'its owner'}</span> : null}
 							</CardHeader>
@@ -399,7 +399,7 @@ function App({ config }: { config: AdminConfig }) {
 										<Version
 											version={version}
 											level={i > 0 ? 4 : 3}
-											describedBy={`graft-spec-${spec.spec_id}-title`}
+											describedBy={`graft-spec-${spec.spec_id}-title graft-spec-${spec.spec_id}-id`}
 											config={config}
 											busy={busy === spec.spec_id}
 											managed={spec.managed_by !== null}

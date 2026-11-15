@@ -82,7 +82,11 @@ async function draw(focus?: string): Promise<void> {
 				busy = false;
 				return;
 			}
-			await draw(item.id);
+			// Focus may have moved while the request was out: keep it on whichever customization's
+			// button has it now; fall back to this one only if focus was lost to the page.
+			const active = document.activeElement;
+			const focused = active instanceof HTMLButtonElement ? active.closest('section')?.dataset.id : undefined;
+			await draw(focused ?? (active === null || active === document.body ? item.id : undefined));
 		});
 		section.append(status, button);
 		root.append(section);
