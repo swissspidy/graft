@@ -1046,6 +1046,19 @@ check(
 	$late
 );
 check( 'two starts cannot both succeed', ! Graft\experiment_claim_start( 'headline-check', array_merge( $headline_experiment, array( 'id' => 'a-second-start' ) ) ) );
+$marker = Graft\experiment_claim_end( 'headline-check', $headline_experiment );
+check(
+	'while an experiment is ending, it is not running and nothing can start',
+	is_array( $marker ) && null === Graft\experiment_of( 'headline-check' ) && ! Graft\experiment_claim_start( 'headline-check', array_merge( $headline_experiment, array( 'id' => 'during-the-end' ) ) ) && null === Graft\experiment_claim_end( 'headline-check', $headline_experiment )
+);
+Graft\experiment_restore( 'headline-check', $marker );
+check( 'an end that does not complete puts the experiment back', Graft\experiment_of( 'headline-check' ) === $headline_experiment );
+$marker = Graft\experiment_claim_end( 'headline-check', $headline_experiment );
+Graft\experiment_swap( 'headline-check', $marker, array_merge( $marker, array( 'since' => time() - Graft\EXPERIMENT_ENDING_TIMEOUT - 1 ) ) );
+$after_dead_end = array_merge( $headline_experiment, array( 'id' => 'after-a-dead-end' ) );
+check( 'a start clears the marker of an end that died long ago', Graft\experiment_claim_start( 'headline-check', $after_dead_end ) && Graft\experiment_of( 'headline-check' ) === $after_dead_end );
+Graft\experiment_finish_end( 'headline-check', Graft\experiment_claim_end( 'headline-check', $after_dead_end ) );
+Graft\experiment_claim_start( 'headline-check', $headline_experiment );
 $at                  = static fn( int $hours ) => static fn() => strtotime( $headline_experiment['started'] ) + $hours * HOUR_IN_SECONDS;
 add_filter( 'graft_experiment_now', $at( 23 ) );
 $before = Graft\experiment_decision( $headline_experiment )['action'];
