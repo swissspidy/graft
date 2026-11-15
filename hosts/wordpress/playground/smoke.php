@@ -267,6 +267,77 @@ check( 'archiving stops serving it', 'archived' === ( $archived['state'] ?? null
 check( 'invalid events are refused', is_wp_error( Graft\apply_event( 'review-queue', 2, 'approve' ) ) );
 
 // ---------------------------------------------------------------------------
+// Experiments: a customization for a share of its audience (ADR 0016).
+// ---------------------------------------------------------------------------
+
+check( 'experiment buckets match the lab: the same hash, the user id as the visitor', 'variant' === Graft\experiment_bucket( 'exp-0042', 7, 0.3 ) && 'baseline' === Graft\experiment_bucket( 'exp-0042', 8, 0.3 ) );
+
+$pba = $examples['pending-by-author'];
+wp_set_current_user( $admin );
+Graft\create_version( array( 'source' => $pba['source'], 'manifest' => $pba['manifest'], 'title' => $pba['title'] ) );
+Graft\attach_build( 'pending-by-author', 1, $pba['build'], array( 'passed' => true ) );
+$experiment_args = array( 'share' => 0.5, 'metric' => 'post.published', 'minPerBucket' => 10, 'maxDays' => 14 );
+$early           = rest( 'POST', '/graft/v1/specs/pending-by-author/experiment', $experiment_args );
+Graft\approve_version( 'pending-by-author', 1 );
+check( 'only a live customization can be tested', 409 === $early['status'] && 'graft_experiment_not_active' === $early['code'], $early );
+check( 'the variant stays a minority', 'graft_experiment_share' === rest( 'POST', '/graft/v1/specs/pending-by-author/experiment', array_merge( $experiment_args, array( 'share' => 0.9 ) ) )['code'] );
+check( 'the metric is a host event', 'graft_experiment_metric' === rest( 'POST', '/graft/v1/specs/pending-by-author/experiment', array_merge( $experiment_args, array( 'metric' => 'post.deleted' ) ) )['code'] );
+wp_set_current_user( user_named( 'editor', 'editor-experiment' ) );
+check( 'only administrators start experiments', 403 === rest( 'POST', '/graft/v1/specs/pending-by-author/experiment', $experiment_args )['status'] );
+wp_set_current_user( $admin );
+$started = rest( 'POST', '/graft/v1/specs/pending-by-author/experiment', $experiment_args );
+check( 'an administrator starts one', 201 === $started['status'] && 0.5 === $started['data']['share'] && 'continue' === $started['data']['decision']['action'], $started );
+check( 'one at a time per customization', 'graft_experiment_running' === rest( 'POST', '/graft/v1/specs/pending-by-author/experiment', $experiment_args )['code'] );
+
+// Sixty editors look at the dashboard; those in the variant see the widget and publish more.
+$people = array( 'variant' => array(), 'baseline' => array() );
+$served = true;
+for ( $i = 0; $i < 60; $i++ ) {
+	$person = user_named( 'editor', 'exp-editor-' . $i );
+	wp_set_current_user( $person );
+	$bucket            = Graft\experiment_bucket( 'pending-by-author', $person, 0.5 );
+	$people[ $bucket ][] = $person;
+	$served            = $served && ( 'variant' === $bucket ) === isset( Graft\servable_specs()['pending-by-author'] );
+}
+$pba_record = Graft\version_record( Graft\get_version_post( 'pending-by-author', 1 ) );
+check( 'the variant sees the customization and the baseline does not', $served && count( $people['variant'] ) >= 10 && count( $people['baseline'] ) >= 10, array( array_map( 'count', $people ), Graft\not_served_reason( $pba_record ) ) );
+foreach ( $people['variant'] as $person ) {
+	wp_set_current_user( $person );
+	$post = wp_insert_post( array( 'post_title' => 'By ' . $person, 'post_status' => 'draft', 'post_author' => $person ) );
+	wp_update_post( array( 'ID' => $post, 'post_status' => 'publish' ) );
+	wp_update_post( array( 'ID' => wp_insert_post( array( 'post_title' => 'Again', 'post_status' => 'draft', 'post_author' => $person ) ), 'post_status' => 'publish' ) );
+}
+wp_set_current_user( $admin );
+$running = rest( 'GET', '/graft/v1/experiments' );
+$counts  = $running['data'][0]['decision']['counts'] ?? null;
+check(
+	'each person counts once a day, and converts once a day however often they publish',
+	array( 'visits' => count( $people['variant'] ), 'conversions' => count( $people['variant'] ) ) === ( $counts['variant'] ?? null ) && array( 'visits' => count( $people['baseline'] ), 'conversions' => 0 ) === ( $counts['baseline'] ?? null ),
+	$counts
+);
+check( 'the rule would keep a clear winner at the planned sample', 'keep' === ( $running['data'][0]['decision']['action'] ?? null ), $running['data'][0]['decision'] ?? null );
+$decided = rest( 'POST', '/graft/v1/experiments/decide' );
+wp_set_current_user( user_named( 'editor', 'exp-after-keep' ) );
+check( 'keeping it serves it to the whole audience', 'keep' === ( $decided['data']->{'pending-by-author'}['outcome'] ?? $decided['data']['pending-by-author']['outcome'] ?? null ) && isset( Graft\servable_specs()['pending-by-author'] ) && null === Graft\experiment_of( 'pending-by-author' ), $decided );
+
+wp_set_current_user( $admin );
+rest( 'POST', '/graft/v1/specs/pending-by-author/experiment', $experiment_args );
+foreach ( $people['baseline'] as $person ) {
+	wp_set_current_user( $person );
+	Graft\servable_specs();
+	wp_update_post( array( 'ID' => wp_insert_post( array( 'post_title' => 'Baseline', 'post_status' => 'draft', 'post_author' => $person ) ), 'post_status' => 'publish' ) );
+}
+foreach ( $people['variant'] as $person ) {
+	Graft\experiment_record( 'pending-by-author', 'variant', $person, false );
+}
+wp_set_current_user( $admin );
+$decided = rest( 'POST', '/graft/v1/experiments/decide' );
+$state   = Graft\version_record( Graft\get_version_post( 'pending-by-author', 1 ) )['state'];
+check( 'a clear loser is archived', 'archived' === $state && null === Graft\experiment_of( 'pending-by-author' ), array( $state, $decided ) );
+$whats = array_map( static fn( $entry ) => $entry['what'], array_filter( Graft\change_log(), static fn( $entry ) => 'pending-by-author' === $entry['spec'] ) );
+check( 'the change log has every start and end', array( 'experiment_started', 'experiment_kept', 'experiment_started', 'experiment_reverted' ) === array_values( array_filter( $whats, static fn( $what ) => 0 === strpos( $what, 'experiment_' ) ) ), array_values( $whats ) );
+
+// ---------------------------------------------------------------------------
 // Host changes and upgrades prepared ahead of them (milestone 6).
 // ---------------------------------------------------------------------------
 
@@ -942,6 +1013,22 @@ check(
 check( 'and what was created and attached', array( 'build_attached', 'created' ) === array_values( array_unique( array_map( static fn( $entry ) => $entry['what'], array_filter( $changes['data'], static fn( $entry ) => in_array( $entry['what'], array( 'created', 'build_attached' ), true ) && 'waiting-too-long' === $entry['spec'] ) ) ) ) );
 wp_set_current_user( user_named( 'editor', 'editor-changes' ) );
 check( 'only administrators read it', 403 === rest( 'GET', '/graft/v1/changes' )['status'] );
+
+// Experiments, continued: refusals and ends that need later fixtures.
+$experiment_args = array( 'share' => 0.5, 'metric' => 'post.published', 'minPerBucket' => 10, 'maxDays' => 14 );
+wp_set_current_user( $admin );
+check( 'a customization that acts on its own cannot be tested', 'graft_experiment_triggers' === rest( 'POST', '/graft/v1/specs/waiting-too-long/experiment', $experiment_args )['code'] );
+$headline = $examples['headline-check'];
+Graft\create_version( array( 'source' => $headline['source'], 'manifest' => $headline['manifest'], 'title' => $headline['title'] ) );
+Graft\attach_build( 'headline-check', 1, $headline['build'], array( 'passed' => true ) );
+Graft\approve_version( 'headline-check', 1 );
+rest( 'POST', '/graft/v1/specs/headline-check/experiment', $experiment_args );
+Graft\apply_event( 'headline-check', 1, 'archive' );
+$last = Graft\change_log();
+check( 'an experiment whose version stops being live ends without a decision', null === Graft\experiment_of( 'headline-check' ) && 'experiment_abandoned' === ( end( $last )['what'] ?? null ), end( $last ) );
+$ended = rest( 'DELETE', '/graft/v1/specs/headline-check/experiment', array( 'outcome' => 'keep' ) );
+check( 'ending one that is not running says so', 404 === $ended['status'] && 'graft_experiment_none' === $ended['code'], $ended );
+
 
 global $wp_version;
 echo wp_json_encode(

@@ -77,7 +77,8 @@ function servable_specs(): array {
 			$build  = $record['builds'][ $surface['hash'] ]['build'] ?? null;
 			// Never serve a build whose scopes the grant does not cover, or one that did not pass its checks
 			// (a version can be active through its build for another surface): see not_served_reason().
-			if ( null === not_served_reason( $record, $surface ) && applies_to_user( $record, $user ) ) {
+			// Under an experiment, only the variant share of the audience is served (ADR 0016).
+			if ( null === not_served_reason( $record, $surface ) && applies_to_user( $record, $user ) && experiment_serves( $record, $user ) ) {
 				$servable[ $spec->post_name ] = array(
 					'record' => $record,
 					'build'  => $build,

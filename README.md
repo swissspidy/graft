@@ -276,6 +276,7 @@ Later decisions each have their own record:
 | [0013](docs/adr/0013-operating-and-recovering.md) | Safe mode, a change log, why a customization is not showing, locked areas, customizations for one person |
 | [0014](docs/adr/0014-customizations-of-ones-own.md) | People who are not administrators writing customizations for themselves (WordPress) |
 | [0015](docs/adr/0015-website-host.md) | A website as a host, for experiments that change a site's source (implemented in [the lab](https://github.com/swissspidy/lab)) |
+| [0016](docs/adr/0016-experiments.md) | Experiments: a customization for a share of its audience, kept or archived by a host event (WordPress) |
 
 [docs/audit-2026-11.md](docs/audit-2026-11.md) lists what a full read of the
 code found, what was fixed and what is still open, and compares Graft with
