@@ -64,7 +64,11 @@ The rule is the lab's, ported to PHP so that it runs on the site:
   (default 14) pass without a keep.
 
 A daily job applies the rule, and `POST graft/v1/experiments/decide`
-applies it on demand. Keeping removes the experiment, so the customization
+applies it on demand. A decision carries the id of the experiment it was
+made for, and never ends a later one. `maxDays` counts elapsed time from
+the start. Events are counted only while the customization can be served
+at all: in safe mode, or without a build for the current surface, neither
+bucket is seeing what is being tested. Keeping removes the experiment, so the customization
 is served to its whole audience. Reverting archives the version that was
 tested.
 
@@ -122,8 +126,10 @@ schema and core are unchanged.
   does not show them yet.
 - "Why is this not showing" (ADR 0013) does not yet say that a person is
   in an experiment's baseline.
-- Counts live in an option, with one entry per person per day. That is
-  fine for a site's editors. A site with many thousands of signed-in
-  people would need a table.
+- Counts are post meta on the spec: one row per person, day, bucket and
+  kind, only ever added, and keyed by the experiment's id. Concurrent
+  requests cannot lose each other's counts, a request cannot bring back an
+  experiment that ended, and the rows go when it ends. That is fine for a
+  site's editors; many thousands of signed-in people would need a table.
 - EmDash and the browser extension have no experiments. Their hosts would
   need the same event attribution first.

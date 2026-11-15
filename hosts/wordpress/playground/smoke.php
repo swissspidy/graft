@@ -322,6 +322,15 @@ check( 'keeping it serves it to the whole audience', 'keep' === ( $decided['data
 
 wp_set_current_user( $admin );
 rest( 'POST', '/graft/v1/specs/pending-by-author/experiment', $experiment_args );
+$second = Graft\experiment_of( 'pending-by-author' );
+check( 'a new experiment starts from zero: the last one’s counts are not its own', array( 'baseline' => array( 'visits' => 0, 'conversions' => 0 ), 'variant' => array( 'visits' => 0, 'conversions' => 0 ) ) === Graft\experiment_counts( $second ) );
+$stale = Graft\end_experiment( 'pending-by-author', 'revert', 'A decision made for an earlier experiment.', 'not-this-experiment' );
+check( 'a decision never ends a later experiment', is_wp_error( $stale ) && 'graft_experiment_changed' === $stale->get_error_code() && null !== Graft\experiment_of( 'pending-by-author' ) );
+add_filter( 'graft_safe_mode', '__return_true' );
+wp_set_current_user( $people['baseline'][0] );
+wp_update_post( array( 'ID' => wp_insert_post( array( 'post_title' => 'In safe mode', 'post_status' => 'draft', 'post_author' => $people['baseline'][0] ) ), 'post_status' => 'publish' ) );
+remove_filter( 'graft_safe_mode', '__return_true' );
+check( 'events while the customization cannot be served are not counted', 0 === Graft\experiment_counts( $second )['baseline']['conversions'] );
 foreach ( $people['baseline'] as $person ) {
 	wp_set_current_user( $person );
 	Graft\servable_specs();
@@ -1022,7 +1031,16 @@ $headline = $examples['headline-check'];
 Graft\create_version( array( 'source' => $headline['source'], 'manifest' => $headline['manifest'], 'title' => $headline['title'] ) );
 Graft\attach_build( 'headline-check', 1, $headline['build'], array( 'passed' => true ) );
 Graft\approve_version( 'headline-check', 1 );
-rest( 'POST', '/graft/v1/specs/headline-check/experiment', $experiment_args );
+rest( 'POST', '/graft/v1/specs/headline-check/experiment', array_merge( $experiment_args, array( 'maxDays' => 1 ) ) );
+$headline_experiment = Graft\experiment_of( 'headline-check' );
+$at                  = static fn( int $hours ) => static fn() => strtotime( $headline_experiment['started'] ) + $hours * HOUR_IN_SECONDS;
+add_filter( 'graft_experiment_now', $at( 23 ) );
+$before = Graft\experiment_decision( $headline_experiment )['action'];
+remove_all_filters( 'graft_experiment_now' );
+add_filter( 'graft_experiment_now', $at( 25 ) );
+$after = Graft\experiment_decision( $headline_experiment )['action'];
+remove_all_filters( 'graft_experiment_now' );
+check( 'maxDays counts elapsed time, not calendar days', 'continue' === $before && 'revert' === $after, array( $before, $after ) );
 Graft\apply_event( 'headline-check', 1, 'archive' );
 $last = Graft\change_log();
 check( 'an experiment whose version stops being live ends without a decision', null === Graft\experiment_of( 'headline-check' ) && 'experiment_abandoned' === ( end( $last )['what'] ?? null ), end( $last ) );

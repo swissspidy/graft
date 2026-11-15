@@ -27,6 +27,14 @@ const EXPERIMENTS_OPTION = 'graft_experiments';
 const EXPERIMENT_KEEP    = 0.95;
 const EXPERIMENT_REVERT  = 0.05;
 const EXPERIMENT_MAX_SHARE = 0.5;
+/**
+ * Post meta on the spec: one row per person, day, bucket and kind, as
+ * "<experiment id>|<day>|<bucket>|<user id>|<seen|converted>". Rows are only
+ * ever added (add_post_meta is one INSERT), so concurrent requests cannot
+ * lose each other's counts, and rows of an experiment that ended do not
+ * count for the next one.
+ */
+const EXPERIMENT_MARK = '_graft_experiment_mark';
 
 /**
  * Running experiments, keyed by spec id.
@@ -95,7 +103,9 @@ function experiment_day(): string {
 }
 
 /**
- * Records a person as seen (and optionally converted) today, in their bucket.
+ * Records a person as seen (and optionally converted) today, in their
+ * bucket, for the experiment running now. Only appends rows; never writes
+ * the experiment record, so it cannot restore an experiment that ended.
  *
  * @param string $spec_id   Spec id.
  * @param string $bucket    Bucket.
@@ -104,26 +114,35 @@ function experiment_day(): string {
  */
 function experiment_record( string $spec_id, string $bucket, int $user_id, bool $converted ): void {
 	$experiment = experiment_of( $spec_id );
-	if ( ! $experiment ) {
+	$spec       = get_spec_post( $spec_id );
+	if ( ! $experiment || ! $spec || empty( $experiment['id'] ) ) {
 		return;
 	}
-	$day   = experiment_day();
-	$entry = $experiment['days'][ $day ][ $bucket ] ?? array(
-		'seen'      => array(),
-		'converted' => array(),
-	);
-	$changed = false;
-	if ( ! in_array( $user_id, $entry['seen'], true ) ) {
-		$entry['seen'][] = $user_id;
-		$changed         = true;
+	$prefix   = implode( '|', array( $experiment['id'], experiment_day(), $bucket, $user_id ) );
+	$existing = (array) get_post_meta( $spec->ID, EXPERIMENT_MARK );
+	foreach ( $converted ? array( 'seen', 'converted' ) : array( 'seen' ) as $kind ) {
+		// A duplicate from two requests at once is harmless: counts read distinct rows.
+		if ( ! in_array( "$prefix|$kind", $existing, true ) ) {
+			add_post_meta( $spec->ID, EXPERIMENT_MARK, "$prefix|$kind" );
+		}
 	}
-	if ( $converted && ! in_array( $user_id, $entry['converted'], true ) ) {
-		$entry['converted'][] = $user_id;
-		$changed              = true;
+}
+
+/**
+ * Removes an experiment's rows once it has ended.
+ *
+ * @param string               $spec_id    Spec id.
+ * @param array<string, mixed> $experiment The experiment that ended.
+ */
+function experiment_forget( string $spec_id, array $experiment ): void {
+	$spec = get_spec_post( $spec_id );
+	if ( ! $spec || empty( $experiment['id'] ) ) {
+		return;
 	}
-	if ( $changed ) {
-		$experiment['days'][ $day ][ $bucket ] = $entry;
-		save_experiment( $spec_id, $experiment );
+	foreach ( array_unique( (array) get_post_meta( $spec->ID, EXPERIMENT_MARK ) ) as $mark ) {
+		if ( 0 === strpos( (string) $mark, $experiment['id'] . '|' ) ) {
+			delete_post_meta( $spec->ID, EXPERIMENT_MARK, $mark );
+		}
 	}
 }
 
@@ -158,11 +177,28 @@ function experiment_counts( array $experiment ): array {
 		'baseline' => array( 'visits' => 0, 'conversions' => 0 ),
 		'variant'  => array( 'visits' => 0, 'conversions' => 0 ),
 	);
-	foreach ( (array) ( $experiment['days'] ?? array() ) as $buckets ) {
-		foreach ( array( 'baseline', 'variant' ) as $bucket ) {
-			$seen                                = (array) ( $buckets[ $bucket ]['seen'] ?? array() );
-			$counts[ $bucket ]['visits']        += count( $seen );
-			$counts[ $bucket ]['conversions']   += count( array_intersect( (array) ( $buckets[ $bucket ]['converted'] ?? array() ), $seen ) );
+	$spec = get_spec_post( (string) $experiment['spec'] );
+	if ( ! $spec || empty( $experiment['id'] ) ) {
+		return $counts;
+	}
+	$seen      = array();
+	$converted = array();
+	foreach ( array_unique( (array) get_post_meta( $spec->ID, EXPERIMENT_MARK ) ) as $mark ) {
+		$parts = explode( '|', (string) $mark );
+		if ( 5 !== count( $parts ) || $parts[0] !== $experiment['id'] || ! isset( $counts[ $parts[2] ] ) ) {
+			continue;
+		}
+		$person = "$parts[2]|$parts[1]|$parts[3]";
+		if ( 'seen' === $parts[4] ) {
+			$seen[ $person ] = $parts[2];
+		} elseif ( 'converted' === $parts[4] ) {
+			$converted[ $person ] = true;
+		}
+	}
+	foreach ( $seen as $person => $bucket ) {
+		++$counts[ $bucket ]['visits'];
+		if ( isset( $converted[ $person ] ) ) {
+			++$counts[ $bucket ]['conversions'];
 		}
 	}
 	return $counts;
@@ -209,10 +245,13 @@ function probability_better( array $baseline, array $variant ): float {
 function experiment_decision( array $experiment ): array {
 	$counts = experiment_counts( $experiment );
 	$p      = probability_better( $counts['baseline'], $counts['variant'] );
-	$days   = ( time() - strtotime( (string) $experiment['started'] ) ) / DAY_IN_SECONDS;
-	/** This filter is documented in experiment_day(). */
-	$day_index = ( strtotime( experiment_day() . ' 00:00:00 UTC' ) - strtotime( gmdate( 'Y-m-d', strtotime( (string) $experiment['started'] ) ) . ' 00:00:00 UTC' ) ) / DAY_IN_SECONDS;
-	$days      = max( $days, (float) $day_index );
+	/**
+	 * Filters the time experiments are decided at (tests move the clock).
+	 *
+	 * @param int $now Unix time.
+	 */
+	$now  = (int) apply_filters( 'graft_experiment_now', time() );
+	$days = ( $now - strtotime( (string) $experiment['started'] ) ) / DAY_IN_SECONDS;
 	$per       = (int) $experiment['minPerBucket'];
 	$enough    = $counts['baseline']['visits'] >= $per && $counts['variant']['visits'] >= $per;
 	$shown     = sprintf( 'P(variant better) = %.3f', $p );
@@ -286,6 +325,8 @@ function start_experiment( string $spec_id, array $args ) {
 		return new WP_Error( 'graft_experiment_bounds', __( 'minPerBucket must be at least 10, and maxDays from 1 to 90.', 'graft' ), array( 'status' => 400 ) );
 	}
 	$experiment = array(
+		// Identifies this run: its counts, and the decision that may end it.
+		'id'           => wp_generate_uuid4(),
 		'spec'         => $spec_id,
 		'version'      => $active,
 		'share'        => $share,
@@ -294,7 +335,6 @@ function start_experiment( string $spec_id, array $args ) {
 		'maxDays'      => $days,
 		'started'      => gmdate( 'c' ),
 		'startedBy'    => get_current_user_id(),
-		'days'         => array(),
 	);
 	save_experiment( $spec_id, $experiment );
 	record_change( 'experiment_started', $spec_id, $active, array( 'share' => $share, 'metric' => $metric ) );
@@ -305,15 +345,19 @@ function start_experiment( string $spec_id, array $args ) {
  * Ends an experiment: `keep` serves the customization to its whole
  * audience, `revert` archives it.
  *
- * @param string $spec_id Spec id.
- * @param string $outcome keep or revert.
- * @param string $reason  Why, for the change log.
+ * @param string      $spec_id  Spec id.
+ * @param string      $outcome  keep or revert.
+ * @param string      $reason   Why, for the change log.
+ * @param string|null $expected The experiment id a decision was made for: a decision never ends a later experiment.
  * @return array<string, mixed>|WP_Error The final counts and outcome.
  */
-function end_experiment( string $spec_id, string $outcome, string $reason ) {
+function end_experiment( string $spec_id, string $outcome, string $reason, ?string $expected = null ) {
 	$experiment = experiment_of( $spec_id );
 	if ( ! $experiment ) {
 		return new WP_Error( 'graft_experiment_none', __( 'This customization is not being tested.', 'graft' ), array( 'status' => 404 ) );
+	}
+	if ( null !== $expected && ( $experiment['id'] ?? null ) !== $expected ) {
+		return new WP_Error( 'graft_experiment_changed', __( 'The experiment changed since it was decided: another one is running now.', 'graft' ), array( 'status' => 409 ) );
 	}
 	if ( 'keep' !== $outcome && 'revert' !== $outcome ) {
 		return new WP_Error( 'graft_experiment_outcome', __( 'The outcome must be keep or revert.', 'graft' ), array( 'status' => 400 ) );
@@ -333,6 +377,7 @@ function end_experiment( string $spec_id, string $outcome, string $reason ) {
 		'reason'  => $reason,
 		'counts'  => experiment_counts( $experiment ),
 	);
+	experiment_forget( $spec_id, $experiment );
 	record_change( 'experiment_' . ( 'keep' === $outcome ? 'kept' : 'reverted' ), $spec_id, (int) $experiment['version'], $summary );
 	return $summary;
 }
@@ -357,7 +402,10 @@ function experiment_on_post_transition( string $new_status, string $old_status, 
 			continue;
 		}
 		$post_version = get_version_post( (string) $spec_id, (int) $experiment['version'] );
-		if ( ! $post_version || ! applies_to_user( version_record( $post_version ), $user ) ) {
+		$record       = $post_version ? version_record( $post_version ) : null;
+		// Only while the customization can be served at all (not in safe mode, a build for this
+		// surface, within its grant): otherwise neither bucket is seeing what is being tested.
+		if ( ! $record || null !== not_served_reason( $record, current_surface() ) || ! applies_to_user( $record, $user ) ) {
 			continue;
 		}
 		experiment_record( (string) $spec_id, experiment_bucket( (string) $spec_id, $user->ID, (float) $experiment['share'] ), $user->ID, true );
@@ -377,7 +425,7 @@ function decide_experiments(): array {
 		if ( 'continue' === $decision['action'] ) {
 			continue;
 		}
-		$result = end_experiment( (string) $spec_id, $decision['action'], $decision['reason'] );
+		$result = end_experiment( (string) $spec_id, $decision['action'], $decision['reason'], (string) ( $experiment['id'] ?? '' ) );
 		if ( ! is_wp_error( $result ) ) {
 			$ended[ $spec_id ] = $result;
 		}
@@ -402,9 +450,7 @@ function schedule_experiment_tick(): void {
  * @return array<string, mixed>
  */
 function experiment_output( array $experiment ): array {
-	$out = $experiment;
-	unset( $out['days'] );
-	return $out + array( 'decision' => experiment_decision( $experiment ) );
+	return $experiment + array( 'decision' => experiment_decision( $experiment ) );
 }
 
 /**
@@ -483,13 +529,15 @@ function experiment_on_spec_transition( string $next, string $state, string $eve
 		return;
 	}
 	save_experiment( $record['spec_id'], null );
+	$counts = experiment_counts( $experiment );
+	experiment_forget( $record['spec_id'], $experiment );
 	record_change(
 		'experiment_abandoned',
 		$record['spec_id'],
 		$record['version'],
 		array(
 			'reason' => sprintf( 'The version stopped being live (%s).', $event ),
-			'counts' => experiment_counts( $experiment ),
+			'counts' => $counts,
 		)
 	);
 }
