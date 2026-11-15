@@ -23,7 +23,11 @@ function el<K extends keyof HTMLElementTagNameMap>(tag: K, text?: string): HTMLE
 	return node;
 }
 
-async function draw(focus?: string): Promise<void> {
+/**
+ * Redraws the list. `fallback` is the customization whose button keeps focus
+ * if focus is on the page itself when the controls are replaced.
+ */
+async function draw(fallback?: string): Promise<void> {
 	const root = document.getElementById('customizations')!;
 	let list: Listed[];
 	try {
@@ -35,6 +39,16 @@ async function draw(focus?: string): Promise<void> {
 		root.replaceChildren(alert);
 		return;
 	}
+	// Read focus just before the controls are replaced, not before the list was asked for:
+	// it may have moved while the reply was out. Keep it on whichever customization's button
+	// has it now; fall back only if it is on the page itself, and leave it alone otherwise.
+	const active = document.activeElement;
+	const focus =
+		active instanceof HTMLButtonElement && root.contains(active)
+			? active.closest('section')?.dataset.id
+			: active === null || active === document.body
+				? fallback
+				: undefined;
 	root.replaceChildren();
 	if (list.length === 0) {
 		root.append(el('p', 'No customizations.'));
@@ -82,11 +96,7 @@ async function draw(focus?: string): Promise<void> {
 				busy = false;
 				return;
 			}
-			// Focus may have moved while the request was out: keep it on whichever customization's
-			// button has it now; fall back to this one only if focus was lost to the page.
-			const active = document.activeElement;
-			const focused = active instanceof HTMLButtonElement ? active.closest('section')?.dataset.id : undefined;
-			await draw(focused ?? (active === null || active === document.body ? item.id : undefined));
+			await draw(item.id);
 		});
 		section.append(status, button);
 		root.append(section);
