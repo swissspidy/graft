@@ -217,10 +217,19 @@ function experiment_restore( string $spec_id, array $marker ): void {
  */
 function experiment_version_live( string $spec_id, int $version ): bool {
 	$spec = get_spec_post( $spec_id );
+	// Read what is stored now, not this request's cache: another request may have changed it.
+	if ( $spec ) {
+		wp_cache_delete( $spec->ID, 'post_meta' );
+	}
+	$post = get_version_post( $spec_id, $version );
+	if ( $post ) {
+		clean_post_cache( $post );
+		wp_cache_delete( $post->ID, 'post_meta' );
+	}
 	if ( ! $spec || (int) get_post_meta( $spec->ID, '_graft_active_version', true ) !== $version ) {
 		return false;
 	}
-	$post = get_version_post( $spec_id, $version );
+	$post = $post ? get_post( $post->ID ) : null;
 	return $post && 'active' === ( version_record( $post )['state'] ?? '' );
 }
 
@@ -734,8 +743,12 @@ function register_experiment_routes(): void {
 				'callback'            => static function ( WP_REST_Request $request ) {
 					$spec_id  = (string) $request['spec_id'];
 					$snapshot = experiment_of( $spec_id );
+					// Decided on this one read: a start right after it is never ended by mistake.
+					if ( ! $snapshot ) {
+						return new WP_Error( 'graft_experiment_none', __( 'This customization is not being tested.', 'graft' ), array( 'status' => 404 ) );
+					}
 					// The screen sends the experiment it shows: a newer one is never ended by mistake.
-					if ( $snapshot && null !== $request['experiment'] && (string) $request['experiment'] !== (string) $snapshot['id'] ) {
+					if ( null !== $request['experiment'] && (string) $request['experiment'] !== (string) $snapshot['id'] ) {
 						return new WP_Error( 'graft_experiment_changed', __( 'The experiment changed since it was read: it ended, or another one is running now.', 'graft' ), array( 'status' => 409 ) );
 					}
 					$result = end_experiment( $spec_id, (string) $request['outcome'], __( 'Ended by an administrator.', 'graft' ), $snapshot );

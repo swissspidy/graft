@@ -1109,12 +1109,18 @@ check(
 	null === get_option( Graft\experiment_option( 'headline-check' ), null ) && 'experiment_abandoned' === ( $last_change['what'] ?? null ),
 	$last_change
 );
-// A newer version that goes live while a start is claiming: the start takes its claim back.
-$racing = static function ( string $query ) use ( $headline_spec ): string {
+// A newer version that goes live in another request while a start is claiming: the start
+// takes its claim back. The change is written to the table directly, so this request's
+// cache still holds the old version, as it would with a change from another request.
+$active_meta = static function ( int $version ) use ( $headline_spec ): void {
+	global $wpdb;
+	$wpdb->update( $wpdb->postmeta, array( 'meta_value' => (string) $version ), array( 'post_id' => $headline_spec->ID, 'meta_key' => '_graft_active_version' ) );
+};
+$racing      = static function ( string $query ) use ( $active_meta ): string {
 	static $busy = false;
 	if ( ! $busy && false !== strpos( $query, 'INSERT IGNORE' ) && false !== strpos( $query, 'graft_experiment_headline-check' ) ) {
 		$busy = true;
-		update_post_meta( $headline_spec->ID, '_graft_active_version', 2 );
+		$active_meta( 2 );
 		$busy = false;
 	}
 	return $query;
@@ -1122,7 +1128,10 @@ $racing = static function ( string $query ) use ( $headline_spec ): string {
 add_filter( 'query', $racing );
 $raced = rest( 'POST', '/graft/v1/specs/headline-check/experiment', $experiment_args );
 remove_filter( 'query', $racing );
-update_post_meta( $headline_spec->ID, '_graft_active_version', 1 );
+$active_meta( 1 );
+wp_cache_delete( $headline_spec->ID, 'post_meta' );
+$no_end = rest( 'DELETE', '/graft/v1/specs/headline-check/experiment', array( 'outcome' => 'revert' ) );
+check( 'an end with nothing running is refused, without reading again', 404 === $no_end['status'] && 'graft_experiment_none' === $no_end['code'], $no_end );
 check(
 	'a start whose version is replaced while it claims takes the claim back',
 	409 === $raced['status'] && 'graft_experiment_not_active' === $raced['code'] && null === get_option( Graft\experiment_option( 'headline-check' ), null ),
