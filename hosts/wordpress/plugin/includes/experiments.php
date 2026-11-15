@@ -146,6 +146,25 @@ function experiment_claim_end( string $spec_id, array $experiment ): ?array {
 }
 
 /**
+ * Renews an end's marker, only if it is still this end's: one UPDATE that
+ * matches the marker as claimed. A start may clear a marker older than
+ * EXPERIMENT_ENDING_TIMEOUT, so an end renews it right before it acts.
+ *
+ * @param string               $spec_id Spec id.
+ * @param array<string, mixed> $marker  The marker as claimed or last renewed.
+ * @return array<string, mixed>|null The renewed marker, or null when another request took it over.
+ */
+function experiment_renew_end( string $spec_id, array $marker ): ?array {
+	$renewed = array_merge( $marker, array( 'since' => time() ) );
+	if ( $renewed === $marker ) {
+		// Same second: nothing to write, but still confirm the marker is ours.
+		wp_cache_delete( experiment_option( $spec_id ), 'options' );
+		return get_option( experiment_option( $spec_id ), null ) === $marker ? $marker : null;
+	}
+	return experiment_swap( $spec_id, $marker, $renewed ) ? $renewed : null;
+}
+
+/**
  * Removes the marker of an end that completed.
  *
  * @param string               $spec_id Spec id.
@@ -471,6 +490,12 @@ function end_experiment( string $spec_id, string $outcome, string $reason, ?arra
 			return new WP_Error( 'graft_experiment_recomputed', __( 'The decision no longer holds on the final counts; the experiment keeps running.', 'graft' ), array( 'status' => 409 ) );
 		}
 		$reason = (string) $decision['reason'];
+	}
+	// An end that took longer than EXPERIMENT_ENDING_TIMEOUT may have lost its marker to a
+	// start. Renew it in one statement right before acting: if it is gone, act on nothing.
+	$marker = experiment_renew_end( $spec_id, $marker );
+	if ( ! $marker ) {
+		return new WP_Error( 'graft_experiment_taken_over', __( 'This end took too long and another experiment started meanwhile; nothing was changed.', 'graft' ), array( 'status' => 409 ) );
 	}
 	if ( 'revert' === $outcome ) {
 		$archived = apply_event( $spec_id, (int) $experiment['version'], 'archive' );

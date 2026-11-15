@@ -70,7 +70,9 @@ exact experiment it was decided on for an "ending" marker, in one update,
 so a stale decision can never end a later experiment, and nothing can start
 until the end has archived (or kept) and removed the marker, or put the
 experiment back. A marker left by a request that died is cleared by the
-next start after ten minutes. Once the marker is in place recorders find no
+next start after ten minutes; an end renews its marker in one update right
+before it archives, so an end that stalled past that and lost its marker
+changes nothing. Once the marker is in place recorders find no
 running experiment, and the daily rule is applied again on the counts as
 they stand: if it no longer holds, the experiment is put back and keeps
 running. A request that was already recording at that instant may still

@@ -1064,7 +1064,26 @@ $marker = Graft\experiment_claim_end( 'headline-check', $headline_experiment );
 Graft\experiment_swap( 'headline-check', $marker, array_merge( $marker, array( 'since' => time() - Graft\EXPERIMENT_ENDING_TIMEOUT - 1 ) ) );
 $after_dead_end = array_merge( $headline_experiment, array( 'id' => 'after-a-dead-end' ) );
 check( 'a start clears the marker of an end that died long ago', Graft\experiment_claim_start( 'headline-check', $after_dead_end ) && Graft\experiment_of( 'headline-check' ) === $after_dead_end );
-Graft\experiment_finish_end( 'headline-check', Graft\experiment_claim_end( 'headline-check', $after_dead_end ) );
+$taken_over = array_merge( $headline_experiment, array( 'id' => 'took-over-a-slow-end' ) );
+$slow       = Graft\end_experiment(
+	'headline-check',
+	'revert',
+	'A slow end.',
+	$after_dead_end,
+	static function () use ( $taken_over ): array {
+		// The end stalls past the timeout; a start clears its marker and runs.
+		$stalled = get_option( Graft\experiment_option( 'headline-check' ) );
+		Graft\experiment_swap( 'headline-check', $stalled, array_merge( $stalled, array( 'since' => time() - Graft\EXPERIMENT_ENDING_TIMEOUT - 1 ) ) );
+		Graft\experiment_claim_start( 'headline-check', $taken_over );
+		return array( 'action' => 'revert', 'reason' => 'Decided before the stall.' );
+	}
+);
+check(
+	'an end that stalled past the timeout acts on nothing once another experiment started',
+	is_wp_error( $slow ) && 'graft_experiment_taken_over' === $slow->get_error_code() && Graft\experiment_of( 'headline-check' ) === $taken_over && 'active' === Graft\version_record( Graft\get_version_post( 'headline-check', 1 ) )['state'],
+	$slow
+);
+Graft\experiment_finish_end( 'headline-check', Graft\experiment_claim_end( 'headline-check', $taken_over ) );
 Graft\experiment_claim_start( 'headline-check', $headline_experiment );
 $at                  = static fn( int $hours ) => static fn() => strtotime( $headline_experiment['started'] ) + $hours * HOUR_IN_SECONDS;
 add_filter( 'graft_experiment_now', $at( 23 ) );
