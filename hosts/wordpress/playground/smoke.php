@@ -796,6 +796,14 @@ $bad_manifest                                   = $wtl['manifest'];
 $bad_manifest['triggers']['flag-stale']['schedule'] = array( 'every' => '1h' );
 $bad_manifest['triggers']['clear-on-publish']['event'] = 'post.deleted';
 check( 'manifests with unknown events are refused', is_wp_error( Graft\validate_manifest( $bad_manifest ) ) );
+$newline_id       = $wtl['manifest'];
+$newline_id['id'] = $newline_id['id'] . "\n";
+$newline_trigger  = $wtl['manifest'];
+$newline_trigger['triggers'] = array( "flag-stale\n" => $newline_trigger['triggers']['flag-stale'] );
+check(
+	'ids with a trailing newline are refused, so ids stay whitespace-free',
+	is_wp_error( Graft\validate_manifest( $newline_id ) ) && is_wp_error( Graft\validate_manifest( $newline_trigger ) ) && ! is_wp_error( Graft\validate_manifest( $wtl['manifest'] ) )
+);
 
 wp_insert_term( 'Waiting too long', 'post_tag', array( 'slug' => 'waiting-too-long' ) );
 $old_date = static function ( int $days ): string {

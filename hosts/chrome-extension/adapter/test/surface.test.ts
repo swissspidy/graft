@@ -43,5 +43,6 @@ describe('the extension manifest', () => {
 		expect(manifest.content_scripts).toEqual([{ matches: ['http://127.0.0.1/projects/*'], js: ['content.js'], run_at: 'document_idle', all_frames: false }]);
 		expect(manifest).not.toHaveProperty('externally_connectable');
 		expect(manifest).not.toHaveProperty('web_accessible_resources');
+		expect((manifest.content_security_policy as { extension_pages: string }).extension_pages).toContain("require-trusted-types-for 'script'; trusted-types 'none'");
 	});
 });

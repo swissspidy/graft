@@ -120,3 +120,60 @@ test('when the app changes, the anchor is found again by its landmark and the dr
 		)
 		.toEqual(expect.arrayContaining(['slot project.sidebar moved', expect.stringMatching(/^capability tasks\.list \/tasks\/\d+ is missing "due"/)]));
 });
+
+test('the options page refuses markup written as a string, and keeps focus on the button it redraws', async ({ context, extensionId }) => {
+	const options = await context.newPage();
+	await options.goto(`chrome-extension://${extensionId}/options.html`);
+	const section = options.locator('section', { has: options.getByRole('heading', { name: 'My open tasks' }) });
+	await expect(section.getByRole('button', { name: 'Approve' })).toHaveAccessibleDescription(/My open tasks.*Waiting for approval\./);
+	// Trusted Types, enforced by the extension's CSP with no policy allowed.
+	const refused = await options.evaluate(() => {
+		try {
+			document.body.insertAdjacentHTML('beforeend', '<b>x</b>');
+			return 'allowed';
+		} catch (error) {
+			return (error as Error).name;
+		}
+	});
+	expect(refused).toBe('TypeError');
+
+	await section.getByRole('button', { name: 'Approve' }).press('Enter');
+	await expect(section.getByText('Approved: shown in the app.')).toBeVisible();
+	await expect(section.getByRole('button', { name: 'Revoke' })).toBeFocused();
+	await options.close();
+});
+
+test('the options page does not take focus back when it moved while the list was reloading', async ({ context, extensionId }) => {
+	const options = await context.newPage();
+	await options.goto(`chrome-extension://${extensionId}/options.html`);
+	const section = options.locator('section', { has: options.getByRole('heading', { name: 'My open tasks' }) });
+	await expect(section.getByRole('button', { name: 'Approve' })).toBeVisible();
+	// Hold the list reply that follows the approval, and give focus somewhere else to go meanwhile.
+	await options.evaluate(() => {
+		const original = chrome.runtime.sendMessage.bind(chrome.runtime) as (message: { type: string }) => Promise<unknown>;
+		const held = window as unknown as { release: () => void; listed: boolean };
+		const hold = new Promise<void>((resolve) => {
+			held.release = resolve;
+		});
+		held.listed = false;
+		(chrome.runtime as { sendMessage: unknown }).sendMessage = async (message: { type: string }) => {
+			const reply = await original(message);
+			if (message.type === 'list') {
+				held.listed = true;
+				await hold;
+			}
+			return reply;
+		};
+		const elsewhere = document.createElement('button');
+		elsewhere.type = 'button';
+		elsewhere.textContent = 'Elsewhere';
+		document.body.append(elsewhere);
+	});
+	await section.getByRole('button', { name: 'Approve' }).press('Enter');
+	await expect.poll(() => options.evaluate(() => (window as unknown as { listed: boolean }).listed)).toBe(true);
+	await options.getByRole('button', { name: 'Elsewhere' }).focus();
+	await options.evaluate(() => (window as unknown as { release: () => void }).release());
+	await expect(section.getByRole('button', { name: 'Revoke' })).toBeVisible();
+	await expect(options.getByRole('button', { name: 'Elsewhere' })).toBeFocused();
+	await options.close();
+});

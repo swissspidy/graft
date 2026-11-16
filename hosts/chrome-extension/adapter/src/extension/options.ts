@@ -23,18 +23,43 @@ function el<K extends keyof HTMLElementTagNameMap>(tag: K, text?: string): HTMLE
 	return node;
 }
 
-async function draw(): Promise<void> {
+/**
+ * Redraws the list. `fallback` is the customization whose button keeps focus
+ * if focus is on the page itself when the controls are replaced.
+ */
+async function draw(fallback?: string): Promise<void> {
 	const root = document.getElementById('customizations')!;
-	const list = await send<Listed[]>({ type: 'list' });
+	let list: Listed[];
+	try {
+		list = await send<Listed[]>({ type: 'list' });
+	} catch (error) {
+		const alert = el('p', `Could not load the customizations: ${(error as Error).message}`);
+		alert.className = 'error';
+		alert.setAttribute('role', 'alert');
+		root.replaceChildren(alert);
+		return;
+	}
+	// Read focus just before the controls are replaced, not before the list was asked for:
+	// it may have moved while the reply was out. Keep it on whichever customization's button
+	// has it now; fall back only if it is on the page itself, and leave it alone otherwise.
+	const active = document.activeElement;
+	const focus =
+		active instanceof HTMLButtonElement && root.contains(active)
+			? active.closest('section')?.dataset.id
+			: active === null || active === document.body
+				? fallback
+				: undefined;
 	root.replaceChildren();
 	if (list.length === 0) {
 		root.append(el('p', 'No customizations.'));
 		return;
 	}
-	for (const item of list) {
+	list.forEach((item, index) => {
 		const section = el('section');
 		section.dataset.id = item.id;
-		section.append(el('h2', item.title), el('p', `In ${item.slot}. From: ${item.from === 'packaged' ? 'shipped with the extension' : item.from}.`));
+		const heading = el('h2', item.title);
+		heading.id = `customization-${index}`;
+		section.append(heading, el('p', `In ${item.slot}. From: ${item.from === 'packaged' ? 'shipped with the extension' : item.from}.`));
 		section.append(el('h3', 'It may'));
 		const permissions = el('ul');
 		item.permissions.forEach((p) => permissions.append(el('li', p.title)));
@@ -50,15 +75,36 @@ async function draw(): Promise<void> {
 		section.append(criteria);
 		const status = el('p', item.approved ? (item.blocked ? `Approved, but not shown: ${item.blocked}` : 'Approved: shown in the app.') : 'Waiting for approval.');
 		status.className = 'status';
+		status.id = `customization-${index}-status`;
 		const button = el('button', item.approved ? 'Revoke' : 'Approve');
 		button.type = 'button';
+		// Every section has the same two button labels: which customization it is for, and its state, describe it.
+		button.setAttribute('aria-describedby', `${heading.id} ${status.id}`);
+		let busy = false;
 		button.addEventListener('click', async () => {
-			await send({ type: item.approved ? 'revoke' : 'approve', id: item.id });
-			await draw();
+			// Not disabled while it waits: a disabled button drops focus.
+			if (busy) {
+				return;
+			}
+			busy = true;
+			try {
+				await send({ type: item.approved ? 'revoke' : 'approve', id: item.id });
+			} catch (error) {
+				status.setAttribute('role', 'alert');
+				status.classList.add('error');
+				status.textContent = (error as Error).message;
+				busy = false;
+				return;
+			}
+			await draw(item.id);
 		});
 		section.append(status, button);
 		root.append(section);
-	}
+		// Redrawing removes the button that was pressed: focus goes to its replacement, not to the page.
+		if (item.id === focus) {
+			button.focus();
+		}
+	});
 }
 
 void draw();

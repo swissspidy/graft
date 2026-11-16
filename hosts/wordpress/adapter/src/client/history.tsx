@@ -67,7 +67,7 @@ export function History({ scopes }: { scopes: Record<string, string> }) {
 	return (
 		<Card data-graft-history="">
 			<CardHeader>
-				<strong>History</strong>
+				<h2 style={{ margin: 0, fontSize: 'inherit' }}>History</h2>
 				<Button variant="secondary" onClick={() => (Array.isArray(changes) ? setChanges(null) : void load())} disabled={changes === 'loading'}>
 					{Array.isArray(changes) ? 'Hide' : 'Show what changed'}
 				</Button>

@@ -7,7 +7,9 @@ import { appModel } from '../host/surface.ts';
  * permissions for exactly the apps' origins, the content script only on
  * the pages that have slots, and nothing else. No externally_connectable,
  * no web-accessible resources, no remote code; the only API permission is
- * storage.
+ * storage. Extension pages build their DOM without parsing markup, so
+ * Trusted Types is enforced with no policy allowed: any string written to
+ * an HTML or script sink throws.
  */
 export function extensionManifest(surfaces: Surface[], version: string): Record<string, unknown> {
 	const origins = new Set<string>();
@@ -32,6 +34,6 @@ export function extensionManifest(surfaces: Surface[], version: string): Record<
 		background: { service_worker: 'background.js', type: 'module' },
 		content_scripts: [{ matches: [...pages].sort(), js: ['content.js'], run_at: 'document_idle', all_frames: false }],
 		options_ui: { page: 'options.html', open_in_tab: true },
-		content_security_policy: { extension_pages: "script-src 'self'; object-src 'none'; base-uri 'none'" },
+		content_security_policy: { extension_pages: "script-src 'self'; object-src 'none'; base-uri 'none'; require-trusted-types-for 'script'; trusted-types 'none'" },
 	};
 }

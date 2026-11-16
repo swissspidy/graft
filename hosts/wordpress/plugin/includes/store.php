@@ -240,7 +240,7 @@ function validate_manifest( $manifest ) {
 	if ( 1 !== ( $manifest['graft'] ?? null ) ) {
 		return $error( __( 'Unsupported spec format.', 'graft' ) );
 	}
-	if ( ! is_string( $manifest['id'] ?? null ) || ! preg_match( '/^[a-z0-9][a-z0-9-]{1,62}$/', $manifest['id'] ) ) {
+	if ( ! is_string( $manifest['id'] ?? null ) || ! preg_match( '/^[a-z0-9][a-z0-9-]{1,62}$/D', $manifest['id'] ) ) {
 		return $error( __( 'Invalid spec id.', 'graft' ) );
 	}
 	if ( 'wordpress' !== ( $manifest['host'] ?? null ) ) {
@@ -285,7 +285,7 @@ function validate_manifest_triggers( $triggers, callable $error ) {
 	}
 	$scopes = surface_scopes();
 	foreach ( $triggers as $id => $trigger ) {
-		if ( ! preg_match( '/^[a-z][a-z0-9-]{0,40}$/', (string) $id ) || ! is_array( $trigger ) || isset( $trigger['schedule'] ) === isset( $trigger['event'] ) ) {
+		if ( ! preg_match( '/^[a-z][a-z0-9-]{0,40}$/D', (string) $id ) || ! is_array( $trigger ) || isset( $trigger['schedule'] ) === isset( $trigger['event'] ) ) {
 			return $error( __( 'Invalid trigger.', 'graft' ) );
 		}
 		if ( isset( $trigger['event'] ) && ! isset( $host['events'][ $trigger['event'] ] ) ) {

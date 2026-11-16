@@ -112,7 +112,7 @@ export function Automation({ surface, scopes }: { surface: Surface; scopes: Reco
 	return (
 		<Card>
 			<CardHeader>
-				<strong>Running on their own</strong>
+				<h2 style={{ margin: 0, fontSize: 'inherit' }}>Running on their own</h2>
 			</CardHeader>
 			<CardBody>
 				<div data-graft-automation="">
@@ -152,9 +152,11 @@ export function Automation({ surface, scopes }: { surface: Surface; scopes: Reco
 						<tbody>
 							{data.triggers.map((t) => {
 								const key = `${t.spec}/${t.trigger}`;
+								// Every row has the same button labels: its first cell says which trigger they are for.
+								const title = `graft-trigger-${key}`;
 								return (
 									<tr key={key} data-graft-trigger={key} data-graft-paused={t.paused ? 'true' : 'false'}>
-										<td>
+										<td id={title}>
 											{t.title} <code>{t.trigger}</code>
 										</td>
 										<td>
@@ -167,17 +169,17 @@ export function Automation({ surface, scopes }: { surface: Surface; scopes: Reco
 										<td>{t.lastRun ? `${when(t.lastRun)} (${statusLabels[t.lastStatus ?? ''] ?? t.lastStatus})` : 'Not yet'}</td>
 										<td>{t.event ? 'On the event' : t.paused ? '—' : when(t.nextRun)}</td>
 										<td style={{ whiteSpace: 'nowrap' }}>
-											<Button variant="link" disabled={busy !== null} onClick={() => void act(key, `${key}/${t.paused ? 'resume' : 'pause'}`)}>
+											<Button variant="link" disabled={busy !== null} aria-describedby={title} onClick={() => void act(key, `${key}/${t.paused ? 'resume' : 'pause'}`)}>
 												{t.paused ? 'Resume' : 'Pause'}
 											</Button>
 											{t.schedule ? (
 												<>
 													{' · '}
-													<Button variant="link" disabled={busy !== null} onClick={() => void act(key, `${key}/run`, { dry_run: true })}>
+													<Button variant="link" disabled={busy !== null} aria-describedby={title} onClick={() => void act(key, `${key}/run`, { dry_run: true })}>
 														Dry run
 													</Button>
 													{' · '}
-													<Button variant="link" disabled={busy !== null || t.paused || data.disabled !== null} onClick={() => void act(key, `${key}/run`)}>
+													<Button variant="link" disabled={busy !== null || t.paused || data.disabled !== null} aria-describedby={title} onClick={() => void act(key, `${key}/run`)}>
 														Run now
 													</Button>
 												</>
@@ -191,7 +193,7 @@ export function Automation({ surface, scopes }: { surface: Surface; scopes: Reco
 
 					{data.runs.length > 0 ? (
 						<>
-							<h4>Recent runs</h4>
+							<h3>Recent runs</h3>
 							<table className="widefat striped graft-trigger-runs">
 								<thead>
 									<tr>

@@ -173,19 +173,28 @@ export function Authoring({ surface, onSaved, onCancel, startVerifier, personalO
 	const warnings = validation.diagnostics.filter((d) => d.severity === 'warning');
 	return (
 		<div className="graft-authoring" style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-			<label htmlFor="graft-spec-source">
-				<strong>Spec</strong> <span className="description">Markdown with YAML frontmatter; see the examples for the format.</span>
-			</label>
+			<div>
+				<label htmlFor="graft-spec-source">
+					<strong>Spec</strong>
+				</label>{' '}
+				<span id="graft-spec-source-hint" className="description">
+					Markdown with YAML frontmatter; see the examples for the format.
+				</span>
+			</div>
 			<textarea
 				id="graft-spec-source"
 				value={source}
 				onChange={(event) => setSource(event.target.value)}
 				rows={22}
 				spellCheck={false}
+				autoCapitalize="none"
+				autoCorrect="off"
+				aria-describedby="graft-spec-source-hint graft-spec-diagnostics"
+				aria-invalid={current && errors.length > 0 ? true : undefined}
 				style={{ fontFamily: 'Menlo, Consolas, monospace', width: '100%' }}
 				disabled={busy}
 			/>
-			<ul className="graft-diagnostics" aria-live="polite">
+			<ul id="graft-spec-diagnostics" className="graft-diagnostics" aria-live="polite">
 				{current && validation.ok && errors.length === 0 ? <li>Valid for this site.</li> : null}
 				{[...errors, ...warnings].map((d, i) => (
 					<li key={i} className={d.severity === 'error' ? 'graft-error' : 'graft-warning'}>
