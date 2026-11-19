@@ -177,3 +177,25 @@ test('the options page does not take focus back when it moved while the list was
 	await expect(options.getByRole('button', { name: 'Elsewhere' })).toBeFocused();
 	await options.close();
 });
+
+test('every change is in the activity log, and "Done" can be undone from there', async ({ signIn, approve, app, context, extensionId }) => {
+	await approve('My open tasks');
+	const page = await signIn('ada');
+	await panel(page).getByRole('row', { name: /Check redirects/ }).getByRole('button', { name: 'Done' }).click();
+	await expect(panel(page).getByRole('status')).toHaveText('Marked done.');
+
+	const options = await context.newPage();
+	await options.goto(`chrome-extension://${extensionId}/options.html`);
+	const entry = options.locator('.activity li').filter({ hasText: 'Marks a task done.' });
+	await expect(entry).toHaveCount(1);
+	await expect(entry).toContainText('My open tasks, by you');
+	await entry.getByRole('button', { name: 'Undo' }).click();
+	await expect(entry).toContainText('Undone');
+	await expect(entry.getByRole('button', { name: 'Undo' })).toHaveCount(0);
+	// The undo is in the log too, and went to the app with the person's session.
+	await expect(options.locator('.activity li').filter({ hasText: 'Opens a done task again.' })).toContainText('undone by you');
+	expect(app.log()).toContain('POST /api/tasks/t2/reopen');
+
+	await page.reload();
+	await expect(panel(page).getByRole('row', { name: /Check redirects/ })).toBeVisible();
+});

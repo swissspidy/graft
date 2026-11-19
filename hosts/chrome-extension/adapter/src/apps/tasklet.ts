@@ -97,7 +97,20 @@ export const tasklet: AppDescription = {
 			input: { type: 'object', properties: { id }, required: ['id'], additionalProperties: false },
 			output: task,
 			scopes: ['tasks.status:write'],
-			binding: { method: 'POST', path: '/api/tasks/{id}/complete', headers: { 'X-Requested-With': 'tasklet' } },
+			binding: {
+				method: 'POST',
+				path: '/api/tasks/{id}/complete',
+				headers: { 'X-Requested-With': 'tasklet' },
+				undo: { capability: 'tasks.reopen', input: { id: { input: 'id' } } },
+			},
+		},
+		'tasks.reopen': {
+			kind: 'write',
+			description: 'Opens a done task again.',
+			input: { type: 'object', properties: { id }, required: ['id'], additionalProperties: false },
+			output: task,
+			scopes: ['tasks.status:write'],
+			binding: { method: 'POST', path: '/api/tasks/{id}/reopen', headers: { 'X-Requested-With': 'tasklet' } },
 		},
 		'members.list': {
 			kind: 'read',
@@ -125,7 +138,7 @@ export const tasklet: AppDescription = {
 	},
 	scopes: {
 		'tasks:read': { title: "See a project's tasks", host: ['guest', 'member', 'owner'] },
-		'tasks.status:write': { title: 'Mark tasks done', host: ['member', 'owner'] },
+		'tasks.status:write': { title: 'Mark tasks done, or open them again', host: ['member', 'owner'] },
 		'members:read': { title: "See everyone's name and email address", host: ['member', 'owner'] },
 	},
 };

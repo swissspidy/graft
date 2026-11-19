@@ -5,6 +5,7 @@ import { parseArgs } from 'node:util';
 import { canonicalJson, hashSurface, validateSpec, type Build, type Surface } from '@swissspidy/graft-core';
 import { startTasklet } from '../../../fixtures/tasklet/server.ts';
 import { tasklet, taskletProbes } from '../apps/tasklet.ts';
+import { chromeSurface } from '../browser/surface.ts';
 import { appSurface } from '../host/surface.ts';
 import { checkDrift, formatDriftReport, observe, observedVersion, type Probes } from './drift.ts';
 import { connectSandbox, startTaskletSandbox, type FixtureSandbox } from './sandbox.ts';
@@ -15,7 +16,8 @@ import '../host/a2ui.ts';
  * The browser host's tooling:
  *
  *   surface [--check]       Writes surfaces/tasklet.json: the declared Tasklet surface,
- *                           fingerprinted against the fixture app (version 1).
+ *                           fingerprinted against the fixture app (version 1); and
+ *                           surfaces/chrome.json: the browser's own surface.
  *   drift [options] [build.json...]
  *                           Probes the app and reports which slots and capabilities drifted
  *                           from the surface, and where each build's upgrade ladder starts.
@@ -34,6 +36,7 @@ import '../host/a2ui.ts';
 
 const root = fileURLToPath(new URL('../../', import.meta.url));
 const SURFACE = `${root}surfaces/tasklet.json`;
+const CHROME_SURFACE = `${root}surfaces/chrome.json`;
 
 async function declared(): Promise<Surface> {
 	const server = await startTasklet({ version: 1 });
@@ -51,18 +54,22 @@ const [command, ...rest] = process.argv.slice(2);
 
 if (command === 'surface') {
 	const { values } = parseArgs({ args: rest, options: { check: { type: 'boolean' } } });
-	const surface = await declared();
-	const text = `${JSON.stringify(surface, null, '\t')}\n`;
-	if (values.check) {
-		const current = await readFile(SURFACE, 'utf8').catch(() => '');
-		if (canonicalJson(JSON.parse(current || 'null')) !== canonicalJson(surface)) {
-			console.error(`${SURFACE} is out of date: run pnpm surface:extension.`);
-			process.exit(1);
+	for (const [file, surface] of [
+		[SURFACE, await declared()],
+		[CHROME_SURFACE, await chromeSurface()],
+	] as const) {
+		const text = `${JSON.stringify(surface, null, '\t')}\n`;
+		if (values.check) {
+			const current = await readFile(file, 'utf8').catch(() => '');
+			if (canonicalJson(JSON.parse(current || 'null')) !== canonicalJson(surface)) {
+				console.error(`${file} is out of date: run pnpm surface:extension.`);
+				process.exit(1);
+			}
+			console.log(`${file} is up to date (${surface.hash}).`);
+		} else {
+			await writeFile(file, text);
+			console.log(`Wrote ${file} (${surface.hash}, ${surface.hostVersion}).`);
 		}
-		console.log(`${SURFACE} is up to date (${surface.hash}).`);
-	} else {
-		await writeFile(SURFACE, text);
-		console.log(`Wrote ${SURFACE} (${surface.hash}, ${surface.hostVersion}).`);
 	}
 } else if (command === 'drift') {
 	const { values, positionals } = parseArgs({

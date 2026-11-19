@@ -26,7 +26,7 @@ stop only when every check passes.
 
 Never edit these by hand: `hosts/**/surfaces/*.json`, `examples/agency/surface.json`,
 `hosts/emdash/adapter/emdash-plugin.jsonc`, bundles (`examples/agency/managed`,
-`examples/chrome-extension/bundles`), and the `refs`, `spec` and `surface`
+`examples/chrome-extension/bundles`, `examples/browser/bundles`), and the `refs`, `spec` and `surface`
 fields of a build. `hosts/wordpress/plugin/build/` is the output of
 `pnpm build` and is not checked in.
 

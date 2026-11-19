@@ -1,0 +1,111 @@
+import type { Surface } from '@swissspidy/graft-core';
+import type { CallRecord } from './gateway.ts';
+import { undoCall, type UndoCall } from './undo.ts';
+
+/**
+ * The extension's activity log: what customizations did and what the
+ * gateway refused them, newest last, kept in the extension's storage and
+ * shown on the options page. Every write is recorded, with how to undo it
+ * when its capability says how; so is every refusal and every failed
+ * call. Reads that went through are not: every page view makes them, and
+ * the options page already says what each customization may read.
+ */
+
+/** Who made a call: the person, through a customization's view; a trigger; or the person undoing an earlier call. */
+export type ActivitySource = { kind: 'view' } | { kind: 'trigger'; trigger: string } | { kind: 'undo'; of: string };
+
+export interface Activity {
+	id: string;
+	/** ISO 8601. */
+	at: string;
+	customization: string;
+	title: string;
+	source: ActivitySource;
+	/** The surface the call was made on, by hash; an undo runs on the same one. */
+	surface: string;
+	/** For an app, the origin the request went to; an undo goes there too. */
+	origin?: string;
+	capability: string;
+	kind: 'read' | 'write';
+	/** The capability's description, as the surface words it. */
+	description?: string;
+	input: unknown;
+	outcome: CallRecord['outcome'];
+	code?: string;
+	error?: string;
+	/** How to put it back; `done` once it was, `error` when that failed. */
+	undo?: UndoCall & { done?: string; error?: string };
+}
+
+/** Most entries kept. */
+export const ACTIVITY_LIMIT = 200;
+
+/** Whether a call belongs in the log. */
+export function worthRecording(record: CallRecord): boolean {
+	return record.kind === 'write' || record.outcome !== 'ok';
+}
+
+let counter = 0;
+
+/** A log entry for a call the gateway reported. */
+export function activityFrom(
+	record: CallRecord,
+	where: { customization: string; title: string; source: ActivitySource; surface: Surface; origin?: string },
+	now: number = Date.now(),
+): Activity {
+	const declared = where.surface.capabilities[record.capability];
+	const undo = record.outcome === 'ok' && record.kind === 'write' ? undoCall(declared, record.input, record.output) : undefined;
+	counter = (counter + 1) % 1_000_000;
+	return {
+		id: `${now.toString(36)}-${counter.toString(36)}-${Math.random().toString(36).slice(2, 8)}`,
+		at: new Date(now).toISOString(),
+		customization: where.customization,
+		title: where.title,
+		source: where.source,
+		surface: where.surface.hash ?? '',
+		...(where.origin ? { origin: where.origin } : {}),
+		capability: record.capability,
+		kind: record.kind,
+		...(declared?.description ? { description: declared.description } : {}),
+		input: record.input,
+		outcome: record.outcome,
+		...(record.code ? { code: record.code } : {}),
+		...(record.error ? { error: record.error } : {}),
+		...(undo ? { undo } : {}),
+	};
+}
+
+/** The log with an entry added, the oldest dropped past the limit. */
+export function appendActivity(log: Activity[], entry: Activity, limit: number = ACTIVITY_LIMIT): Activity[] {
+	return [...log, entry].slice(-limit);
+}
+
+/** Why an entry cannot be undone now, or undefined when it can. */
+export function undoRefusal(entry: Activity | undefined, surface: Surface | undefined): string | undefined {
+	if (!entry?.undo) {
+		return 'There is nothing to undo there.';
+	}
+	if (entry.undo.done) {
+		return 'It was undone already.';
+	}
+	if (!surface || surface.hash !== entry.surface) {
+		return 'The extension no longer has the version of the app this was done on.';
+	}
+	const original = surface.capabilities[entry.capability];
+	const reverse = surface.capabilities[entry.undo.capability];
+	if (!original || !reverse || reverse.kind !== 'write') {
+		return 'This version of the app has no way to undo it.';
+	}
+	// Never more than the original needed, which was approved when the call was made.
+	if (!reverse.scopes.every((scope) => original.scopes.includes(scope))) {
+		return 'Undoing it would need a permission the original did not.';
+	}
+	return undefined;
+}
+
+/** A call in words: the capability's description and its input. */
+export function describeActivity(entry: Activity): string {
+	const what = entry.description ?? entry.capability;
+	const input = JSON.stringify(entry.input);
+	return input && input !== '{}' && input !== 'null' ? `${what} (${input})` : what;
+}

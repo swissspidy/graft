@@ -1,4 +1,5 @@
 import type { Capability, JsonSchema, Scope, Slot, Surface } from '@swissspidy/graft-core';
+import { undoProblems, type Undo } from './undo.ts';
 
 /**
  * The browser host: a web app Graft does not control, customized from an
@@ -32,6 +33,8 @@ export interface HttpBinding {
 	body?: string[];
 	/** Fixed request headers, e.g. a CSRF header the app wants on writes. */
 	headers?: Record<string, string>;
+	/** How to put back what this write did (activity.ts). */
+	undo?: Undo;
 }
 
 /** An ARIA landmark: a role (explicit, or implied by the element) and its accessible name. */
@@ -101,6 +104,10 @@ export function appSurface(app: AppDescription, observed?: { hostVersion: string
 		slots[id] = { ...slot, anchor: describeLandmark(at.landmark) };
 	}
 	const model: AppModel = { app: { id: app.id, title: app.title, origins: app.origins }, viewer: app.viewer, anchors };
+	const problems = undoProblems(app.capabilities);
+	if (problems.length > 0) {
+		throw new Error(`The description of ${app.title} is invalid: ${problems.join(' ')}`);
+	}
 	return {
 		graft: 1,
 		host: HOST,
