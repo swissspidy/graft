@@ -29,8 +29,8 @@
 				},
 				"surface": {
 					"host": "browser",
-					"hostVersion": "observed-832cc479981a",
-					"hash": "sha256:ce6a866ab3fdb2efafab2a7bcea1cf245ba81bc78e556e8fc24538e8dda9a987"
+					"hostVersion": "observed-2130d5221741",
+					"hash": "sha256:3b82bfe5e8ec4db1e21b3ded0dbd7c208414e8abc1947792f7ea772c64ceb480"
 				},
 				"mount": {
 					"slot": "project.sidebar",
@@ -426,15 +426,15 @@
 			},
 			"verification": {
 				"passed": true,
-				"build": "sha256:ebf22d2ace36bebd443b8591e96681ea9d03270fd210b137fac30e1403ee5aa1",
+				"build": "sha256:964fb31a1219fab336af05378f36b024425f5f2b9d8f7ca2efd0392c95b497e8",
 				"spec": {
 					"id": "my-tasks",
 					"hash": "sha256:a99a811f6868d9da3c37cbba3ccfee336d04b2bbfcd08ca28bff550aabff03b5"
 				},
 				"surface": {
 					"host": "browser",
-					"hostVersion": "observed-832cc479981a",
-					"hash": "sha256:ce6a866ab3fdb2efafab2a7bcea1cf245ba81bc78e556e8fc24538e8dda9a987"
+					"hostVersion": "observed-2130d5221741",
+					"hash": "sha256:3b82bfe5e8ec4db1e21b3ded0dbd7c208414e8abc1947792f7ea772c64ceb480"
 				},
 				"results": [
 					{
@@ -481,7 +481,7 @@
 					}
 				],
 				"unchecked": [],
-				"verifiedAt": "2026-11-02T20:37:41.799Z"
+				"verifiedAt": "2026-11-19T16:22:15.954Z"
 			}
 		}
 	]

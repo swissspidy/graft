@@ -1,8 +1,8 @@
 {
 	"graft": 1,
 	"host": "browser",
-	"hostVersion": "observed-832cc479981a",
-	"fingerprint": "sha256:832cc479981ac95f9d72a2063db469f279153c3a91afe3a0792818dc2a2f600a",
+	"hostVersion": "observed-2130d5221741",
+	"fingerprint": "sha256:2130d5221741729bac9d6f7460d7445af8f3165e524031766e8e07e49c915351",
 	"slots": {
 		"project.sidebar": {
 			"kind": "extension",
@@ -256,6 +256,92 @@
 				"path": "/api/tasks/{id}/complete",
 				"headers": {
 					"X-Requested-With": "tasklet"
+				},
+				"undo": {
+					"capability": "tasks.reopen",
+					"input": {
+						"id": {
+							"input": "id"
+						}
+					}
+				}
+			}
+		},
+		"tasks.reopen": {
+			"kind": "write",
+			"description": "Opens a done task again.",
+			"input": {
+				"type": "object",
+				"properties": {
+					"id": {
+						"type": "string",
+						"pattern": "^[A-Za-z0-9_-]{1,64}$"
+					}
+				},
+				"required": [
+					"id"
+				],
+				"additionalProperties": false
+			},
+			"output": {
+				"type": "object",
+				"properties": {
+					"id": {
+						"type": "string"
+					},
+					"title": {
+						"type": "string"
+					},
+					"status": {
+						"enum": [
+							"open",
+							"done"
+						]
+					},
+					"due": {
+						"description": "Due date (YYYY-MM-DD), or null.",
+						"type": [
+							"string",
+							"null"
+						]
+					},
+					"assignee": {
+						"type": [
+							"object",
+							"null"
+						],
+						"properties": {
+							"id": {
+								"type": "string"
+							},
+							"name": {
+								"type": "string"
+							}
+						},
+						"required": [
+							"id",
+							"name"
+						],
+						"additionalProperties": false
+					}
+				},
+				"required": [
+					"id",
+					"title",
+					"status",
+					"due",
+					"assignee"
+				],
+				"additionalProperties": false
+			},
+			"scopes": [
+				"tasks.status:write"
+			],
+			"binding": {
+				"method": "POST",
+				"path": "/api/tasks/{id}/reopen",
+				"headers": {
+					"X-Requested-With": "tasklet"
 				}
 			}
 		},
@@ -322,7 +408,7 @@
 			]
 		},
 		"tasks.status:write": {
-			"title": "Mark tasks done",
+			"title": "Mark tasks done, or open them again",
 			"host": [
 				"member",
 				"owner"
@@ -385,5 +471,5 @@
 			}
 		}
 	},
-	"hash": "sha256:ce6a866ab3fdb2efafab2a7bcea1cf245ba81bc78e556e8fc24538e8dda9a987"
+	"hash": "sha256:3b82bfe5e8ec4db1e21b3ded0dbd7c208414e8abc1947792f7ea772c64ceb480"
 }

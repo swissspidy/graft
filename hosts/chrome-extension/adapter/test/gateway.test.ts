@@ -2,7 +2,8 @@ import { readFile } from 'node:fs/promises';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import type { CustomizationBundle, Surface } from '@swissspidy/graft-core';
 import { startTasklet, type TaskletServer } from '../../fixtures/tasklet/server.ts';
-import { act, fromBundle, gatewayCall, mountsFor, renderMount, unservable, type Installed, type PageContext } from '../src/host/gateway.ts';
+import { activityFrom } from '../src/host/activity.ts';
+import { act, fromBundle, gatewayCall, guarded, httpPerform, mountsFor, renderMount, unservable, type CallRecord, type Installed, type PageContext } from '../src/host/gateway.ts';
 import type { Fetch } from '../src/host/http.ts';
 import type { ViewNode } from '../src/host/a2ui.ts';
 import '../src/host/a2ui.ts';
@@ -58,10 +59,10 @@ describe('the gateway', () => {
 	it('refuses calls the build does not make, the grant does not cover, or with invalid input', async () => {
 		const installed = await approved();
 		const fetch = await session('ada');
-		const call = gatewayCall(installed, surface, app.url, fetch);
+		const call = gatewayCall(installed, surface, httpPerform(app.url, fetch));
 		await expect(call('members.list', {})).rejects.toMatchObject({ code: 'graft_capability_not_in_build' });
 		await expect(call('tasks.list', { project: 'launch', extra: 1 })).rejects.toMatchObject({ code: 'graft_invalid_input' });
-		const narrow = gatewayCall({ ...installed, grant: ['tasks:read'] }, surface, app.url, fetch);
+		const narrow = gatewayCall({ ...installed, grant: ['tasks:read'] }, surface, httpPerform(app.url, fetch));
 		await expect(narrow('tasks.complete', { id: 't1' })).rejects.toMatchObject({ code: 'graft_not_granted' });
 		// A build changed after it was verified is not served, even when it still validates.
 		const widened = { ...installed, build: { ...installed.build, data: { ...installed.build.data, members: { call: 'members.list', input: {} } } } };
@@ -90,6 +91,27 @@ describe('the gateway', () => {
 		expect(done.notice).toEqual({ tone: 'success', text: 'Marked done.' });
 		expect(JSON.stringify(done.view)).not.toContain('Check redirects');
 		expect(app.log()).toContain('POST /api/tasks/t2/complete');
+	});
+
+	it('reports every write and refusal, and a write can be undone with the reverse its capability declares', async () => {
+		const installed = await approved();
+		const url = `${app.url}/projects/launch`;
+		const [mount] = await mountsFor([installed], surface, url);
+		const calls: CallRecord[] = [];
+		const page: PageContext = { surface, url, fetch: await session('ada'), onCall: (record) => calls.push(record) };
+		await act(page, mount!, 'my-tasks:t0:0:t1');
+		const write = calls.find((c) => c.kind === 'write')!;
+		expect(write).toMatchObject({ capability: 'tasks.complete', input: { id: 't1' }, outcome: 'ok' });
+		const entry = activityFrom(write, { customization: installed.id, title: installed.title, source: { kind: 'view' }, surface, origin: app.url });
+		expect(entry.undo).toEqual({ capability: 'tasks.reopen', input: { id: 't1' } });
+		await guarded(entry.undo!.capability, surface.capabilities['tasks.reopen'], entry.undo!.input, undefined, httpPerform(app.url, await session('ada')));
+		expect(app.log()).toContain('POST /api/tasks/t1/reopen');
+		expect(JSON.stringify((await renderMount(page, mount!)).view)).toContain('Write launch post');
+
+		const refused: CallRecord[] = [];
+		const call = gatewayCall(installed, surface, httpPerform(app.url, await session('ada')), { onCall: (record) => refused.push(record) });
+		await expect(call('members.list', {})).rejects.toMatchObject({ code: 'graft_capability_not_in_build' });
+		expect(refused).toEqual([expect.objectContaining({ capability: 'members.list', outcome: 'refused', code: 'graft_capability_not_in_build' })]);
 	});
 
 	it('reports answers that no longer match as drift', async () => {

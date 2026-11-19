@@ -1,0 +1,327 @@
+{
+	"graft": 1,
+	"host": "chrome",
+	"hostVersion": "121",
+	"slots": {
+		"side-panel": {
+			"kind": "owned",
+			"title": "Side panel",
+			"description": "The extension's side panel, which the person opens from the toolbar next to any page.",
+			"anchor": "side panel",
+			"options": {
+				"type": "object",
+				"properties": {
+					"title": {
+						"type": "string",
+						"minLength": 1,
+						"maxLength": 60
+					}
+				},
+				"required": [
+					"title"
+				],
+				"additionalProperties": false
+			},
+			"provides": {
+				"type": "object",
+				"properties": {},
+				"additionalProperties": false
+			}
+		}
+	},
+	"capabilities": {
+		"tabs.list": {
+			"kind": "read",
+			"description": "The open tabs of every window, least recently used first; optionally only pinned or unpinned ones, or only those not used for more than a number of days.",
+			"input": {
+				"type": "object",
+				"properties": {
+					"pinned": {
+						"type": "boolean"
+					},
+					"unusedForDays": {
+						"description": "Only tabs last used more than this many days ago.",
+						"type": "integer",
+						"minimum": 1,
+						"maximum": 365
+					}
+				},
+				"additionalProperties": false
+			},
+			"output": {
+				"type": "object",
+				"properties": {
+					"tabs": {
+						"type": "array",
+						"items": {
+							"type": "object",
+							"properties": {
+								"id": {
+									"type": "integer"
+								},
+								"title": {
+									"type": "string"
+								},
+								"url": {
+									"type": "string"
+								},
+								"pinned": {
+									"type": "boolean"
+								},
+								"active": {
+									"description": "Whether it is the tab shown in its window.",
+									"type": "boolean"
+								},
+								"lastUsed": {
+									"description": "When the person last had it in front of them (ISO 8601), or null when Chrome does not know.",
+									"type": [
+										"string",
+										"null"
+									]
+								}
+							},
+							"required": [
+								"id",
+								"title",
+								"url",
+								"pinned",
+								"active",
+								"lastUsed"
+							],
+							"additionalProperties": false
+						}
+					}
+				},
+				"required": [
+					"tabs"
+				],
+				"additionalProperties": false
+			},
+			"scopes": [
+				"tabs:read"
+			],
+			"binding": {
+				"api": "tabs.list"
+			}
+		},
+		"tabs.close": {
+			"kind": "write",
+			"description": "Closes a tab. Answers with the tab as it was, so it can be opened again.",
+			"input": {
+				"type": "object",
+				"properties": {
+					"id": {
+						"type": "integer",
+						"minimum": 0
+					}
+				},
+				"required": [
+					"id"
+				],
+				"additionalProperties": false
+			},
+			"output": {
+				"type": "object",
+				"properties": {
+					"id": {
+						"type": "integer"
+					},
+					"title": {
+						"type": "string"
+					},
+					"url": {
+						"type": "string"
+					},
+					"pinned": {
+						"type": "boolean"
+					},
+					"active": {
+						"description": "Whether it is the tab shown in its window.",
+						"type": "boolean"
+					},
+					"lastUsed": {
+						"description": "When the person last had it in front of them (ISO 8601), or null when Chrome does not know.",
+						"type": [
+							"string",
+							"null"
+						]
+					}
+				},
+				"required": [
+					"id",
+					"title",
+					"url",
+					"pinned",
+					"active",
+					"lastUsed"
+				],
+				"additionalProperties": false
+			},
+			"scopes": [
+				"tabs:write"
+			],
+			"binding": {
+				"api": "tabs.close",
+				"undo": {
+					"capability": "tabs.open",
+					"input": {
+						"url": {
+							"output": "/url"
+						}
+					}
+				}
+			}
+		},
+		"tabs.open": {
+			"kind": "write",
+			"description": "Opens a web page (http or https) in a new tab, in the background.",
+			"input": {
+				"type": "object",
+				"properties": {
+					"url": {
+						"type": "string",
+						"pattern": "^https?://",
+						"maxLength": 2048
+					}
+				},
+				"required": [
+					"url"
+				],
+				"additionalProperties": false
+			},
+			"output": {
+				"type": "object",
+				"properties": {
+					"id": {
+						"type": "integer"
+					},
+					"title": {
+						"type": "string"
+					},
+					"url": {
+						"type": "string"
+					},
+					"pinned": {
+						"type": "boolean"
+					},
+					"active": {
+						"description": "Whether it is the tab shown in its window.",
+						"type": "boolean"
+					},
+					"lastUsed": {
+						"description": "When the person last had it in front of them (ISO 8601), or null when Chrome does not know.",
+						"type": [
+							"string",
+							"null"
+						]
+					}
+				},
+				"required": [
+					"id",
+					"title",
+					"url",
+					"pinned",
+					"active",
+					"lastUsed"
+				],
+				"additionalProperties": false
+			},
+			"scopes": [
+				"tabs:write"
+			],
+			"binding": {
+				"api": "tabs.open"
+			}
+		},
+		"tabs.focus": {
+			"kind": "write",
+			"description": "Brings a tab to the front of its window.",
+			"input": {
+				"type": "object",
+				"properties": {
+					"id": {
+						"type": "integer",
+						"minimum": 0
+					}
+				},
+				"required": [
+					"id"
+				],
+				"additionalProperties": false
+			},
+			"output": {
+				"type": "object",
+				"properties": {
+					"id": {
+						"type": "integer"
+					},
+					"title": {
+						"type": "string"
+					},
+					"url": {
+						"type": "string"
+					},
+					"pinned": {
+						"type": "boolean"
+					},
+					"active": {
+						"description": "Whether it is the tab shown in its window.",
+						"type": "boolean"
+					},
+					"lastUsed": {
+						"description": "When the person last had it in front of them (ISO 8601), or null when Chrome does not know.",
+						"type": [
+							"string",
+							"null"
+						]
+					}
+				},
+				"required": [
+					"id",
+					"title",
+					"url",
+					"pinned",
+					"active",
+					"lastUsed"
+				],
+				"additionalProperties": false
+			},
+			"scopes": [
+				"tabs:write"
+			],
+			"binding": {
+				"api": "tabs.focus"
+			}
+		}
+	},
+	"scopes": {
+		"tabs:read": {
+			"title": "See the titles and addresses of your open tabs"
+		},
+		"tabs:write": {
+			"title": "Open, close and switch between your tabs"
+		}
+	},
+	"model": {
+		"permissions": {
+			"tabs:read": [
+				"tabs"
+			],
+			"tabs:write": []
+		},
+		"pages": {
+			"side-panel": "sidepanel.html"
+		}
+	},
+	"triggers": {
+		"identity": "the extension in your browser, with only the permissions approved for each trigger",
+		"minInterval": 3600,
+		"maxPerRun": 20,
+		"capabilities": [
+			"tabs.list",
+			"tabs.close"
+		],
+		"events": {}
+	},
+	"hash": "sha256:9cff419b4b45541b336152c34c1425b7ee9fda2b6b6b816d095db0ebe9bf084b"
+}

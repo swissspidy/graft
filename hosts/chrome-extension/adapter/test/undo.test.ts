@@ -1,0 +1,80 @@
+import { readFile } from 'node:fs/promises';
+import { describe, expect, it } from 'vitest';
+import type { Capability, Surface } from '@swissspidy/graft-core';
+import { tasklet } from '../src/apps/tasklet.ts';
+import { activityFrom, appendActivity, undoRefusal, worthRecording } from '../src/host/activity.ts';
+import { appSurface } from '../src/host/surface.ts';
+import { undoCall, undoProblems } from '../src/host/undo.ts';
+
+const surface = JSON.parse(await readFile(new URL('../surfaces/tasklet.json', import.meta.url), 'utf8')) as Surface;
+
+const write = (scopes: string[], binding: Record<string, unknown> = {}): Capability => ({
+	kind: 'write',
+	input: { type: 'object', properties: { id: { type: 'string' }, url: { type: 'string' } } },
+	output: { type: 'object' },
+	scopes,
+	binding,
+});
+
+describe('undo', () => {
+	it('takes the reverse call’s input from the original input or its answer', () => {
+		const complete = surface.capabilities['tasks.complete'];
+		expect(undoCall(complete, { id: 't2' }, { id: 't2', status: 'done' })).toEqual({ capability: 'tasks.reopen', input: { id: 't2' } });
+		const close = write(['tabs:write'], { undo: { capability: 'open', input: { url: { output: '/url' } } } });
+		expect(undoCall(close, { id: 3 }, { url: 'https://example.com/' })).toEqual({ capability: 'open', input: { url: 'https://example.com/' } });
+		// A field the reverse needs and the answer lacks: no undo, rather than a wrong one.
+		expect(undoCall(close, { id: 3 }, {})).toBeUndefined();
+		expect(undoCall(surface.capabilities['tasks.reopen'], { id: 't2' }, {})).toBeUndefined();
+	});
+
+	it('never needs more than the original: a reverse is a write within its scopes, taking fields it has', () => {
+		expect(undoProblems(surface.capabilities)).toEqual([]);
+		expect(
+			undoProblems({
+				close: write(['tabs:write'], { undo: { capability: 'wider', input: { id: { input: 'id' } } } }),
+				wider: write(['tabs:write', 'history:write']),
+				gone: write(['a'], { undo: { capability: 'missing', input: {} } }),
+				odd: write(['a'], { undo: { capability: 'close', input: { color: { input: 'id' } } } }),
+			}),
+		).toEqual([
+			'The undo of "close" needs history:write, which "close" does not.',
+			'The undo of "gone" names "missing", which is not a write capability.',
+			'The undo of "odd" needs tabs:write, which "odd" does not.',
+			'The undo of "odd" sets "color", which "close" does not take.',
+		]);
+		const invalid = structuredClone(tasklet);
+		invalid.capabilities['tasks.reopen']!.scopes = ['tasks.status:write', 'members:read'];
+		expect(() => appSurface(invalid)).toThrow('needs members:read');
+	});
+});
+
+describe('the activity log', () => {
+	const where = { customization: 'my-tasks', title: 'My open tasks', source: { kind: 'view' as const }, surface, origin: 'http://127.0.0.1:4490' };
+
+	it('records writes and anything that did not go through, not reads that did', () => {
+		expect(worthRecording({ capability: 'tasks.list', kind: 'read', input: {}, outcome: 'ok' })).toBe(false);
+		expect(worthRecording({ capability: 'tasks.list', kind: 'read', input: {}, outcome: 'failed', code: 'graft_drift' })).toBe(true);
+		expect(worthRecording({ capability: 'members.list', kind: 'read', input: {}, outcome: 'refused', code: 'graft_capability_not_in_build' })).toBe(true);
+		expect(worthRecording({ capability: 'tasks.complete', kind: 'write', input: { id: 't1' }, outcome: 'ok' })).toBe(true);
+	});
+
+	it('keeps how to undo a write that went through, and only that', () => {
+		const done = activityFrom({ capability: 'tasks.complete', kind: 'write', input: { id: 't2' }, outcome: 'ok', output: { id: 't2' } }, where, Date.UTC(2026, 10, 19));
+		expect(done).toMatchObject({ at: '2026-11-19T00:00:00.000Z', surface: surface.hash, origin: where.origin, description: 'Marks a task done.', undo: { capability: 'tasks.reopen', input: { id: 't2' } } });
+		expect(undoRefusal(done, surface)).toBeUndefined();
+		const failed = activityFrom({ capability: 'tasks.complete', kind: 'write', input: { id: 't2' }, outcome: 'failed', code: 'host_forbidden' }, where);
+		expect(failed.undo).toBeUndefined();
+		expect(undoRefusal(failed, surface)).toBe('There is nothing to undo there.');
+		expect(undoRefusal({ ...done, undo: { ...done.undo!, done: '2026-11-19T00:01:00.000Z' } }, surface)).toBe('It was undone already.');
+		// Undone on the surface the call was made on, or not at all.
+		expect(undoRefusal(done, { ...surface, hash: 'sha256:other' })).toBe('The extension no longer has the version of the app this was done on.');
+	});
+
+	it('keeps the latest entries', () => {
+		let log = [] as ReturnType<typeof activityFrom>[];
+		for (let i = 0; i < 5; i++) {
+			log = appendActivity(log, activityFrom({ capability: 'tasks.complete', kind: 'write', input: { id: `t${i}` }, outcome: 'ok', output: {} }, where), 3);
+		}
+		expect(log.map((e) => (e.input as { id: string }).id)).toEqual(['t2', 't3', 't4']);
+	});
+});

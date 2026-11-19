@@ -199,7 +199,7 @@ pnpm graft validate --surface hosts/wordpress/plugin/surfaces/7.1.json examples/
 pnpm graft build examples/builds/review-queue.json \
   --surface hosts/wordpress/plugin/surfaces/7.1.json --spec examples/specs/review-queue.md [--fix-refs]
 pnpm graft check examples/specs examples/builds --surface hosts/wordpress/plugin/surfaces/7.1.json   # fast: every build still matches its spec and surface
-pnpm check:builds   # the same for every example and canary build, on all three hosts
+pnpm check:builds   # the same for every example and canary build, on every host
 pnpm graft verify --surface hosts/wordpress/plugin/surfaces/7.1.json --spec examples/specs examples/builds/*.json
 pnpm graft verify --surface hosts/emdash/adapter/surfaces/1.3.json --spec examples/emdash/specs examples/emdash/builds/*.json
 pnpm graft bundle --spec examples/agency/specs/upcoming-events.md --surface examples/agency/surface.json \
@@ -245,8 +245,8 @@ pnpm graft site verify --site <url> --token <token>
 | `pnpm test:e2e:emdash` | Playwright in the EmDash admin: the page, the widget and the editor panel |
 | `pnpm test:cfworker` | The unit tests again on the schema engine used where code generation is forbidden |
 | `pnpm test:packages` | The npm packages, packed as published, installed outside the workspace and imported |
-| `pnpm verify:extension` | The browser extension example build's checks against a copy of the fixture app |
-| `pnpm test:e2e:extension` | Playwright with the unpacked extension in Chromium: approval, the injected panel under the app's CSP, the gateway's refusals, drift and the upgrade ladder after it |
+| `pnpm verify:extension` | The browser extension example builds' checks: against a copy of the fixture app, and in an in-memory browser |
+| `pnpm test:e2e:extension` | Playwright with the unpacked extension in Chromium: approval, the injected panel under the app's CSP, the gateway's refusals, drift and the upgrade ladder after it, the activity log and undo, the side panel, and triggers (dry run, pause, a scheduled run, pause all) |
 
 CI runs all of them, plus a weekly canary against WordPress nightly. As of
 7.2-alpha the surface is unchanged (same hash as 7.1) and every
@@ -275,6 +275,7 @@ Later decisions each have their own record:
 | [0012](docs/adr/0012-drag-and-drop.md) | Dragging a card as another way to press its button (WordPress) |
 | [0013](docs/adr/0013-operating-and-recovering.md) | Safe mode, a change log, why a customization is not showing, locked areas, customizations for one person |
 | [0014](docs/adr/0014-customizations-of-ones-own.md) | People who are not administrators writing customizations for themselves (WordPress) |
+| [0015](docs/adr/0015-browser-activity-undo-and-triggers.md) | The browser extension's activity log and undo, triggers on `chrome.alarms`, and the browser itself (tabs, the side panel) as a surface (proposed) |
 
 [docs/audit-2026-11.md](docs/audit-2026-11.md) lists what a full read of the
 code found, what was fixed and what is still open, and compares Graft with

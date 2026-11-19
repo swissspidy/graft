@@ -60,7 +60,7 @@ export async function loadHostFormats(host: string): Promise<void> {
 		await import('@graft/wordpress-adapter');
 	} else if (host === 'emdash') {
 		await import('@graft/emdash/node');
-	} else if (host === 'browser') {
+	} else if (host === 'browser' || host === 'chrome') {
 		// Only the format: the node entry also loads Playwright and esbuild, which validating needs none of.
 		await import('@graft/chrome-extension/host');
 	}
@@ -107,6 +107,21 @@ export async function hostTools(surface: Surface, options: HostToolOptions = {})
 			guide: browser.hostGuide,
 			startSandbox: () => browser.startTaskletSandbox(),
 			verify: (targets, sandbox) => browser.verifyInBrowserHost(targets, sandbox ? { sandbox: sandbox as never } : {}),
+			scenarios: [],
+			loadCorpus: unsupported,
+			canary: unsupported,
+		};
+	}
+	if (surface.host === 'chrome') {
+		// The browser itself, customized from the same extension; the sandbox is an in-memory browser.
+		const browser = await import('@graft/chrome-extension/node');
+		const unsupported = async (): Promise<never> => {
+			throw new Error('The browser surface has no canary: it changes only with the extension, which regenerates it (pnpm surface:extension).');
+		};
+		return {
+			guide: browser.chromeHostGuide,
+			startSandbox: () => browser.startChromeSandbox(),
+			verify: (targets, sandbox) => browser.verifyInChrome(targets, sandbox ? { sandbox: sandbox as never } : {}),
 			scenarios: [],
 			loadCorpus: unsupported,
 			canary: unsupported,

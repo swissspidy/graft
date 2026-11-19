@@ -20,4 +20,5 @@ export {
 } from './drift.ts';
 export { startTasklet, type TaskletServer, type TaskletVersion } from '../../../fixtures/tasklet/server.ts';
 export { upgradeAfterDrift } from './upgrade.ts';
+export { FakeTabs, PERSON, startChromeSandbox, verifyInChrome, type ChromeSandbox } from './chrome-sandbox.ts';
 export type { Build, Surface } from '@swissspidy/graft-core';
