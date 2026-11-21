@@ -112,8 +112,13 @@ describe('running a trigger', () => {
 		const paused = { ...before, paused: { at: '', reason: 'Paused by you.' } };
 		expect(afterRun(before, { ...ran, paused: paused.paused }, paused).paused).toBeUndefined();
 		// Paused by the run itself after too many failures: paused, whatever was stored.
-		const failing = { ...ran, paused: { at: '', reason: 'It failed 3 times in a row.' } };
-		expect(afterRun(before, failing, before).paused?.reason).toBe('It failed 3 times in a row.');
+		const twice = { ...before, failures: 2 };
+		const failing = { ...ran, failures: 3, paused: { at: '', reason: 'It failed 3 times in a row.' } };
+		expect(afterRun(twice, failing, twice).paused?.reason).toBe('It failed 3 times in a row.');
+		// Resumed while that run went on (failures back to 0): its failure counts as the first, and it does not pause.
+		const resumed = { ...twice, failures: 0 };
+		expect(afterRun(resumed, failing, twice)).toMatchObject({ failures: 1 });
+		expect(afterRun(resumed, failing, twice).paused).toBeUndefined();
 	});
 
 	it(`pauses itself after ${PAUSE_AFTER_FAILURES} failed runs in a row`, async () => {

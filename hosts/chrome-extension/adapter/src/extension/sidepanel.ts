@@ -18,6 +18,8 @@ async function send<T>(message: PanelMessage): Promise<T> {
 
 /** The views drawn, by customization id: kept across refreshes so each keeps its state. */
 const views = new Map<string, CustomizationView>();
+/** The latest draw started: an older one whose reply arrives late must not overwrite it. */
+let drawing = 0;
 
 /**
  * Draws the side panel's customizations as the service worker lists them
@@ -26,11 +28,17 @@ const views = new Map<string, CustomizationView>();
  */
 async function draw(): Promise<void> {
 	const root = document.getElementById('panel')!;
+	const mine = ++drawing;
 	let infos: PanelInfo[];
 	try {
 		infos = await send<PanelInfo[]>({ type: 'panel-mounts' });
 	} catch (error) {
-		root.replaceChildren(el('p', 'error', `Could not load the customizations: ${(error as Error).message}`));
+		if (mine === drawing) {
+			root.replaceChildren(el('p', 'error', `Could not load the customizations: ${(error as Error).message}`));
+		}
+		return;
+	}
+	if (mine !== drawing) {
 		return;
 	}
 	const ids = new Set(infos.map((info) => `${info.id}${info.preview ? ':preview' : ''}`));
@@ -60,8 +68,11 @@ async function draw(): Promise<void> {
 		hosts.push(view.host);
 		void view.render();
 	}
-	// The same elements, in order: a view that stays keeps its focus and state.
-	root.replaceChildren(...hosts);
+	// Only when the list changed: replacing the same elements would detach them, and a focused button would lose focus.
+	const same = hosts.length === root.children.length && hosts.every((host, i) => root.children[i] === host);
+	if (!same) {
+		root.replaceChildren(...hosts);
+	}
 }
 
 let timer: ReturnType<typeof setTimeout> | undefined;

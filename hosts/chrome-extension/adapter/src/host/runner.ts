@@ -201,10 +201,15 @@ export function describeTrigger(installed: Installed, surface: Surface | undefin
  */
 export function afterRun(stored: TriggerState | undefined, ran: TriggerState, before: TriggerState): TriggerState {
 	const { paused: runPaused, ...rest } = ran;
-	// A pause the run set is new; one it carried from before stays only if nobody resumed meanwhile.
-	const setByRun = runPaused !== undefined && runPaused !== before.paused;
-	const paused = setByRun ? runPaused : stored?.specHash === ran.specHash ? stored.paused : undefined;
-	return { ...rest, ...(paused ? { paused } : {}) };
+	const current = stored?.specHash === ran.specHash ? stored : undefined;
+	// The run failed if it counted a failure; it counts on the stored count, which a Resume meanwhile set back to 0.
+	const failed = ran.failures > 0;
+	const failures = failed ? (current?.failures ?? before.failures) + 1 : 0;
+	// A pause the run set is new, and only when the count it builds on reaches the limit; any other pause or resume
+	// saved while it ran is kept.
+	const setByRun = runPaused !== undefined && runPaused !== before.paused && failures >= PAUSE_AFTER_FAILURES;
+	const paused = setByRun ? runPaused : current?.paused;
+	return { ...rest, failures, ...(paused ? { paused } : {}) };
 }
 
 /** Reads a stored value now, from inside a step of the storage queue. */
