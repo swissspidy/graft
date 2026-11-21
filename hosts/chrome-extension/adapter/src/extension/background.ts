@@ -10,6 +10,7 @@ import { originMatches } from '../host/pages.ts';
 import { describeTrigger, dueTriggers, nextRun, runInstalledTrigger, stateFor, triggerKey, unrunnable, type TriggerState } from '../host/runner.ts';
 import { HOST, appModel } from '../host/surface.ts';
 import type { ActivityReply, ContentMessage, DriftEvent, Listed, MountInfo, OptionsMessage, PageMessage, PanelInfo, Reply, RunRecord } from './messages.ts';
+import { createQueue } from './queue.ts';
 import { chromeTabs } from './tabs.ts';
 import '../host/a2ui.ts';
 
@@ -58,21 +59,9 @@ async function store(customizations: Record<string, Installed>): Promise<void> {
 	await chrome.storage.local.set({ customizations });
 }
 
-// Storage updates in order: two calls finishing together must not drop each other's log entry.
-let writes: Promise<unknown> = Promise.resolve();
-function update<T>(key: string, fallback: T, change: (value: T) => T): Promise<void> {
-	const next = writes.then(async () => {
-		const current = ((await chrome.storage.local.get(key))[key] as T | undefined) ?? fallback;
-		await chrome.storage.local.set({ [key]: change(current) });
-	});
-	writes = next.catch(() => {});
-	return next;
-}
-
-const read = async <T>(key: string, fallback: T): Promise<T> => {
-	await writes;
-	return ((await chrome.storage.local.get(key))[key] as T | undefined) ?? fallback;
-};
+// Storage in order (./queue.ts): two changes at once never drop each other.
+const queue = createQueue({ get: (key) => chrome.storage.local.get(key), set: (items) => chrome.storage.local.set(items) });
+const { update, read } = queue;
 
 /**
  * Installs the packaged bundles that validate for a shipped surface. A
@@ -329,15 +318,15 @@ async function runTrigger(installed: Installed, surface: Surface, trigger: strin
 	const tabs = tabsPerform(chromeTabs(), () => now);
 	const granted = installed.triggerGrants?.[trigger] ?? [];
 	/** Why the run must stop before its next call: safe mode, a pause, or a grant revoked since it started. */
-	const stopped = async (): Promise<string | undefined> => {
-		if (await safeMode()) {
+	const stopped = async (peek: <V>(key: string, fallback: V) => Promise<V>): Promise<string | undefined> => {
+		if (await peek('safeMode', false)) {
 			return SAFE_MODE_REASON;
 		}
-		const current = (await stored())[installed.id];
+		const current = (await peek<Record<string, Installed>>('customizations', {}))[installed.id];
 		if (!current?.grant || current.specHash !== installed.specHash || !granted.every((scope) => current.triggerGrants?.[trigger]?.includes(scope))) {
 			return 'Its approval was revoked.';
 		}
-		if (how === 'schedule' && ((await read('triggersPaused', false)) || stateFor(current, trigger, await triggerStates()).paused)) {
+		if (how === 'schedule' && ((await peek('triggersPaused', false)) || stateFor(current, trigger, await peek<Record<string, TriggerState>>('triggers', {})).paused)) {
 			return 'It was paused.';
 		}
 		return undefined;
@@ -346,14 +335,16 @@ async function runTrigger(installed: Installed, surface: Surface, trigger: strin
 		installed,
 		surface,
 		trigger,
-		// Checked before every call, so nothing starts after safe mode, a pause or a revocation takes effect.
-		perform: async (name, capability, input) => {
-			const why = await stopped();
-			if (why) {
-				throw new CallError('graft_trigger_stopped', why);
-			}
-			return tabs(name, capability, input);
-		},
+		// Checked before every call, in the same step of the storage queue as the call: nothing starts after safe
+		// mode, a pause or a revocation is saved, and none of them is saved while a call is starting.
+		perform: (name, capability, input) =>
+			queue.exclusive(async (peek) => {
+				const why = await stopped(peek);
+				if (why) {
+					throw new CallError('graft_trigger_stopped', why);
+				}
+				return tabs(name, capability, input);
+			}),
 		state: stateFor(installed, trigger, states),
 		now,
 		dryRun: how === 'dry-run',
