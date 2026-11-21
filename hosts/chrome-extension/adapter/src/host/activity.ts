@@ -29,6 +29,7 @@ export interface Activity {
 	kind: 'read' | 'write';
 	/** The capability's description, as the surface words it. */
 	description?: string;
+	/** The call's input as the log shows it, web addresses shortened; Undo uses `undo.input`, never this. */
 	input: unknown;
 	outcome: CallRecord['outcome'];
 	code?: string;
@@ -71,7 +72,8 @@ export function activityFrom(
 		capability: record.capability,
 		kind: record.kind,
 		...(declared?.description ? { description: declared.description } : {}),
-		input: record.input,
+		// Kept as shown: an Undo has its own input (`undo`), so nothing needs the raw one.
+		input: shown(record.input),
 		outcome: record.outcome,
 		...(record.code ? { code: record.code } : {}),
 		...(record.error ? { error: record.error } : {}),

@@ -80,6 +80,17 @@ describe('the activity log', () => {
 		expect(describeActivity({ capability: 'tabs.open', input: { url: 'https://example.com/a' } })).toBe('tabs.open ({"url":"https://example.com/a"})');
 	});
 
+	it('stores inputs shortened, and keeps the full address only where Undo needs it', async () => {
+		const chrome = JSON.parse(await readFile(new URL('../surfaces/chrome.json', import.meta.url), 'utf8')) as Surface;
+		const at = { customization: 'stale-tabs', title: 'Stale tabs', source: { kind: 'view' as const }, surface: chrome };
+		const url = 'https://example.com/reset?token=secret';
+		const closed = activityFrom({ capability: 'tabs.close', kind: 'write', input: { id: 3 }, outcome: 'ok', output: { id: 3, url } }, at);
+		expect(closed.undo).toEqual({ capability: 'tabs.open', input: { url } });
+		const reopened = activityFrom({ capability: 'tabs.open', kind: 'write', input: { url }, outcome: 'ok', output: { id: 4, url } }, { ...at, source: { kind: 'undo', of: closed.id } });
+		expect(reopened.input).toEqual({ url: 'https://example.com/reset…' });
+		expect(JSON.stringify(reopened)).not.toContain('secret');
+	});
+
 	it('keeps the latest entries', () => {
 		let log = [] as ReturnType<typeof activityFrom>[];
 		for (let i = 0; i < 5; i++) {

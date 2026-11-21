@@ -528,7 +528,9 @@ async function fromOptions(message: OptionsMessage, now: number = Date.now()): P
 		return activity();
 	}
 	if (message.type === 'undo') {
-		return undo(String(message.entry));
+		// The page redraws from the log; the entry itself, with the reverse call's input, stays here.
+		await undo(String(message.entry));
+		return null;
 	}
 	if (message.type === 'safe-mode') {
 		await update('safeMode', false, () => message.on === true);
