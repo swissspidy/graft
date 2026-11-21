@@ -1,4 +1,5 @@
 import type { PanelInfo, PanelMessage, RenderReply, Reply } from './messages.ts';
+import { reconcile } from './reconcile.ts';
 import { CustomizationView, el } from './view.ts';
 
 /**
@@ -68,11 +69,8 @@ async function draw(): Promise<void> {
 		hosts.push(view.host);
 		void view.render();
 	}
-	// Only when the list changed: replacing the same elements would detach them, and a focused button would lose focus.
-	const same = hosts.length === root.children.length && hosts.every((host, i) => root.children[i] === host);
-	if (!same) {
-		root.replaceChildren(...hosts);
-	}
+	// In place: a view that stays is never detached, so a focused button in it keeps its focus.
+	reconcile(root, hosts);
 }
 
 let timer: ReturnType<typeof setTimeout> | undefined;
