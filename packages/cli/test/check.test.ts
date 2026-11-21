@@ -41,6 +41,8 @@ describe('graft check', () => {
 			join(root, 'hosts/emdash/adapter/surfaces/1.4.json'),
 			'--surface',
 			join(root, 'hosts/chrome-extension/adapter/surfaces/tasklet.json'),
+			'--surface',
+			join(root, 'hosts/chrome-extension/adapter/surfaces/chrome.json'),
 		]);
 		const output = String(log.mock.calls[0]?.[0]);
 		expect(output).toContain('all up to date');

@@ -13,7 +13,7 @@ import { extensionManifest } from '../src/extension/manifest.ts';
  *
  *   tsx scripts/build-extension.ts [--surface <file>]... [--bundle <file>]... [--out <dir>]
  *
- * Defaults: the Tasklet surface and the example bundle.
+ * Defaults: the Tasklet and browser surfaces, and the example bundles for them.
  */
 
 const root = fileURLToPath(new URL('..', import.meta.url));
@@ -28,8 +28,8 @@ const { values } = parseArgs({
 	},
 });
 const out = values.out ?? `${root}dist/extension`;
-const surfaces = values.surface ?? [`${root}surfaces/tasklet.json`];
-const bundles = values.bundle ?? [`${repo}examples/chrome-extension/bundles/my-tasks.json`];
+const surfaces = values.surface ?? [`${root}surfaces/tasklet.json`, `${root}surfaces/chrome.json`];
+const bundles = values.bundle ?? [`${repo}examples/chrome-extension/bundles/my-tasks.json`, `${repo}examples/browser/bundles/stale-tabs.json`];
 
 await rm(out, { recursive: true, force: true });
 await mkdir(`${out}/graft`, { recursive: true });
@@ -52,8 +52,10 @@ const results = await Promise.all([
 	build({ ...common, entryPoints: [`${root}src/extension/background.ts`], outfile: `${out}/background.js`, format: 'esm' }),
 	build({ ...common, entryPoints: [`${root}src/extension/content.ts`], outfile: `${out}/content.js`, format: 'iife' }),
 	build({ ...common, entryPoints: [`${root}src/extension/options.ts`], outfile: `${out}/options.js`, format: 'iife' }),
+	build({ ...common, entryPoints: [`${root}src/extension/sidepanel.ts`], outfile: `${out}/sidepanel.js`, format: 'iife' }),
 ]);
 await copyFile(`${root}src/extension/options.html`, `${out}/options.html`);
+await copyFile(`${root}src/extension/sidepanel.html`, `${out}/sidepanel.html`);
 await copyFile(`${root}src/extension/options.css`, `${out}/options.css`);
 
 const loaded = await Promise.all(surfaces.map(async (file) => JSON.parse(await readFile(file, 'utf8')) as Surface));
@@ -66,7 +68,7 @@ await mkdir(`${root}dist`, { recursive: true });
 await writeFile(`${root}dist/.gitignore`, '*\n');
 
 // Manifest V3 refuses generated code: make sure none slipped into a bundle through a dependency.
-for (const file of ['background.js', 'content.js', 'options.js']) {
+for (const file of ['background.js', 'content.js', 'options.js', 'sidepanel.js']) {
 	const code = await readFile(`${out}/${file}`, 'utf8');
 	if (/\bnew Function\s*\(|\beval\s*\(/.test(code)) {
 		throw new Error(`${file} contains generated code (eval or new Function), which Manifest V3 refuses.`);
@@ -78,4 +80,4 @@ for (const result of results) {
 		console.log(`${file.replace(repo, '')} ${Math.round(output.bytes / 1024)} KB`);
 	}
 }
-console.log(`Wrote the unpacked extension to ${out.replace(repo, '')}: ${loaded.length} app surface(s), ${loadedBundles.length} customization(s).`);
+console.log(`Wrote the unpacked extension to ${out.replace(repo, '')}: ${loaded.length} surface(s), ${loadedBundles.length} customization(s).`);

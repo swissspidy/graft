@@ -331,7 +331,7 @@ export async function startTasklet(options: TaskletOptions = {}): Promise<Taskle
 					);
 					return json(res, 200, { tasks: list.map(taskJson) });
 				}
-				const complete = /^\/api\/tasks\/([^/]+)\/complete$/.exec(path);
+				const complete = /^\/api\/tasks\/([^/]+)\/(complete|reopen)$/.exec(path);
 				if (complete && req.method === 'POST') {
 					if (req.headers['x-requested-with'] !== 'tasklet') {
 						return json(res, 403, { error: 'missing CSRF header' });
@@ -343,7 +343,12 @@ export async function startTasklet(options: TaskletOptions = {}): Promise<Taskle
 					if (!task) {
 						return json(res, 404, { error: 'no such task' });
 					}
-					task.status = 'done';
+					const status = complete[2] === 'complete' ? 'done' : 'open';
+					// A change to the status it already has is refused, so it never looks like something to undo.
+					if (task.status === status) {
+						return json(res, 409, { error: `the task is ${status} already` });
+					}
+					task.status = status;
 					return json(res, 200, taskJson(task));
 				}
 				return json(res, 404, { error: 'not found' });

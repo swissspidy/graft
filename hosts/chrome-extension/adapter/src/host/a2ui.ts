@@ -25,6 +25,13 @@ export const browserA2UIFormat = createA2UIFormat(browserA2UI);
 
 registerUiFormat(browserA2UIFormat);
 
+/** The same catalog on the browser's own surface (`host: chrome`), drawn in the side panel. */
+export const chromeA2UI: A2UIFormatHost = { ...browserA2UI, host: 'chrome' };
+
+export const chromeA2UIFormat = createA2UIFormat(chromeA2UI);
+
+registerUiFormat(chromeA2UIFormat);
+
 export type Tone = 'success' | 'warning' | 'error' | 'info';
 
 /** A button as the content script draws it. */
@@ -107,7 +114,7 @@ export function renderA2UI(build: Build, ctx: EvalContext, prefix: string, sent:
 		rendered.actions.push({ key, id: drawn.id, available, ...(drawn.action ? { action: drawn.action } : {}), ...(drawn.set ? { set: drawn.set } : {}) });
 		return available ? { key, label: drawn.label, ...(drawn.variant === 'primary' ? { primary: true } : {}) } : undefined;
 	};
-	walkA2UI(build as unknown as A2UIBuild, ctx, { [INPUT_GROUP]: state }, browserA2UI, {
+	walkA2UI(build as unknown as A2UIBuild, ctx, { [INPUT_GROUP]: state }, build.surface.host === chromeA2UI.host ? chromeA2UI : browserA2UI, {
 		text: (text, variant) => {
 			if (variant === 'divider') {
 				out.push({ type: 'divider' });
@@ -169,4 +176,13 @@ export const a2uiNotes = `Browser host specifics:
 - A table field's "tone" ("success", "warning", "error", "info") marks the cell.
 - Slots on a page provide one {"id"} per page parameter, e.g. /slot/project/id on a project page. Pass them to data source inputs with {"$slot": "project.id"}.
 - Every capability is a call to the app's own API as the viewer; the app may still refuse it for their account. Its output is exactly the declared schema.
+- After an action, use "then": ["refresh:<source>"] to load the data again, or "remove-row:<source>".`;
+
+/** What the compiler should know about the browser's own surface (`host: chrome`). */
+export const chromeA2UINotes = `Browser surface specifics:
+- The customization is drawn in the extension's side panel, next to whatever page the person has open, with the extension's own plain components: Text variants become headings, body text or captions; Buttons; Tables with per-row buttons; Row, Column and Card group them. There are no inputs: TextField and CheckBox do not exist here.
+- There is one person and no audiences: leave "audience" out. Buttons the grant does not cover are not drawn.
+- A table field's "tone" ("success", "warning", "error", "info") marks the cell.
+- The side panel provides no slot props.
+- Capabilities are the browser's tab functions; their output is exactly the declared schema. "tabs.list" does the filtering (pinned, unusedForDays) and sorts least recently used first.
 - After an action, use "then": ["refresh:<source>"] to load the data again, or "remove-row:<source>".`;

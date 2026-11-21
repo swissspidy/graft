@@ -2,7 +2,8 @@ import { readFile } from 'node:fs/promises';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import type { CustomizationBundle, Surface } from '@swissspidy/graft-core';
 import { startTasklet, type TaskletServer } from '../../fixtures/tasklet/server.ts';
-import { act, fromBundle, gatewayCall, mountsFor, renderMount, unservable, type Installed, type PageContext } from '../src/host/gateway.ts';
+import { activityFrom } from '../src/host/activity.ts';
+import { act, fromBundle, gatewayCall, guarded, httpPerform, mountsFor, previewGrant, renderMount, unservable, type CallRecord, type Installed, type PageContext } from '../src/host/gateway.ts';
 import type { Fetch } from '../src/host/http.ts';
 import type { ViewNode } from '../src/host/a2ui.ts';
 import '../src/host/a2ui.ts';
@@ -58,10 +59,10 @@ describe('the gateway', () => {
 	it('refuses calls the build does not make, the grant does not cover, or with invalid input', async () => {
 		const installed = await approved();
 		const fetch = await session('ada');
-		const call = gatewayCall(installed, surface, app.url, fetch);
+		const call = gatewayCall(installed, surface, httpPerform(app.url, fetch));
 		await expect(call('members.list', {})).rejects.toMatchObject({ code: 'graft_capability_not_in_build' });
 		await expect(call('tasks.list', { project: 'launch', extra: 1 })).rejects.toMatchObject({ code: 'graft_invalid_input' });
-		const narrow = gatewayCall({ ...installed, grant: ['tasks:read'] }, surface, app.url, fetch);
+		const narrow = gatewayCall({ ...installed, grant: ['tasks:read'] }, surface, httpPerform(app.url, fetch));
 		await expect(narrow('tasks.complete', { id: 't1' })).rejects.toMatchObject({ code: 'graft_not_granted' });
 		// A build changed after it was verified is not served, even when it still validates.
 		const widened = { ...installed, build: { ...installed.build, data: { ...installed.build.data, members: { call: 'members.list', input: {} } } } };
@@ -90,6 +91,77 @@ describe('the gateway', () => {
 		expect(done.notice).toEqual({ tone: 'success', text: 'Marked done.' });
 		expect(JSON.stringify(done.view)).not.toContain('Check redirects');
 		expect(app.log()).toContain('POST /api/tasks/t2/complete');
+	});
+
+	it('reports every write and refusal, and a write can be undone with the reverse its capability declares', async () => {
+		const installed = await approved();
+		const url = `${app.url}/projects/launch`;
+		const [mount] = await mountsFor([installed], surface, url);
+		const calls: CallRecord[] = [];
+		const page: PageContext = { surface, url, fetch: await session('ada'), onCall: (record) => calls.push(record) };
+		await act(page, mount!, 'my-tasks:t0:0:t1');
+		const write = calls.find((c) => c.kind === 'write')!;
+		expect(write).toMatchObject({ capability: 'tasks.complete', input: { id: 't1' }, outcome: 'ok' });
+		const entry = activityFrom(write, { customization: installed.id, title: installed.title, source: { kind: 'view' }, surface, origin: app.url });
+		expect(entry.undo).toEqual({ capability: 'tasks.reopen', input: { id: 't1' } });
+		await guarded(entry.undo!.capability, surface.capabilities['tasks.reopen'], entry.undo!.input, undefined, httpPerform(app.url, await session('ada')));
+		expect(app.log()).toContain('POST /api/tasks/t1/reopen');
+		expect(JSON.stringify((await renderMount(page, mount!)).view)).toContain('Write launch post');
+
+		const refused: CallRecord[] = [];
+		const call = gatewayCall(installed, surface, httpPerform(app.url, await session('ada')), { onCall: (record) => refused.push(record) });
+		await expect(call('members.list', {})).rejects.toMatchObject({ code: 'graft_capability_not_in_build' });
+		expect(refused).toEqual([expect.objectContaining({ capability: 'members.list', outcome: 'refused', code: 'graft_capability_not_in_build' })]);
+	});
+
+	it('previews an unapproved customization only when asked, reading and never writing', async () => {
+		const { installed } = await fromBundle(bundle, surface, 'test');
+		const url = `${app.url}/projects/launch`;
+		expect(await mountsFor([installed!], surface, url)).toEqual([]);
+		const [mount] = await mountsFor([installed!], surface, url, new Set(['my-tasks']));
+		expect(mount).toMatchObject({ preview: true, installed: { grant: ['tasks:read'] } });
+		expect(previewGrant(installed!, surface)).toEqual(['tasks:read']);
+
+		const calls: CallRecord[] = [];
+		const page: PageContext = { surface, url, fetch: await session('ada'), onCall: (record) => calls.push(record) };
+		const before = app.log().length;
+		const shown = await renderMount(page, mount!);
+		const text = JSON.stringify(shown.view);
+		expect(shown.view[0]).toMatchObject({ type: 'notice', tone: 'info', text: expect.stringContaining('Preview with your data') });
+		expect(text).toContain('Write launch post');
+		// Ada is a member, so the build would draw "Done": the preview does not.
+		expect(text).not.toContain('"Done"');
+		expect(shown.actions.filter((a) => a.available)).toEqual([]);
+		expect(await act(page, mount!, 'my-tasks:t0:0:t1')).toMatchObject({ notice: { tone: 'error', text: 'That action is not available.' } });
+		await expect(shown.call('tasks.complete', { id: 't1' })).rejects.toMatchObject({ code: 'graft_preview_read_only' });
+		expect(calls.at(-1)).toMatchObject({ capability: 'tasks.complete', outcome: 'refused', code: 'graft_preview_read_only' });
+		expect(app.log().slice(before).filter((line) => line.startsWith('POST'))).toEqual([]);
+
+		// An approved customization is served as itself, never as a preview.
+		const [served] = await mountsFor([await approved()], surface, url, new Set(['my-tasks']));
+		expect(served?.preview).toBeUndefined();
+	});
+
+	it('keeps a write that went through a success when reporting it fails', async () => {
+		const installed = await approved();
+		const call = gatewayCall(installed, surface, httpPerform(app.url, await session('ada')), {
+			onCall: () => {
+				throw new Error('the log is broken');
+			},
+		});
+		await expect(call('tasks.complete', { id: 't4' })).resolves.toMatchObject({ id: 't4', status: 'done' });
+		await expect(call('members.list', {})).rejects.toMatchObject({ code: 'graft_capability_not_in_build' });
+	});
+
+	it('offers no Undo for "Done" on a task that was done already: the app refuses the change', async () => {
+		const installed = await approved();
+		const calls: CallRecord[] = [];
+		const call = gatewayCall(installed, surface, httpPerform(app.url, await session('ada')), { onCall: (record) => calls.push(record) });
+		// t3 starts done.
+		await expect(call('tasks.complete', { id: 't3' })).rejects.toMatchObject({ code: 'host_error' });
+		const entry = activityFrom(calls.at(-1)!, { customization: installed.id, title: installed.title, source: { kind: 'view' }, surface, origin: app.url });
+		expect(entry).toMatchObject({ outcome: 'failed' });
+		expect(entry.undo).toBeUndefined();
 	});
 
 	it('reports answers that no longer match as drift', async () => {

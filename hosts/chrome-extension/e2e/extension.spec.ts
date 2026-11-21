@@ -20,7 +20,7 @@ test('nothing is injected until the customization is approved on the options pag
 	const section = options.locator('section', { has: options.getByRole('heading', { name: 'My open tasks' }) });
 	await expect(section.getByText('Waiting for approval.')).toBeVisible();
 	// What it may do, in plain language, and each check next to its criterion.
-	await expect(section.getByText("See a project's tasks")).toBeVisible();
+	await expect(section.getByText("See a project's tasks", { exact: true })).toBeVisible();
 	await expect(section.getByText('Mark tasks done')).toBeVisible();
 	await expect(section.getByText('Guests do not get the "Done" button')).toBeVisible();
 	await expect(section.getByText(/Given a guest "g" and an open task "Read me"/)).toBeVisible();
@@ -176,4 +176,78 @@ test('the options page does not take focus back when it moved while the list was
 	await expect(section.getByRole('button', { name: 'Revoke' })).toBeVisible();
 	await expect(options.getByRole('button', { name: 'Elsewhere' })).toBeFocused();
 	await options.close();
+});
+
+test('every change is in the activity log, and "Done" can be undone from there', async ({ signIn, approve, app, context, extensionId }) => {
+	await approve('My open tasks');
+	const page = await signIn('ada');
+	await panel(page).getByRole('row', { name: /Check redirects/ }).getByRole('button', { name: 'Done' }).click();
+	await expect(panel(page).getByRole('status')).toHaveText('Marked done.');
+
+	const options = await context.newPage();
+	await options.goto(`chrome-extension://${extensionId}/options.html`);
+	const entry = options.locator('.activity li').filter({ hasText: 'Marks a task done.' });
+	await expect(entry).toHaveCount(1);
+	await expect(entry).toContainText('My open tasks, by you');
+	await entry.getByRole('button', { name: 'Undo' }).click();
+	await expect(entry).toContainText('Undone');
+	await expect(entry.getByRole('button', { name: 'Undo' })).toHaveCount(0);
+	// The undo is in the log too, and went to the app with the person's session.
+	await expect(options.locator('.activity li').filter({ hasText: 'Opens a done task again.' })).toContainText('undone by you');
+	expect(app.log()).toContain('POST /api/tasks/t2/reopen');
+
+	await page.reload();
+	await expect(panel(page).getByRole('row', { name: /Check redirects/ })).toBeVisible();
+});
+
+test('a preview shows the customization with the person’s data and no button that changes anything, until it is approved', async ({ signIn, context, extensionId, app }) => {
+	const options = await context.newPage();
+	await options.goto(`chrome-extension://${extensionId}/options.html`);
+	const section = options.locator('section', { has: options.getByRole('heading', { name: 'My open tasks' }) });
+	await expect(section.locator('.preview')).toContainText("It may read: See a project's tasks.");
+	await section.getByRole('button', { name: 'Preview' }).click();
+	await expect(section.locator('.preview')).toContainText('Previewing in Project sidebar until');
+
+	const page = await signIn('ada');
+	const box = page.getByRole('region', { name: 'My open tasks (preview)' });
+	await expect(box.getByRole('status')).toContainText('Preview with your data');
+	await expect(box.getByRole('row', { name: /Write launch post/ })).toBeVisible();
+	await expect(box.getByRole('button')).toHaveCount(0);
+	expect(app.log().filter((line) => line.startsWith('POST'))).toEqual([]);
+
+	await section.getByRole('button', { name: 'Approve' }).click();
+	await expect(section.getByText('Approved: shown in the app.')).toBeVisible();
+	await expect(section.locator('.preview')).toHaveCount(0);
+	await page.reload();
+	await expect(panel(page).getByRole('button', { name: 'Done' }).first()).toBeVisible();
+});
+
+test('safe mode stops every customization at once, and the options page still works', async ({ signIn, approve, context, extensionId, worker }) => {
+	await approve('My open tasks');
+	await approve('Stale tabs');
+	const options = await context.newPage();
+	await options.goto(`chrome-extension://${extensionId}/options.html`);
+	await options.getByRole('button', { name: 'Turn on safe mode' }).click();
+	await expect(options.locator('#safe-mode')).toContainText('Safe mode is on');
+	const section = options.locator('section', { has: options.getByRole('heading', { name: 'My open tasks' }) });
+	await expect(section.getByText('Approved, but not shown: Safe mode is on: nothing is shown or run.')).toBeVisible();
+	const trigger = options.locator('li[data-trigger="close-stale"]');
+	await expect(trigger.locator('.trigger-state')).toHaveText('Not running: Safe mode is on: nothing is shown or run.');
+	// Safe mode stops runs, not dry runs.
+	await expect(trigger.getByRole('button', { name: 'Run now' })).toHaveCount(0);
+	await trigger.getByRole('button', { name: 'Dry run' }).click();
+	await expect(options.locator('.runs li').first()).toContainText('Dry run: would act on 0 of 0.');
+
+	const page = await signIn('ada');
+	await page.waitForTimeout(1_000);
+	await expect(page.locator('graft-customization')).toHaveCount(0);
+	const sidePanel = await context.newPage();
+	await sidePanel.goto(`chrome-extension://${extensionId}/sidepanel.html`);
+	await expect(sidePanel.getByText('Nothing here yet.')).toBeVisible();
+	expect(await worker.evaluate((now) => (globalThis as unknown as { graft: { tick(now: number): Promise<unknown[]> } }).graft.tick(now), Date.now() + 8 * 24 * 60 * 60 * 1000)).toEqual([]);
+
+	await options.getByRole('button', { name: 'Turn off safe mode' }).click();
+	await expect(options.locator('#safe-mode')).not.toContainText('Safe mode is on');
+	await page.reload();
+	await expect(panel(page)).toBeVisible();
 });

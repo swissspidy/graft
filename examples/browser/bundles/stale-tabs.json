@@ -1,0 +1,575 @@
+{
+	"graft": 1,
+	"kind": "customization",
+	"title": "Stale tabs",
+	"spec": {
+		"source": "---\ngraft: 1\nid: stale-tabs\nhost: chrome\nmount:\n  slot: side-panel\n  title: Stale tabs\npermissions:\n  - tabs:read\n  - tabs:write\ntriggers:\n  close-stale:\n    schedule: { every: 1d }\n    permissions: [tabs:read, tabs:write]\n    limit: 10\n---\n\n# Stale tabs\n\nThe side panel lists the tabs I have not looked at for more than a week,\nso I can close them, and once a day the extension closes some of them on\nits own. Pinned tabs are left alone. Every tab it closes can be opened\nagain from the extension's activity log.\n\n## Acceptance criteria\n\n- Lists only tabs not used for more than 7 days {#stale-only}\n- Pinned tabs are never listed {#pinned-hidden}\n- Columns: Tab, Last used {#columns}\n- \"Last used\" says how many days ago, e.g. \"10 days ago\" {#last-used}\n- \"Close\" closes the tab and removes it from the list {#close}\n- Once a day, tabs not used for more than 7 days are closed on their own {#daily}\n- Pinned tabs are never closed on their own {#pinned-kept}\n- At most 10 tabs are closed on their own in a day {#limit}\n- When no tab is stale, it says \"No stale tabs\" {#empty}\n\n## Out of scope\n\n- Grouping, moving or bookmarking tabs\n- Tabs in other browser profiles\n",
+		"manifest": {
+			"graft": 1,
+			"id": "stale-tabs",
+			"host": "chrome",
+			"mount": {
+				"slot": "side-panel",
+				"title": "Stale tabs"
+			},
+			"permissions": [
+				"tabs:read",
+				"tabs:write"
+			],
+			"triggers": {
+				"close-stale": {
+					"schedule": {
+						"every": "1d"
+					},
+					"permissions": [
+						"tabs:read",
+						"tabs:write"
+					],
+					"limit": 10
+				}
+			}
+		},
+		"hash": "sha256:c9f690cd3fbb3b2a3f651a2af49d5d65d84f2cfbd85c4775fe7884067a66c73c"
+	},
+	"builds": [
+		{
+			"build": {
+				"graft": 1,
+				"spec": {
+					"id": "stale-tabs",
+					"hash": "sha256:c9f690cd3fbb3b2a3f651a2af49d5d65d84f2cfbd85c4775fe7884067a66c73c"
+				},
+				"surface": {
+					"host": "chrome",
+					"hostVersion": "121",
+					"hash": "sha256:09a2a51fd7e522dd49d3dba66a774bba5ac421a4c195705a036d1cb5a6f4d17c"
+				},
+				"mount": {
+					"slot": "side-panel",
+					"title": "Stale tabs"
+				},
+				"data": {
+					"stale": {
+						"call": "tabs.list",
+						"input": {
+							"pinned": false,
+							"unusedForDays": 7
+						}
+					}
+				},
+				"ui": {
+					"protocol": "a2ui/v0.9",
+					"catalogId": "graft:browser",
+					"components": [
+						{
+							"id": "root",
+							"component": "Column",
+							"children": [
+								"tabs"
+							]
+						},
+						{
+							"id": "tabs",
+							"component": "Table",
+							"rows": {
+								"path": "/stale/tabs"
+							},
+							"fields": [
+								{
+									"id": "title",
+									"label": "Tab",
+									"primary": true
+								},
+								{
+									"id": "used",
+									"label": "Last used",
+									"value": {
+										"call": "formatString",
+										"args": {
+											"value": "${daysSince(value: ${lastUsed})} days ago"
+										}
+									}
+								}
+							],
+							"rowActions": [
+								{
+									"id": "close",
+									"label": "Close",
+									"visible": {
+										"call": "can",
+										"args": {
+											"scope": "tabs:write"
+										}
+									},
+									"action": {
+										"event": {
+											"name": "close",
+											"context": {
+												"id": {
+													"path": "id"
+												}
+											}
+										}
+									}
+								}
+							],
+							"empty": "No stale tabs"
+						}
+					]
+				},
+				"events": {
+					"close": {
+						"call": "tabs.close",
+						"input": {
+							"id": {
+								"$context": "id"
+							}
+						},
+						"then": [
+							"remove-row:stale"
+						],
+						"notice": "Closed. You can open it again from the extension's activity."
+					}
+				},
+				"triggers": {
+					"close-stale": {
+						"schedule": {
+							"every": "1d"
+						},
+						"targets": {
+							"call": "tabs.list",
+							"input": {
+								"pinned": false,
+								"unusedForDays": 7
+							},
+							"items": "tabs"
+						},
+						"call": "tabs.close",
+						"input": {
+							"id": {
+								"$target": "id"
+							}
+						}
+					}
+				},
+				"checks": [
+					{
+						"criterion": "stale-only",
+						"fixtures": {
+							"tabs": [
+								{
+									"title": "Old",
+									"unused_days": 10
+								},
+								{
+									"title": "Last week",
+									"unused_days": 8
+								},
+								{
+									"title": "Six days",
+									"unused_days": 6
+								},
+								{
+									"title": "Yesterday",
+									"unused_days": 1
+								},
+								{
+									"title": "Now",
+									"active": true
+								}
+							]
+						},
+						"view_as": "you",
+						"expect": [
+							{
+								"rows": [
+									"Old",
+									"Last week"
+								]
+							}
+						]
+					},
+					{
+						"criterion": "pinned-hidden",
+						"fixtures": {
+							"tabs": [
+								{
+									"title": "Old pinned",
+									"pinned": true,
+									"unused_days": 30
+								},
+								{
+									"title": "Old",
+									"unused_days": 10
+								}
+							]
+						},
+						"view_as": "you",
+						"expect": [
+							{
+								"rows": [
+									"Old"
+								]
+							}
+						]
+					},
+					{
+						"criterion": "columns",
+						"fixtures": {
+							"tabs": [
+								{
+									"title": "Old",
+									"unused_days": 10
+								}
+							]
+						},
+						"view_as": "you",
+						"expect": [
+							{
+								"columns": [
+									"Tab",
+									"Last used"
+								]
+							}
+						]
+					},
+					{
+						"criterion": "last-used",
+						"fixtures": {
+							"tabs": [
+								{
+									"title": "Old",
+									"unused_days": 10
+								}
+							]
+						},
+						"view_as": "you",
+						"expect": [
+							{
+								"cell": {
+									"row": {
+										"title": "Old"
+									},
+									"column": "Last used",
+									"text": "10 days ago"
+								}
+							}
+						]
+					},
+					{
+						"criterion": "close",
+						"fixtures": {
+							"tabs": [
+								{
+									"title": "Old",
+									"unused_days": 10
+								},
+								{
+									"title": "Older",
+									"unused_days": 20
+								},
+								{
+									"title": "Fresh"
+								}
+							]
+						},
+						"view_as": "you",
+						"steps": [
+							{
+								"action": "close",
+								"row": {
+									"title": "Older"
+								}
+							}
+						],
+						"expect": [
+							{
+								"tabs": [
+									"Old",
+									"Fresh"
+								]
+							},
+							{
+								"rows": [
+									"Old"
+								]
+							}
+						]
+					},
+					{
+						"criterion": "daily",
+						"fixtures": {
+							"tabs": [
+								{
+									"title": "Old",
+									"unused_days": 10
+								},
+								{
+									"title": "Six days",
+									"unused_days": 6
+								},
+								{
+									"title": "Fresh",
+									"unused_days": 1
+								}
+							]
+						},
+						"view_as": "you",
+						"steps": [
+							{
+								"trigger": "close-stale"
+							}
+						],
+						"expect": [
+							{
+								"run": {
+									"trigger": "close-stale",
+									"calls": 1,
+									"failed": 0
+								}
+							},
+							{
+								"tabs": [
+									"Six days",
+									"Fresh"
+								]
+							}
+						]
+					},
+					{
+						"criterion": "pinned-kept",
+						"fixtures": {
+							"tabs": [
+								{
+									"title": "Old pinned",
+									"pinned": true,
+									"unused_days": 30
+								},
+								{
+									"title": "Old",
+									"unused_days": 10
+								}
+							]
+						},
+						"view_as": "you",
+						"steps": [
+							{
+								"trigger": "close-stale"
+							}
+						],
+						"expect": [
+							{
+								"run": {
+									"trigger": "close-stale",
+									"calls": 1,
+									"failed": 0
+								}
+							},
+							{
+								"tabs": [
+									"Old pinned"
+								]
+							}
+						]
+					},
+					{
+						"criterion": "limit",
+						"fixtures": {
+							"tabs": [
+								{
+									"title": "Old 1",
+									"unused_days": 11
+								},
+								{
+									"title": "Old 2",
+									"unused_days": 12
+								},
+								{
+									"title": "Old 3",
+									"unused_days": 13
+								},
+								{
+									"title": "Old 4",
+									"unused_days": 14
+								},
+								{
+									"title": "Old 5",
+									"unused_days": 15
+								},
+								{
+									"title": "Old 6",
+									"unused_days": 16
+								},
+								{
+									"title": "Old 7",
+									"unused_days": 17
+								},
+								{
+									"title": "Old 8",
+									"unused_days": 18
+								},
+								{
+									"title": "Old 9",
+									"unused_days": 19
+								},
+								{
+									"title": "Old 10",
+									"unused_days": 20
+								},
+								{
+									"title": "Old 11",
+									"unused_days": 21
+								}
+							]
+						},
+						"view_as": "you",
+						"steps": [
+							{
+								"trigger": "close-stale"
+							}
+						],
+						"expect": [
+							{
+								"run": {
+									"trigger": "close-stale",
+									"calls": 10,
+									"skipped": 1
+								}
+							},
+							{
+								"tabs": [
+									"Old 1"
+								]
+							}
+						]
+					},
+					{
+						"criterion": "empty",
+						"fixtures": {
+							"tabs": [
+								{
+									"title": "Fresh",
+									"unused_days": 2
+								}
+							]
+						},
+						"view_as": "you",
+						"expect": [
+							{
+								"text": "No stale tabs"
+							}
+						]
+					}
+				],
+				"refs": {
+					"slot": "side-panel",
+					"capabilities": [
+						"tabs.close",
+						"tabs.list"
+					],
+					"scopes": [
+						"tabs:read",
+						"tabs:write"
+					],
+					"catalog": {
+						"Column": [
+							"children"
+						],
+						"Table": [
+							"empty",
+							"fields",
+							"rowActions",
+							"rows"
+						]
+					},
+					"triggers": {
+						"events": [],
+						"capabilities": [
+							"tabs.close",
+							"tabs.list"
+						],
+						"scopes": [
+							"tabs:read",
+							"tabs:write"
+						]
+					}
+				},
+				"provenance": {
+					"compiler": "graft-compiler/0.1.0+a2ui",
+					"strategy": "handwritten"
+				}
+			},
+			"verification": {
+				"passed": true,
+				"build": "sha256:d4cd75e9263f0424bff24bf37e9afa15986652d1b04558d4250ca124602f57d6",
+				"spec": {
+					"id": "stale-tabs",
+					"hash": "sha256:c9f690cd3fbb3b2a3f651a2af49d5d65d84f2cfbd85c4775fe7884067a66c73c"
+				},
+				"surface": {
+					"host": "chrome",
+					"hostVersion": "121",
+					"hash": "sha256:09a2a51fd7e522dd49d3dba66a774bba5ac421a4c195705a036d1cb5a6f4d17c"
+				},
+				"results": [
+					{
+						"criterion": "stale-only",
+						"check": 0,
+						"passed": true,
+						"failures": []
+					},
+					{
+						"criterion": "pinned-hidden",
+						"check": 1,
+						"passed": true,
+						"failures": []
+					},
+					{
+						"criterion": "columns",
+						"check": 2,
+						"passed": true,
+						"failures": []
+					},
+					{
+						"criterion": "last-used",
+						"check": 3,
+						"passed": true,
+						"failures": []
+					},
+					{
+						"criterion": "close",
+						"check": 4,
+						"passed": true,
+						"failures": []
+					},
+					{
+						"criterion": "daily",
+						"check": 5,
+						"passed": true,
+						"failures": []
+					},
+					{
+						"criterion": "pinned-kept",
+						"check": 6,
+						"passed": true,
+						"failures": []
+					},
+					{
+						"criterion": "limit",
+						"check": 7,
+						"passed": true,
+						"failures": []
+					},
+					{
+						"criterion": "empty",
+						"check": 8,
+						"passed": true,
+						"failures": []
+					}
+				],
+				"unchecked": [],
+				"verifiedAt": "2026-11-21T00:31:16.877Z"
+			}
+		}
+	]
+}

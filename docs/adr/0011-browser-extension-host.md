@@ -1,6 +1,6 @@
 # ADR 0011: A browser extension as the host for apps without a plugin API
 
-- Status: Proposed
+- Status: Proposed; extended by [ADR 0017](0017-browser-activity-undo-and-triggers.md) (activity, undo, triggers, the browser as a surface)
 - Date: 2026-10-21
 - Builds on: [ADR 0001](0001-architecture.md), [ADR 0003](0003-emdash-host.md), [ADR 0008](0008-agency-sites.md), [ADR 0009](0009-a2ui.md)
 

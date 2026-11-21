@@ -6,8 +6,8 @@
 	},
 	"surface": {
 		"host": "browser",
-		"hostVersion": "observed-832cc479981a",
-		"hash": "sha256:ce6a866ab3fdb2efafab2a7bcea1cf245ba81bc78e556e8fc24538e8dda9a987"
+		"hostVersion": "observed-2130d5221741",
+		"hash": "sha256:3b82bfe5e8ec4db1e21b3ded0dbd7c208414e8abc1947792f7ea772c64ceb480"
 	},
 	"mount": {
 		"slot": "project.sidebar",
