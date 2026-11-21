@@ -246,7 +246,7 @@ pnpm graft site verify --site <url> --token <token>
 | `pnpm test:cfworker` | The unit tests again on the schema engine used where code generation is forbidden |
 | `pnpm test:packages` | The npm packages, packed as published, installed outside the workspace and imported |
 | `pnpm verify:extension` | The browser extension example builds' checks: against a copy of the fixture app, and in an in-memory browser |
-| `pnpm test:e2e:extension` | Playwright with the unpacked extension in Chromium: approval, the injected panel under the app's CSP, the gateway's refusals, drift and the upgrade ladder after it, the activity log and undo, the side panel, and triggers (dry run, pause, a scheduled run, pause all) |
+| `pnpm test:e2e:extension` | Playwright with the unpacked extension in Chromium: approval, the injected panel under the app's CSP, the gateway's refusals, drift and the upgrade ladder after it, the activity log and undo, the side panel, triggers (dry run, pause, a scheduled run, pause all), previews before approval and safe mode |
 
 CI runs all of them, plus a weekly canary against WordPress nightly. As of
 7.2-alpha the surface is unchanged (same hash as 7.1) and every
@@ -278,6 +278,7 @@ Later decisions each have their own record:
 | [0015](docs/adr/0015-website-host.md) | A website as a host, for experiments that change a site's source (implemented in [the lab](https://github.com/swissspidy/lab)) |
 | [0016](docs/adr/0016-experiments.md) | Experiments: a customization for a share of its audience, kept or archived by a host event (WordPress) |
 | [0017](docs/adr/0017-browser-activity-undo-and-triggers.md) | The browser extension's activity log and undo, triggers on `chrome.alarms`, and the browser itself (tabs, the side panel) as a surface (proposed) |
+| [0018](docs/adr/0018-preview-and-safe-mode-in-the-extension.md) | Previews with your own data before approval, and safe mode, in the browser extension (proposed) |
 
 [docs/audit-2026-11.md](docs/audit-2026-11.md) lists what a full read of the
 code found, what was fixed and what is still open, and compares Graft with

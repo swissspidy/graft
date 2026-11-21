@@ -100,6 +100,39 @@ function drawTrigger(item: Listed, trigger: ListedTrigger, index: number): HTMLL
 	return li;
 }
 
+function drawPreview(item: Listed, index: number): HTMLElement {
+	const preview = item.preview!;
+	const box = el('div', undefined, 'preview');
+	const text = el(
+		'p',
+		preview.until
+			? `Previewing in ${item.slot} until ${new Date(preview.until).toLocaleTimeString()}: it reads with your account and changes nothing.`
+			: `Try it with your data before you approve it: for ${preview.minutes} minutes, it is shown in ${item.slot} without its buttons that change anything. ${preview.reads.length ? `It may read: ${preview.reads.join('; ')}.` : 'It reads nothing.'}`,
+	);
+	text.id = `customization-${index}-preview`;
+	box.append(text);
+	const key = `${item.id}/preview`;
+	box.append(
+		preview.until
+			? button('Stop the preview', key, () => send({ type: 'preview', id: item.id, on: false }), { secondary: true, describedBy: `customization-${index} ${text.id}` })
+			: button('Preview', key, () => send({ type: 'preview', id: item.id, on: true }), { secondary: true, describedBy: `customization-${index} ${text.id}` }),
+	);
+	return box;
+}
+
+function drawSafeMode(on: boolean): void {
+	const root = document.getElementById('safe-mode')!;
+	const text = el(
+		'p',
+		on
+			? 'Safe mode is on: no customization is shown, previewed or run. You can still approve, revoke and undo here.'
+			: 'If a customization gets in your way, safe mode stops all of them at once, until you turn it off.',
+		on ? 'status error' : 'muted',
+	);
+	text.id = 'safe-mode-status';
+	root.replaceChildren(text, button(on ? 'Turn off safe mode' : 'Turn on safe mode', 'safe-mode', () => send({ type: 'safe-mode', on: !on }), { secondary: !on, describedBy: text.id }));
+}
+
 async function drawCustomizations(): Promise<void> {
 	const root = document.getElementById('customizations')!;
 	let list: Listed[];
@@ -144,6 +177,9 @@ async function drawCustomizations(): Promise<void> {
 			criteria.append(li);
 		}
 		section.append(criteria);
+		if (item.preview) {
+			section.append(drawPreview(item, index));
+		}
 		const status = el('p', item.approved ? (item.blocked ? `Approved, but not shown: ${item.blocked}` : 'Approved: shown in the app.') : 'Waiting for approval.', 'status');
 		status.id = `customization-${index}-status`;
 		// Every section has the same button labels: which customization it is for, and its state, describe it.
@@ -166,6 +202,7 @@ async function drawActivity(): Promise<void> {
 		return;
 	}
 	const { activity, runs, paused } = reply;
+	drawSafeMode(reply.safeMode);
 	root.replaceChildren();
 	const all = el('p', paused ? 'Nothing runs on its own: you paused every customization’s triggers. ' : 'Customizations may run on their own as approved. ', 'status');
 	all.append(button(paused ? 'Resume all' : 'Pause all', 'pause-all', () => send({ type: 'pause-all', paused: !paused }), { secondary: true }));

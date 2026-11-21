@@ -7,3 +7,4 @@ button{font:inherit;border:1px solid var(--accent);border-radius:4px;background:
 button.secondary{background:transparent;color:var(--accent)}button+button{margin-left:6px}
 .activity li,.runs li{margin:4px 0}.muted{opacity:.8;font-size:13px}
 body.panel{max-width:none;margin:8px;padding:0}
+.preview{border-left:3px solid var(--accent);padding-left:10px;margin:12px 0}

@@ -4,7 +4,7 @@ import { CHROME, browserModel } from '../browser/surface.ts';
 import { tabsPerform } from '../browser/tabs.ts';
 import { activityFrom, appendActivity, describeActivity, undoRefusal, worthRecording, type Activity, type ActivitySource } from '../host/activity.ts';
 import { describers } from '../host/describe.ts';
-import { act, fromBundle, guarded, httpPerform, mountsFor, renderMount, unservable, type CallRecord, type Context, type Installed, type Mount, type PageContext } from '../host/gateway.ts';
+import { act, asPreview, fromBundle, guarded, httpPerform, mountsFor, previewGrant, renderMount, unservable, unverified, type CallRecord, type Context, type Installed, type Mount, type PageContext } from '../host/gateway.ts';
 import { CallError } from '../host/http.ts';
 import { originMatches } from '../host/pages.ts';
 import { describeTrigger, dueTriggers, nextRun, runInstalledTrigger, stateFor, triggerKey, unrunnable, type TriggerState } from '../host/runner.ts';
@@ -155,12 +155,41 @@ function recorder(installed: Installed, surface: Surface, source: ActivitySource
 	};
 }
 
+// Safe mode and previews -------------------------------------------------------------------------
+
+/** How long a preview lasts once the person asks for it. */
+const PREVIEW_MINUTES = 10;
+
+const SAFE_MODE_REASON = 'Safe mode is on: nothing is shown or run.';
+
+/** Safe mode: nothing is served, previewed or run; the options page, approval and undo still work. */
+const safeMode = () => read('safeMode', false);
+
+interface Preview {
+	/** When it ends, in ms since the epoch. */
+	until: number;
+	/** The spec version it was asked for: a new version needs asking again. */
+	specHash: string;
+}
+
+/** The customizations the person asked to preview, and that are still being previewed. */
+async function activePreviews(now: number = Date.now()): Promise<Set<string>> {
+	const previews = await read<Record<string, Preview>>('previews', {});
+	const customizations = await stored();
+	return new Set(Object.entries(previews).filter(([id, p]) => p.until > now && customizations[id]?.specHash === p.specHash && !customizations[id]?.grant).map(([id]) => id));
+}
+
+const titleOf = (m: Mount) => `${(m.installed.build.mount.title as string | undefined) ?? m.installed.title}${m.preview ? ' (preview)' : ''}`;
+
 async function pageFor(url: string): Promise<{ surface: Surface; mounts: Mount[] } | undefined> {
 	const surface = await surfaceFor(url);
 	if (!surface) {
 		return undefined;
 	}
-	return { surface, mounts: await mountsFor(Object.values(await stored()), surface, url) };
+	if (await safeMode()) {
+		return { surface, mounts: [] };
+	}
+	return { surface, mounts: await mountsFor(Object.values(await stored()), surface, url, await activePreviews()) };
 }
 
 /** An app page's context for one customization: calls to the page's origin, recorded as the person's. */
@@ -186,10 +215,19 @@ async function panelMounts(): Promise<{ surface: Surface; mounts: Mount[] } | un
 		return undefined;
 	}
 	const mounts: Mount[] = [];
+	if (await safeMode()) {
+		return { surface, mounts };
+	}
+	const previews = await activePreviews();
 	for (const installed of Object.values(await stored())) {
 		const slot = installed.build.mount.slot;
-		if (installed.build.surface.hash === surface.hash && browserModel(surface).pages[slot] === 'sidepanel.html' && (await unservable(installed, surface)) === undefined) {
+		if (installed.build.surface.hash !== surface.hash || browserModel(surface).pages[slot] !== 'sidepanel.html') {
+			continue;
+		}
+		if ((await unservable(installed, surface)) === undefined) {
 			mounts.push({ installed, slot, props: {} });
+		} else if (!installed.grant && previews.has(installed.id) && (await unverified(installed, surface)) === undefined) {
+			mounts.push({ installed: asPreview(installed, surface), slot, props: {}, preview: true });
 		}
 	}
 	return { surface, mounts };
@@ -209,7 +247,7 @@ async function fromContent(message: ContentMessage, url: string): Promise<unknow
 	}
 	const { surface, mounts } = found;
 	if (message.type === 'mounts') {
-		return mounts.map((m): MountInfo => ({ id: m.installed.id, title: (m.installed.build.mount.title as string | undefined) ?? m.installed.title, slot: m.slot, anchor: m.anchor! }));
+		return mounts.map((m): MountInfo => ({ id: m.installed.id, title: titleOf(m), slot: m.slot, anchor: m.anchor!, ...(m.preview ? { preview: true } : {}) }));
 	}
 	if (message.type === 'anchor') {
 		if (!mounts.some((m) => m.slot === message.slot) || (message.status !== 'moved' && message.status !== 'broken')) {
@@ -237,7 +275,7 @@ async function fromContent(message: ContentMessage, url: string): Promise<unknow
 async function fromPanel(message: Extract<PageMessage, { type: `panel-${string}` }>): Promise<unknown> {
 	const found = await panelMounts();
 	if (message.type === 'panel-mounts') {
-		return (found?.mounts ?? []).map((m): PanelInfo => ({ id: m.installed.id, title: (m.installed.build.mount.title as string | undefined) ?? m.installed.title }));
+		return (found?.mounts ?? []).map((m): PanelInfo => ({ id: m.installed.id, title: titleOf(m), ...(m.preview ? { preview: true } : {}) }));
 	}
 	const mount = found?.mounts.find((m) => m.installed.id === message.id);
 	if (!found || !mount) {
@@ -294,7 +332,7 @@ async function runTrigger(installed: Installed, surface: Surface, trigger: strin
 /** Starts the triggers that are due; what an alarm does. */
 async function tick(now: number = Date.now()): Promise<RunRecord[]> {
 	await whenReady();
-	if (await read('triggersPaused', false)) {
+	if ((await read('triggersPaused', false)) || (await safeMode())) {
 		return [];
 	}
 	const { surfaces } = await loadPackaged();
@@ -362,18 +400,23 @@ async function undoOnce(id: string): Promise<Activity> {
 
 // The options page -------------------------------------------------------------------------------
 
-async function listed(): Promise<Listed[]> {
+async function listed(now: number = Date.now()): Promise<Listed[]> {
 	const customizations = await stored();
 	const states = await triggerStates();
+	const safe = await safeMode();
+	const previews = await read<Record<string, Preview>>('previews', {});
+	const previewing = await activePreviews(now);
 	const result: Listed[] = [];
 	for (const installed of Object.values(customizations)) {
 		const surface = await surfaceOf(installed);
-		const blocked = surface ? await unservable(installed, surface) : 'The extension does not know this version of the app.';
+		const unserved = surface ? await unservable(installed, surface) : 'The extension does not know this version of the app.';
+		const blocked = safe && installed.grant ? (unserved ?? SAFE_MODE_REASON) : unserved;
+		const canPreview = !installed.grant && surface !== undefined && (await unverified(installed, surface)) === undefined;
 		const triggers = [];
 		for (const id of Object.keys(installed.build.triggers ?? {})) {
 			const described = describeTrigger(installed, surface, id);
 			const state = stateFor(installed, id, states);
-			const why = surface ? await unrunnable(installed, surface, id) : blocked;
+			const why = surface ? ((await unrunnable(installed, surface, id)) ?? (safe ? SAFE_MODE_REASON : undefined)) : blocked;
 			const schedule = installed.build.triggers?.[id]?.schedule;
 			const next = state.nextRun ?? (schedule && installed.approvedAt ? nextRun(schedule, Date.parse(installed.approvedAt), false) : undefined);
 			triggers.push({
@@ -397,6 +440,15 @@ async function listed(): Promise<Listed[]> {
 			})),
 			approved: installed.grant !== null,
 			...(blocked ? { blocked } : {}),
+			...(canPreview && !safe
+				? {
+						preview: {
+							reads: previewGrant(installed, surface!).map((scope) => surface!.scopes[scope]?.title ?? scope),
+							minutes: PREVIEW_MINUTES,
+							...(previewing.has(installed.id) ? { until: new Date(previews[installed.id]!.until).toISOString() } : {}),
+						},
+					}
+				: {}),
 			triggers,
 			...(triggers.length > 0 && surface?.triggers?.identity ? { identity: surface.triggers.identity } : {}),
 		});
@@ -415,6 +467,7 @@ async function activity(): Promise<ActivityReply> {
 		})),
 		runs: [...(await read<RunRecord[]>('runs', []))].reverse(),
 		paused: await read('triggersPaused', false),
+		safeMode: await safeMode(),
 	};
 }
 
@@ -427,6 +480,10 @@ async function fromOptions(message: OptionsMessage, now: number = Date.now()): P
 	}
 	if (message.type === 'undo') {
 		return undo(String(message.entry));
+	}
+	if (message.type === 'safe-mode') {
+		await update('safeMode', false, () => message.on === true);
+		return null;
 	}
 	if (message.type === 'pause-all') {
 		await update('triggersPaused', false, () => message.paused === true);
@@ -458,6 +515,9 @@ async function fromOptions(message: OptionsMessage, now: number = Date.now()): P
 		if (why) {
 			throw new Error(why);
 		}
+		if (message.op === 'run' && (await safeMode())) {
+			throw new Error(SAFE_MODE_REASON);
+		}
 		if (message.op === 'run' && state.paused) {
 			throw new Error('It is paused: resume it first, or try a dry run.');
 		}
@@ -466,7 +526,26 @@ async function fromOptions(message: OptionsMessage, now: number = Date.now()): P
 		}
 		throw new Error('Unknown message.');
 	}
+	if (message.type === 'preview') {
+		if (message.on === true) {
+			const surface = await surfaceOf(installed);
+			const why = installed.grant ? 'It is approved already.' : (await safeMode()) ? SAFE_MODE_REASON : surface ? await unverified(installed, surface) : 'The extension does not know this version of the app.';
+			if (why) {
+				throw new Error(why);
+			}
+		}
+		await update<Record<string, Preview>>('previews', {}, (previews) => {
+			const { [installed.id]: _previous, ...rest } = previews;
+			return message.on === true ? { ...rest, [installed.id]: { until: now + PREVIEW_MINUTES * 60_000, specHash: installed.specHash } } : rest;
+		});
+		return null;
+	}
 	if (message.type === 'approve') {
+		// Approving ends its preview.
+		await update<Record<string, Preview>>('previews', {}, (previews) => {
+			const { [installed.id]: _previous, ...rest } = previews;
+			return rest;
+		});
 		// The grants are what the spec asks for, as the person read it on the page: for its views, and for each trigger apart.
 		const triggerGrants = Object.fromEntries(Object.entries(installed.manifest.triggers ?? {}).map(([id, trigger]) => [id, [...trigger.permissions]]));
 		customizations[message.id] = {
@@ -532,7 +611,7 @@ void chrome.sidePanel?.setPanelBehavior({ openPanelOnActionClick: true }).catch(
 	runTrigger: async (id: string, trigger: string, options: { now?: number; dryRun?: boolean } = {}) => {
 		const installed = (await stored())[id];
 		const surface = installed ? await surfaceOf(installed) : undefined;
-		const why = installed && surface ? await unrunnable(installed, surface, trigger) : 'No such customization.';
+		const why = (await safeMode()) && !options.dryRun ? SAFE_MODE_REASON : installed && surface ? await unrunnable(installed, surface, trigger) : 'No such customization.';
 		if (why) {
 			throw new Error(why);
 		}

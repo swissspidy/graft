@@ -5,6 +5,7 @@ export { createCan, usableScopes } from './can.ts';
 export { a2uiNotes, browserA2UI, browserA2UIFormat, chromeA2UI, chromeA2UIFormat, chromeA2UINotes, nextState, renderA2UI, rowKey, type Rendered, type RenderedAction, type Tone, type ViewButton, type ViewNode } from './a2ui.ts';
 export {
 	act,
+	asPreview,
 	fromBundle,
 	gatewayCall,
 	guarded,
@@ -12,8 +13,11 @@ export {
 	mountsFor,
 	pageContext,
 	pageRole,
+	previewGrant,
 	renderMount,
 	unservable,
+	unverified,
+	withoutWrites,
 	type ActResult,
 	type Call,
 	type CallRecord,

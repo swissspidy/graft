@@ -10,7 +10,8 @@ extension's side panel. Everything customizations change is in an
 activity log, with Undo where the change can be put back, and
 customizations can run on their own on a schedule. The design and its
 limits are in [ADR 0011](../../docs/adr/0011-browser-extension-host.md)
-and [ADR 0017](../../docs/adr/0017-browser-activity-undo-and-triggers.md).
+[ADR 0017](../../docs/adr/0017-browser-activity-undo-and-triggers.md)
+and [ADR 0018](../../docs/adr/0018-preview-and-safe-mode-in-the-extension.md).
 
 The target app here is **Tasklet** (`fixtures/tasklet`), a small task
 tracker standing in for a third-party app: pages with ARIA landmarks, a
@@ -29,7 +30,9 @@ pnpm serve:extension      # Tasklet on http://127.0.0.1:4490 (--version 2 or 3 f
 1. In Chrome, open `chrome://extensions`, turn on Developer mode, and
    **Load unpacked** `hosts/chrome-extension/adapter/dist/extension`.
 2. Open the extension's options: **My open tasks** waits for approval,
-   with what it may do and the checks it passed. Approve it.
+   with what it may do and the checks it passed. **Preview** shows it
+   in Tasklet with your data for ten minutes, without its buttons.
+   Approve it.
 3. Sign in to Tasklet at http://127.0.0.1:4490/login?as=ada (a member;
    `grace` is a guest, `lin` the owner). The project's sidebar now shows
    Ada's open tasks, the overdue one marked, with **Done** buttons.
@@ -39,6 +42,8 @@ pnpm serve:extension      # Tasklet on http://127.0.0.1:4490 (--version 2 or 3 f
    the side panel lists tabs you have not used for more than a week.
    Under **Runs on its own**, try a dry run, pause it, or run it now.
    Whatever it closes can be opened again from **Activity**.
+6. **Turn on safe mode** at the top of the options page: nothing is
+   shown or run until you turn it off, and the options page still works.
 
 Restart Tasklet with `--version 2`: the sidebar's test id is renamed, and
 the customization is still there, found by its landmark. With

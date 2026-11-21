@@ -106,6 +106,23 @@ export async function unservable(installed: Installed, surface: Surface): Promis
 	if (!installed.grant) {
 		return 'It is waiting for approval.';
 	}
+	const unchecked = await unverified(installed, surface);
+	if (unchecked) {
+		return unchecked;
+	}
+	const missing = extractRefs(installed.build, surface).scopes.filter((scope) => !installed.grant!.includes(scope));
+	if (missing.length > 0) {
+		return `It needs permissions that were not approved: ${missing.join(', ')}.`;
+	}
+	return undefined;
+}
+
+/**
+ * Why a stored customization's build is not the verified build for this
+ * surface and spec, or undefined when it is. What serving needs apart from
+ * the grant; all a preview needs.
+ */
+export async function unverified(installed: Installed, surface: Surface): Promise<string | undefined> {
 	const { build, verification } = installed;
 	if (build.surface.hash !== surface.hash) {
 		return 'Its build is for another version of the app.';
@@ -116,11 +133,24 @@ export async function unservable(installed: Installed, surface: Surface): Promis
 	if (verification.surface?.hash !== surface.hash || (await verificationProblem(verification, build))) {
 		return 'Its build has not passed its checks for this version of the app.';
 	}
-	const missing = extractRefs(build, surface).scopes.filter((scope) => !installed.grant!.includes(scope));
-	if (missing.length > 0) {
-		return `It needs permissions that were not approved: ${missing.join(', ')}.`;
-	}
 	return undefined;
+}
+
+/**
+ * What a preview may use: the scopes of the read capabilities the build
+ * uses, of those its spec asks for. A preview reads with the person's
+ * account after they asked for it, and never writes.
+ */
+export function previewGrant(installed: Installed, surface: Surface): string[] {
+	const reads = extractRefs(installed.build, surface).capabilities.filter((name) => surface.capabilities[name]?.kind === 'read');
+	const scopes = new Set(reads.flatMap((name) => surface.capabilities[name]!.scopes));
+	return installed.manifest.permissions.filter((scope) => scopes.has(scope));
+}
+
+/** The customization as a preview draws it: unapproved, with only the preview's grant. */
+export function asPreview(installed: Installed, surface: Surface): Installed {
+	const { triggerGrants: _triggerGrants, ...rest } = installed;
+	return { ...rest, grant: previewGrant(installed, surface) };
 }
 
 /** A customization mounted on a page: where, and the slot props from the URL. */
@@ -130,10 +160,15 @@ export interface Mount {
 	/** Where it goes in an app's page; none for a place the extension owns (the side panel). */
 	anchor?: Anchor;
 	props: Record<string, unknown>;
+	/** A preview the person asked for before approving it: read-only, and drawn without its buttons that act. */
+	preview?: boolean;
 }
 
-/** The servable customizations whose slots are on this page. */
-export async function mountsFor(list: Installed[], surface: Surface, url: string): Promise<Mount[]> {
+/**
+ * The servable customizations whose slots are on this page, and the
+ * previews asked for (by id) of those that are not approved but verified.
+ */
+export async function mountsFor(list: Installed[], surface: Surface, url: string, previews: ReadonlySet<string> = new Set()): Promise<Mount[]> {
 	const model = appModel(surface);
 	if (!model.app.origins.some((origin) => originMatches(origin, url))) {
 		return [];
@@ -143,8 +178,13 @@ export async function mountsFor(list: Installed[], surface: Surface, url: string
 		const slot = installed.build.mount.slot;
 		const anchor = model.anchors[slot];
 		const props = anchor ? slotProps(anchor, url) : undefined;
-		if (anchor && props && (await unservable(installed, surface)) === undefined) {
+		if (!anchor || !props) {
+			continue;
+		}
+		if ((await unservable(installed, surface)) === undefined) {
 			mounts.push({ installed, slot, anchor, props });
+		} else if (!installed.grant && previews.has(installed.id) && (await unverified(installed, surface)) === undefined) {
+			mounts.push({ installed: asPreview(installed, surface), slot, anchor, props, preview: true });
 		}
 	}
 	return mounts;
@@ -213,8 +253,8 @@ export async function guarded(
 	}
 }
 
-/** The gateway for one customization on one page. */
-export function gatewayCall(installed: Installed, surface: Surface, run: Perform, hooks: GatewayHooks = {}): Call {
+/** The gateway for one customization on one page; read-only for a preview. */
+export function gatewayCall(installed: Installed, surface: Surface, run: Perform, hooks: GatewayHooks = {}, options: { readOnly?: boolean } = {}): Call {
 	const used = new Set(extractRefs(installed.build, surface).capabilities);
 	const grant = installed.grant ?? [];
 	return async (capability, input) => {
@@ -223,6 +263,8 @@ export function gatewayCall(installed: Installed, surface: Surface, run: Perform
 		let refusal: CallError | undefined;
 		if (!declared || !used.has(capability)) {
 			refusal = new CallError('graft_capability_not_in_build', `This customization does not use "${capability}".`);
+		} else if (options.readOnly && declared.kind !== 'read') {
+			refusal = new CallError('graft_preview_read_only', 'This is a preview: nothing changes until you approve it.');
 		} else if (!declared.scopes.every((scope) => grant.includes(scope))) {
 			refusal = new CallError('graft_not_granted', `"${capability}" needs a permission that was not approved.`);
 		} else if (!compileSchema(declared.input as object)(value)) {
@@ -284,7 +326,7 @@ export async function renderMount(where: PageContext | Context, mount: Mount, st
 	const { installed } = mount;
 	const viewer = role ?? (await ctx.role());
 	const audience = installed.manifest.audience ?? [];
-	const call = gatewayCall(installed, ctx.surface, ctx.perform, ctx);
+	const call = gatewayCall(installed, ctx.surface, ctx.perform, ctx, { readOnly: mount.preview === true });
 	if (audience.length > 0 && (viewer === undefined || !audience.includes(viewer))) {
 		return { view: [], actions: [], problems: [], call, state };
 	}
@@ -299,8 +341,12 @@ export async function renderMount(where: PageContext | Context, mount: Mount, st
 			errors.push(errorMessage(error));
 		}
 	}
-	const rendered = renderA2UI(installed.build, { data, slot: mount.props, can, now }, installed.id, state);
+	const drawn = renderA2UI(installed.build, { data, slot: mount.props, can, now }, installed.id, state);
+	const rendered = mount.preview ? withoutWrites(drawn) : drawn;
 	const notices: ViewNode[] = [];
+	if (mount.preview) {
+		notices.push({ type: 'notice', tone: 'info', text: 'Preview with your data: it reads, and changes nothing until you approve it on the options page.' });
+	}
 	if (errors.length > 0) {
 		notices.push({ type: 'notice', tone: 'error', text: `Some data could not be loaded. ${errors.join(' ')}` });
 	}
@@ -308,6 +354,25 @@ export async function renderMount(where: PageContext | Context, mount: Mount, st
 		notices.push({ type: 'notice', tone: 'error', text: `Some of this could not be drawn. ${rendered.problems.join(' ')}` });
 	}
 	return { ...rendered, view: [...notices, ...rendered.view], call, state };
+}
+
+/** A render with every button that would call a capability taken out; local ones (filters, tabs) stay. */
+export function withoutWrites(rendered: Rendered): Rendered {
+	const gone = new Set(rendered.actions.filter((a) => a.action).map((a) => a.key));
+	const strip = (nodes: ViewNode[]): ViewNode[] =>
+		nodes.flatMap((node): ViewNode[] => {
+			if (node.type === 'button') {
+				return gone.has(node.button.key) ? [] : [node];
+			}
+			if (node.type === 'group') {
+				return [{ ...node, children: strip(node.children) }];
+			}
+			if (node.type === 'table') {
+				return [{ ...node, rows: node.rows.map((row) => ({ ...row, buttons: row.buttons.filter((b) => !gone.has(b.key)) })) }];
+			}
+			return [node];
+		});
+	return { ...rendered, view: strip(rendered.view), actions: rendered.actions.map((a) => (a.action ? { ...a, available: false } : a)) };
 }
 
 export interface ActResult {

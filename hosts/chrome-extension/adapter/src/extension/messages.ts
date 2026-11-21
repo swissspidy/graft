@@ -29,7 +29,9 @@ export type OptionsMessage =
 	| { type: 'activity' }
 	| { type: 'undo'; entry: string }
 	| { type: 'trigger'; id: string; trigger: string; op: 'pause' | 'resume' | 'run' | 'dry-run' }
-	| { type: 'pause-all'; paused: boolean };
+	| { type: 'pause-all'; paused: boolean }
+	| { type: 'safe-mode'; on: boolean }
+	| { type: 'preview'; id: string; on: boolean };
 
 export type PageMessage = PanelMessage | OptionsMessage;
 
@@ -38,11 +40,14 @@ export interface MountInfo {
 	title: string;
 	slot: string;
 	anchor: Anchor;
+	/** A preview: read-only until it is approved. */
+	preview?: boolean;
 }
 
 export interface PanelInfo {
 	id: string;
 	title: string;
+	preview?: boolean;
 }
 
 export interface RenderReply {
@@ -78,6 +83,8 @@ export interface Listed {
 	approved: boolean;
 	/** Why it is not served, if it is not. */
 	blocked?: string;
+	/** For a verified customization waiting for approval: what a preview would read, for how long, and until when it runs if it does. */
+	preview?: { reads: string[]; minutes: number; until?: string };
 	triggers: ListedTrigger[];
 	/** Who its triggers act as, in words. */
 	identity?: string;
@@ -98,6 +105,7 @@ export interface ActivityReply {
 	activity: Array<Activity & { canUndo: boolean; text: string }>;
 	runs: RunRecord[];
 	paused: boolean;
+	safeMode: boolean;
 }
 
 /** What the service worker noticed about the app drifting from its surface. */

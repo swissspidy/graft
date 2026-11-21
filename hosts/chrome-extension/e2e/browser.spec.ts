@@ -86,3 +86,17 @@ test('pausing every trigger stops them all', async ({ context, extensionId, appr
 	expect(await tick(worker, Date.now() + 8 * DAY)).toEqual([]);
 	expect(stale.isClosed()).toBe(false);
 });
+
+test('a preview of a side panel customization is drawn there, read-only, until it ends', async ({ context, extensionId }) => {
+	const options = await tab(context, `chrome-extension://${extensionId}/options.html`);
+	const section = options.locator('section', { has: options.getByRole('heading', { name: 'Stale tabs' }) });
+	await expect(section.locator('.preview')).toContainText('It may read: See the titles and addresses of your open tabs.');
+	await section.getByRole('button', { name: 'Preview' }).click();
+	const panel = await tab(context, `chrome-extension://${extensionId}/sidepanel.html`);
+	const box = panel.getByRole('region', { name: 'Stale tabs (preview)' });
+	await expect(box.getByText('No stale tabs')).toBeVisible();
+	await section.getByRole('button', { name: 'Stop the preview' }).click();
+	await expect(section.getByRole('button', { name: 'Preview' })).toBeVisible();
+	await panel.reload();
+	await expect(panel.getByText('Nothing here yet.')).toBeVisible();
+});
