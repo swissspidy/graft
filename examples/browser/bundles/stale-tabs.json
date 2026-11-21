@@ -42,7 +42,7 @@
 				"surface": {
 					"host": "chrome",
 					"hostVersion": "121",
-					"hash": "sha256:9cff419b4b45541b336152c34c1425b7ee9fda2b6b6b816d095db0ebe9bf084b"
+					"hash": "sha256:09a2a51fd7e522dd49d3dba66a774bba5ac421a4c195705a036d1cb5a6f4d17c"
 				},
 				"mount": {
 					"slot": "side-panel",
@@ -501,7 +501,7 @@
 			},
 			"verification": {
 				"passed": true,
-				"build": "sha256:85b6003f342f3e4b0056fc73b8d30362d10e962c7c2e4f55cd78f39a2861595e",
+				"build": "sha256:d4cd75e9263f0424bff24bf37e9afa15986652d1b04558d4250ca124602f57d6",
 				"spec": {
 					"id": "stale-tabs",
 					"hash": "sha256:c9f690cd3fbb3b2a3f651a2af49d5d65d84f2cfbd85c4775fe7884067a66c73c"
@@ -509,7 +509,7 @@
 				"surface": {
 					"host": "chrome",
 					"hostVersion": "121",
-					"hash": "sha256:9cff419b4b45541b336152c34c1425b7ee9fda2b6b6b816d095db0ebe9bf084b"
+					"hash": "sha256:09a2a51fd7e522dd49d3dba66a774bba5ac421a4c195705a036d1cb5a6f4d17c"
 				},
 				"results": [
 					{
@@ -568,7 +568,7 @@
 					}
 				],
 				"unchecked": [],
-				"verifiedAt": "2026-11-19T16:22:17.180Z"
+				"verifiedAt": "2026-11-21T00:31:16.877Z"
 			}
 		}
 	]

@@ -40,7 +40,7 @@
 						"type": "boolean"
 					},
 					"unusedForDays": {
-						"description": "Only tabs last used more than this many days ago.",
+						"description": "Only tabs last used more than this many days ago; a tab in front of its window is in use.",
 						"type": "integer",
 						"minimum": 1,
 						"maximum": 365
@@ -323,5 +323,5 @@
 		],
 		"events": {}
 	},
-	"hash": "sha256:9cff419b4b45541b336152c34c1425b7ee9fda2b6b6b816d095db0ebe9bf084b"
+	"hash": "sha256:09a2a51fd7e522dd49d3dba66a774bba5ac421a4c195705a036d1cb5a6f4d17c"
 }

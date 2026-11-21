@@ -54,6 +54,8 @@ test('a week later, the trigger closes unpinned tabs on its own, and a closed ta
 	}
 	const pinned = await tab(context, `${app.url}/login?pinned`);
 	const stale = await tab(context, `${app.url}/login?stale`);
+	// The tab in front is in use however long ago it was brought there: the stale one goes to the back.
+	await pinned.bringToFront();
 	await worker.evaluate(async (url) => {
 		const [found] = await chrome.tabs.query({ url });
 		await chrome.tabs.update(found!.id!, { pinned: true });

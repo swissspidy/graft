@@ -7,7 +7,7 @@
 	"surface": {
 		"host": "chrome",
 		"hostVersion": "121",
-		"hash": "sha256:9cff419b4b45541b336152c34c1425b7ee9fda2b6b6b816d095db0ebe9bf084b"
+		"hash": "sha256:09a2a51fd7e522dd49d3dba66a774bba5ac421a4c195705a036d1cb5a6f4d17c"
 	},
 	"mount": {
 		"slot": "side-panel",

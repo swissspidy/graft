@@ -33,8 +33,12 @@ export interface Activity {
 	outcome: CallRecord['outcome'];
 	code?: string;
 	error?: string;
-	/** How to put it back; `done` once it was, `error` when that failed. */
-	undo?: UndoCall & { done?: string; error?: string };
+	/**
+	 * How to put it back; `done` once it was, `error` when that failed.
+	 * `started` marks an undo that ran and may have changed something,
+	 * whose outcome was not saved: it is not offered again.
+	 */
+	undo?: UndoCall & { done?: string; error?: string; started?: string };
 }
 
 /** Most entries kept. */
@@ -88,6 +92,9 @@ export function undoRefusal(entry: Activity | undefined, surface: Surface | unde
 	if (entry.undo.done) {
 		return 'It was undone already.';
 	}
+	if (entry.undo.started) {
+		return 'It is being undone, or was, and the result could not be saved.';
+	}
 	if (!surface || surface.hash !== entry.surface) {
 		return 'The extension no longer has the version of the app this was done on.';
 	}
@@ -103,9 +110,22 @@ export function undoRefusal(entry: Activity | undefined, surface: Surface | unde
 	return undefined;
 }
 
-/** A call in words: the capability's description and its input. */
-export function describeActivity(entry: Activity): string {
+/** A web address as the log shows it: without its query and fragment, which can hold tokens. */
+function shortUrl(value: string): string {
+	try {
+		const url = new URL(value);
+		return url.protocol === 'http:' || url.protocol === 'https:' ? `${url.origin}${url.pathname}${url.search || url.hash ? '…' : ''}` : value;
+	} catch {
+		return value;
+	}
+}
+
+const shown = (value: unknown): unknown =>
+	typeof value === 'string' ? shortUrl(value) : Array.isArray(value) ? value.map(shown) : typeof value === 'object' && value !== null ? Object.fromEntries(Object.entries(value).map(([k, v]) => [k, shown(v)])) : value;
+
+/** A call in words: the capability's description and its input, with web addresses shortened. */
+export function describeActivity(entry: Pick<Activity, 'description' | 'capability' | 'input'>): string {
 	const what = entry.description ?? entry.capability;
-	const input = JSON.stringify(entry.input);
+	const input = JSON.stringify(shown(entry.input));
 	return input && input !== '{}' && input !== 'null' ? `${what} (${input})` : what;
 }

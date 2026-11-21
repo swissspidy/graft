@@ -115,8 +115,20 @@ async function installPackaged(): Promise<void> {
 	// Woken every 15 minutes to start the triggers that are due; schedules are at least an hour apart. Created
 	// once: creating it again on every start of the service worker would push it back each time, and a busy
 	// browser would never let it fire.
-	if (surfaces.some((surface) => surface.triggers) && !(await chrome.alarms.get(ALARM))) {
-		await chrome.alarms.create(ALARM, { periodInMinutes: 15 });
+	if (surfaces.some((surface) => surface.triggers)) {
+		// Apart from readiness: a scheduling failure must not stop the views and the options page from working.
+		void scheduleTriggers();
+	}
+}
+
+/** The alarm that starts due triggers; retried on the next start of the service worker if setting it failed. */
+async function scheduleTriggers(): Promise<void> {
+	try {
+		if (!(await chrome.alarms.get(ALARM))) {
+			await chrome.alarms.create(ALARM, { periodInMinutes: 15 });
+		}
+	} catch (error) {
+		console.error('Graft: triggers cannot be scheduled:', error);
 	}
 }
 
@@ -150,7 +162,10 @@ async function recordActivity(entry: Activity): Promise<void> {
 function recorder(installed: Installed, surface: Surface, source: ActivitySource, origin?: string) {
 	return (record: CallRecord) => {
 		if (worthRecording(record)) {
-			void recordActivity(activityFrom(record, { customization: installed.id, title: installed.title, source, surface, ...(origin ? { origin } : {}) }));
+			recordActivity(activityFrom(record, { customization: installed.id, title: installed.title, source, surface, ...(origin ? { origin } : {}) })).catch((error: unknown) => {
+				// The call is done and is not repeated; what is lost is its entry (and its Undo), which is said here.
+				console.error(`Graft: "${record.capability}" by ${installed.id} could not be added to the activity log:`, error);
+			});
 		}
 	};
 }
@@ -310,12 +325,35 @@ async function recordRun(record: RunRecord): Promise<void> {
 /** Runs one trigger now: on its schedule, because someone asked, or as a dry run that changes nothing. */
 async function runTrigger(installed: Installed, surface: Surface, trigger: string, how: RunRecord['how'], now: number): Promise<RunRecord> {
 	const states = await triggerStates();
+	// Tabs "unused for more than N days" count to the run's clock.
+	const tabs = tabsPerform(chromeTabs(), () => now);
+	const granted = installed.triggerGrants?.[trigger] ?? [];
+	/** Why the run must stop before its next call: safe mode, a pause, or a grant revoked since it started. */
+	const stopped = async (): Promise<string | undefined> => {
+		if (await safeMode()) {
+			return SAFE_MODE_REASON;
+		}
+		const current = (await stored())[installed.id];
+		if (!current?.grant || current.specHash !== installed.specHash || !granted.every((scope) => current.triggerGrants?.[trigger]?.includes(scope))) {
+			return 'Its approval was revoked.';
+		}
+		if (how === 'schedule' && ((await read('triggersPaused', false)) || stateFor(current, trigger, await triggerStates()).paused)) {
+			return 'It was paused.';
+		}
+		return undefined;
+	};
 	const { run, state } = await runInstalledTrigger({
 		installed,
 		surface,
 		trigger,
-		// Tabs "unused for more than N days" count to the run's clock.
-		perform: tabsPerform(chromeTabs(), () => now),
+		// Checked before every call, so nothing starts after safe mode, a pause or a revocation takes effect.
+		perform: async (name, capability, input) => {
+			const why = await stopped();
+			if (why) {
+				throw new CallError('graft_trigger_stopped', why);
+			}
+			return tabs(name, capability, input);
+		},
 		state: stateFor(installed, trigger, states),
 		now,
 		dryRun: how === 'dry-run',
@@ -384,13 +422,19 @@ async function undoOnce(id: string): Promise<Activity> {
 	}
 	const perform = surface!.host === CHROME ? tabsPerform(chromeTabs()) : httpPerform(entry!.origin!, (input, init) => fetch(input, init));
 	const installed = { id: entry!.customization, title: entry!.title } as Installed;
+	// Marked before the reverse runs: if saving its outcome fails afterwards, the entry is not offered again.
+	const started = new Date().toISOString();
+	await update<Activity[]>('activity', [], (current) => current.map((e) => (e.id === id ? { ...e, undo: { ...reverse, started } } : e)));
 	let error: string | undefined;
+	let changed = true;
 	try {
 		await guarded(reverse.capability, declared, reverse.input, refusal, perform, { onCall: recorder(installed, surface!, { kind: 'undo', of: entry!.id }, entry!.origin) });
 	} catch (caught) {
 		error = (caught as Error).message;
+		// Refused by the gateway or by the host: nothing changed, so it may be tried again.
+		changed = !(caught instanceof CallError && (caught.code.startsWith('graft_') || caught.code.startsWith('host_')) && caught.code !== 'host_unreachable' && caught.code !== 'graft_drift');
 	}
-	const done: Activity = { ...entry!, undo: { ...reverse, ...(error ? { error } : { done: new Date().toISOString() }) } };
+	const done: Activity = { ...entry!, undo: { ...reverse, ...(error ? { error, ...(changed ? { started } : {}) } : { done: new Date().toISOString() }) } };
 	await update<Activity[]>('activity', [], (current) => current.map((e) => (e.id === id ? done : e)));
 	if (error) {
 		throw new Error(`It could not be undone: ${error}`);
@@ -460,11 +504,16 @@ async function activity(): Promise<ActivityReply> {
 	const { surfaces } = await loadPackaged();
 	const log = await read<Activity[]>('activity', []);
 	return {
-		activity: [...log].reverse().map((entry) => ({
-			...entry,
-			text: describeActivity(entry),
-			canUndo: undoRefusal(entry, surfaces.find((s) => s.hash === entry.surface)) === undefined,
-		})),
+		// What the page needs to show, not the raw inputs: those stay in the service worker, for Undo.
+		activity: [...log].reverse().map((full) => {
+			const { input: _input, undo, ...entry } = full;
+			return {
+				...entry,
+				...(undo ? { undo: { capability: undo.capability, ...(undo.done ? { done: undo.done } : {}), ...(undo.error ? { error: undo.error } : {}) } } : {}),
+				text: describeActivity(full),
+				canUndo: undoRefusal(full, surfaces.find((s) => s.hash === full.surface)) === undefined,
+			};
+		}),
 		runs: [...(await read<RunRecord[]>('runs', []))].reverse(),
 		paused: await read('triggersPaused', false),
 		safeMode: await safeMode(),
@@ -540,27 +589,33 @@ async function fromOptions(message: OptionsMessage, now: number = Date.now()): P
 		});
 		return null;
 	}
+	if (message.type !== 'approve' && message.type !== 'revoke') {
+		throw new Error('Unknown message.');
+	}
+	// In the storage queue, on the map as it is then: two approvals at once must not drop each other.
+	await update<Record<string, Installed>>('customizations', {}, (latest) => {
+		const current = latest[message.id];
+		if (!current) {
+			return latest;
+		}
+		if (message.type === 'revoke') {
+			const { approvedAt: _approvedAt, triggerGrants: _triggerGrants, ...rest } = current;
+			return { ...latest, [message.id]: { ...rest, grant: null } };
+		}
+		// The grants are what the spec asks for, as the person read it on the page: for its views, and for each trigger apart.
+		const triggerGrants = Object.fromEntries(Object.entries(current.manifest.triggers ?? {}).map(([id, trigger]) => [id, [...trigger.permissions]]));
+		return {
+			...latest,
+			[message.id]: { ...current, grant: [...current.manifest.permissions], ...(Object.keys(triggerGrants).length > 0 ? { triggerGrants } : {}), approvedAt: new Date(now).toISOString() },
+		};
+	});
 	if (message.type === 'approve') {
-		// Approving ends its preview.
+		// Approving ends its preview, once the approval is saved.
 		await update<Record<string, Preview>>('previews', {}, (previews) => {
 			const { [installed.id]: _previous, ...rest } = previews;
 			return rest;
 		});
-		// The grants are what the spec asks for, as the person read it on the page: for its views, and for each trigger apart.
-		const triggerGrants = Object.fromEntries(Object.entries(installed.manifest.triggers ?? {}).map(([id, trigger]) => [id, [...trigger.permissions]]));
-		customizations[message.id] = {
-			...installed,
-			grant: [...installed.manifest.permissions],
-			...(Object.keys(triggerGrants).length > 0 ? { triggerGrants } : {}),
-			approvedAt: new Date(now).toISOString(),
-		};
-	} else if (message.type === 'revoke') {
-		const { approvedAt: _approvedAt, triggerGrants: _triggerGrants, ...rest } = installed;
-		customizations[message.id] = { ...rest, grant: null };
-	} else {
-		throw new Error('Unknown message.');
 	}
-	await store(customizations);
 	return null;
 }
 

@@ -102,7 +102,8 @@ export interface RunRecord {
 
 /** The activity page of the options page: newest first. */
 export interface ActivityReply {
-	activity: Array<Activity & { canUndo: boolean; text: string }>;
+	/** Without the raw inputs, which stay in the service worker for Undo. */
+	activity: Array<Omit<Activity, 'input' | 'undo'> & { undo?: { capability: string; done?: string; error?: string }; canUndo: boolean; text: string }>;
 	runs: RunRecord[];
 	paused: boolean;
 	safeMode: boolean;

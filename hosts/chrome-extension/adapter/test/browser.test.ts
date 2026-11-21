@@ -32,7 +32,9 @@ describe('the browser surface', () => {
 		];
 		expect(listTabs(tabs, {}, now).map((t) => t.id)).toEqual([2, 1, 3]);
 		expect(listTabs(tabs, { pinned: false, unusedForDays: 7 }, now).map((t) => t.id)).toEqual([1]);
-		expect(listTabs(tabs, { unusedForDays: 7 }, now + 30 * DAY).map((t) => t.id)).toEqual([2, 1, 3]);
+		// The tab in front is in use, however long ago it was brought there (Chrome does not update lastAccessed while it stays).
+		expect(listTabs(tabs, { unusedForDays: 7 }, now + 30 * DAY).map((t) => t.id)).toEqual([2, 1]);
+		expect(listTabs(tabs, {}, now + 30 * DAY).map((t) => t.id)).toEqual([2, 1, 3]);
 	});
 
 	it('opens web pages only, and answers a closed tab with what it takes to open it again', async () => {

@@ -218,7 +218,7 @@ export interface GatewayHooks {
 	onCall?: (record: CallRecord) => void;
 }
 
-const REFUSALS = new Set(['graft_capability_not_in_build', 'graft_not_granted', 'graft_invalid_input', 'graft_invalid_binding', 'graft_capability_not_in_trigger', 'graft_capability_not_unattended']);
+const REFUSALS = new Set(['graft_capability_not_in_build', 'graft_not_granted', 'graft_invalid_input', 'graft_invalid_binding', 'graft_capability_not_in_trigger', 'graft_capability_not_unattended', 'graft_trigger_stopped', 'graft_preview_read_only']);
 
 /**
  * Runs `perform` behind checks and reports the outcome: what refusal or

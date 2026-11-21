@@ -53,7 +53,8 @@ export function listTabs(tabs: Tab[], input: Record<string, unknown>, now: numbe
 	const days = typeof input.unusedForDays === 'number' ? input.unusedForDays : undefined;
 	return tabs
 		.filter((tab) => typeof input.pinned !== 'boolean' || tab.pinned === input.pinned)
-		.filter((tab) => days === undefined || (typeof tab.lastAccessed === 'number' && now - tab.lastAccessed > days * DAY))
+		// Chrome sets lastAccessed when a tab is brought to the front, and not while it stays there: a tab in front is in use, however old that is.
+		.filter((tab) => days === undefined || (!tab.active && typeof tab.lastAccessed === 'number' && now - tab.lastAccessed > days * DAY))
 		.sort((a, b) => (a.lastAccessed ?? 0) - (b.lastAccessed ?? 0) || a.id - b.id);
 }
 

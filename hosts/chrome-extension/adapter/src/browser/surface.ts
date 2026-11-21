@@ -55,7 +55,7 @@ const capabilities: Record<string, Capability & { binding: TabsBinding }> = {
 			type: 'object',
 			properties: {
 				pinned: { type: 'boolean' },
-				unusedForDays: { description: 'Only tabs last used more than this many days ago.', type: 'integer', minimum: 1, maximum: 365 },
+				unusedForDays: { description: 'Only tabs last used more than this many days ago; a tab in front of its window is in use.', type: 'integer', minimum: 1, maximum: 365 },
 			},
 			additionalProperties: false,
 		},

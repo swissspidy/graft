@@ -2,7 +2,7 @@ import { readFile } from 'node:fs/promises';
 import { describe, expect, it } from 'vitest';
 import type { Capability, Surface } from '@swissspidy/graft-core';
 import { tasklet } from '../src/apps/tasklet.ts';
-import { activityFrom, appendActivity, undoRefusal, worthRecording } from '../src/host/activity.ts';
+import { activityFrom, appendActivity, describeActivity, undoRefusal, worthRecording } from '../src/host/activity.ts';
 import { appSurface } from '../src/host/surface.ts';
 import { undoCall, undoProblems } from '../src/host/undo.ts';
 
@@ -68,6 +68,16 @@ describe('the activity log', () => {
 		expect(undoRefusal({ ...done, undo: { ...done.undo!, done: '2026-11-19T00:01:00.000Z' } }, surface)).toBe('It was undone already.');
 		// Undone on the surface the call was made on, or not at all.
 		expect(undoRefusal(done, { ...surface, hash: 'sha256:other' })).toBe('The extension no longer has the version of the app this was done on.');
+	});
+
+	it('does not offer again an undo whose outcome was not saved', () => {
+		const done = activityFrom({ capability: 'tasks.complete', kind: 'write', input: { id: 't2' }, outcome: 'ok', output: { id: 't2' } }, where);
+		expect(undoRefusal({ ...done, undo: { ...done.undo!, started: '2026-11-21T00:00:00.000Z' } }, surface)).toBe('It is being undone, or was, and the result could not be saved.');
+	});
+
+	it('shows web addresses without their query and fragment, which can hold tokens', () => {
+		expect(describeActivity({ capability: 'tabs.open', description: 'Opens a web page.', input: { url: 'https://example.com/reset?token=secret#x' } })).toBe('Opens a web page. ({"url":"https://example.com/reset…"})');
+		expect(describeActivity({ capability: 'tabs.open', input: { url: 'https://example.com/a' } })).toBe('tabs.open ({"url":"https://example.com/a"})');
 	});
 
 	it('keeps the latest entries', () => {
