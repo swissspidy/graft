@@ -2,7 +2,8 @@ import { readFile } from 'node:fs/promises';
 import { describe, expect, it } from 'vitest';
 import type { Capability, Surface } from '@swissspidy/graft-core';
 import { tasklet } from '../src/apps/tasklet.ts';
-import { activityFrom, appendActivity, describeActivity, undoRefusal, worthRecording } from '../src/host/activity.ts';
+import { activityFrom, appendActivity, changedNothing, describeActivity, undoRefusal, worthRecording } from '../src/host/activity.ts';
+import { CallError } from '../src/host/http.ts';
 import { appSurface } from '../src/host/surface.ts';
 import { undoCall, undoProblems } from '../src/host/undo.ts';
 
@@ -89,6 +90,18 @@ describe('the activity log', () => {
 		const reopened = activityFrom({ capability: 'tabs.open', kind: 'write', input: { url }, outcome: 'ok', output: { id: 4, url } }, { ...at, source: { kind: 'undo', of: closed.id } });
 		expect(reopened.input).toEqual({ url: 'https://example.com/reset…' });
 		expect(JSON.stringify(reopened)).not.toContain('secret');
+	});
+
+	it('lets an undo be tried again only after a refusal known to change nothing', () => {
+		const error = (code: string) => new CallError(code, code);
+		for (const code of ['graft_invalid_input', 'graft_not_granted', 'host_forbidden', 'host_unauthorized', 'host_not_found']) {
+			expect(changedNothing(error(code))).toBe(true);
+		}
+		// A 500 can come after the change took effect; so can a timeout or an answer that does not match.
+		for (const code of ['host_error', 'host_unreachable', 'graft_drift']) {
+			expect(changedNothing(error(code))).toBe(false);
+		}
+		expect(changedNothing(new Error('anything'))).toBe(false);
 	});
 
 	it('keeps the latest entries', () => {

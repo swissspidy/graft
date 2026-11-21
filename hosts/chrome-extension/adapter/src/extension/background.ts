@@ -2,7 +2,7 @@ import { compileSchema, describeCheck, setSchemaEngine, validateSpec, type Custo
 import { cfworkerEngine } from '@swissspidy/graft-core/cfworker';
 import { CHROME, browserModel } from '../browser/surface.ts';
 import { tabsPerform } from '../browser/tabs.ts';
-import { activityFrom, appendActivity, describeActivity, undoRefusal, worthRecording, type Activity, type ActivitySource } from '../host/activity.ts';
+import { activityFrom, appendActivity, changedNothing, describeActivity, undoRefusal, worthRecording, type Activity, type ActivitySource } from '../host/activity.ts';
 import { describers } from '../host/describe.ts';
 import { act, asPreview, fromBundle, guarded, httpPerform, mountsFor, previewGrant, renderMount, unservable, unverified, type CallRecord, type Context, type Installed, type Mount, type PageContext } from '../host/gateway.ts';
 import { CallError } from '../host/http.ts';
@@ -431,8 +431,8 @@ async function undoOnce(id: string): Promise<Activity> {
 		await guarded(reverse.capability, declared, reverse.input, refusal, perform, { onCall: recorder(installed, surface!, { kind: 'undo', of: entry!.id }, entry!.origin) });
 	} catch (caught) {
 		error = (caught as Error).message;
-		// Refused by the gateway or by the host: nothing changed, so it may be tried again.
-		changed = !(caught instanceof CallError && (caught.code.startsWith('graft_') || caught.code.startsWith('host_')) && caught.code !== 'host_unreachable' && caught.code !== 'graft_drift');
+		// Only a refusal known to change nothing lets it be tried again; anything else may have taken effect.
+		changed = !changedNothing(caught);
 	}
 	const done: Activity = { ...entry!, undo: { ...reverse, ...(error ? { error, ...(changed ? { started } : {}) } : { done: new Date().toISOString() }) } };
 	await update<Activity[]>('activity', [], (current) => current.map((e) => (e.id === id ? done : e)));

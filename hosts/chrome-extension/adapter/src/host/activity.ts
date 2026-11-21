@@ -1,5 +1,6 @@
 import type { Surface } from '@swissspidy/graft-core';
 import type { CallRecord } from './gateway.ts';
+import { CallError } from './http.ts';
 import { undoCall, type UndoCall } from './undo.ts';
 
 /**
@@ -130,4 +131,21 @@ export function describeActivity(entry: Pick<Activity, 'description' | 'capabili
 	const what = entry.description ?? entry.capability;
 	const input = JSON.stringify(shown(entry.input));
 	return input && input !== '{}' && input !== 'null' ? `${what} (${input})` : what;
+}
+
+/** Refusals by the host that are known to change nothing: the app said no before acting, or the tab was gone. */
+const HOST_REFUSALS = new Set(['host_unauthorized', 'host_forbidden', 'host_not_found']);
+
+/**
+ * Whether a failed call is known to have changed nothing, so it may be
+ * tried again: the gateway's own refusals (before any request), and the
+ * host's refusals above. Not an unreachable host, an answer that does not
+ * match (drift), or any other host error such as a 500, which can come
+ * after the change took effect.
+ */
+export function changedNothing(error: unknown): boolean {
+	if (!(error instanceof CallError)) {
+		return false;
+	}
+	return (error.code.startsWith('graft_') && error.code !== 'graft_drift') || HOST_REFUSALS.has(error.code);
 }
