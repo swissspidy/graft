@@ -247,3 +247,14 @@ export function stoppable(exclusive: <T>(step: (peek: Peek) => Promise<T>) => Pr
 			return perform(name, capability, input);
 		});
 }
+
+/**
+ * Pause or resume a trigger in the stored states, as they are when the
+ * change gets its turn in the storage queue: whatever a run saved before
+ * (its schedule, the targets it handled) is kept.
+ */
+export function pauseOrResume(states: Record<string, TriggerState>, installed: Installed, trigger: string, op: 'pause' | 'resume', now: number): Record<string, TriggerState> {
+	const { paused: _paused, ...latest } = stateFor(installed, trigger, states);
+	const changed: TriggerState = op === 'pause' ? { ...latest, paused: { at: new Date(now).toISOString(), reason: 'Paused by you.' } } : { ...latest, failures: 0 };
+	return { ...states, [triggerKey(installed.id, trigger)]: changed };
+}

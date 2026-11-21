@@ -3,7 +3,7 @@ import { describe, expect, it } from 'vitest';
 import type { CustomizationBundle, Surface } from '@swissspidy/graft-core';
 import { tabsPerform } from '../src/browser/tabs.ts';
 import { fromBundle, type CallRecord, type Installed } from '../src/host/gateway.ts';
-import { afterRun, dueTriggers, nextRun, PAUSE_AFTER_FAILURES, runInstalledTrigger, stateFor, stopReason, stoppable, unrunnable } from '../src/host/runner.ts';
+import { afterRun, dueTriggers, nextRun, PAUSE_AFTER_FAILURES, pauseOrResume, runInstalledTrigger, stateFor, stopReason, stoppable, unrunnable, type TriggerState } from '../src/host/runner.ts';
 import { createQueue, type Storage } from '../src/extension/queue.ts';
 import type { Tabs } from '../src/browser/tabs.ts';
 import { FakeTabs } from '../src/node/chrome-sandbox.ts';
@@ -182,4 +182,28 @@ describe('stopping a run while it goes on', () => {
 			expect(tabs.all()).toHaveLength(2);
 		});
 	}
+});
+
+describe('pausing and resuming', () => {
+	it('applies to what a run saved after the pause or resume was asked for and before it was saved', async () => {
+		const installed = await approved();
+		const key = 'stale-tabs/close-stale';
+		const data: Record<string, unknown> = { triggers: {} };
+		const storage: Storage = {
+			get: async (k) => (await Promise.resolve(), k in data ? { [k]: structuredClone(data[k]) } : {}),
+			set: async (items) => void Object.assign(data, structuredClone(items)),
+		};
+		const queue = createQueue(storage);
+		const saved: TriggerState = { specHash: installed.specHash, failures: 0, handled: ['7', '8'], lastRun: 1_000, nextRun: 2_000 };
+		for (const op of ['pause', 'resume'] as const) {
+			data.triggers = {};
+			// The run's save is queued first, then the person's pause or resume: the second applies on top of the first.
+			const run = queue.update<Record<string, TriggerState>>('triggers', {}, (states) => ({ ...states, [key]: afterRun(states[key], saved, stateFor(installed, 'close-stale', {})) }));
+			const control = queue.update<Record<string, TriggerState>>('triggers', {}, (states) => pauseOrResume(states, installed, 'close-stale', op, 5_000));
+			await Promise.all([run, control]);
+			const state = (data.triggers as Record<string, TriggerState>)[key]!;
+			expect(state).toMatchObject({ lastRun: 1_000, nextRun: 2_000, handled: ['7', '8'] });
+			expect(Boolean(state.paused)).toBe(op === 'pause');
+		}
+	});
 });

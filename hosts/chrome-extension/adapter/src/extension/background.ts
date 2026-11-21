@@ -7,7 +7,7 @@ import { describers } from '../host/describe.ts';
 import { act, asPreview, fromBundle, guarded, httpPerform, mountsFor, previewGrant, renderMount, unservable, unverified, type CallRecord, type Context, type Installed, type Mount, type PageContext } from '../host/gateway.ts';
 import { CallError } from '../host/http.ts';
 import { originMatches } from '../host/pages.ts';
-import { afterRun, describeTrigger, dueTriggers, nextRun, runInstalledTrigger, SAFE_MODE_REASON, stateFor, stopReason, stoppable, triggerKey, unrunnable, type TriggerState } from '../host/runner.ts';
+import { afterRun, describeTrigger, dueTriggers, nextRun, pauseOrResume, runInstalledTrigger, SAFE_MODE_REASON, stateFor, stopReason, stoppable, triggerKey, unrunnable, type TriggerState } from '../host/runner.ts';
 import { HOST, appModel } from '../host/surface.ts';
 import type { ActivityReply, ContentMessage, DriftEvent, Listed, MountInfo, OptionsMessage, PageMessage, PanelInfo, Reply, RunRecord } from './messages.ts';
 import { createQueue } from './queue.ts';
@@ -547,11 +547,8 @@ async function fromOptions(message: OptionsMessage, now: number = Date.now()): P
 		// Pause and resume change the state as it is stored when their turn in the queue comes, never a copy read
 		// before: a run that saved meanwhile keeps its schedule and the targets it handled.
 		if (message.op === 'pause' || message.op === 'resume') {
-			await update<Record<string, TriggerState>>('triggers', {}, (states) => {
-				const { paused: _paused, ...latest } = stateFor(installed, trigger, states);
-				const changed = message.op === 'pause' ? { ...latest, paused: { at: new Date(now).toISOString(), reason: 'Paused by you.' } } : { ...latest, failures: 0 };
-				return { ...states, [key]: changed };
-			});
+			const op = message.op;
+			await update<Record<string, TriggerState>>('triggers', {}, (states) => pauseOrResume(states, installed, trigger, op, now));
 			return null;
 		}
 		const why = await unrunnable(installed, surface, trigger);
