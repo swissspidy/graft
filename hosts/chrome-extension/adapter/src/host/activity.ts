@@ -123,6 +123,9 @@ function shortUrl(value: string): string {
 	}
 }
 
+/** An input with its web addresses shortened, as the log keeps inputs nothing needs in full. */
+export const shownInput = (value: Record<string, unknown>): Record<string, unknown> => shown(value) as Record<string, unknown>;
+
 const shown = (value: unknown): unknown =>
 	typeof value === 'string' ? shortUrl(value) : Array.isArray(value) ? value.map(shown) : typeof value === 'object' && value !== null ? Object.fromEntries(Object.entries(value).map(([k, v]) => [k, shown(v)])) : value;
 

@@ -77,6 +77,10 @@ test('a week later, the trigger closes unpinned tabs on its own, and a closed ta
 	await entry.getByRole('button', { name: 'Undo' }).click();
 	await expect((await reopened).url()).toContain('/login?stale');
 	await expect(entry).toContainText('Undone');
+	// Once nothing can be undone any more, the log keeps no full address with its query.
+	const log = await worker.evaluate(async () => JSON.stringify((await chrome.storage.local.get('activity')).activity));
+	expect(log).toContain('/login…');
+	expect(log).not.toContain('login?stale');
 });
 
 test('pausing every trigger stops them all', async ({ context, extensionId, approve, app, worker }) => {
