@@ -206,3 +206,44 @@ export function afterRun(stored: TriggerState | undefined, ran: TriggerState, be
 	const paused = setByRun ? runPaused : stored?.specHash === ran.specHash ? stored.paused : undefined;
 	return { ...rest, ...(paused ? { paused } : {}) };
 }
+
+/** Reads a stored value now, from inside a step of the storage queue. */
+export type Peek = <V>(key: string, fallback: V) => Promise<V>;
+
+export const SAFE_MODE_REASON = 'Safe mode is on: nothing is shown or run.';
+
+/**
+ * Why a trigger run must stop before its next call, from what is stored
+ * now: safe mode, the approval or this trigger's grant revoked since the
+ * run started, and for a scheduled run, Pause all or its own pause.
+ */
+export async function stopReason(peek: Peek, installed: Installed, trigger: string, how: 'schedule' | 'manual' | 'dry-run'): Promise<string | undefined> {
+	if (await peek('safeMode', false)) {
+		return SAFE_MODE_REASON;
+	}
+	const granted = installed.triggerGrants?.[trigger] ?? [];
+	const current = (await peek<Record<string, Installed>>('customizations', {}))[installed.id];
+	if (!current?.grant || current.specHash !== installed.specHash || !granted.every((scope) => current.triggerGrants?.[trigger]?.includes(scope))) {
+		return 'Its approval was revoked.';
+	}
+	if (how === 'schedule' && ((await peek('triggersPaused', false)) || stateFor(current, trigger, await peek<Record<string, TriggerState>>('triggers', {})).paused)) {
+		return 'It was paused.';
+	}
+	return undefined;
+}
+
+/**
+ * A trigger's calls, each checked and started in one step of the storage
+ * queue (`exclusive`): nothing starts after safe mode, a pause or a
+ * revocation is saved, and none of them is saved while a call is starting.
+ */
+export function stoppable(exclusive: <T>(step: (peek: Peek) => Promise<T>) => Promise<T>, check: (peek: Peek) => Promise<string | undefined>, perform: Perform): Perform {
+	return (name, capability, input) =>
+		exclusive(async (peek) => {
+			const why = await check(peek);
+			if (why) {
+				throw new CallError('graft_trigger_stopped', why);
+			}
+			return perform(name, capability, input);
+		});
+}

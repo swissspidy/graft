@@ -7,7 +7,7 @@ import { describers } from '../host/describe.ts';
 import { act, asPreview, fromBundle, guarded, httpPerform, mountsFor, previewGrant, renderMount, unservable, unverified, type CallRecord, type Context, type Installed, type Mount, type PageContext } from '../host/gateway.ts';
 import { CallError } from '../host/http.ts';
 import { originMatches } from '../host/pages.ts';
-import { afterRun, describeTrigger, dueTriggers, nextRun, runInstalledTrigger, stateFor, triggerKey, unrunnable, type TriggerState } from '../host/runner.ts';
+import { afterRun, describeTrigger, dueTriggers, nextRun, runInstalledTrigger, SAFE_MODE_REASON, stateFor, stopReason, stoppable, triggerKey, unrunnable, type TriggerState } from '../host/runner.ts';
 import { HOST, appModel } from '../host/surface.ts';
 import type { ActivityReply, ContentMessage, DriftEvent, Listed, MountInfo, OptionsMessage, PageMessage, PanelInfo, Reply, RunRecord } from './messages.ts';
 import { createQueue } from './queue.ts';
@@ -164,7 +164,6 @@ function recorder(installed: Installed, surface: Surface, source: ActivitySource
 /** How long a preview lasts once the person asks for it. */
 const PREVIEW_MINUTES = 10;
 
-const SAFE_MODE_REASON = 'Safe mode is on: nothing is shown or run.';
 
 /** Safe mode: nothing is served, previewed or run; the options page, approval and undo still work. */
 const safeMode = () => read('safeMode', false);
@@ -329,35 +328,11 @@ async function runTriggerOnce(installed: Installed, surface: Surface, trigger: s
 	const before = stateFor(installed, trigger, states);
 	// Tabs "unused for more than N days" count to the run's clock.
 	const tabs = tabsPerform(chromeTabs(), () => now);
-	const granted = installed.triggerGrants?.[trigger] ?? [];
-	/** Why the run must stop before its next call: safe mode, a pause, or a grant revoked since it started. */
-	const stopped = async (peek: <V>(key: string, fallback: V) => Promise<V>): Promise<string | undefined> => {
-		if (await peek('safeMode', false)) {
-			return SAFE_MODE_REASON;
-		}
-		const current = (await peek<Record<string, Installed>>('customizations', {}))[installed.id];
-		if (!current?.grant || current.specHash !== installed.specHash || !granted.every((scope) => current.triggerGrants?.[trigger]?.includes(scope))) {
-			return 'Its approval was revoked.';
-		}
-		if (how === 'schedule' && ((await peek('triggersPaused', false)) || stateFor(current, trigger, await peek<Record<string, TriggerState>>('triggers', {})).paused)) {
-			return 'It was paused.';
-		}
-		return undefined;
-	};
 	const { run, state } = await runInstalledTrigger({
 		installed,
 		surface,
 		trigger,
-		// Checked before every call, in the same step of the storage queue as the call: nothing starts after safe
-		// mode, a pause or a revocation is saved, and none of them is saved while a call is starting.
-		perform: (name, capability, input) =>
-			queue.exclusive(async (peek) => {
-				const why = await stopped(peek);
-				if (why) {
-					throw new CallError('graft_trigger_stopped', why);
-				}
-				return tabs(name, capability, input);
-			}),
+		perform: stoppable(queue.exclusive, (peek) => stopReason(peek, installed, trigger, how), tabs),
 		state: before,
 		now,
 		dryRun: how === 'dry-run',

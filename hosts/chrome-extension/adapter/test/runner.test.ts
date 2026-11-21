@@ -3,7 +3,9 @@ import { describe, expect, it } from 'vitest';
 import type { CustomizationBundle, Surface } from '@swissspidy/graft-core';
 import { tabsPerform } from '../src/browser/tabs.ts';
 import { fromBundle, type CallRecord, type Installed } from '../src/host/gateway.ts';
-import { afterRun, dueTriggers, nextRun, PAUSE_AFTER_FAILURES, runInstalledTrigger, stateFor, unrunnable } from '../src/host/runner.ts';
+import { afterRun, dueTriggers, nextRun, PAUSE_AFTER_FAILURES, runInstalledTrigger, stateFor, stopReason, stoppable, unrunnable } from '../src/host/runner.ts';
+import { createQueue, type Storage } from '../src/extension/queue.ts';
+import type { Tabs } from '../src/browser/tabs.ts';
 import { FakeTabs } from '../src/node/chrome-sandbox.ts';
 import '../src/host/a2ui.ts';
 
@@ -124,4 +126,60 @@ describe('running a trigger', () => {
 		expect(state.failures).toBe(PAUSE_AFTER_FAILURES);
 		expect(state.paused?.reason).toMatch(/^It failed 3 times in a row: Reading the targets failed/);
 	});
+});
+
+describe('stopping a run while it goes on', () => {
+	/** chrome.storage.local in memory, answering on a later tick as Chrome does. */
+	const memory = (data: Record<string, unknown>): Storage => ({
+		get: async (key) => (await Promise.resolve(), key in data ? { [key]: structuredClone(data[key]) } : {}),
+		set: async (items) => void Object.assign(data, structuredClone(items)),
+	});
+
+	const controls: Array<[string, (data: Record<string, unknown>) => Record<string, unknown>]> = [
+		['safe mode', () => ({ safeMode: true })],
+		['Pause all', () => ({ triggersPaused: true })],
+		['its own pause', (data) => {
+			const { specHash } = (data.customizations as Record<string, Installed>)['stale-tabs']!;
+			return { triggers: { 'stale-tabs/close-stale': { specHash, failures: 0, handled: [], paused: { at: '', reason: 'Paused by you.' } } } };
+		}],
+		['Revoke', (data) => ({ customizations: { 'stale-tabs': { ...(data.customizations as Record<string, Installed>)['stale-tabs'], grant: null } } })],
+	];
+
+	for (const [name, change] of controls) {
+		it(`starts no call after ${name} is saved, through the extension's own queue and check`, async () => {
+			const installed = await approved();
+			const now = Date.now();
+			const tabs = new FakeTabs();
+			tabs.seed([1, 2, 3].map((n) => ({ title: `Old ${n}`, unused_days: 10 + n })), now);
+			const data: Record<string, unknown> = { customizations: { 'stale-tabs': installed } };
+			const queue = createQueue(memory(data));
+			// The person saves the control while the first tab is being closed: queued behind that call.
+			let saved: Promise<void> | undefined;
+			const watched: Tabs = {
+				...tabs,
+				query: () => tabs.query(),
+				get: (id) => tabs.get(id),
+				create: (url) => tabs.create(url),
+				focus: (id) => tabs.focus(id),
+				remove: async (id) => {
+					await tabs.remove(id);
+					saved ??= Promise.all(Object.entries(change(data)).map(([key, value]) => queue.update(key, null, () => value))).then(() => {});
+				},
+			};
+			const calls: CallRecord[] = [];
+			const { run } = await runInstalledTrigger({
+				installed,
+				surface,
+				trigger: 'close-stale',
+				perform: stoppable(queue.exclusive, (peek) => stopReason(peek, installed, 'close-stale', 'schedule'), tabsPerform(watched, () => now)),
+				state: stateFor(installed, 'close-stale', {}),
+				now,
+				onCall: (c) => calls.push(c),
+			});
+			await saved;
+			expect(run.calls.map((c) => c.ok)).toEqual([true, false, false]);
+			expect(calls.filter((c) => c.capability === 'tabs.close').map((c) => c.code ?? c.outcome)).toEqual(['ok', 'graft_trigger_stopped', 'graft_trigger_stopped']);
+			expect(tabs.all()).toHaveLength(2);
+		});
+	}
 });
