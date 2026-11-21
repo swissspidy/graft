@@ -192,3 +192,17 @@ export function describeTrigger(installed: Installed, surface: Surface | undefin
 		may: (declared?.permissions ?? []).map((scope) => surface?.scopes[scope]?.title ?? scope),
 	};
 }
+
+/**
+ * The state to save after a run, given the state stored now: the run's
+ * schedule, failures and handled targets, with any pause or resume saved
+ * while it ran kept. Only a pause the run itself set (after too many
+ * failures) is added.
+ */
+export function afterRun(stored: TriggerState | undefined, ran: TriggerState, before: TriggerState): TriggerState {
+	const { paused: runPaused, ...rest } = ran;
+	// A pause the run set is new; one it carried from before stays only if nobody resumed meanwhile.
+	const setByRun = runPaused !== undefined && runPaused !== before.paused;
+	const paused = setByRun ? runPaused : stored?.specHash === ran.specHash ? stored.paused : undefined;
+	return { ...rest, ...(paused ? { paused } : {}) };
+}

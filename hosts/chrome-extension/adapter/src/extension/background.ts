@@ -7,7 +7,7 @@ import { describers } from '../host/describe.ts';
 import { act, asPreview, fromBundle, guarded, httpPerform, mountsFor, previewGrant, renderMount, unservable, unverified, type CallRecord, type Context, type Installed, type Mount, type PageContext } from '../host/gateway.ts';
 import { CallError } from '../host/http.ts';
 import { originMatches } from '../host/pages.ts';
-import { describeTrigger, dueTriggers, nextRun, runInstalledTrigger, stateFor, triggerKey, unrunnable, type TriggerState } from '../host/runner.ts';
+import { afterRun, describeTrigger, dueTriggers, nextRun, runInstalledTrigger, stateFor, triggerKey, unrunnable, type TriggerState } from '../host/runner.ts';
 import { HOST, appModel } from '../host/surface.ts';
 import type { ActivityReply, ContentMessage, DriftEvent, Listed, MountInfo, OptionsMessage, PageMessage, PanelInfo, Reply, RunRecord } from './messages.ts';
 import { createQueue } from './queue.ts';
@@ -312,8 +312,25 @@ async function recordRun(record: RunRecord): Promise<void> {
 }
 
 /** Runs one trigger now: on its schedule, because someone asked, or as a dry run that changes nothing. */
+/** Triggers running now, by key: a trigger runs once at a time. */
+const running = new Set<string>();
+
 async function runTrigger(installed: Installed, surface: Surface, trigger: string, how: RunRecord['how'], now: number): Promise<RunRecord> {
+	const key = triggerKey(installed.id, trigger);
+	if (running.has(key)) {
+		throw new Error('It is running already.');
+	}
+	running.add(key);
+	try {
+		return await runTriggerOnce(installed, surface, trigger, how, now);
+	} finally {
+		running.delete(key);
+	}
+}
+
+async function runTriggerOnce(installed: Installed, surface: Surface, trigger: string, how: RunRecord['how'], now: number): Promise<RunRecord> {
 	const states = await triggerStates();
+	const before = stateFor(installed, trigger, states);
 	// Tabs "unused for more than N days" count to the run's clock.
 	const tabs = tabsPerform(chromeTabs(), () => now);
 	const granted = installed.triggerGrants?.[trigger] ?? [];
@@ -345,13 +362,15 @@ async function runTrigger(installed: Installed, surface: Surface, trigger: strin
 				}
 				return tabs(name, capability, input);
 			}),
-		state: stateFor(installed, trigger, states),
+		state: before,
 		now,
 		dryRun: how === 'dry-run',
 		onCall: recorder(installed, surface, { kind: 'trigger', trigger }),
 	});
 	if (how !== 'dry-run') {
-		await saveTriggerState(triggerKey(installed.id, trigger), state);
+		// Against the state stored now: a pause or resume saved while the run went on is kept.
+		const key = triggerKey(installed.id, trigger);
+		await update<Record<string, TriggerState>>('triggers', {}, (stored) => ({ ...stored, [key]: afterRun(stored[key], state, before) }));
 	}
 	const record: RunRecord = { at: new Date(now).toISOString(), customization: installed.id, title: installed.title, trigger, how, run };
 	await recordRun(record);
@@ -369,7 +388,12 @@ async function tick(now: number = Date.now()): Promise<RunRecord[]> {
 	const due = await dueTriggers(list, (installed) => surfaces.find((s) => s.hash === installed.build.surface.hash), await triggerStates(), now);
 	const records: RunRecord[] = [];
 	for (const { installed, surface, trigger } of due) {
-		records.push(await runTrigger(installed, surface, trigger, 'schedule', now));
+		try {
+			records.push(await runTrigger(installed, surface, trigger, 'schedule', now));
+		} catch (error) {
+			// Running already (started by hand): this tick leaves it alone.
+			console.warn(`Graft: "${trigger}" of ${installed.id} not started:`, (error as Error).message);
+		}
 	}
 	return records;
 }

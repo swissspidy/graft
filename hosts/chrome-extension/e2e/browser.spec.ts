@@ -106,3 +106,31 @@ test('a preview of a side panel customization is drawn there, read-only, until i
 	await panel.reload();
 	await expect(panel.getByText('Nothing here yet.')).toBeVisible();
 });
+
+test('a trigger paused while it runs stays paused, and does not run twice at once', async ({ approve, worker, extensionId }) => {
+	await approve('Stale tabs');
+	const result = await worker.evaluate(async (later) => {
+		type Graft = { runTrigger(id: string, trigger: string, options: { now: number }): Promise<unknown>; handle(message: unknown, sender: unknown): Promise<unknown> };
+		const graft = (globalThis as unknown as { graft: Graft }).graft;
+		const options = { id: chrome.runtime.id, url: chrome.runtime.getURL('options.html'), frameId: 0 };
+		const [first, second, pause] = await Promise.allSettled([
+			graft.runTrigger('stale-tabs', 'close-stale', { now: later }),
+			graft.runTrigger('stale-tabs', 'close-stale', { now: later }),
+			graft.handle({ type: 'trigger', id: 'stale-tabs', trigger: 'close-stale', op: 'pause' }, options),
+		]);
+		const states = (await chrome.storage.local.get('triggers')).triggers as Record<string, { paused?: { reason: string }; lastRun?: number }>;
+		return {
+			first: first.status,
+			second: second.status === 'rejected' ? (second.reason as Error).message : 'ran',
+			pause: pause.status,
+			state: states['stale-tabs/close-stale'],
+		};
+	}, Date.now() + 8 * 24 * 60 * 60 * 1000);
+	expect(result.first).toBe('fulfilled');
+	expect(result.second).toBe('It is running already.');
+	expect(result.pause).toBe('fulfilled');
+	// Whichever finished first, the run's save kept the pause.
+	expect(result.state).toMatchObject({ paused: { reason: 'Paused by you.' } });
+	expect(result.state?.lastRun).toBeGreaterThan(0);
+	expect(extensionId).toBeTruthy();
+});

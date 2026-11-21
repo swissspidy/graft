@@ -3,7 +3,7 @@ import { describe, expect, it } from 'vitest';
 import type { CustomizationBundle, Surface } from '@swissspidy/graft-core';
 import { tabsPerform } from '../src/browser/tabs.ts';
 import { fromBundle, type CallRecord, type Installed } from '../src/host/gateway.ts';
-import { dueTriggers, nextRun, PAUSE_AFTER_FAILURES, runInstalledTrigger, stateFor, unrunnable } from '../src/host/runner.ts';
+import { afterRun, dueTriggers, nextRun, PAUSE_AFTER_FAILURES, runInstalledTrigger, stateFor, unrunnable } from '../src/host/runner.ts';
 import { FakeTabs } from '../src/node/chrome-sandbox.ts';
 import '../src/host/a2ui.ts';
 
@@ -94,6 +94,24 @@ describe('running a trigger', () => {
 		expect(run.calls[0]).toMatchObject({ ok: false });
 		expect(calls.at(-1)).toMatchObject({ capability: 'tabs.close', outcome: 'refused', code: 'graft_not_granted' });
 		expect(tabs.all()).toHaveLength(3);
+	});
+
+	it('keeps a pause or resume saved while it ran, and adds only a pause it set itself', async () => {
+		const installed = await approved();
+		const now = Date.now();
+		const before = stateFor(installed, 'close-stale', {});
+		const { state: ran } = await runInstalledTrigger({ installed, surface, trigger: 'close-stale', perform: tabsPerform(browser(now), () => now), state: before, now });
+		// Paused by the person while the run was going on: still paused after it saves.
+		const pausedMeanwhile = { ...before, paused: { at: new Date(now).toISOString(), reason: 'Paused by you.' } };
+		expect(afterRun(pausedMeanwhile, ran, before)).toMatchObject({ lastRun: now, paused: { reason: 'Paused by you.' } });
+		// Not paused: the run's state as it is.
+		expect(afterRun(before, ran, before)).toEqual(ran);
+		// Resumed meanwhile from a pause the run started under: not paused again by the save.
+		const paused = { ...before, paused: { at: '', reason: 'Paused by you.' } };
+		expect(afterRun(before, { ...ran, paused: paused.paused }, paused).paused).toBeUndefined();
+		// Paused by the run itself after too many failures: paused, whatever was stored.
+		const failing = { ...ran, paused: { at: '', reason: 'It failed 3 times in a row.' } };
+		expect(afterRun(before, failing, before).paused?.reason).toBe('It failed 3 times in a row.');
 	});
 
 	it(`pauses itself after ${PAUSE_AFTER_FAILURES} failed runs in a row`, async () => {
