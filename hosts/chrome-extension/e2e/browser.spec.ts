@@ -134,3 +134,26 @@ test('a trigger paused while it runs stays paused, and does not run twice at onc
 	expect(result.state?.lastRun).toBeGreaterThan(0);
 	expect(extensionId).toBeTruthy();
 });
+
+test('a revoked trigger does not run, and a resume keeps what a run saved', async ({ approve, worker }) => {
+	await approve('Stale tabs');
+	const result = await worker.evaluate(async (later) => {
+		type Graft = { runTrigger(id: string, trigger: string, options: { now: number }): Promise<unknown>; handle(message: unknown, sender: unknown): Promise<{ ok: boolean }> };
+		const graft = (globalThis as unknown as { graft: Graft }).graft;
+		const options = { id: chrome.runtime.id, url: chrome.runtime.getURL('options.html'), frameId: 0 };
+		const op = (o: string) => graft.handle({ type: 'trigger', id: 'stale-tabs', trigger: 'close-stale', op: o }, options);
+		// A run and a pause, then a resume: the resume starts from what the run saved.
+		await Promise.all([graft.runTrigger('stale-tabs', 'close-stale', { now: later }), op('pause')]);
+		await op('resume');
+		const state = ((await chrome.storage.local.get('triggers')).triggers as Record<string, { paused?: unknown; lastRun?: number }>)['stale-tabs/close-stale'];
+		await graft.handle({ type: 'revoke', id: 'stale-tabs' }, options);
+		const revoked = await graft.runTrigger('stale-tabs', 'close-stale', { now: later }).then(
+			() => 'ran',
+			(error: Error) => error.message,
+		);
+		return { state, revoked };
+	}, Date.now() + 8 * 24 * 60 * 60 * 1000);
+	expect(result.state?.paused).toBeUndefined();
+	expect(result.state?.lastRun).toBeGreaterThan(0);
+	expect(result.revoked).toBe('It is waiting for approval.');
+});

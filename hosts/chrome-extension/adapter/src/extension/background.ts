@@ -303,10 +303,6 @@ async function triggerStates(): Promise<Record<string, TriggerState>> {
 	return read<Record<string, TriggerState>>('triggers', {});
 }
 
-async function saveTriggerState(key: string, state: TriggerState): Promise<void> {
-	await update<Record<string, TriggerState>>('triggers', {}, (states) => ({ ...states, [key]: state }));
-}
-
 async function recordRun(record: RunRecord): Promise<void> {
 	await update<RunRecord[]>('runs', [], (runs) => [...runs, record].slice(-RUNS_LIMIT));
 }
@@ -573,13 +569,14 @@ async function fromOptions(message: OptionsMessage, now: number = Date.now()): P
 		}
 		const key = triggerKey(installed.id, trigger);
 		const state = stateFor(installed, trigger, await triggerStates());
-		if (message.op === 'pause') {
-			await saveTriggerState(key, { ...state, paused: { at: new Date(now).toISOString(), reason: 'Paused by you.' } });
-			return null;
-		}
-		if (message.op === 'resume') {
-			const { paused: _paused, ...rest } = state;
-			await saveTriggerState(key, { ...rest, failures: 0 });
+		// Pause and resume change the state as it is stored when their turn in the queue comes, never a copy read
+		// before: a run that saved meanwhile keeps its schedule and the targets it handled.
+		if (message.op === 'pause' || message.op === 'resume') {
+			await update<Record<string, TriggerState>>('triggers', {}, (states) => {
+				const { paused: _paused, ...latest } = stateFor(installed, trigger, states);
+				const changed = message.op === 'pause' ? { ...latest, paused: { at: new Date(now).toISOString(), reason: 'Paused by you.' } } : { ...latest, failures: 0 };
+				return { ...states, [key]: changed };
+			});
 			return null;
 		}
 		const why = await unrunnable(installed, surface, trigger);
