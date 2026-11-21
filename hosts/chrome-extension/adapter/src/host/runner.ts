@@ -218,7 +218,8 @@ export const SAFE_MODE_REASON = 'Safe mode is on: nothing is shown or run.';
  * run started, and for a scheduled run, Pause all or its own pause.
  */
 export async function stopReason(peek: Peek, installed: Installed, trigger: string, how: 'schedule' | 'manual' | 'dry-run'): Promise<string | undefined> {
-	if (await peek('safeMode', false)) {
+	// A dry run makes no write, and safe mode leaves dry runs working (ADR 0018); a revocation still stops it.
+	if (how !== 'dry-run' && (await peek('safeMode', false))) {
 		return SAFE_MODE_REASON;
 	}
 	const granted = installed.triggerGrants?.[trigger] ?? [];

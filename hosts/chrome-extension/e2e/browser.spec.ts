@@ -21,11 +21,10 @@ async function tab(context: import('@playwright/test').BrowserContext, url: stri
 	return page;
 }
 
-test('the side panel shows nothing before approval, then the approved customization', async ({ context, extensionId, approve }) => {
+test('the side panel shows nothing before approval, then the approved customization, without being reopened', async ({ context, extensionId, approve }) => {
 	const panel = await tab(context, `chrome-extension://${extensionId}/sidepanel.html`);
 	await expect(panel.getByText('Nothing here yet.')).toBeVisible();
 	await approve('Stale tabs');
-	await panel.reload();
 	const box = panel.getByRole('region', { name: 'Stale tabs' });
 	// Every tab here was opened just now.
 	await expect(box.getByText('No stale tabs')).toBeVisible();

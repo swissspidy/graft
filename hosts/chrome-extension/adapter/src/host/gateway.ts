@@ -234,23 +234,32 @@ export async function guarded(
 	hooks: GatewayHooks = {},
 ): Promise<unknown> {
 	const kind = declared?.kind ?? 'read';
+	// The hooks only observe: one that throws never turns a call that went through into a failure, or changes why one failed.
+	const observe = (fn: () => void) => {
+		try {
+			fn();
+		} catch (error) {
+			console.error(`Graft: reporting "${name}" failed:`, error);
+		}
+	};
 	if (refusal || !declared) {
 		const error = refusal ?? new CallError('graft_capability_not_in_build', `This customization does not use "${name}".`);
-		hooks.onCall?.({ capability: name, kind, input, outcome: 'refused', code: error.code, error: error.message });
+		observe(() => hooks.onCall?.({ capability: name, kind, input, outcome: 'refused', code: error.code, error: error.message }));
 		throw error;
 	}
+	let output: unknown;
 	try {
-		const output = await run(name, declared, input);
-		hooks.onCall?.({ capability: name, kind, input, outcome: 'ok', output });
-		return output;
+		output = await run(name, declared, input);
 	} catch (error) {
 		const code = error instanceof CallError ? error.code : 'host_error';
 		if (error instanceof CallError && error.code === 'graft_drift') {
-			hooks.onDrift?.(name, error.details ?? [error.message]);
+			observe(() => hooks.onDrift?.(name, error.details ?? [error.message]));
 		}
-		hooks.onCall?.({ capability: name, kind, input, outcome: REFUSALS.has(code) ? 'refused' : 'failed', code, error: errorMessage(error) });
+		observe(() => hooks.onCall?.({ capability: name, kind, input, outcome: REFUSALS.has(code) ? 'refused' : 'failed', code, error: errorMessage(error) }));
 		throw error;
 	}
+	observe(() => hooks.onCall?.({ capability: name, kind, input, outcome: 'ok', output }));
+	return output;
 }
 
 /** The gateway for one customization on one page; read-only for a preview. */

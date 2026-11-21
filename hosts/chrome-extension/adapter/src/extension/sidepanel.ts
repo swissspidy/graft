@@ -16,38 +16,66 @@ async function send<T>(message: PanelMessage): Promise<T> {
 	return reply.value;
 }
 
-const views: CustomizationView[] = [];
+/** The views drawn, by customization id: kept across refreshes so each keeps its state. */
+const views = new Map<string, CustomizationView>();
 
-async function start(): Promise<void> {
+/**
+ * Draws the side panel's customizations as the service worker lists them
+ * now: one approved, revoked, previewed or stopped by safe mode since the
+ * last time appears or goes, and the others draw again.
+ */
+async function draw(): Promise<void> {
 	const root = document.getElementById('panel')!;
-	const infos = await send<PanelInfo[]>({ type: 'panel-mounts' });
-	root.replaceChildren();
+	let infos: PanelInfo[];
+	try {
+		infos = await send<PanelInfo[]>({ type: 'panel-mounts' });
+	} catch (error) {
+		root.replaceChildren(el('p', 'error', `Could not load the customizations: ${(error as Error).message}`));
+		return;
+	}
+	const ids = new Set(infos.map((info) => `${info.id}${info.preview ? ':preview' : ''}`));
+	for (const id of [...views.keys()].filter((id) => !ids.has(id))) {
+		views.delete(id);
+	}
 	if (infos.length === 0) {
 		const empty = el('p', undefined, 'Nothing here yet. Customizations for the side panel show up here once you approve them. ');
 		const link = el('button', undefined, 'Open the customizations');
 		link.type = 'button';
 		link.addEventListener('click', () => void chrome.runtime.openOptionsPage());
 		empty.append(link);
-		root.append(empty);
+		root.replaceChildren(empty);
 		return;
 	}
+	const hosts: HTMLElement[] = [];
 	for (const info of infos) {
-		const view = new CustomizationView(info.id, info.title, {
-			render: (state) => send<RenderReply>({ type: 'panel-render', id: info.id, state }),
-			act: (key, state) => send<RenderReply>({ type: 'panel-act', id: info.id, key, state }),
-		});
-		views.push(view);
-		root.append(view.host);
+		const id = `${info.id}${info.preview ? ':preview' : ''}`;
+		let view = views.get(id);
+		if (!view) {
+			view = new CustomizationView(info.id, info.title, {
+				render: (state) => send<RenderReply>({ type: 'panel-render', id: info.id, state }),
+				act: (key, state) => send<RenderReply>({ type: 'panel-act', id: info.id, key, state }),
+			});
+			views.set(id, view);
+		}
+		hosts.push(view.host);
 		void view.render();
 	}
+	// The same elements, in order: a view that stays keeps its focus and state.
+	root.replaceChildren(...hosts);
 }
 
 let timer: ReturnType<typeof setTimeout> | undefined;
 function refresh(): void {
 	clearTimeout(timer);
-	timer = setTimeout(() => views.forEach((view) => void view.render()), 300);
+	timer = setTimeout(() => void draw(), 300);
 }
 
+// What is shown changes with approvals, previews and safe mode, as well as with the tabs.
+chrome.storage.onChanged.addListener((changes, area) => {
+	if (area === 'local' && ['customizations', 'previews', 'safeMode'].some((key) => key in changes)) {
+		refresh();
+	}
+});
 chrome.tabs.onCreated.addListener(refresh);
 chrome.tabs.onRemoved.addListener(refresh);
 chrome.tabs.onUpdated.addListener((_id, change) => {
@@ -57,4 +85,4 @@ chrome.tabs.onUpdated.addListener((_id, change) => {
 });
 chrome.tabs.onActivated.addListener(refresh);
 
-void start();
+void draw();

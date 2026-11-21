@@ -37,6 +37,18 @@ describe('the browser surface', () => {
 		expect(listTabs(tabs, {}, now + 30 * DAY).map((t) => t.id)).toEqual([2, 1, 3]);
 	});
 
+	it('records the tab brought to the front as used now, and only that one', async () => {
+		const tabs = new FakeTabs();
+		tabs.seed([{ title: 'Old', unused_days: 10 }, { title: 'Other', unused_days: 10, active: true }], Date.now());
+		const perform = tabsPerform(tabs);
+		await perform('tabs.focus', surface.capabilities['tabs.focus']!, { id: 1 });
+		const [old, other] = await tabs.query();
+		expect(old).toMatchObject({ active: true });
+		expect(Date.now() - old!.lastAccessed!).toBeLessThan(1000);
+		expect(other).toMatchObject({ active: false });
+		expect(Date.now() - other!.lastAccessed!).toBeGreaterThan(9 * DAY);
+	});
+
 	it('opens web pages only, and answers a closed tab with what it takes to open it again', async () => {
 		const tabs = new FakeTabs();
 		tabs.seed([{ title: 'Old', url: 'https://old.example/' }], Date.now());
@@ -55,6 +67,9 @@ describe('the stale-tabs example', () => {
 		const build = JSON.parse(await read('builds/stale-tabs.json')) as Build;
 		expect((await validateBuild(build, surface)).diagnostics.filter((d) => d.severity === 'error')).toEqual([]);
 		const [verification] = await verifyInChrome([{ build, spec: spec as Spec, surface }]);
+		// Every check ran, one result per check, and each passed.
+		expect(verification!.results.map((r) => r.criterion)).toEqual(build.checks.map((c) => c.criterion));
+		expect(verification!.results.length).toBe(9);
 		expect(verification!.results.filter((r) => !r.passed)).toEqual([]);
 		const bundle = JSON.parse(await read('bundles/stale-tabs.json')) as CustomizationBundle;
 		expect((await fromBundle(bundle, surface, 'test')).problems).toEqual([]);
@@ -81,9 +96,13 @@ describe('the stale-tabs example', () => {
 		expect(writes).toEqual(['tabs.close ok']);
 		// Without "tabs:write" approved there is no Close button, and a forged key does nothing.
 		tabs.seed([{ title: 'Older', unused_days: 20 }], Date.now());
+		// The key of Older's Close button, as an approved render offers it: a real row, not one already gone.
+		const olderKey = (await renderMount(context, mount)).actions.find((a) => a.available)!.key;
 		const readOnly = { ...mount, installed: { ...approved, grant: ['tabs:read'] } };
 		expect((await renderMount(context, readOnly)).actions.filter((a) => a.available)).toEqual([]);
-		expect(await act(context, readOnly, key)).toMatchObject({ notice: { tone: 'error', text: 'That action is not available.' } });
+		expect(await act(context, readOnly, olderKey)).toMatchObject({ notice: { tone: 'error', text: 'That action is not available.' } });
+		expect(tabs.all().map((t) => t.title)).toEqual(['Fresh', 'Older']);
+		expect(writes).toEqual(['tabs.close ok']);
 	});
 });
 

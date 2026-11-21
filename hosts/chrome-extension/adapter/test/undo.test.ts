@@ -20,11 +20,15 @@ const write = (scopes: string[], binding: Record<string, unknown> = {}): Capabil
 describe('undo', () => {
 	it('takes the reverse call’s input from the original input or its answer', () => {
 		const complete = surface.capabilities['tasks.complete'];
-		expect(undoCall(complete, { id: 't2' }, { id: 't2', status: 'done' })).toEqual({ capability: 'tasks.reopen', input: { id: 't2' } });
+		// The id comes from the input, not the answer: they differ here so the test tells them apart.
+		expect(undoCall(complete, { id: 't2' }, { id: 'other', status: 'done' })).toEqual({ capability: 'tasks.reopen', input: { id: 't2' } });
 		const close = write(['tabs:write'], { undo: { capability: 'open', input: { url: { output: '/url' } } } });
 		expect(undoCall(close, { id: 3 }, { url: 'https://example.com/' })).toEqual({ capability: 'open', input: { url: 'https://example.com/' } });
 		// A field the reverse needs and the answer lacks: no undo, rather than a wrong one.
 		expect(undoCall(close, { id: 3 }, {})).toBeUndefined();
+		// "/" is the member named "", not the whole answer (RFC 6901).
+		const byEmptyName = write(['a'], { undo: { capability: 'open', input: { url: { output: '/' } } } });
+		expect(undoCall(byEmptyName, {}, { '': 'https://example.com/' })).toEqual({ capability: 'open', input: { url: 'https://example.com/' } });
 		expect(undoCall(surface.capabilities['tasks.reopen'], { id: 't2' }, {})).toBeUndefined();
 	});
 
@@ -60,7 +64,7 @@ describe('the activity log', () => {
 	});
 
 	it('keeps how to undo a write that went through, and only that', () => {
-		const done = activityFrom({ capability: 'tasks.complete', kind: 'write', input: { id: 't2' }, outcome: 'ok', output: { id: 't2' } }, where, Date.UTC(2026, 10, 19));
+		const done = activityFrom({ capability: 'tasks.complete', kind: 'write', input: { id: 't2' }, outcome: 'ok', output: { id: 'answered' } }, where, Date.UTC(2026, 10, 19));
 		expect(done).toMatchObject({ at: '2026-11-19T00:00:00.000Z', surface: surface.hash, origin: where.origin, description: 'Marks a task done.', undo: { capability: 'tasks.reopen', input: { id: 't2' } } });
 		expect(undoRefusal(done, surface)).toBeUndefined();
 		const failed = activityFrom({ capability: 'tasks.complete', kind: 'write', input: { id: 't2' }, outcome: 'failed', code: 'host_forbidden' }, where);
@@ -79,6 +83,15 @@ describe('the activity log', () => {
 	it('shows web addresses without their query and fragment, which can hold tokens', () => {
 		expect(describeActivity({ capability: 'tabs.open', description: 'Opens a web page.', input: { url: 'https://example.com/reset?token=secret#x' } })).toBe('Opens a web page. ({"url":"https://example.com/reset…"})');
 		expect(describeActivity({ capability: 'tabs.open', input: { url: 'https://example.com/a' } })).toBe('tabs.open ({"url":"https://example.com/a"})');
+	});
+
+	it('offers no Undo the reverse would refuse, such as reopening a chrome:// page', async () => {
+		const chrome = JSON.parse(await readFile(new URL('../surfaces/chrome.json', import.meta.url), 'utf8')) as Surface;
+		const at = { customization: 'stale-tabs', title: 'Stale tabs', source: { kind: 'view' as const }, surface: chrome };
+		const settings = activityFrom({ capability: 'tabs.close', kind: 'write', input: { id: 3 }, outcome: 'ok', output: { id: 3, url: 'chrome://settings/' } }, at);
+		expect(settings.undo).toBeUndefined();
+		const long = activityFrom({ capability: 'tabs.close', kind: 'write', input: { id: 4 }, outcome: 'ok', output: { id: 4, url: `https://example.com/${'a'.repeat(2100)}` } }, at);
+		expect(long.undo).toBeUndefined();
 	});
 
 	it('stores inputs shortened, and keeps the full address only where Undo needs it', async () => {

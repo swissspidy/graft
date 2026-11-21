@@ -66,6 +66,8 @@ export interface ListedTrigger {
 	may: string[];
 	/** Why it does not run, when it does not (waiting for approval, paused, ...). */
 	blocked?: string;
+	/** Safe mode is all that stops it: a dry run still works. */
+	safeMode?: boolean;
 	paused?: string;
 	lastRun?: string;
 	nextRun?: string;

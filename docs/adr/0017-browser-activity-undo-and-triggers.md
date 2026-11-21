@@ -83,7 +83,11 @@ description that breaks one does not build:
 - The reverse takes every field the undo sets.
 
 When a write goes through, its log entry keeps the reverse call,
-computed from that call's input and answer. **Undo** on the options page
+computed from that call's input and answer. Undo is offered only if the
+reverse accepts that input, so closing a `chrome://` page, which
+`tabs.open` refuses, offers no Undo. Tasklet refuses a status change to
+the status a task already has (409), so "Done" on a done task fails and
+offers nothing to undo. **Undo** on the options page
 runs it once, under these conditions:
 
 - It runs on the surface the call was made on, by hash.

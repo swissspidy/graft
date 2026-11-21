@@ -54,6 +54,8 @@ export class CustomizationView {
 	private readonly root: ShadowRoot;
 	private state: Record<string, unknown> = {};
 	private busy = false;
+	/** Bumped by every render and click: only the reply to the latest one is drawn. */
+	private generation = 0;
 	/** Each drawn button's key, to give focus back to the same button after a redraw. */
 	private readonly keys = new WeakMap<HTMLButtonElement, string>();
 
@@ -72,10 +74,16 @@ export class CustomizationView {
 		if (this.busy) {
 			return;
 		}
+		const mine = ++this.generation;
+		let reply: RenderReply;
 		try {
-			this.show(await this.transport.render(this.state));
+			reply = await this.transport.render(this.state);
 		} catch (error) {
-			this.show({ view: [{ type: 'notice', tone: 'error', text: (error as Error).message }], state: this.state });
+			reply = { view: [{ type: 'notice', tone: 'error', text: (error as Error).message }], state: this.state };
+		}
+		// A click (or a later render) answered meanwhile: this older reply would put back older state.
+		if (mine === this.generation) {
+			this.show(reply);
 		}
 	}
 
@@ -85,6 +93,7 @@ export class CustomizationView {
 			return;
 		}
 		this.busy = true;
+		++this.generation;
 		try {
 			this.show(await this.transport.act(button.key, this.state));
 		} catch (error) {

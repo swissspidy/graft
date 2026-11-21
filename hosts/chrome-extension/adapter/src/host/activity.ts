@@ -60,7 +60,7 @@ export function activityFrom(
 	now: number = Date.now(),
 ): Activity {
 	const declared = where.surface.capabilities[record.capability];
-	const undo = record.outcome === 'ok' && record.kind === 'write' ? undoCall(declared, record.input, record.output) : undefined;
+	const undo = record.outcome === 'ok' && record.kind === 'write' ? undoCall(declared, record.input, record.output, where.surface.capabilities) : undefined;
 	counter = (counter + 1) % 1_000_000;
 	return {
 		id: `${now.toString(36)}-${counter.toString(36)}-${Math.random().toString(36).slice(2, 8)}`,

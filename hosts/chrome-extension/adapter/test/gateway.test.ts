@@ -142,6 +142,28 @@ describe('the gateway', () => {
 		expect(served?.preview).toBeUndefined();
 	});
 
+	it('keeps a write that went through a success when reporting it fails', async () => {
+		const installed = await approved();
+		const call = gatewayCall(installed, surface, httpPerform(app.url, await session('ada')), {
+			onCall: () => {
+				throw new Error('the log is broken');
+			},
+		});
+		await expect(call('tasks.complete', { id: 't4' })).resolves.toMatchObject({ id: 't4', status: 'done' });
+		await expect(call('members.list', {})).rejects.toMatchObject({ code: 'graft_capability_not_in_build' });
+	});
+
+	it('offers no Undo for "Done" on a task that was done already: the app refuses the change', async () => {
+		const installed = await approved();
+		const calls: CallRecord[] = [];
+		const call = gatewayCall(installed, surface, httpPerform(app.url, await session('ada')), { onCall: (record) => calls.push(record) });
+		// t3 starts done.
+		await expect(call('tasks.complete', { id: 't3' })).rejects.toMatchObject({ code: 'host_error' });
+		const entry = activityFrom(calls.at(-1)!, { customization: installed.id, title: installed.title, source: { kind: 'view' }, surface, origin: app.url });
+		expect(entry).toMatchObject({ outcome: 'failed' });
+		expect(entry.undo).toBeUndefined();
+	});
+
 	it('reports answers that no longer match as drift', async () => {
 		const installed = await approved();
 		const url = `${app.url}/projects/launch`;

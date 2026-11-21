@@ -343,7 +343,12 @@ export async function startTasklet(options: TaskletOptions = {}): Promise<Taskle
 					if (!task) {
 						return json(res, 404, { error: 'no such task' });
 					}
-					task.status = complete[2] === 'complete' ? 'done' : 'open';
+					const status = complete[2] === 'complete' ? 'done' : 'open';
+					// A change to the status it already has is refused, so it never looks like something to undo.
+					if (task.status === status) {
+						return json(res, 409, { error: `the task is ${status} already` });
+					}
+					task.status = status;
 					return json(res, 200, taskJson(task));
 				}
 				return json(res, 404, { error: 'not found' });

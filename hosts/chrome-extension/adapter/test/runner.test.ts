@@ -184,6 +184,18 @@ describe('stopping a run while it goes on', () => {
 	}
 });
 
+describe('dry runs in safe mode', () => {
+	it('lets a dry run read in safe mode, and stops a real run', async () => {
+		const installed = await approved();
+		const data: Record<string, unknown> = { safeMode: true, customizations: { 'stale-tabs': installed } };
+		const peek = async <V>(key: string, fallback: V): Promise<V> => (key in data ? (data[key] as V) : fallback);
+		expect(await stopReason(peek, installed, 'close-stale', 'dry-run')).toBeUndefined();
+		expect(await stopReason(peek, installed, 'close-stale', 'manual')).toBe('Safe mode is on: nothing is shown or run.');
+		data.customizations = { 'stale-tabs': { ...installed, grant: null } };
+		expect(await stopReason(peek, installed, 'close-stale', 'dry-run')).toBe('Its approval was revoked.');
+	});
+});
+
 describe('pausing and resuming', () => {
 	it('applies to what a run saved after the pause or resume was asked for and before it was saved', async () => {
 		const installed = await approved();

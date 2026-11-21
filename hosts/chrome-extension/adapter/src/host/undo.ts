@@ -1,4 +1,4 @@
-import type { Capability } from '@swissspidy/graft-core';
+import { compileSchema, type Capability } from '@swissspidy/graft-core';
 
 /**
  * Undo in the browser host. A write capability can say how to put back
@@ -39,7 +39,8 @@ export function undoOf(capability: Capability | undefined): Undo | undefined {
 }
 
 function pointer(value: unknown, path: string): unknown {
-	if (path === '' || path === '/') {
+	// RFC 6901: "" is the whole document; "/" is the member named "".
+	if (path === '') {
 		return value;
 	}
 	return path
@@ -51,10 +52,12 @@ function pointer(value: unknown, path: string): unknown {
 
 /**
  * The reverse of a write that went through, from its input and its
- * (projected) answer; undefined when the capability has no undo or a field
- * the reverse needs is missing.
+ * (projected) answer; undefined when the capability has no undo, a field
+ * the reverse needs is missing, or (given the surface's capabilities) the
+ * reverse would refuse the input, such as a closed `chrome://` page that
+ * `tabs.open` does not open.
  */
-export function undoCall(capability: Capability | undefined, input: unknown, output: unknown): UndoCall | undefined {
+export function undoCall(capability: Capability | undefined, input: unknown, output: unknown, capabilities?: Record<string, Capability>): UndoCall | undefined {
 	const undo = undoOf(capability);
 	if (!undo) {
 		return undefined;
@@ -66,6 +69,10 @@ export function undoCall(capability: Capability | undefined, input: unknown, out
 			return undefined;
 		}
 		fields[name] = value;
+	}
+	const reverse = capabilities?.[undo.capability];
+	if (capabilities && (!reverse || !compileSchema(reverse.input as object)(fields))) {
+		return undefined;
 	}
 	return { capability: undo.capability, input: fields };
 }

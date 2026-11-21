@@ -176,10 +176,11 @@ interface Preview {
 }
 
 /** The customizations the person asked to preview, and that are still being previewed. */
-async function activePreviews(now: number = Date.now()): Promise<Set<string>> {
+async function activePreviews(now: number = Date.now()): Promise<Map<string, Preview>> {
 	const previews = await read<Record<string, Preview>>('previews', {});
 	const customizations = await stored();
-	return new Set(Object.entries(previews).filter(([id, p]) => p.until > now && customizations[id]?.specHash === p.specHash && !customizations[id]?.grant).map(([id]) => id));
+	// One read, kept with its entries: eligibility and the expiry shown come from the same snapshot.
+	return new Map(Object.entries(previews).filter(([id, p]) => p.until > now && customizations[id]?.specHash === p.specHash && !customizations[id]?.grant));
 }
 
 const titleOf = (m: Mount) => `${(m.installed.build.mount.title as string | undefined) ?? m.installed.title}${m.preview ? ' (preview)' : ''}`;
@@ -192,7 +193,7 @@ async function pageFor(url: string): Promise<{ surface: Surface; mounts: Mount[]
 	if (await safeMode()) {
 		return { surface, mounts: [] };
 	}
-	return { surface, mounts: await mountsFor(Object.values(await stored()), surface, url, await activePreviews()) };
+	return { surface, mounts: await mountsFor(Object.values(await stored()), surface, url, new Set((await activePreviews()).keys())) };
 }
 
 /** An app page's context for one customization: calls to the page's origin, recorded as the person's. */
@@ -439,7 +440,6 @@ async function listed(now: number = Date.now()): Promise<Listed[]> {
 	const customizations = await stored();
 	const states = await triggerStates();
 	const safe = await safeMode();
-	const previews = await read<Record<string, Preview>>('previews', {});
 	const previewing = await activePreviews(now);
 	const result: Listed[] = [];
 	for (const installed of Object.values(customizations)) {
@@ -451,13 +451,16 @@ async function listed(now: number = Date.now()): Promise<Listed[]> {
 		for (const id of Object.keys(installed.build.triggers ?? {})) {
 			const described = describeTrigger(installed, surface, id);
 			const state = stateFor(installed, id, states);
-			const why = surface ? ((await unrunnable(installed, surface, id)) ?? (safe ? SAFE_MODE_REASON : undefined)) : blocked;
+			const unrun = surface ? await unrunnable(installed, surface, id) : blocked;
+			// Safe mode stops runs, not dry runs: the options page keeps Dry run when safe mode is all that blocks it.
+			const why = unrun ?? (safe ? SAFE_MODE_REASON : undefined);
 			const schedule = installed.build.triggers?.[id]?.schedule;
 			const next = state.nextRun ?? (schedule && installed.approvedAt ? nextRun(schedule, Date.parse(installed.approvedAt), false) : undefined);
 			triggers.push({
 				id,
 				...described,
 				...(why ? { blocked: why } : {}),
+				...(!unrun && safe ? { safeMode: true } : {}),
 				...(state.paused ? { paused: state.paused.reason } : {}),
 				...(state.lastRun ? { lastRun: new Date(state.lastRun).toISOString() } : {}),
 				...(next && !why && !state.paused ? { nextRun: new Date(next).toISOString() } : {}),
@@ -480,7 +483,7 @@ async function listed(now: number = Date.now()): Promise<Listed[]> {
 						preview: {
 							reads: previewGrant(installed, surface!).map((scope) => surface!.scopes[scope]?.title ?? scope),
 							minutes: PREVIEW_MINUTES,
-							...(previewing.has(installed.id) ? { until: new Date(previews[installed.id]!.until).toISOString() } : {}),
+							...(previewing.has(installed.id) ? { until: new Date(previewing.get(installed.id)!.until).toISOString() } : {}),
 						},
 					}
 				: {}),

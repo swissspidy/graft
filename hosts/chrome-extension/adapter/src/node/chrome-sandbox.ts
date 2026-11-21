@@ -85,9 +85,10 @@ export class FakeTabs implements Tabs {
 	}
 
 	async focus(id: number): Promise<Tab> {
-		const tab = this.tabs.find((t) => t.id === id)!;
-		this.tabs = this.tabs.map((t) => ({ ...t, active: t.id === id }));
-		return { ...tab, active: true, lastAccessed: Date.now() };
+		// The tab brought to the front is the one used now; the others keep when they were last used.
+		const now = Date.now();
+		this.tabs = this.tabs.map((t) => (t.id === id ? { ...t, active: true, lastAccessed: now } : { ...t, active: false }));
+		return { ...this.tabs.find((t) => t.id === id)! };
 	}
 }
 

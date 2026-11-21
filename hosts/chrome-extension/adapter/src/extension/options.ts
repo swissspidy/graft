@@ -85,10 +85,13 @@ function drawTrigger(item: Listed, trigger: ListedTrigger, index: number): HTMLL
 			? `Paused: ${trigger.paused}`
 			: `Running${trigger.nextRun ? `; next run ${time(trigger.nextRun)}` : ''}${trigger.lastRun ? `; last run ${time(trigger.lastRun)}` : ''}.`;
 	li.append(el('p', state, 'status trigger-state'));
+	const op = (name: 'pause' | 'resume' | 'run' | 'dry-run') => () => send({ type: 'trigger', id: item.id, trigger: trigger.id, op: name });
+	const key = (name: string) => `${item.id}/${trigger.id}/${name}`;
+	const options = { secondary: true, describedBy: what.id };
+	if (trigger.safeMode) {
+		li.append(button('Dry run', key('dry-run'), op('dry-run'), options));
+	}
 	if (!trigger.blocked) {
-		const op = (name: 'pause' | 'resume' | 'run' | 'dry-run') => () => send({ type: 'trigger', id: item.id, trigger: trigger.id, op: name });
-		const key = (name: string) => `${item.id}/${trigger.id}/${name}`;
-		const options = { secondary: true, describedBy: what.id };
 		li.append(
 			trigger.paused ? button('Resume', key('pause'), op('resume'), options) : button('Pause', key('pause'), op('pause'), options),
 			button('Dry run', key('dry-run'), op('dry-run'), options),
@@ -133,16 +136,14 @@ function drawSafeMode(on: boolean): void {
 	root.replaceChildren(text, button(on ? 'Turn off safe mode' : 'Turn on safe mode', 'safe-mode', () => send({ type: 'safe-mode', on: !on }), { secondary: !on, describedBy: text.id }));
 }
 
-async function drawCustomizations(): Promise<void> {
+function drawCustomizations(loaded: Listed[] | Error): void {
 	const root = document.getElementById('customizations')!;
-	let list: Listed[];
-	try {
-		list = await send<Listed[]>({ type: 'list' });
-	} catch (error) {
-		root.replaceChildren(el('p', `Could not load the customizations: ${(error as Error).message}`, 'error'));
+	if (loaded instanceof Error) {
+		root.replaceChildren(el('p', `Could not load the customizations: ${loaded.message}`, 'error'));
 		root.firstElementChild!.setAttribute('role', 'alert');
 		return;
 	}
+	const list = loaded;
 	root.replaceChildren();
 	if (list.length === 0) {
 		root.append(el('p', 'No customizations.'));
@@ -191,16 +192,14 @@ async function drawCustomizations(): Promise<void> {
 	});
 }
 
-async function drawActivity(): Promise<void> {
+function drawActivity(loaded: ActivityReply | Error): void {
 	const root = document.getElementById('activity')!;
-	let reply: ActivityReply;
-	try {
-		reply = await send<ActivityReply>({ type: 'activity' });
-	} catch (error) {
-		root.replaceChildren(el('p', `Could not load the activity: ${(error as Error).message}`, 'error'));
+	if (loaded instanceof Error) {
+		root.replaceChildren(el('p', `Could not load the activity: ${loaded.message}`, 'error'));
 		root.firstElementChild!.setAttribute('role', 'alert');
 		return;
 	}
+	const reply = loaded;
 	const { activity, runs, paused } = reply;
 	drawSafeMode(reply.safeMode);
 	root.replaceChildren();
@@ -248,15 +247,20 @@ async function drawActivity(): Promise<void> {
  * moved meanwhile); `fallback` is the button that was pressed, focused again
  * only if focus fell to the page itself.
  */
+const load = <T>(message: OptionsMessage): Promise<T | Error> => send<T>(message).catch((error: unknown) => (error instanceof Error ? error : new Error(String(error))));
+
 async function draw(fallback?: string): Promise<void> {
-	const active = () => document.activeElement;
-	const before = active();
-	const wanted = before instanceof HTMLButtonElement && before.dataset.key ? before.dataset.key : undefined;
-	await Promise.all([drawCustomizations(), drawActivity()]);
-	const now = active();
-	const key = wanted ?? (now === null || now === document.body ? fallback : undefined);
-	if (key && (now === null || now === document.body || !now.isConnected)) {
-		[...document.querySelectorAll<HTMLButtonElement>('button[data-key]')].find((b) => b.dataset.key === key)?.focus();
+	const [list, activity] = await Promise.all([load<Listed[]>({ type: 'list' }), load<ActivityReply>({ type: 'activity' })]);
+	// Read focus just before the controls are replaced, not before the replies were asked for: the person may have
+	// moved it meanwhile. It stays on whichever button has it now; the pressed one gets it back only if focus is on
+	// the page itself.
+	const active = document.activeElement;
+	const wanted = active instanceof HTMLButtonElement && active.dataset.key ? active.dataset.key : active === null || active === document.body ? fallback : undefined;
+	drawCustomizations(list);
+	drawActivity(activity);
+	const now = document.activeElement;
+	if (wanted && (now === null || now === document.body || !now.isConnected)) {
+		[...document.querySelectorAll<HTMLButtonElement>('button[data-key]')].find((b) => b.dataset.key === wanted)?.focus();
 	}
 }
 

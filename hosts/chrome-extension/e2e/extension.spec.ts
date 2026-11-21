@@ -233,6 +233,10 @@ test('safe mode stops every customization at once, and the options page still wo
 	await expect(section.getByText('Approved, but not shown: Safe mode is on: nothing is shown or run.')).toBeVisible();
 	const trigger = options.locator('li[data-trigger="close-stale"]');
 	await expect(trigger.locator('.trigger-state')).toHaveText('Not running: Safe mode is on: nothing is shown or run.');
+	// Safe mode stops runs, not dry runs.
+	await expect(trigger.getByRole('button', { name: 'Run now' })).toHaveCount(0);
+	await trigger.getByRole('button', { name: 'Dry run' }).click();
+	await expect(options.locator('.runs li').first()).toContainText('Dry run: would act on 0 of 0.');
 
 	const page = await signIn('ada');
 	await page.waitForTimeout(1_000);
