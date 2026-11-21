@@ -415,7 +415,10 @@ async function undoOnce(id: string): Promise<Activity> {
 	const installed = { id: entry!.customization, title: entry!.title } as Installed;
 	// Marked before the reverse runs: if saving its outcome fails afterwards, the entry is not offered again.
 	const started = new Date().toISOString();
-	await update<Activity[]>('activity', [], (current) => current.map((e) => (e.id === id ? { ...e, undo: { ...reverse, started } } : e)));
+	// The mark is saved with the input shortened: if the worker stops before the outcome is saved, the entry cannot be
+	// undone again and needs no full address. The full input stays in memory for the call, and is saved back only
+	// after a refusal that changed nothing.
+	await update<Activity[]>('activity', [], (current) => current.map((e) => (e.id === id ? { ...e, undo: { ...reverse, input: shownInput(reverse.input), started } } : e)));
 	let error: string | undefined;
 	let changed = true;
 	try {
