@@ -13,7 +13,7 @@
     "./standard": "./src/plugin/standard.ts"
   },
   "dependencies": {
-    "@anthropic-ai/sdk": "^1.4.0",
+    "@anthropic-ai/sdk": "^1.11.0",
     "@swissspidy/graft-a2ui": "workspace:*",
     "@swissspidy/graft-core": "workspace:*"
   },
@@ -21,8 +21,8 @@
     "emdash": "^1.0.1"
   },
   "devDependencies": {
-    "@emdash-cms/auth": "1.4.0",
-    "emdash": "1.4.0",
+    "@emdash-cms/auth": "1.5.0",
+    "emdash": "1.5.0",
     "esbuild": "^0.28.2"
   }
 }
